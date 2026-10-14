@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- The Campfire: a fire in the fog, lit red from below by The Entity. -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="78%" r="75%">
+      <stop offset="0" stop-color="#4a0b10"/>
+      <stop offset="0.45" stop-color="#1a0a0c"/>
+      <stop offset="1" stop-color="#07080a"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ff8a2a" stop-opacity="0.75"/>
+      <stop offset="0.5" stop-color="#e0301e" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#e0301e" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="flameOuter" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#d0141d"/>
+      <stop offset="0.55" stop-color="#ff4d1f"/>
+      <stop offset="1" stop-color="#ff9a3c"/>
+    </linearGradient>
+    <linearGradient id="flameInner" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ffb347"/>
+      <stop offset="1" stop-color="#fff1b8"/>
+    </linearGradient>
+    <linearGradient id="log" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a3a26"/>
+      <stop offset="1" stop-color="#2a1a12"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- fog bands -->
+  <g fill="#9fb2c8" opacity="0.10">
+    <ellipse cx="150" cy="150" rx="170" ry="34"/>
+    <ellipse cx="380" cy="200" rx="160" ry="28"/>
+  </g>
+
+  <!-- fire glow -->
+  <circle cx="256" cy="330" r="190" fill="url(#glow)"/>
+
+  <!-- flame -->
+  <path fill="url(#flameOuter)" d="M256 92
+    C268 150 330 178 330 250
+    C330 268 324 282 316 292
+    C318 262 304 244 292 236
+    C296 268 280 300 256 322
+    C232 300 214 276 220 236
+    C206 248 192 268 196 296
+    C186 282 182 266 182 250
+    C182 196 236 170 256 92 Z"/>
+  <path fill="url(#flameInner)" d="M258 196
+    C266 232 296 246 292 282
+    C290 300 276 314 258 322
+    C240 314 224 300 224 282
+    C224 252 252 238 258 196 Z"/>
+
+  <!-- crossed logs -->
+  <g stroke="#120a07" stroke-width="6">
+    <rect x="140" y="318" width="232" height="44" rx="22" fill="url(#log)" transform="rotate(14 256 340)"/>
+    <rect x="140" y="318" width="232" height="44" rx="22" fill="url(#log)" transform="rotate(-14 256 340)"/>
+  </g>
+  <g fill="#c98a52" opacity="0.8">
+    <ellipse cx="146" cy="310" rx="12" ry="18" transform="rotate(-14 146 310)"/>
+    <ellipse cx="366" cy="310" rx="12" ry="18" transform="rotate(14 366 310)"/>
+  </g>
+
+  <!-- embers -->
+  <g fill="#ffb347">
+    <circle cx="200" cy="140" r="5" opacity="0.8"/>
+    <circle cx="320" cy="118" r="4" opacity="0.7"/>
+    <circle cx="350" cy="168" r="3" opacity="0.6"/>
+    <circle cx="170" cy="200" r="3" opacity="0.5"/>
+  </g>
+
+  <!-- ground fog over the base -->
+  <ellipse cx="256" cy="420" rx="230" ry="46" fill="#9fb2c8" opacity="0.12"/>
+</svg>

@@ -94,8 +94,27 @@ MAPS = {
     "map_forsakenboneyard.webp": "forsaken-boneyard",
     "map_witheredisle.webp": "withered-isle",
 }
+# Each map image starts with a band showing the sacrifice and generator tracks. The app
+# doesn't use them, so they are cropped off. Values are where the board area begins, in a
+# 2000px-wide preview of the image. The removed fraction goes to src/data/mapCrops.json so
+# the start-room boxes in src/data/maps.ts can be shifted to match.
+MAP_CROP_TOP = {
+    "autohaven": 250,
+    "macmillan": 250,
+    "ormond": 266,
+    "crotus-prenn": 250,
+    "forsaken-boneyard": 229,
+    "withered-isle": 229,
+}
+map_crops = {}
 for name, mid in MAPS.items():
-    put(find(src / "maps", name), f"maps/{mid}.webp")
+    target = out / "maps" / f"{mid}.webp"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with Image.open(find(src / "maps", name)) as im:
+        top = round(MAP_CROP_TOP[mid] * im.width / 2000)
+        im.crop((0, top, im.width, im.height)).save(target, "WEBP", quality=90)
+        map_crops[mid] = top / im.height
+(data / "mapCrops.json").write_text(json.dumps(map_crops, indent=2) + "\n", encoding="utf-8")
 
 movement = {}
 for name in ["Sneak", "Sprint", "Crouch", "Vault", "Wait", "One", "Two", "Three", "Four", "Five", "Skull"]:
@@ -122,6 +141,49 @@ def crop_die(path: Path, prefix: str) -> list[str]:
 components["dangerDieFaces"] = crop_die(find(src / "dice_face/dangerdie", "dieCrit.webp"), "danger")
 components["skillDieFaces"] = crop_die(find(src / "dice_face/skillcheck", "dieSkill.webp"), "skill")
 
+# --- perk cards: the three perks sit at the same place on every board of a kind
+# (survivor boards are 2400x1615, killer boards 2400x1833). Boxes are in board pixels.
+PERK_BOXES = {
+    "survivors": [(642, 672, 1182, 1452), (1224, 672, 1770, 1452), (1806, 672, 2358, 1452)],
+    "killers": [(634, 966, 1182, 1746), (1222, 966, 1770, 1746), (1806, 966, 2354, 1746)],
+}
+
+
+# Killer POWER and PASSIVE panels (with their headings). A few passives are longer and
+# their panel starts higher on the board.
+POWER_BOX = (630, 640, 1498, 962)
+PASSIVE_BOX = (1500, 640, 2360, 962)
+PASSIVE_TOP = {"knight": 400, "singularity": 540, "skullmerchant": 540}
+
+
+def crop_killer_panels(board: Path, lang: str, cid: str, has_passive: bool) -> dict:
+    boxes = {"power": POWER_BOX}
+    if has_passive:
+        x1, y1, x2, y2 = PASSIVE_BOX
+        boxes["passive"] = (x1, PASSIVE_TOP.get(cid, y1), x2, y2)
+    paths = {}
+    with Image.open(board) as im:
+        for name, box in boxes.items():
+            dest = f"killers/{name}-{lang}/{cid}.webp"
+            target = out / dest
+            target.parent.mkdir(parents=True, exist_ok=True)
+            im.crop(box).save(target, "WEBP", quality=88)
+            paths[name] = f"assets/{dest}"
+    return paths
+
+
+def crop_perks(board: Path, folder: str, lang: str, cid: str) -> list[str]:
+    paths = []
+    with Image.open(board) as im:
+        for n, box in enumerate(PERK_BOXES[folder], start=1):
+            dest = f"{folder}/perks-{lang}/{cid}-{n}.webp"
+            target = out / dest
+            target.parent.mkdir(parents=True, exist_ok=True)
+            im.crop(box).save(target, "WEBP", quality=88)
+            paths.append(f"assets/{dest}")
+    return paths
+
+
 # --- characters & items: map via JSON "source" fields
 def remap(kind: str, entries: list, folder: str) -> None:
     for e in entries:
@@ -131,6 +193,15 @@ def remap(kind: str, entries: list, folder: str) -> None:
             if s.get(key):
                 img[key] = put(src / s[key], f"{folder}/{dest}/{e['id']}.webp")
         e["images"] = img
+        for key, lang in (("boardTh", "th"), ("boardEn", "en")):
+            if s.get(key):
+                for perk, path in zip(e["perks"], crop_perks(src / s[key], folder, lang, e["id"])):
+                    perk.setdefault("image", {})[lang] = path
+                if folder == "killers":
+                    panels = crop_killer_panels(src / s[key], lang, e["id"], bool(e.get("passive")))
+                    e["power"].setdefault("image", {})[lang] = panels["power"]
+                    if "passive" in panels:
+                        e.setdefault("passiveImage", {})[lang] = panels["passive"]
         for t in e.get("tokens", []):
             slug = re.sub(r"[^a-z0-9]+", "-", t["name"].lower()).strip("-")
             t["image"] = put(src / t.pop("source"), f"{folder}/tokens/{e['id']}-{slug}.webp")

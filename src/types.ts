@@ -6,6 +6,8 @@ export interface Perk {
   cost: number
   flavor: Bilingual
   text: Bilingual
+  /** The perk card cut from the character board, per language. */
+  image?: Partial<Record<Lang, string>>
 }
 
 export interface CharacterImages {
@@ -40,8 +42,11 @@ export interface Killer {
   bloodpoints: { start: number; max: number }
   description: Bilingual
   extraAction: { cost: number; text: Bilingual } | null
-  power: { name: string; text: Bilingual }
+  /** `image` is the POWER panel cut from the board, per language. */
+  power: { name: string; text: Bilingual; image?: Partial<Record<Lang, string>> }
   passive: Bilingual | null
+  /** The PASSIVE panel cut from the board, per language (absent when there is no passive). */
+  passiveImage?: Partial<Record<Lang, string>>
   perks: Perk[]
   tokens: KillerToken[]
   images: CharacterImages

@@ -30,6 +30,10 @@
         "text": {
           "en": "At the start of any Survivor turn, reveal one of the Killer's set movement cards.",
           "th": "เมื่อเริ่มเทิร์นของผู้รอดชีวิตคนใดก็ได้, ให้เปิดการ์ดเคลื่อนที่ที่วางไว้ของฆาตกรหนึ่งใบ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/ace-1.webp",
+          "en": "assets/survivors/perks-en/ace-1.webp"
         }
       },
       {
@@ -42,6 +46,10 @@
         "text": {
           "en": "Before you interact, swap a prop in your space with another from the same category in a connected space. Generators with progress, occupied lockers, and occupied hooks can't be swapped.",
           "th": "ก่อน Interact, ให้สลับ prop ในห้องของคุณ กับ prop อื่นที่มีสีเดียวกัน จากห้องที่เชื่อมกัน, ไม่สามารถสลับ เครื่องปั่นไฟ ที่มีความคืบหน้า, ตู้หลบที่มีคนอยู่ และ ตะขอแขวน ที่มีคนอยู่ได้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/ace-2.webp",
+          "en": "assets/survivors/perks-en/ace-2.webp"
         }
       },
       {
@@ -54,6 +62,10 @@
         "text": {
           "en": "At the end of your turn, take a Survivor bonus turn. The Killer gains 2 {BP}.",
           "th": "เมื่อจบเทิร์นของคุณ, ให้เล่น Survivor bonus turn, ฆาตกรได้รับ 2 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/ace-3.webp",
+          "en": "assets/survivors/perks-en/ace-3.webp"
         }
       }
     ],
@@ -94,6 +106,10 @@
         "text": {
           "en": "As an interaction, interact with the Killer to move them along any path. The Killer gains a {BP}.",
           "th": "Perk นี้เป็นการ Interact, ให้ Interact กับฆาตกร, เพื่อให้เขาเคลื่อนที่ไปตามเส้นทางใดก็ได้, ฆาตกรได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/adam-1.webp",
+          "en": "assets/survivors/perks-en/adam-1.webp"
         }
       },
       {
@@ -106,6 +122,10 @@
         "text": {
           "en": "When you or another Survivor in your space or a connected space rolls a success, change the result to a great success instead.",
           "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ ผล สำเร็จ, ให้เปลี่ยนเป็น ผล สำเร็จอย่างยิ่ง แทน"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/adam-2.webp",
+          "en": "assets/survivors/perks-en/adam-2.webp"
         }
       },
       {
@@ -118,6 +138,10 @@
         "text": {
           "en": "After you sabotage an occupied hook or the hook you are on is sabotaged by another Survivor, either you or the other Survivor becomes healthy (your choice).",
           "th": "หลังจากคุณ ทำลาย ตะขอแขวน ที่มีคนอยู่ หรือ ตะขอแขวน ที่คุณอยู่ถูกผู้รอดชีวิตคนอื่น ทำลาย, ให้คุณ หรือ ผู้รอดชีวิตอีกคนกลับมาไม่บาดเจ็บ (คุณเป็นผู้เลือก)"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/adam-3.webp",
+          "en": "assets/survivors/perks-en/adam-3.webp"
         }
       }
     ],
@@ -158,6 +182,10 @@
         "text": {
           "en": "Before or after moving during your turn, roll the danger die. On a success, another Survivor in your space becomes healthy. You can still interact this turn.",
           "th": "ก่อน หรือ หลังเคลื่อนที่ในเทิร์นของคุณ, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ผู้รอดชีวิตอีกคนในห้องของคุณจะกลับมาไม่บาดเจ็บ, คุณยัง Interact ได้ในเทิร์นนี้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/claudette-1.webp",
+          "en": "assets/survivors/perks-en/claudette-1.webp"
         }
       },
       {
@@ -170,6 +198,10 @@
         "text": {
           "en": "At the start of your turn, you may take a {BP} from a willing Survivor, OR; you may give a {BP} to a willing Survivor.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, คุณอาจรับ 1 {BP} จากผู้รอดชีวิตที่เต็มใจ หรือ ให้ 1 {BP} แก่ผู้รอดชีวิตที่เต็มใจ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/claudette-2.webp",
+          "en": "assets/survivors/perks-en/claudette-2.webp"
         }
       },
       {
@@ -182,6 +214,10 @@
         "text": {
           "en": "At the start of your turn, roll the danger die. On a success, you become healthy.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, คุณจะกลับมาไม่บาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/claudette-3.webp",
+          "en": "assets/survivors/perks-en/claudette-3.webp"
         }
       }
     ],
@@ -222,6 +258,10 @@
         "text": {
           "en": "When the Killer interacts with a healthy Survivor in your space, roll the danger die. On a success, that Survivor remains healthy and the Killer gains a {BP}.",
           "th": "เมื่อฆาตกร Interact กับผู้รอดชีวิตที่ไม่บาดเจ็บในห้องของคุณ, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ผู้รอดชีวิตคนนั้นยังคงไม่บาดเจ็บ และ ฆาตกรได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/david-1.webp",
+          "en": "assets/survivors/perks-en/david-1.webp"
         }
       },
       {
@@ -234,6 +274,10 @@
         "text": {
           "en": "When another Survivor in your space would be sacrificed, roll the danger die. On a success, that Survivor moves along any path instead of being sacrificed.",
           "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณจะถูกสังเวย, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ผู้รอดชีวิตคนนั้นเคลื่อนที่ไปตามเส้นทางใดก็ได้แทนที่จะถูกสังเวย"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/david-2.webp",
+          "en": "assets/survivors/perks-en/david-2.webp"
         }
       },
       {
@@ -246,6 +290,10 @@
         "text": {
           "en": "When the Killer would leave your space, prevent that move. The Killer can still interact in your space.",
           "th": "เมื่อฆาตกรจะออกจากห้องของคุณ, ให้ห้ามการเคลื่อนที่นั้น, ฆาตกรยัง Interact ในห้องของคุณได้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/david-3.webp",
+          "en": "assets/survivors/perks-en/david-3.webp"
         }
       }
     ],
@@ -286,6 +334,10 @@
         "text": {
           "en": "When you would interact, another Survivor in your space or a connected space interacts instead.",
           "th": "เมื่อคุณจะ Interact, ให้ผู้รอดชีวิตคนอื่นในห้องของคุณ หรือ ห้องที่เชื่อมกัน Interact แทน"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/dwight-1.webp",
+          "en": "assets/survivors/perks-en/dwight-1.webp"
         }
       },
       {
@@ -298,6 +350,10 @@
         "text": {
           "en": "When another Survivor in your space moves, move with them, OR; when you move, another Survivor in your space moves with you.",
           "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณเคลื่อนที่, ให้เคลื่อนที่ไปกับเขา, หรือ เมื่อคุณเคลื่อนที่, ผู้รอดชีวิตคนอื่นในห้องของคุณเคลื่อนที่ไปกับคุณ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/dwight-2.webp",
+          "en": "assets/survivors/perks-en/dwight-2.webp"
         }
       },
       {
@@ -310,6 +366,10 @@
         "text": {
           "en": "When another survivor in your space or a connected space would perform a skill check, roll two skill check dice and keep either result instead.",
           "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณ หรือ ห้องที่เชื่อมกัน ต้องทำ Skill Check, ให้ทอยเต๋า Skill Check สองลูก และเลือกผลใดผลหนึ่งแทน"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/dwight-3.webp",
+          "en": "assets/survivors/perks-en/dwight-3.webp"
         }
       }
     ],
@@ -350,6 +410,10 @@
         "text": {
           "en": "As an interaction, interact with the Killer to reveal their first set movement card. They cannot interact after moving with their first card. The Killer gains 2 {BP}.",
           "th": "Perk นี้เป็นการ Interact, ให้ Interact กับฆาตกร, เพื่อเปิดการ์ดเคลื่อนที่ใบแรกที่เขาวางไว้, ฆาตกรจะ Interact ไม่ได้หลังจากเคลื่อนที่ด้วยการ์ดใบแรกของเขา, ฆาตกรได้รับ 2 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/elodie-1.webp",
+          "en": "assets/survivors/perks-en/elodie-1.webp"
         }
       },
       {
@@ -362,6 +426,10 @@
         "text": {
           "en": "When another Survivor would discard an item, you gain it instead. If you have more than one item, discard until you only have one.",
           "th": "เมื่อผู้รอดชีวิตคนอื่นจะทิ้ง item, ให้คุณรับ item นั้นแทน, ถ้าคุณมี item มากกว่าหนึ่งชิ้น, ให้ทิ้งจนเหลือหนึ่งชิ้น"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/elodie-2.webp",
+          "en": "assets/survivors/perks-en/elodie-2.webp"
         }
       },
       {
@@ -374,6 +442,10 @@
         "text": {
           "en": "When you would move during your turn, remain in your space instead. You cannot interact this turn. Gain a {BP}.",
           "th": "เมื่อคุณจะเคลื่อนที่ในเทิร์นของคุณ, ให้อยู่ในห้องของคุณแทน, คุณ Interact ไม่ได้ในเทิร์นนี้, ได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/elodie-3.webp",
+          "en": "assets/survivors/perks-en/elodie-3.webp"
         }
       }
     ],
@@ -414,6 +486,10 @@
         "text": {
           "en": "After performing your first interaction, interact again. The second interaction must target a survival prop.",
           "th": "หลังจากทำ Interaction ครั้งแรก, ให้ Interact อีกครั้ง, Interaction ครั้งที่สองต้องเป็นกับ prop สีน้ำเงิน"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/felix-1.webp",
+          "en": "assets/survivors/perks-en/felix-1.webp"
         }
       },
       {
@@ -426,6 +502,10 @@
         "text": {
           "en": "When you would reveal a prop, reveal any prop in a connected space instead.",
           "th": "เมื่อคุณจะเปิด prop, ให้เปิด prop ใดก็ได้ในห้องที่เชื่อมกันแทน"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/felix-2.webp",
+          "en": "assets/survivors/perks-en/felix-2.webp"
         }
       },
       {
@@ -438,6 +518,10 @@
         "text": {
           "en": "When you would discard an item after using it, keep it instead. You cannot use it again during this turn.",
           "th": "เมื่อคุณจะทิ้ง item หลังใช้, ให้เก็บไว้แทน, คุณใช้มันอีกครั้งในเทิร์นนี้ไม่ได้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/felix-3.webp",
+          "en": "assets/survivors/perks-en/felix-3.webp"
         }
       }
     ],
@@ -478,6 +562,10 @@
         "text": {
           "en": "When you move over a pallet or out of a space with a pallet during your turn, move again along any other path before interacting (if you would interact).",
           "th": "เมื่อคุณเคลื่อนที่ผ่าน แผ่นพาเลท หรือ ออกจากห้องที่มี แผ่นพาเลท ในเทิร์นของคุณ, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact (ถ้าคุณจะ Interact)"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/feng-1.webp",
+          "en": "assets/survivors/perks-en/feng-1.webp"
         }
       },
       {
@@ -490,6 +578,10 @@
         "text": {
           "en": "When the Killer breaks a pallet, moves through a breakable wall, or damages a generator, move along any path.",
           "th": "เมื่อฆาตกรทำลาย แผ่นพาเลท, เคลื่อนที่ผ่านกำแพงทำลายได้, หรือ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/feng-2.webp",
+          "en": "assets/survivors/perks-en/feng-2.webp"
         }
       },
       {
@@ -502,6 +594,10 @@
         "text": {
           "en": "When you roll a failure while interacting with a generator, interact again. The second interaction must target a different prop or Survivor.",
           "th": "เมื่อคุณทอยได้ ผล ล้มเหลว ขณะ Interact กับ เครื่องปั่นไฟ, ให้ Interact อีกครั้ง, การ Interact ครั้งที่สองต้องเป็นกับ prop หรือผู้รอดชีวิตคนละอย่าง"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/feng-3.webp",
+          "en": "assets/survivors/perks-en/feng-3.webp"
         }
       }
     ],
@@ -542,6 +638,10 @@
         "text": {
           "en": "At the start of your turn, discard your item to add a progress to a generator in your space.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ทิ้ง item ของคุณ, เพื่อเพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ ในห้องของคุณ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/gabriel-1.webp",
+          "en": "assets/survivors/perks-en/gabriel-1.webp"
         }
       },
       {
@@ -554,6 +654,10 @@
         "text": {
           "en": "After moving, move again along any other path, as long as the space you move into has a generator.",
           "th": "หลังจากเคลื่อนที่, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ ตราบใดที่ห้องที่คุณเข้าไปมี เครื่องปั่นไฟ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/gabriel-2.webp",
+          "en": "assets/survivors/perks-en/gabriel-2.webp"
         }
       },
       {
@@ -566,6 +670,10 @@
         "text": {
           "en": "When the killer would pick you up (before rolling dice), add a sacrifice progress to the sacrifice track instead. You are not picked up.",
           "th": "เมื่อฆาตกรจะ pick up คุณ (ก่อนทอยเต๋า), ให้เพิ่ม sacrifice progress ลงในแทร็ก sacrifice แทน, คุณจะไม่ถูก pick up"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/gabriel-3.webp",
+          "en": "assets/survivors/perks-en/gabriel-3.webp"
         }
       }
     ],
@@ -606,6 +714,10 @@
         "text": {
           "en": "When you enter the Killer's space, gain 1 {BP}.",
           "th": "เมื่อคุณเข้าไปในห้องของฆาตกร, ให้ได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/haddie-1.webp",
+          "en": "assets/survivors/perks-en/haddie-1.webp"
         }
       },
       {
@@ -618,6 +730,10 @@
         "text": {
           "en": "When the Killer would interact in your space, discard an item to prevent that interaction.",
           "th": "เมื่อฆาตกรจะ Interact ในห้องของคุณ, ให้ทิ้ง item, เพื่อป้องกัน Interaction นั้น"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/haddie-2.webp",
+          "en": "assets/survivors/perks-en/haddie-2.webp"
         }
       },
       {
@@ -630,6 +746,10 @@
         "text": {
           "en": "When you would move with your card, instead roll two Skill Check dice and choose one. Move directly to the corresponding starting space on the board. (You then interact as normal).",
           "th": "เมื่อคุณจะเคลื่อนที่ด้วยการ์ดของคุณ, ให้ทอยเต๋า Skill Check สองลูกแทน และ เลือกหนึ่งผล, แล้วเคลื่อนที่ตรงไปยังห้องเริ่มต้นที่ตรงกันบนกระดาน (จากนั้น Interact ตามปกติ)"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/haddie-3.webp",
+          "en": "assets/survivors/perks-en/haddie-3.webp"
         }
       }
     ],
@@ -670,6 +790,10 @@
         "text": {
           "en": "When you or another Survivor in your space or a connected space rolls a failure, treat it as a success instead. The Killer still gains {BP}, however.",
           "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ ผล ล้มเหลว, ให้ถือว่าเป็น ผล สำเร็จ แทน, แต่ฆาตกรยังได้รับ {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jake-1.webp",
+          "en": "assets/survivors/perks-en/jake-1.webp"
         }
       },
       {
@@ -682,6 +806,10 @@
         "text": {
           "en": "As an interaction, move a crow in your space to any space on the game board.",
           "th": "Perk นี้เป็นการ Interact, ให้ย้าย อีกา ในห้องของคุณไปยังห้องใดก็ได้บนกระดานเกม"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jake-2.webp",
+          "en": "assets/survivors/perks-en/jake-2.webp"
         }
       },
       {
@@ -694,6 +822,10 @@
         "text": {
           "en": "After you sabotage a hook, either gain a {BP}, or spend 2 {BP} to take a Survivor bonus turn.",
           "th": "หลังจากคุณ ทำลาย ตะขอแขวน, ให้รับ 1 {BP} หรือ จ่าย 2 {BP}, เพื่อเล่น Survivor bonus turn"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jake-3.webp",
+          "en": "assets/survivors/perks-en/jake-3.webp"
         }
       }
     ],
@@ -734,6 +866,10 @@
         "text": {
           "en": "When a Survivor rolls a great success during a skill check on a Survivor turn, that Survivor takes a Survivor bonus turn.",
           "th": "เมื่อผู้รอดชีวิตทอยได้ ผล สำเร็จอย่างยิ่ง จาก Skill Check ในเทิร์นของผู้รอดชีวิต, ผู้รอดชีวิตคนนั้นเล่น Survivor bonus turn"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jane-1.webp",
+          "en": "assets/survivors/perks-en/jane-1.webp"
         }
       },
       {
@@ -746,6 +882,10 @@
         "text": {
           "en": "As an interaction, you may interact with another Survivor in a connected space to use the \"heal\" interaction on them.",
           "th": "Perk นี้เป็นการ Interact, คุณอาจ Interact กับผู้รอดชีวิตอีกคนในห้องที่เชื่อมกัน, เพื่อใช้ Interaction \"heal\" กับเขา"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jane-2.webp",
+          "en": "assets/survivors/perks-en/jane-2.webp"
         }
       },
       {
@@ -758,6 +898,10 @@
         "text": {
           "en": "After the Killer enters your space, remove a locker in your space to prevent the Killer from interacting this turn.",
           "th": "หลังจากฆาตกรเข้ามาในห้องของคุณ, ให้เก็บ ตู้หลบ ในห้องของคุณออก, เพื่อป้องกันไม่ให้ฆาตกร Interact ในเทิร์นนี้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jane-3.webp",
+          "en": "assets/survivors/perks-en/jane-3.webp"
         }
       }
     ],
@@ -798,6 +942,10 @@
         "text": {
           "en": "After you sabotage an occupied hook or the hook you are on is sabotaged by another Survivor, roll the danger die. On a success, the Killer loses a sacrifice progress.",
           "th": "หลังจากคุณ ทำลาย ตะขอแขวน ที่มีคนอยู่ หรือ ตะขอแขวน ที่คุณอยู่ถูกผู้รอดชีวิตคนอื่น ทำลาย, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ฆาตกรเสีย sacrifice progress 1 แต้ม"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jeff-1.webp",
+          "en": "assets/survivors/perks-en/jeff-1.webp"
         }
       },
       {
@@ -810,6 +958,10 @@
         "text": {
           "en": "After you or another Survivor becomes healthy, sabotage an unoccupied hook anywhere on the game board.",
           "th": "หลังจากคุณ หรือ ผู้รอดชีวิตคนอื่นกลับมาไม่บาดเจ็บ, ให้ ทำลาย ตะขอแขวน ที่ว่างอยู่ที่ใดก็ได้บนกระดานเกม"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jeff-2.webp",
+          "en": "assets/survivors/perks-en/jeff-2.webp"
         }
       },
       {
@@ -822,6 +974,10 @@
         "text": {
           "en": "After you move into the Killer's space during your turn, move again along any other path before interacting.",
           "th": "หลังจากคุณเคลื่อนที่เข้าไปในห้องของฆาตกรในเทิร์นของคุณ, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jeff-3.webp",
+          "en": "assets/survivors/perks-en/jeff-3.webp"
         }
       }
     ],
@@ -862,6 +1018,10 @@
         "text": {
           "en": "After you successfully cleanse a Hex Totem, instead of gaining {BP}, a sacrificed Survivor moves along any path. They are no longer sacrificed. (This does not count as sabotaging the hook.)",
           "th": "หลังจากคุณ ชำระล้าง โทเท็มคำสาป สำเร็จ, แทนที่จะได้รับ {BP}, ให้ผู้รอดชีวิตที่ถูกสังเวยหนึ่งคนเคลื่อนที่ไปตามเส้นทางใดก็ได้, เขาจะไม่ถูกสังเวยอีกต่อไป (ไม่นับว่าเป็นการ ทำลาย ตะขอแขวน)"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jonah-1.webp",
+          "en": "assets/survivors/perks-en/jonah-1.webp"
         }
       },
       {
@@ -874,6 +1034,10 @@
         "text": {
           "en": "At the end of your turn, if you are wounded, gain 1 {BP}.",
           "th": "เมื่อจบเทิร์นของคุณ, ถ้าคุณบาดเจ็บ, ให้ได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jonah-2.webp",
+          "en": "assets/survivors/perks-en/jonah-2.webp"
         }
       },
       {
@@ -886,6 +1050,10 @@
         "text": {
           "en": "When you or another survivor in your space or a connected space rolls a \"4\", treat it as a great success instead.",
           "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ \"4\", ให้ถือเป็น ผล สำเร็จอย่างยิ่ง แทน"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/jonah-3.webp",
+          "en": "assets/survivors/perks-en/jonah-3.webp"
         }
       }
     ],
@@ -926,6 +1094,10 @@
         "text": {
           "en": "You may interact with a survival or altruism prop in a connected space. If that prop was a locker, move into that space.",
           "th": "คุณอาจ Interact กับ prop สีน้ำเงิน หรือ สีเขียว ในห้องที่เชื่อมกัน, ถ้า prop นั้นคือ ตู้หลบ, ให้เคลื่อนที่เข้าไปในห้องนั้น"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/kate-1.webp",
+          "en": "assets/survivors/perks-en/kate-1.webp"
         }
       },
       {
@@ -938,6 +1110,10 @@
         "text": {
           "en": "When you or another Survivor in your space is picked up, after the Killer decides how many dice to roll, the Survivor who was picked up may roll 4 skill check dice instead of the number the Killer chose.",
           "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่นในห้องของคุณถูก pick up, หลังจากฆาตกรตัดสินใจว่าจะให้ทอยเต๋ากี่ลูก, ผู้รอดชีวิตที่ถูก pick up อาจทอยเต๋า Skill Check 4 ลูกแทนจำนวนที่ฆาตกรเลือก"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/kate-2.webp",
+          "en": "assets/survivors/perks-en/kate-2.webp"
         }
       },
       {
@@ -950,6 +1126,10 @@
         "text": {
           "en": "After you move, if you occupied a locker at the start of the turn, move again along any other path before interacting.",
           "th": "หลังจากคุณเคลื่อนที่, ถ้าคุณอยู่บน ตู้หลบ เมื่อเริ่มเทิร์น, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/kate-3.webp",
+          "en": "assets/survivors/perks-en/kate-3.webp"
         }
       }
     ],
@@ -990,6 +1170,10 @@
         "text": {
           "en": "After you move with your movement card, move again along any other path.",
           "th": "หลังจากคุณเคลื่อนที่ด้วยการ์ดเคลื่อนที่, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/meg-1.webp",
+          "en": "assets/survivors/perks-en/meg-1.webp"
         }
       },
       {
@@ -1002,6 +1186,10 @@
         "text": {
           "en": "At the start of cleanup, if a generator was completed this round, take a Survivor bonus turn.",
           "th": "เมื่อเริ่มเฟส Cleanup, ถ้ามี เครื่องปั่นไฟ ถูกซ่อมเสร็จในรอบนี้, ให้เล่น Survivor bonus turn"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/meg-2.webp",
+          "en": "assets/survivors/perks-en/meg-2.webp"
         }
       },
       {
@@ -1014,6 +1202,10 @@
         "text": {
           "en": "When the Killer enters your space (before they interact), interact with a locker in your space.",
           "th": "เมื่อฆาตกรเข้ามาในห้องของคุณ (ก่อนที่เขาจะ Interact), ให้ Interact กับ ตู้หลบ ในห้องของคุณ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/meg-3.webp",
+          "en": "assets/survivors/perks-en/meg-3.webp"
         }
       }
     ],
@@ -1054,6 +1246,10 @@
         "text": {
           "en": "After you successfully cleanse a Hex Totem, instead of gaining {BP}, a Survivor becomes healthy.",
           "th": "หลังจากคุณ ชำระล้าง โทเท็มคำสาป สำเร็จ, แทนที่จะได้รับ {BP}, ให้ผู้รอดชีวิตหนึ่งคนกลับมาไม่บาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/mikaela-1.webp",
+          "en": "assets/survivors/perks-en/mikaela-1.webp"
         }
       },
       {
@@ -1066,6 +1262,10 @@
         "text": {
           "en": "After moving along a path, place the Entity on that path. Players cannot move along that path.",
           "th": "หลังจากเคลื่อนที่ตามเส้นทางหนึ่ง, ให้วาง The Entity บนเส้นทางนั้น, ผู้เล่นเคลื่อนที่ตามเส้นทางนั้นไม่ได้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/mikaela-2.webp",
+          "en": "assets/survivors/perks-en/mikaela-2.webp"
         }
       },
       {
@@ -1078,6 +1278,10 @@
         "text": {
           "en": "At the start of the planning phase, reveal a prop anywhere on the game board.",
           "th": "เมื่อเริ่มเฟส Planning, ให้เปิด prop ที่ใดก็ได้บนกระดานเกม"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/mikaela-3.webp",
+          "en": "assets/survivors/perks-en/mikaela-3.webp"
         }
       }
     ],
@@ -1118,6 +1322,10 @@
         "text": {
           "en": "Instead of interacting during your turn, move along any path, including against a one-way path, then gain a {BP}.",
           "th": "แทนที่จะ Interact ในเทิร์นของคุณ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้ รวมถึงย้อนเส้นทางทางเดียว, จากนั้นรับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/nea-1.webp",
+          "en": "assets/survivors/perks-en/nea-1.webp"
         }
       },
       {
@@ -1130,6 +1338,10 @@
         "text": {
           "en": "At the start of any Survivor turn, remove a breakable wall from play. Return it to play in the same path at the end of that Survivor turn.",
           "th": "เมื่อเริ่มเทิร์นของผู้รอดชีวิตคนใดก็ได้, ให้เก็บกำแพงทำลายได้หนึ่งอันออกจากเกม, แล้ววางกลับในเส้นทางเดิม เมื่อจบเทิร์นของผู้รอดชีวิตนั้น"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/nea-2.webp",
+          "en": "assets/survivors/perks-en/nea-2.webp"
         }
       },
       {
@@ -1142,6 +1354,10 @@
         "text": {
           "en": "After you interact with a chest, the chest is not removed.",
           "th": "หลังจากคุณ Interact กับ กล่องไอเทม, กล่องไอเทม จะไม่ถูกเก็บออก"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/nea-3.webp",
+          "en": "assets/survivors/perks-en/nea-3.webp"
         }
       }
     ],
@@ -1182,6 +1398,10 @@
         "text": {
           "en": "When another Survivor would interact in your space, they may interact with you instead. If they do, you move along any path, then that Survivor moves along any path.",
           "th": "เมื่อผู้รอดชีวิตคนอื่นจะ Interact ในห้องของคุณ, เขาอาจ Interact กับคุณแทนได้, ถ้าทำเช่นนั้น, คุณเคลื่อนที่ไปตามเส้นทางใดก็ได้, แล้วผู้รอดชีวิตคนนั้นเคลื่อนที่ไปตามเส้นทางใดก็ได้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/renato-1.webp",
+          "en": "assets/survivors/perks-en/renato-1.webp"
         }
       },
       {
@@ -1194,6 +1414,10 @@
         "text": {
           "en": "At the end of your turn, if there is a sacrificed Survivor, take a Survivor bonus turn.",
           "th": "เมื่อจบเทิร์นของคุณ, ถ้ามีผู้รอดชีวิตที่ถูกสังเวยอยู่, ให้เล่น Survivor bonus turn"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/renato-2.webp",
+          "en": "assets/survivors/perks-en/renato-2.webp"
         }
       },
       {
@@ -1206,6 +1430,10 @@
         "text": {
           "en": "At the end of your turn, if there is no sacrifice progress on your board, take a Survivor bonus turn. Add a sacrifice progress to your board.",
           "th": "เมื่อจบเทิร์นของคุณ, ถ้าไม่มี sacrifice progress บนบอร์ดของคุณ, ให้เล่น Survivor bonus turn, และเพิ่ม sacrifice progress ลงบนบอร์ดของคุณ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/renato-3.webp",
+          "en": "assets/survivors/perks-en/renato-3.webp"
         }
       }
     ],
@@ -1246,6 +1474,10 @@
         "text": {
           "en": "As an interaction, each Survivor gains a {BP}. then the Killer gains a sacrifice progress.",
           "th": "Perk นี้เป็นการ Interact, ผู้รอดชีวิตทุกคนได้รับ 1 {BP}, จากนั้น ฆาตกรได้รับ sacrifice progress 1 แต้ม"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/sable-1.webp",
+          "en": "assets/survivors/perks-en/sable-1.webp"
         }
       },
       {
@@ -1258,6 +1490,10 @@
         "text": {
           "en": "At the start of your turn, choose a wounded Survivor without a sacrifice progress on their board. Add a sacrifice progress to their board and they become healthy.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, ให้เลือกผู้รอดชีวิตที่บาดเจ็บ และไม่มี sacrifice progress บนบอร์ดของเขา, เพิ่ม sacrifice progress 1 แต้มลงบนบอร์ดของเขา, แล้วเขาจะกลับมาไม่บาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/sable-2.webp",
+          "en": "assets/survivors/perks-en/sable-2.webp"
         }
       },
       {
@@ -1270,6 +1506,10 @@
         "text": {
           "en": "As an interaction, all Survivors in your space may collectively pay 6 {BP}. If they do, add up to 3 progress to any face-up generator and the Killer gains a sacrifice progress.",
           "th": "Perk นี้เป็นการ Interact, ผู้รอดชีวิตทุกคนในห้องของคุณอาจร่วมกันจ่าย 6 {BP}, หากทำเช่นนั้น, ให้เพิ่มความคืบหน้าสูงสุด 3 แต้ม ให้ เครื่องปั่นไฟ ที่หงายหน้าเครื่องใดก็ได้, และฆาตกรได้รับ sacrifice progress 1 แต้ม"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/sable-3.webp",
+          "en": "assets/survivors/perks-en/sable-3.webp"
         }
       }
     ],
@@ -1310,6 +1550,10 @@
         "text": {
           "en": "When another Survivor would interact in your space, they may interact with you instead. If they do, the Killer gains a {BP} and that Survivor takes a Survivor bonus turn.",
           "th": "เมื่อผู้รอดชีวิตคนอื่นจะ Interact ในห้องของคุณ, เขาอาจ Interact กับคุณแทนได้, ถ้าทำเช่นนั้น, ฆาตกรได้รับ 1 {BP} และ ผู้รอดชีวิตคนนั้นเล่น Survivor bonus turn"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/thalita-1.webp",
+          "en": "assets/survivors/perks-en/thalita-1.webp"
         }
       },
       {
@@ -1322,6 +1566,10 @@
         "text": {
           "en": "After you interact with a generator, if another Survivor interacted with the same generator this round, add 1 progress to that generator.",
           "th": "หลังจากคุณ Interact กับ เครื่องปั่นไฟ, ถ้ามีผู้รอดชีวิตคนอื่น Interact กับ เครื่องปั่นไฟ เครื่องเดียวกันในรอบนี้, ให้เพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ นั้น"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/thalita-2.webp",
+          "en": "assets/survivors/perks-en/thalita-2.webp"
         }
       },
       {
@@ -1334,6 +1582,10 @@
         "text": {
           "en": "When you reveal 'Vault' (Yellow) as your set movement card, treat it as 'Sneak', 'Crouch', or 'Sprint' instead.",
           "th": "เมื่อคุณเปิด 'Vault' (สีเหลือง) เป็นการ์ดเคลื่อนที่ที่วางไว้, ให้ถือเป็น 'Sneak', 'Crouch' หรือ 'Sprint' แทน"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/thalita-3.webp",
+          "en": "assets/survivors/perks-en/thalita-3.webp"
         }
       }
     ],
@@ -1374,6 +1626,10 @@
         "text": {
           "en": "At the start of your turn. remove 1 progress from a generator in a connected space to add 1 progress to a generator in your space.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ลบความคืบหน้า 1 แต้มจาก เครื่องปั่นไฟ ในห้องที่เชื่อมกัน, เพื่อเพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ ในห้องของคุณ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/vittorio-1.webp",
+          "en": "assets/survivors/perks-en/vittorio-1.webp"
         }
       },
       {
@@ -1386,6 +1642,10 @@
         "text": {
           "en": "At the start of your turn, remove a breakable wall or pallet from a connected path. Place it on another connected path without any other component.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, ให้เก็บ กำแพงทำลายได้ หรือ แผ่นพาเลท ออกจากเส้นทางที่เชื่อมกัน, แล้ว วางลงบนเส้นทางที่เชื่อมกันอีกเส้นที่ไม่มีชิ้นส่วนอื่น"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/vittorio-2.webp",
+          "en": "assets/survivors/perks-en/vittorio-2.webp"
         }
       },
       {
@@ -1398,6 +1658,10 @@
         "text": {
           "en": "When you leave the Killer's space, the Killer moves with you.",
           "th": "เมื่อคุณออกจากห้องของฆาตกร, ฆาตกรจะเคลื่อนที่ไปพร้อมกับคุณ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/vittorio-3.webp",
+          "en": "assets/survivors/perks-en/vittorio-3.webp"
         }
       }
     ],
@@ -1438,6 +1702,10 @@
         "text": {
           "en": "At the start of your turn, move a wounded Survivor along any path.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ย้ายผู้รอดชีวิตที่บาดเจ็บหนึ่งคนไปตามเส้นทางใดก็ได้"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/yui-1.webp",
+          "en": "assets/survivors/perks-en/yui-1.webp"
         }
       },
       {
@@ -1450,6 +1718,10 @@
         "text": {
           "en": "After any Survivor rolls a great success, you become healthy.",
           "th": "หลังจากผู้รอดชีวิตคนใดก็ได้ทอยได้ ผล สำเร็จอย่างยิ่ง, คุณจะกลับมาไม่บาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/yui-2.webp",
+          "en": "assets/survivors/perks-en/yui-2.webp"
         }
       },
       {
@@ -1462,6 +1734,10 @@
         "text": {
           "en": "At the end of your turn, if you are healthy, become wounded to take a Survivor bonus turn.",
           "th": "เมื่อจบเทิร์นของคุณ, ถ้าคุณไม่บาดเจ็บ, ให้ยอมบาดเจ็บ, เพื่อเล่น Survivor bonus turn"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/yui-3.webp",
+          "en": "assets/survivors/perks-en/yui-3.webp"
         }
       }
     ],
@@ -1502,6 +1778,10 @@
         "text": {
           "en": "After the turn when another Survivor is wounded or sacrificed, interact with a generator in your space.",
           "th": "หลังเทิร์นที่ผู้รอดชีวิตคนอื่นบาดเจ็บ หรือ ถูกสังเวย, ให้ Interact กับ เครื่องปั่นไฟ ในห้องของคุณ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/yunjin-1.webp",
+          "en": "assets/survivors/perks-en/yunjin-1.webp"
         }
       },
       {
@@ -1514,6 +1794,10 @@
         "text": {
           "en": "When the Killer breaks a pallet, moves through a breakable wall, or damages a generator, gain a {BP}.",
           "th": "เมื่อฆาตกรทำลาย แผ่นพาเลท, เคลื่อนที่ผ่านกำแพงทำลายได้, หรือ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/yunjin-2.webp",
+          "en": "assets/survivors/perks-en/yunjin-2.webp"
         }
       },
       {
@@ -1526,6 +1810,10 @@
         "text": {
           "en": "After the turn when another Survivor is wounded or sacrificed, interact with a locker in your space.",
           "th": "หลังเทิร์นที่ผู้รอดชีวิตคนอื่นบาดเจ็บ หรือ ถูกสังเวย, ให้ Interact กับ ตู้หลบ ในห้องของคุณ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/yunjin-3.webp",
+          "en": "assets/survivors/perks-en/yunjin-3.webp"
         }
       }
     ],
@@ -1566,6 +1854,10 @@
         "text": {
           "en": "When the Killer would interact with you or another Survivor in your space, force them to interact with a generator in that space instead. If the generator had 2 progress, gain a {BP}.",
           "th": "เมื่อฆาตกรจะ Interact กับคุณ หรือ ผู้รอดชีวิตคนอื่นในห้องของคุณ, ให้บังคับเขา Interact กับ เครื่องปั่นไฟ ในห้องนั้นแทน, ถ้า เครื่องปั่นไฟ นั้นมีความคืบหน้า 2 แต้ม, ให้ได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/zarina-1.webp",
+          "en": "assets/survivors/perks-en/zarina-1.webp"
         }
       },
       {
@@ -1578,6 +1870,10 @@
         "text": {
           "en": "After you enter a space, if you are not wounded, become wounded to have another Survivor in your space become healthy or to add a progress to a generator (you can still interact this turn).",
           "th": "หลังจากคุณเข้าไปในห้อง, ถ้าคุณไม่บาดเจ็บ, ให้ยอมบาดเจ็บ, เพื่อให้ผู้รอดชีวิตอีกคนในห้องของคุณกลับมาไม่บาดเจ็บ หรือ เพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ (คุณยัง Interact ได้ในเทิร์นนี้)"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/zarina-2.webp",
+          "en": "assets/survivors/perks-en/zarina-2.webp"
         }
       },
       {
@@ -1590,6 +1886,10 @@
         "text": {
           "en": "When you or another Survivor in your space or a connected space rolls a failure, you gain a {BP} instead of the Killer.",
           "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ ผล ล้มเหลว, คุณได้รับ 1 {BP} แทนฆาตกร"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/zarina-3.webp",
+          "en": "assets/survivors/perks-en/zarina-3.webp"
         }
       }
     ],

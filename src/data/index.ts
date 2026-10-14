@@ -1,4 +1,4 @@
-import type { Item, Killer, Survivor } from '../types'
+import type { Item, Killer, Perk, Survivor } from '../types'
 import componentsJson from './components.json'
 import itemsJson from './items.json'
 import killersJson from './killers.json'
@@ -13,11 +13,52 @@ export const components = componentsJson
 export const survivorById = new Map(survivors.map((s) => [s.id, s]))
 export const killerById = new Map(killers.map((k) => [k.id, k]))
 
-export const maps = [
-  { id: 'macmillan', name: 'MacMillan Estate', image: 'assets/maps/macmillan.webp' },
-  { id: 'autohaven', name: 'Autohaven Wreckers', image: 'assets/maps/autohaven.webp' },
-  { id: 'ormond', name: 'Ormond', image: 'assets/maps/ormond.webp' },
-  { id: 'crotus-prenn', name: 'Crotus Prenn Asylum', image: 'assets/maps/crotus-prenn.webp' },
-  { id: 'forsaken-boneyard', name: 'Forsaken Boneyard', image: 'assets/maps/forsaken-boneyard.webp' },
-  { id: 'withered-isle', name: 'Withered Isle', image: 'assets/maps/withered-isle.webp' },
-]
+export { mapById, maps } from './maps'
+
+// ---------- perks for the Devout mode (rulebook p.19) ----------
+// Each board's first perk is the character's own (purple); perks 2–3 are shareable (green)
+// and make up the perk decks in the box (p.3: 28 survivor / 24 killer cards = 2 copies each).
+
+export type PerkKind = 'survivor' | 'killer'
+
+/** A perk identified by the board it comes from: "<kind>:<characterId>:<index 0–2>". */
+export type PerkRef = string
+
+export interface PerkOption {
+  ref: PerkRef
+  perk: Perk
+  ownerId: string
+  ownerName: string
+  shareable: boolean
+}
+
+const options = new Map<PerkRef, PerkOption>()
+for (const [kind, list] of [['survivor', survivors], ['killer', killers]] as const)
+  for (const c of list)
+    c.perks.forEach((perk, i) =>
+      options.set(`${kind}:${c.id}:${i}`, { ref: `${kind}:${c.id}:${i}`, perk, ownerId: c.id, ownerName: c.name, shareable: i > 0 }),
+    )
+
+export function perkOption(ref: PerkRef): PerkOption | undefined {
+  return options.get(ref)
+}
+
+/** The printed perks of a character, as refs. */
+export function printedPerks(kind: PerkKind, characterId: string): PerkRef[] {
+  return [0, 1, 2].map((i) => `${kind}:${characterId}:${i}`)
+}
+
+/** What a character may choose from in Devout: their own 3 perks, then every shareable perk of their side. */
+export function devoutPool(kind: PerkKind, characterId: string): PerkOption[] {
+  const own = printedPerks(kind, characterId).map((r) => options.get(r)!)
+  const others = [...options.values()].filter((o) => o.ref.startsWith(`${kind}:`) && o.shareable && o.ownerId !== characterId)
+  return [...own, ...others]
+}
+
+// The skill-check die texture is cropped into skill-1..6.webp in this face order (0 = skull).
+const SKILL_IMAGE_FACES = [2, 4, 5, 1, 3, 0]
+
+/** Image of a skill check die face 0–5. */
+export function skillFaceImage(face: number): string {
+  return components.skillDieFaces[SKILL_IMAGE_FACES.indexOf(face)]
+}

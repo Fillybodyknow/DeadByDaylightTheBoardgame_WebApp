@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { marked } from 'marked'
 import rulesMd from '../../docs/rules-th.md?raw'
+import { renderMd } from '../rulesDoc'
 
-// The rules doc is our own file, so rendering it as HTML is safe.
-const html = marked.parse(rulesMd, { async: false })
+const html = renderMd(rulesMd)
 </script>
 
 <template>
@@ -32,5 +31,8 @@ const html = marked.parse(rulesMd, { async: false })
   background: var(--bg-hover);
   padding: 0 0.3em;
   border-radius: 4px;
+}
+.rules :deep(pre) {
+  overflow-x: auto;
 }
 </style>

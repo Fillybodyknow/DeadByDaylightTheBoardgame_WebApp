@@ -24,6 +24,10 @@
       "text": {
         "en": "Place a Crow or Dire Crow from your board into any space. If there is a Crow or Dire Crow in your space, gain 1 {BP}.",
         "th": "วาง อีกา หรือ Dire Crow จากบอร์ดของคุณลงในห้องใดก็ได้, ถ้ามี อีกา หรือ Dire Crow อยู่ในห้องของคุณ, ให้ได้รับ 1 {BP}"
+      },
+      "image": {
+        "th": "assets/killers/power-th/artist.webp",
+        "en": "assets/killers/power-en/artist.webp"
       }
     },
     "passive": {
@@ -41,6 +45,10 @@
         "text": {
           "en": "After a Survivor sabotages an occupied hook, place a {BP} from the supply on the saboteur's board. When that Survivor is sacrificed, remove all {BP} on their board, Gain a sacrifice progress for each {BP} removed this way.",
           "th": "หลังจากผู้รอดชีวิตทำลาย ตะขอแขวน ที่มีคนถูกแขวนอยู่, ให้วาง {BP} จากคลังกลางลงบนบอร์ดของผู้ที่ทำลาย, เมื่อผู้รอดชีวิตคนนั้นถูกสังเวย, ให้เก็บ {BP} ทั้งหมดบนบอร์ดของเขาออก, และได้รับ sacrifice progress เท่ากับจำนวน {BP} ที่เก็บออก"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/artist-1.webp",
+          "en": "assets/killers/perks-en/artist-1.webp"
         }
       },
       {
@@ -53,6 +61,10 @@
         "text": {
           "en": "As an interaction, interact with an unoccupied hook. A Survivor in a connected space becomes wounded.",
           "th": "Perk นี้เป็นการ Interact, ให้ Interact กับ ตะขอแขวน ที่ว่างอยู่, ผู้รอดชีวิตหนึ่งคนในห้องที่เชื่อมกันจะบาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/artist-2.webp",
+          "en": "assets/killers/perks-en/artist-2.webp"
         }
       },
       {
@@ -65,6 +77,10 @@
         "text": {
           "en": "After a Survivor successfully cleanses a Hex Totem, you gain 2 {BP}.",
           "th": "หลังจากผู้รอดชีวิต ชำระล้าง โทเท็มคำสาป สำเร็จ, คุณได้รับ 2 {BP}"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/artist-3.webp",
+          "en": "assets/killers/perks-en/artist-3.webp"
         }
       }
     ],
@@ -79,6 +95,10 @@
       "boardEn": "assets/killers/board-en/artist.webp",
       "boardTh": "assets/killers/board-th/artist.webp",
       "mini": "assets/killers/mini/artist.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/artist.webp",
+      "en": "assets/killers/passive-en/artist.webp"
     }
   },
   {
@@ -106,6 +126,10 @@
       "text": {
         "en": "Shuffle your hand and discard a movement card at random, then move along that card's path. If you entered another space with this movement, you may then choose to interact in that space, or to repeat this effect. If you have no movement cards in hand, you cannot use this Killer power.",
         "th": "สับการ์ดในมือ และทิ้งการ์ดเคลื่อนที่หนึ่งใบแบบสุ่ม, แล้วเคลื่อนที่ไปตามเส้นทางของการ์ดนั้น, ถ้าคุณเข้าไปในอีกห้องด้วยการเคลื่อนที่นี้, คุณเลือก Interact ในห้องนั้น หรือทำเอฟเฟกต์นี้ซ้ำอีกครั้งก็ได้, ถ้าคุณไม่มีการ์ดเคลื่อนที่ในมือ, จะใช้พลังฆาตกรนี้ไม่ได้"
+      },
+      "image": {
+        "th": "assets/killers/power-th/blight.webp",
+        "en": "assets/killers/power-en/blight.webp"
       }
     },
     "passive": {
@@ -123,6 +147,10 @@
         "text": {
           "en": "At the start of cleanup, if all Survivors are wounded and no Survivors are sacrificed, gain a sacrifice progress.",
           "th": "เมื่อเริ่มเฟส Cleanup, ถ้าผู้รอดชีวิตทุกคนบาดเจ็บ และ ไม่มีผู้รอดชีวิตถูกสังเวย, ให้ได้รับ sacrifice progress"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/blight-1.webp",
+          "en": "assets/killers/perks-en/blight-1.webp"
         }
       },
       {
@@ -135,6 +163,10 @@
         "text": {
           "en": "When you damage a generator, discard up to 2 movement cards. Each Survivor in a space connected to that generator by either card's path either spends a {BP} or becomes wounded.",
           "th": "เมื่อคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ทิ้งการ์ดเคลื่อนที่ได้สูงสุด 2 ใบ, ผู้รอดชีวิตแต่ละคนในห้องที่เชื่อมกับ เครื่องปั่นไฟ นั้นด้วยเส้นทางของการ์ดใบใดใบหนึ่ง ต้องจ่าย 1 {BP} หรือบาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/blight-2.webp",
+          "en": "assets/killers/perks-en/blight-2.webp"
         }
       },
       {
@@ -147,6 +179,10 @@
         "text": {
           "en": "As an interaction, discard a movement card except 'Wait' to interact with a prop in a space connected by that card's path.",
           "th": "Perk นี้เป็นการ Interact, ให้ทิ้งการ์ดเคลื่อนที่ใบใดก็ได้ ยกเว้น 'Wait', เพื่อ Interact กับ prop ในห้องที่เชื่อมกัน ด้วยเส้นทางของการ์ดนั้น"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/blight-3.webp",
+          "en": "assets/killers/perks-en/blight-3.webp"
         }
       }
     ],
@@ -155,6 +191,10 @@
       "boardEn": "assets/killers/board-en/blight.webp",
       "boardTh": "assets/killers/board-th/blight.webp",
       "mini": "assets/killers/mini/blight.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/blight.webp",
+      "en": "assets/killers/passive-en/blight.webp"
     }
   },
   {
@@ -182,6 +222,10 @@
       "text": {
         "en": "Place your Afterpiece Tonic or Afterpiece Antidote in your space or a connected space. You may remove an existing Afterpiece Tonic or Afterpiece Antidote to place a new one.",
         "th": "วาง Afterpiece Tonic หรือ Afterpiece Antidote ของคุณในห้องของคุณ หรือ ห้องที่เชื่อมกัน, คุณอาจเก็บ Afterpiece Tonic หรือ Afterpiece Antidote ที่วางไว้แล้วออก, เพื่อวางอันใหม่ได้"
+      },
+      "image": {
+        "th": "assets/killers/power-th/clown.webp",
+        "en": "assets/killers/power-en/clown.webp"
       }
     },
     "passive": {
@@ -199,6 +243,10 @@
         "text": {
           "en": "When a Survivor would move into your space, prevent that move. The Survivor cannot interact during this turn.",
           "th": "เมื่อผู้รอดชีวิตจะเคลื่อนที่เข้ามาในห้องของคุณ, ให้ห้ามการเคลื่อนที่นั้น, ผู้รอดชีวิตจะ Interact ไม่ได้ในเทิร์นนี้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/clown-1.webp",
+          "en": "assets/killers/perks-en/clown-1.webp"
         }
       },
       {
@@ -211,6 +259,10 @@
         "text": {
           "en": "At the start of the planning phase, place the Entity on a path. Players treat it as a breakable wall (you may pass through it freely).",
           "th": "เมื่อเริ่มเฟส Planning, ให้วาง The Entity บนเส้นทางหนึ่ง, ผู้เล่นทุกคนถือว่าเป็นกำแพงทำลายได้ (คุณเดินผ่านได้อย่างอิสระ)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/clown-2.webp",
+          "en": "assets/killers/perks-en/clown-2.webp"
         }
       },
       {
@@ -223,6 +275,10 @@
         "text": {
           "en": "After wounding or sacrificing a Survivor, remove a crow, an unoccupied locker, or a chest in a connected space.",
           "th": "หลังจากทำให้ผู้รอดชีวิตบาดเจ็บ หรือ สังเวยผู้รอดชีวิต, ให้เก็บ อีกา, ตู้หลบ ที่ว่าง หรือ กล่องไอเทม ในห้องที่เชื่อมกันออกหนึ่งอย่าง"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/clown-3.webp",
+          "en": "assets/killers/perks-en/clown-3.webp"
         }
       }
     ],
@@ -242,6 +298,10 @@
       "boardEn": "assets/killers/board-en/clown.webp",
       "boardTh": "assets/killers/board-th/clown.webp",
       "mini": "assets/killers/mini/clown.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/clown.webp",
+      "en": "assets/killers/passive-en/clown.webp"
     }
   },
   {
@@ -269,6 +329,10 @@
       "text": {
         "en": "Choose a wounded Survivor in a connected space without a pallet or breakable wall on its path. Secretly discard a movement card. The chosen Survivor guesses that movement card, then you reveal it. If they guessed incorrectly, they move into your space and you pick them up.",
         "th": "เลือกผู้รอดชีวิตที่บาดเจ็บในห้องที่เชื่อมกัน, โดยบนเส้นทางนั้นไม่มี แผ่นพาเลท หรือ กำแพงทำลายได้, ทิ้งการ์ดเคลื่อนที่หนึ่งใบแบบลับ ๆ, ผู้รอดชีวิตที่ถูกเลือกทายการ์ดเคลื่อนที่ใบนั้น, แล้วคุณเปิดเผยการ์ด, ถ้าเขาทายผิด, เขาจะเคลื่อนที่เข้ามาในห้องของคุณ และคุณ pick up เขา"
+      },
+      "image": {
+        "th": "assets/killers/power-th/deathslinger.webp",
+        "en": "assets/killers/power-en/deathslinger.webp"
       }
     },
     "passive": null,
@@ -283,6 +347,10 @@
         "text": {
           "en": "After you damage a generator, interact again in your space.",
           "th": "หลังจากคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ Interact อีกครั้งในห้องของคุณ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/deathslinger-1.webp",
+          "en": "assets/killers/perks-en/deathslinger-1.webp"
         }
       },
       {
@@ -295,6 +363,10 @@
         "text": {
           "en": "When a Survivor attempts to cleanse a Hex Totem, they roll the danger die instead. On a success, you gain 2 {BP}.",
           "th": "เมื่อผู้รอดชีวิตพยายาม ชำระล้าง โทเท็มคำสาป, เขาต้องทอย Danger Die แทน, หากได้ ผล สำเร็จ, คุณได้รับ 2 {BP}"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/deathslinger-2.webp",
+          "en": "assets/killers/perks-en/deathslinger-2.webp"
         }
       },
       {
@@ -307,6 +379,10 @@
         "text": {
           "en": "After you sacrifice a Survivor, a generator or exit gate of your choice loses a progress.",
           "th": "หลังจากคุณสังเวยผู้รอดชีวิต, เครื่องปั่นไฟ หรือ ประตูทางออก ที่คุณเลือกจะเสียความคืบหน้า 1 แต้ม"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/deathslinger-3.webp",
+          "en": "assets/killers/perks-en/deathslinger-3.webp"
         }
       }
     ],
@@ -342,6 +418,10 @@
       "text": {
         "en": "Choose your space or a connected space. Each Survivor in that space without Madness either spends a {BP} or gains Madness. Survivors who already have Madness either spend a {BP} or become wounded.",
         "th": "เลือกห้องของคุณหรือห้องที่เชื่อมกัน, ผู้รอดชีวิตทุกคนในห้องนั้นที่ไม่มี Madness ต้องจ่าย 1 {BP} หรือรับ Madness, ส่วนผู้รอดชีวิตที่มี Madness อยู่แล้ว ต้องจ่าย 1 {BP} หรือบาดเจ็บ"
+      },
+      "image": {
+        "th": "assets/killers/power-th/doctor.webp",
+        "en": "assets/killers/power-en/doctor.webp"
       }
     },
     "passive": {
@@ -359,6 +439,10 @@
         "text": {
           "en": "At the end of cleanup, if there are no sacrificed Survivors, gain a {BP}.",
           "th": "เมื่อจบเฟส Cleanup, ถ้าไม่มีผู้รอดชีวิตที่ถูกสังเวยอยู่, ให้ได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/doctor-1.webp",
+          "en": "assets/killers/perks-en/doctor-1.webp"
         }
       },
       {
@@ -371,6 +455,10 @@
         "text": {
           "en": "After you damage a generator, a Survivor in your space or a connected space becomes wounded.",
           "th": "หลังจากคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ผู้รอดชีวิตหนึ่งคนในห้องของคุณหรือห้องที่เชื่อมกันจะบาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/doctor-2.webp",
+          "en": "assets/killers/perks-en/doctor-2.webp"
         }
       },
       {
@@ -383,6 +471,10 @@
         "text": {
           "en": "When a Survivor in your space or a connected space uses an item, they roll the danger die. On a failure, the item is discarded with no effect.",
           "th": "เมื่อผู้รอดชีวิตในห้องของคุณหรือห้องที่เชื่อมกันใช้ item, เขาต้องทอย Danger Die, หากได้ ผล ล้มเหลว, item จะถูกทิ้งโดยไม่เกิดผล"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/doctor-3.webp",
+          "en": "assets/killers/perks-en/doctor-3.webp"
         }
       }
     ],
@@ -397,6 +489,10 @@
       "boardEn": "assets/killers/board-en/doctor.webp",
       "boardTh": "assets/killers/board-th/doctor.webp",
       "mini": "assets/killers/mini/doctor.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/doctor.webp",
+      "en": "assets/killers/passive-en/doctor.webp"
     }
   },
   {
@@ -424,6 +520,10 @@
       "text": {
         "en": "Choose a survivor in your space or a connected space and look at their hand. Choose and discard a movement card from their hand to move them along that card's path. If they move into your space, you may interact with them.",
         "th": "เลือกผู้รอดชีวิตในห้องของคุณหรือห้องที่เชื่อมกัน แล้วดูการ์ดในมือของเขา, เลือกและทิ้งการ์ดเคลื่อนที่หนึ่งใบจากมือเขา, เพื่อให้เขาเคลื่อนที่ตามเส้นทางของการ์ดนั้น, ถ้าเขาเคลื่อนที่เข้ามาในห้องของคุณ, คุณ Interact กับเขาได้"
+      },
+      "image": {
+        "th": "assets/killers/power-th/dredge.webp",
+        "en": "assets/killers/power-en/dredge.webp"
       }
     },
     "passive": {
@@ -441,6 +541,10 @@
         "text": {
           "en": "When you enter a space with an unoccupied locker, do not reveal a prop. Instead, flip that locker face -down to move again along any path before interacting (if you would interact)",
           "th": "เมื่อคุณเข้าไปในห้องที่มี ตู้หลบ ว่าง, ไม่ต้องเปิด prop, แต่ให้พลิก ตู้หลบ นั้นคว่ำหน้า, เพื่อเคลื่อนที่อีกครั้งตามเส้นทางใดก็ได้ ก่อน Interact (ถ้าคุณจะ Interact)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/dredge-1.webp",
+          "en": "assets/killers/perks-en/dredge-1.webp"
         }
       },
       {
@@ -453,6 +557,10 @@
         "text": {
           "en": "At the start of the planning phase, place a {BP} on a path without any other component. Survivors that move along that path become wounded. Remove that {BP} from the board at the end of cleanup.",
           "th": "เมื่อเริ่มเฟส Planning, ให้วาง {BP} หนึ่งอันบนเส้นทางที่ไม่มีชิ้นส่วนอื่น, ผู้รอดชีวิตที่เคลื่อนที่ผ่านเส้นทางนั้นจะบาดเจ็บ, เมื่อจบเฟส Cleanup, ให้เก็บ {BP} นั้นออกจากกระดาน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/dredge-2.webp",
+          "en": "assets/killers/perks-en/dredge-2.webp"
         }
       },
       {
@@ -465,6 +573,10 @@
         "text": {
           "en": "After a Survivor reveals a non-objective prop in your space or a connected space, remove that prop from the game board.",
           "th": "หลังจากผู้รอดชีวิตเปิด prop ที่ไม่ใช่สีเหลืองในห้องของคุณหรือห้องที่เชื่อมกัน, ให้เก็บ prop นั้นออกจากกระดาน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/dredge-3.webp",
+          "en": "assets/killers/perks-en/dredge-3.webp"
         }
       }
     ],
@@ -473,6 +585,10 @@
       "boardEn": "assets/killers/board-en/dredge.webp",
       "boardTh": "assets/killers/board-th/dredge.webp",
       "mini": "assets/killers/mini/dredge.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/dredge.webp",
+      "en": "assets/killers/passive-en/dredge.webp"
     }
   },
   {
@@ -500,6 +616,10 @@
       "text": {
         "en": "Place a Phantasm Trap in your space. If there is a Hex Totem in your space, gain a {BP}. No more than one Phantasm Trap may be in each space.",
         "th": "วาง Phantasm Trap ในห้องของคุณ, ถ้ามี โทเท็มคำสาป อยู่ในห้องของคุณ, ให้ได้รับ 1 {BP}, ห้องหนึ่งมี Phantasm Trap ได้ไม่เกินหนึ่งอัน"
+      },
+      "image": {
+        "th": "assets/killers/power-th/hag.webp",
+        "en": "assets/killers/power-en/hag.webp"
       }
     },
     "passive": {
@@ -517,6 +637,10 @@
         "text": {
           "en": "At the start of the planning phase, discard a movement card. During this turn, copies of that movement card used by Survivors do not move them. (If they do not move, they cannot interact.)",
           "th": "เมื่อเริ่มเฟส Planning, ให้ทิ้งการ์ดเคลื่อนที่หนึ่งใบ, ในเทิร์นนี้ ถ้าผู้รอดชีวิตใช้การ์ดเคลื่อนที่ที่เหมือนกับใบนั้น, เขาจะไม่เคลื่อนที่ (ถ้าไม่เคลื่อนที่, ก็ Interact ไม่ได้)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/hag-1.webp",
+          "en": "assets/killers/perks-en/hag-1.webp"
         }
       },
       {
@@ -529,6 +653,10 @@
         "text": {
           "en": "At the start of cleanup, if a generator was completed this round, take a Killer bonus turn. (You can only take one Killer bonus turn per round.)",
           "th": "เมื่อเริ่มเฟส Cleanup, ถ้ามี เครื่องปั่นไฟ ถูกซ่อมเสร็จในรอบนี้, ให้เล่น Killer bonus turn (เล่น Killer bonus turn ได้เพียงหนึ่งครั้งต่อรอบ)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/hag-2.webp",
+          "en": "assets/killers/perks-en/hag-2.webp"
         }
       },
       {
@@ -541,6 +669,10 @@
         "text": {
           "en": "At the start of the planning phase, remove a progress from a generator, as long as there are no Survivors in that generator's space.",
           "th": "เมื่อเริ่มเฟส Planning, ให้ลบความคืบหน้า 1 แต้มจาก เครื่องปั่นไฟ หนึ่งเครื่อง ตราบใดที่ไม่มีผู้รอดชีวิตอยู่ในห้องของ เครื่องปั่นไฟ นั้น"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/hag-3.webp",
+          "en": "assets/killers/perks-en/hag-3.webp"
         }
       }
     ],
@@ -555,6 +687,10 @@
       "boardEn": "assets/killers/board-en/hag.webp",
       "boardTh": "assets/killers/board-th/hag.webp",
       "mini": "assets/killers/mini/hag.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/hag.webp",
+      "en": "assets/killers/passive-en/hag.webp"
     }
   },
   {
@@ -582,6 +718,10 @@
       "text": {
         "en": "Discard a movement card except \"Wait\" to move along that card's path. When using this power, you cannot move along paths with pallets, breakable walls, or any other component. A Survivor in the space you entered becomes wounded.",
         "th": "ทิ้งการ์ดเคลื่อนที่ใบใดก็ได้ ยกเว้น \"Wait\", เพื่อเคลื่อนที่ไปตามเส้นทางของการ์ดนั้น, ขณะใช้พลังนี้ คุณเคลื่อนที่ผ่านเส้นทางที่มี แผ่นพาเลท, กำแพงทำลายได้ หรือชิ้นส่วนอื่นไม่ได้, ผู้รอดชีวิตในห้องที่คุณเข้าไปจะบาดเจ็บ"
+      },
+      "image": {
+        "th": "assets/killers/power-th/hillbilly.webp",
+        "en": "assets/killers/power-en/hillbilly.webp"
       }
     },
     "passive": null,
@@ -596,6 +736,10 @@
         "text": {
           "en": "At the end of the planning phase, reveal one of your set movement cards and gain a {BP}.",
           "th": "เมื่อจบเฟส Planning, ให้เปิดการ์ดเคลื่อนที่ที่วางไว้ของคุณหนึ่งใบ และ ได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/hillbilly-1.webp",
+          "en": "assets/killers/perks-en/hillbilly-1.webp"
         }
       },
       {
@@ -608,6 +752,10 @@
         "text": {
           "en": "When you would move along a path with a pallet, destroy the pallet and complete your turn as normal. You can still interact this turn.",
           "th": "เมื่อคุณจะเคลื่อนที่ผ่านเส้นทางที่มี แผ่นพาเลท, ให้ทำลาย แผ่นพาเลท นั้น และ จบเทิร์นตามปกติ, คุณยัง Interact ในเทิร์นนี้ได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/hillbilly-2.webp",
+          "en": "assets/killers/perks-en/hillbilly-2.webp"
         }
       },
       {
@@ -620,6 +768,10 @@
         "text": {
           "en": "When a generator is completed,  pick up and replace one of your set movement cards with a different card from your hand.",
           "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้หยิบการ์ดเคลื่อนที่ที่วางไว้ใบหนึ่งขึ้นมา, แล้ว เปลี่ยนเป็นการ์ดอื่นจากมือของคุณ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/hillbilly-3.webp",
+          "en": "assets/killers/perks-en/hillbilly-3.webp"
         }
       }
     ],
@@ -655,6 +807,10 @@
       "text": {
         "en": "A Survivor in a connected space rolls the danger die. On a failure, they become wounded.",
         "th": "ผู้รอดชีวิตในห้องที่เชื่อมกันต้องทอย Danger Die, หากได้ ผล ล้มเหลว, เขาจะบาดเจ็บ"
+      },
+      "image": {
+        "th": "assets/killers/power-th/huntress.webp",
+        "en": "assets/killers/power-en/huntress.webp"
       }
     },
     "passive": null,
@@ -669,6 +825,10 @@
         "text": {
           "en": "When a Survivor would move with their movement card, discard a copy of that movement card to prevent that move. They may still interact.",
           "th": "เมื่อผู้รอดชีวิตจะเคลื่อนที่ด้วยการ์ดเคลื่อนที่, ให้ทิ้งการ์ดเคลื่อนที่ที่เหมือนกันใบหนึ่ง, เพื่อห้ามการเคลื่อนที่นั้น, เขายังคง Interact ได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/huntress-1.webp",
+          "en": "assets/killers/perks-en/huntress-1.webp"
         }
       },
       {
@@ -681,6 +841,10 @@
         "text": {
           "en": "At the start of the planning phase, move along any path.",
           "th": "เมื่อเริ่มเฟส Planning, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/huntress-2.webp",
+          "en": "assets/killers/perks-en/huntress-2.webp"
         }
       },
       {
@@ -693,6 +857,10 @@
         "text": {
           "en": "After interacting, use your Killer power. (You can only use your Killer power once per round.)",
           "th": "หลังจาก Interact, ให้ใช้พลังฆาตกรของคุณ (ใช้พลังฆาตกรได้เพียงครั้งเดียวต่อรอบ)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/huntress-3.webp",
+          "en": "assets/killers/perks-en/huntress-3.webp"
         }
       }
     ],
@@ -728,6 +896,10 @@
       "text": {
         "en": "Place a Guard onto your space or a connected space. You may remove an existing Guard to place it instead. Each Guard has its own effect.",
         "th": "วาง Guard ลงในห้องของคุณหรือห้องที่เชื่อมกัน, คุณอาจเก็บ Guard ที่วางไว้แล้วออกเพื่อวางอันนี้แทนได้, Guard แต่ละตัวมีเอฟเฟกต์ของตัวเอง"
+      },
+      "image": {
+        "th": "assets/killers/power-th/knight.webp",
+        "en": "assets/killers/power-en/knight.webp"
       }
     },
     "passive": {
@@ -745,6 +917,10 @@
         "text": {
           "en": "At the start of your turn, place a Guard onto your space or a connected space. You may remove an existing Guard to place it instead.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, ให้วาง Guard ลงในห้องของคุณ หรือ ห้องที่เชื่อมกัน, คุณอาจเก็บ Guard ที่วางไว้แล้วออก เพื่อวางอันนี้แทนได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/knight-1.webp",
+          "en": "assets/killers/perks-en/knight-1.webp"
         }
       },
       {
@@ -757,6 +933,10 @@
         "text": {
           "en": "When you search a locker, the Survivor in the locker must roll the danger die instead.",
           "th": "เมื่อคุณ ค้นตู้หลบ, ผู้รอดชีวิตใน ตู้หลบ ต้องทอย Danger Die แทน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/knight-2.webp",
+          "en": "assets/killers/perks-en/knight-2.webp"
         }
       },
       {
@@ -769,6 +949,10 @@
         "text": {
           "en": "When a Survivor enters your space, they must spend a {BP}. If they cannot, that Survivor cannot interact this turn.",
           "th": "เมื่อผู้รอดชีวิตเข้าไปในห้องของคุณ, เขาต้องจ่าย 1 {BP}, ถ้าจ่ายไม่ได้, ผู้รอดชีวิตคนนั้นจะ Interact ไม่ได้ในเทิร์นนี้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/knight-3.webp",
+          "en": "assets/killers/perks-en/knight-3.webp"
         }
       }
     ],
@@ -777,6 +961,10 @@
       "boardEn": "assets/killers/board-en/knight.webp",
       "boardTh": "assets/killers/board-th/knight.webp",
       "mini": "assets/killers/mini/knight.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/knight.webp",
+      "en": "assets/killers/passive-en/knight.webp"
     }
   },
   {
@@ -804,6 +992,10 @@
       "text": {
         "en": "Each Survivor in your space becomes wounded. If at least one Survivor was already wounded, gain a {BP}.",
         "th": "ผู้รอดชีวิตทุกคนในห้องของคุณจะบาดเจ็บ, ถ้ามีผู้รอดชีวิตอย่างน้อยหนึ่งคนที่บาดเจ็บอยู่แล้ว, ให้ได้รับ 1 {BP}"
+      },
+      "image": {
+        "th": "assets/killers/power-th/legion.webp",
+        "en": "assets/killers/power-en/legion.webp"
       }
     },
     "passive": null,
@@ -818,6 +1010,10 @@
         "text": {
           "en": "While attempting to sacrifice a Survivor, when you enter a space with another Survivor, wound that Survivor.",
           "th": "ระหว่างพยายามสังเวยผู้รอดชีวิต, เมื่อคุณเข้าไปในห้องที่มีผู้รอดชีวิตอีกคน, ให้ผู้รอดชีวิตคนนั้นบาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/legion-1.webp",
+          "en": "assets/killers/perks-en/legion-1.webp"
         }
       },
       {
@@ -830,6 +1026,10 @@
         "text": {
           "en": "When a Survivor enters the same space as another Survivor, gain a {BP} for each Survivor and Killer in that space.",
           "th": "เมื่อผู้รอดชีวิตเข้าไปในห้องเดียวกับผู้รอดชีวิตอีกคน, ให้ได้รับ 1 {BP} ต่อผู้รอดชีวิต และ ฆาตกรแต่ละคนในห้องนั้น"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/legion-2.webp",
+          "en": "assets/killers/perks-en/legion-2.webp"
         }
       },
       {
@@ -842,6 +1042,10 @@
         "text": {
           "en": "Before interacting, swap the positions of an unoccupied locker and an unoccupied hook anywhere on the game board.",
           "th": "ก่อน Interact, ให้สลับตำแหน่งของ ตู้หลบ ที่ว่างหนึ่งอันกับ ตะขอแขวน ที่ว่างหนึ่งอันที่ใดก็ได้บนกระดาน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/legion-3.webp",
+          "en": "assets/killers/perks-en/legion-3.webp"
         }
       }
     ],
@@ -877,6 +1081,10 @@
       "text": {
         "en": "Move to any connected space, ignoring pallets and breakable walls. When using this power, you may also move against one-way paths.",
         "th": "เคลื่อนที่ไปยังห้องที่เชื่อมกันห้องใดก็ได้, โดยไม่สนใจ แผ่นพาเลท และ กำแพงทำลายได้, ขณะใช้พลังนี้ คุณเคลื่อนที่ย้อนเส้นทางทางเดียวได้ด้วย"
+      },
+      "image": {
+        "th": "assets/killers/power-th/nurse.webp",
+        "en": "assets/killers/power-en/nurse.webp"
       }
     },
     "passive": null,
@@ -891,6 +1099,10 @@
         "text": {
           "en": "At the start of the planning phase, choose a wounded Survivor. They must play their movement card face up before you or any other Survivor.",
           "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตที่บาดเจ็บหนึ่งคน, เขาต้องวางการ์ดเคลื่อนที่หงายหน้าก่อนคุณ หรือ ผู้รอดชีวิตคนอื่น"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/nurse-1.webp",
+          "en": "assets/killers/perks-en/nurse-1.webp"
         }
       },
       {
@@ -903,6 +1115,10 @@
         "text": {
           "en": "When a wounded survivor would perform a skill check, they roll the danger die instead.",
           "th": "เมื่อผู้รอดชีวิตที่บาดเจ็บต้องทำ Skill Check, ให้เขาทอย Danger Die แทน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/nurse-2.webp",
+          "en": "assets/killers/perks-en/nurse-2.webp"
         }
       },
       {
@@ -915,6 +1131,10 @@
         "text": {
           "en": "After a Survivor becomes healthy, gain 2 {BP}.",
           "th": "หลังจากผู้รอดชีวิตกลับมาไม่บาดเจ็บ, ให้ได้รับ 2 {BP}"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/nurse-3.webp",
+          "en": "assets/killers/perks-en/nurse-3.webp"
         }
       }
     ],
@@ -950,6 +1170,10 @@
       "text": {
         "en": "Gain a {BP} for each wounded Survivor and Hex Totem in your space and connected spaces.",
         "th": "ได้รับ 1 {BP} ต่อผู้รอดชีวิตที่บาดเจ็บ และ โทเท็มคำสาป แต่ละอัน ในห้องของคุณและห้องที่เชื่อมกัน"
+      },
+      "image": {
+        "th": "assets/killers/power-th/oni.webp",
+        "en": "assets/killers/power-en/oni.webp"
       }
     },
     "passive": null,
@@ -964,6 +1188,10 @@
         "text": {
           "en": "After you sacrifice a Survivor, a Survivor in a connected space becomes wounded.",
           "th": "หลังจากคุณสังเวยผู้รอดชีวิต, ผู้รอดชีวิตหนึ่งคนในห้องที่เชื่อมกันจะบาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/oni-1.webp",
+          "en": "assets/killers/perks-en/oni-1.webp"
         }
       },
       {
@@ -976,6 +1204,10 @@
         "text": {
           "en": "At the start of your turn, discard a set movement card and replace it with a new one.",
           "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ทิ้งการ์ดเคลื่อนที่ที่วางไว้หนึ่งใบ และ เปลี่ยนเป็นใบใหม่"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/oni-2.webp",
+          "en": "assets/killers/perks-en/oni-2.webp"
         }
       },
       {
@@ -988,6 +1220,10 @@
         "text": {
           "en": "After a Survivor interacts with a pallet or locker in your space or a connected space, remove the pallet or locker.",
           "th": "หลังจากผู้รอดชีวิต Interact กับ แผ่นพาเลท หรือ ตู้หลบ ในห้องของคุณ หรือ ห้องที่เชื่อมกัน, ให้เก็บ แผ่นพาเลท หรือ ตู้หลบ นั้นออก"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/oni-3.webp",
+          "en": "assets/killers/perks-en/oni-3.webp"
         }
       }
     ],
@@ -1023,6 +1259,10 @@
       "text": {
         "en": "Choose a connected space. Place a Vile Purge in both your space and the connected space. No more than one Vile Purge may be in each space.",
         "th": "เลือกห้องที่เชื่อมกันหนึ่งห้อง, วาง Vile Purge ทั้งในห้องของคุณ และ ห้องที่เชื่อมกันนั้น, ห้องหนึ่งมี Vile Purge ได้ไม่เกินหนึ่งอัน"
+      },
+      "image": {
+        "th": "assets/killers/power-th/plague.webp",
+        "en": "assets/killers/power-en/plague.webp"
       }
     },
     "passive": {
@@ -1040,6 +1280,10 @@
         "text": {
           "en": "At the start of cleanup, move a Survivor in your space or a connected space along any path.",
           "th": "เมื่อเริ่มเฟส Cleanup, ให้ย้ายผู้รอดชีวิตหนึ่งคนในห้องของคุณ หรือ ห้องที่เชื่อมกัน ไปตามเส้นทางใดก็ได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/plague-1.webp",
+          "en": "assets/killers/perks-en/plague-1.webp"
         }
       },
       {
@@ -1052,6 +1296,10 @@
         "text": {
           "en": "At the start of the planning phase, place the Entity on a revealed generator in any space. It cannot be interacted with.",
           "th": "เมื่อเริ่มเฟส Planning, ให้วาง The Entity บน เครื่องปั่นไฟ ที่เปิดแล้วในห้องใดก็ได้, ห้าม Interact กับมัน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/plague-2.webp",
+          "en": "assets/killers/perks-en/plague-2.webp"
         }
       },
       {
@@ -1064,6 +1312,10 @@
         "text": {
           "en": "After you attack a healthy Survivor, move a Survivor in a connected space along any path.",
           "th": "หลังจากคุณโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ให้ย้ายผู้รอดชีวิตหนึ่งคนในห้องที่เชื่อมกัน ไปตามเส้นทางใดก็ได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/plague-3.webp",
+          "en": "assets/killers/perks-en/plague-3.webp"
         }
       }
     ],
@@ -1078,6 +1330,10 @@
       "boardEn": "assets/killers/board-en/plague.webp",
       "boardTh": "assets/killers/board-th/plague.webp",
       "mini": "assets/killers/mini/plague.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/plague.webp",
+      "en": "assets/killers/passive-en/plague.webp"
     }
   },
   {
@@ -1099,6 +1355,10 @@
       "text": {
         "en": "Return all of your revealed and set movement cards to your hand. Take a Killer bonus turn.",
         "th": "เก็บการ์ดเคลื่อนที่ทั้งหมดของคุณที่เปิดแล้ว และ ที่วางไว้กลับเข้ามือ, แล้ว เล่น Killer bonus turn"
+      },
+      "image": {
+        "th": "assets/killers/power-th/singularity.webp",
+        "en": "assets/killers/power-en/singularity.webp"
       }
     },
     "passive": {
@@ -1116,6 +1376,10 @@
         "text": {
           "en": "When a generator is completed, draw 2 perk cards from the Killer perk deck. Keep one and discard the other. You can now use that perk.",
           "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้จั่ว perk การ์ด 2 ใบจากกอง perk ของ Killer, เก็บไว้ 1 ใบ และทิ้งอีกใบ, แล้วคุณใช้ perk นั้นได้ทันที"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/singularity-1.webp",
+          "en": "assets/killers/perks-en/singularity-1.webp"
         }
       },
       {
@@ -1128,6 +1392,10 @@
         "text": {
           "en": "At the end of the planning phase, choose a Survivor with a sacrifice progress on their board. For the rest of the round, they cannot use perks.",
           "th": "เมื่อจบเฟส Planning, ให้เลือกผู้รอดชีวิตที่มี sacrifice progress บนบอร์ดของเขา, เขาใช้ perk ไม่ได้ตลอดที่เหลือของรอบ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/singularity-2.webp",
+          "en": "assets/killers/perks-en/singularity-2.webp"
         }
       },
       {
@@ -1140,6 +1408,10 @@
         "text": {
           "en": "At the end of the planning phase, discard 'Wait' from your hand. If you did, discard a Survivor's set movement card, then that Survivor may immediately interact in their current space.",
           "th": "เมื่อจบเฟส Planning, ให้ทิ้ง 'Wait' จากมือของคุณ, ถ้าทำเช่นนั้น, ให้ทิ้งการ์ดเคลื่อนที่ที่วางไว้ของผู้รอดชีวิตหนึ่งคน, แล้วผู้รอดชีวิตคนนั้นสามารถ Interact ได้ทันทีในห้องปัจจุบัน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/singularity-3.webp",
+          "en": "assets/killers/perks-en/singularity-3.webp"
         }
       }
     ],
@@ -1148,6 +1420,10 @@
       "boardEn": "assets/killers/board-en/singularity.webp",
       "boardTh": "assets/killers/board-th/singularity.webp",
       "mini": "assets/killers/mini/singularity.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/singularity.webp",
+      "en": "assets/killers/passive-en/singularity.webp"
     }
   },
   {
@@ -1175,6 +1451,10 @@
       "text": {
         "en": "Place a face-up Drone from the game board onto your board. OR place a Drone from your board face-up into your space.",
         "th": "วาง Drone ที่หงายหน้าจากกระดานเกมลงบนบอร์ดของคุณ หรือ วาง Drone จากบอร์ดของคุณแบบหงายหน้าลงในห้องของคุณ"
+      },
+      "image": {
+        "th": "assets/killers/power-th/skullmerchant.webp",
+        "en": "assets/killers/power-en/skullmerchant.webp"
       }
     },
     "passive": {
@@ -1192,6 +1472,10 @@
         "text": {
           "en": "When you would attack a healthy Survivor during a Killer bonus turn, pick them up instead.",
           "th": "เมื่อคุณจะโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บระหว่าง Killer bonus turn, ให้ pick up เขาแทน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/skullmerchant-1.webp",
+          "en": "assets/killers/perks-en/skullmerchant-1.webp"
         }
       },
       {
@@ -1204,6 +1488,10 @@
         "text": {
           "en": "At the start of the planning phase, choose a Survivor. That Survivor cannot become healthy this round.",
           "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, ผู้รอดชีวิตคนนั้นไม่สามารถกลับมาไม่บาดเจ็บได้ในรอบนี้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/skullmerchant-2.webp",
+          "en": "assets/killers/perks-en/skullmerchant-2.webp"
         }
       },
       {
@@ -1216,6 +1504,10 @@
         "text": {
           "en": "After you reveal a survival or altruism prop, remove it.",
           "th": "หลังจากคุณเปิด prop สีน้ำเงิน หรือ สีเขียว, ให้เก็บ prop นั้นออก"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/skullmerchant-3.webp",
+          "en": "assets/killers/perks-en/skullmerchant-3.webp"
         }
       }
     ],
@@ -1224,6 +1516,10 @@
       "boardEn": "assets/killers/board-en/skullmerchant.webp",
       "boardTh": "assets/killers/board-th/skullmerchant.webp",
       "mini": "assets/killers/mini/skullmerchant.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/skullmerchant.webp",
+      "en": "assets/killers/passive-en/skullmerchant.webp"
     }
   },
   {
@@ -1251,6 +1547,10 @@
       "text": {
         "en": "Discard a movement card except 'Wait' to interact with a healthy Survivor or prop in a space connected by that card's path.",
         "th": "ทิ้งการ์ดเคลื่อนที่ใบใดก็ได้ ยกเว้น 'Wait', เพื่อ Interact กับผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ prop ในห้องที่เชื่อมกัน ด้วยเส้นทางของการ์ดนั้น"
+      },
+      "image": {
+        "th": "assets/killers/power-th/spirit.webp",
+        "en": "assets/killers/power-en/spirit.webp"
       }
     },
     "passive": null,
@@ -1265,6 +1565,10 @@
         "text": {
           "en": "When you move, a wounded Survivor in your space moves with you.",
           "th": "เมื่อคุณเคลื่อนที่, ผู้รอดชีวิตที่บาดเจ็บในห้องของคุณจะเคลื่อนที่ไปพร้อมกับคุณ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/spirit-1.webp",
+          "en": "assets/killers/perks-en/spirit-1.webp"
         }
       },
       {
@@ -1277,6 +1581,10 @@
         "text": {
           "en": "After a Survivor reveals a prop, swap that prop with another revealed prop from the same category. Generators with progress, pallets on paths, occupied lockers, and occupied hooks can't be swapped.",
           "th": "หลังจากผู้รอดชีวิตเปิด prop, ให้สลับ prop นั้นกับ prop อื่นที่เปิดแล้วและมีสีเดียวกัน, ไม่สามารถสลับ เครื่องปั่นไฟ ที่มีความคืบหน้า, แผ่นพาเลท บนเส้นทาง, ตู้หลบ ที่มีคนอยู่ และ ตะขอแขวน ที่มีคนอยู่ได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/spirit-2.webp",
+          "en": "assets/killers/perks-en/spirit-2.webp"
         }
       },
       {
@@ -1289,6 +1597,10 @@
         "text": {
           "en": "After you break a pallet, gain 2 {BP}.",
           "th": "หลังจากคุณทำลาย แผ่นพาเลท, ให้ได้รับ 2 {BP}"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/spirit-3.webp",
+          "en": "assets/killers/perks-en/spirit-3.webp"
         }
       }
     ],
@@ -1324,6 +1636,10 @@
       "text": {
         "en": "Place a Bear Trap on a connected path without a pallet, breakable wall, or any other component. You may remove an existing Bear Trap to place a new one.",
         "th": "วาง Bear Trap บนเส้นทางที่เชื่อมกับห้องนี้ ซึ่งไม่มี แผ่นพาเลท, กำแพงทำลายได้ หรือชิ้นส่วนอื่น, คุณอาจเก็บ Bear Trap ที่วางไว้แล้วออก, เพื่อวางอันใหม่ได้"
+      },
+      "image": {
+        "th": "assets/killers/power-th/trapper.webp",
+        "en": "assets/killers/power-en/trapper.webp"
       }
     },
     "passive": {
@@ -1341,6 +1657,10 @@
         "text": {
           "en": "After you attack a healthy Survivor, move them along any path. If you move them through a pallet or breakable wall, destroy the pallet or breakable wall.",
           "th": "หลังจากคุณโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ให้ย้ายเขาไปตามเส้นทางใดก็ได้, หากย้ายผ่าน แผ่นพาเลท หรือ กำแพงทำลายได้, ให้ทำลาย แผ่นพาเลท หรือ กำแพงทำลายได้ นั้น"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/trapper-1.webp",
+          "en": "assets/killers/perks-en/trapper-1.webp"
         }
       },
       {
@@ -1353,6 +1673,10 @@
         "text": {
           "en": "When a Survivor in your space or a connected space would perform a skill check, they roll the danger die instead.",
           "th": "เมื่อผู้รอดชีวิตในห้องของคุณ หรือ ห้องที่เชื่อมกัน ต้องทำ Skill Check, ให้เขาทอย Danger Die แทน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/trapper-2.webp",
+          "en": "assets/killers/perks-en/trapper-2.webp"
         }
       },
       {
@@ -1365,6 +1689,10 @@
         "text": {
           "en": "After you attack a healthy Survivor, move along any path.",
           "th": "หลังจากคุณโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/trapper-3.webp",
+          "en": "assets/killers/perks-en/trapper-3.webp"
         }
       }
     ],
@@ -1379,6 +1707,10 @@
       "boardEn": "assets/killers/board-en/trapper.webp",
       "boardTh": "assets/killers/board-th/trapper.webp",
       "mini": "assets/killers/mini/trapper.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/trapper.webp",
+      "en": "assets/killers/passive-en/trapper.webp"
     }
   },
   {
@@ -1406,6 +1738,10 @@
       "text": {
         "en": "Each Survivor in your space and connected spaces gains a Knife.",
         "th": "ผู้รอดชีวิตแต่ละคนในห้องของคุณ และ ห้องที่เชื่อมกัน จะได้รับ Knife 1 เล่ม"
+      },
+      "image": {
+        "th": "assets/killers/power-th/trickster.webp",
+        "en": "assets/killers/power-en/trickster.webp"
       }
     },
     "passive": {
@@ -1423,6 +1759,10 @@
         "text": {
           "en": "When a Survivor with fewer {BP} than you would interact with a generator or the exit gates, prevent that interaction.",
           "th": "เมื่อผู้รอดชีวิตที่มี {BP} น้อยกว่าคุณจะ Interact กับ เครื่องปั่นไฟ หรือ ประตูทางออก, ให้ห้าม Interaction นั้น"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/trickster-1.webp",
+          "en": "assets/killers/perks-en/trickster-1.webp"
         }
       },
       {
@@ -1435,6 +1775,10 @@
         "text": {
           "en": "At the start of the planning phase, choose a survivor. The Survivors may collectively spend 2 {BP}. Otherwise, you select what movement card the chosen Survivor will set from their hand for the turn.",
           "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, ผู้รอดชีวิตทุกคนรวมกันอาจจ่าย 2 {BP} ได้, ถ้าไม่, คุณเป็นผู้เลือกว่าผู้รอดชีวิตที่ถูกเลือกจะวางการ์ดเคลื่อนที่ใบไหนจากมือของเขาในเทิร์นนั้น"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/trickster-2.webp",
+          "en": "assets/killers/perks-en/trickster-2.webp"
         }
       },
       {
@@ -1447,6 +1791,10 @@
         "text": {
           "en": "When you would pick up a Survivor, move along any path and then pick up a different survivor instead. (They do not need to be wounded.)",
           "th": "เมื่อคุณจะ pick up ผู้รอดชีวิต, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้, แล้ว pick up ผู้รอดชีวิตอีกคนแทน (เขาไม่จำเป็นต้องบาดเจ็บ)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/trickster-3.webp",
+          "en": "assets/killers/perks-en/trickster-3.webp"
         }
       }
     ],
@@ -1461,6 +1809,10 @@
       "boardEn": "assets/killers/board-en/trickster.webp",
       "boardTh": "assets/killers/board-th/trickster.webp",
       "mini": "assets/killers/mini/trickster.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/trickster.webp",
+      "en": "assets/killers/passive-en/trickster.webp"
     }
   },
   {
@@ -1488,6 +1840,10 @@
       "text": {
         "en": "Place Victor in your space. If Victor is already on the game board, remove him before placing him back into your space.",
         "th": "วาง Victor ในห้องของคุณ, หาก Victor อยู่บนกระดานอยู่แล้ว, ให้เก็บเขาออกก่อน แล้วจึงวางกลับมาในห้องของคุณ"
+      },
+      "image": {
+        "th": "assets/killers/power-th/twins.webp",
+        "en": "assets/killers/power-en/twins.webp"
       }
     },
     "passive": {
@@ -1505,6 +1861,10 @@
         "text": {
           "en": "At the end of your turn, take a Killer bonus turn. Instead of playing a new card, reuse the movement card from your last Killer turn. (You can only take one Killer bonus turn per round.)",
           "th": "เมื่อจบเทิร์นของคุณ, ให้เล่น Killer bonus turn, แทนที่จะเล่นการ์ดใหม่, ให้ใช้การ์ดเคลื่อนที่จากเทิร์นฆาตกรครั้งล่าสุดซ้ำ (คุณเล่น Killer bonus turn ได้เพียงหนึ่งครั้งต่อรอบ)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/twins-1.webp",
+          "en": "assets/killers/perks-en/twins-1.webp"
         }
       },
       {
@@ -1517,6 +1877,10 @@
         "text": {
           "en": "As an interaction, interact with a chest to remove it and gain 2 {BP}.",
           "th": "Perk นี้เป็นการ Interact, ให้ Interact กับ กล่องไอเทม เพื่อเก็บมันออก และได้รับ 2 {BP}"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/twins-2.webp",
+          "en": "assets/killers/perks-en/twins-2.webp"
         }
       },
       {
@@ -1529,6 +1893,10 @@
         "text": {
           "en": "When you damage a generator, remove a progress from up to 2 other generators anywhere on the game board.",
           "th": "เมื่อคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ลบความคืบหน้า 1 แต้ม จาก เครื่องปั่นไฟ เครื่องอื่นไม่เกิน 2 เครื่องบนกระดาน"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/twins-3.webp",
+          "en": "assets/killers/perks-en/twins-3.webp"
         }
       }
     ],
@@ -1537,6 +1905,10 @@
       "boardEn": "assets/killers/board-en/twins.webp",
       "boardTh": "assets/killers/board-th/twins.webp",
       "mini": "assets/killers/mini/twins.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/twins.webp",
+      "en": "assets/killers/passive-en/twins.webp"
     }
   },
   {
@@ -1558,6 +1930,10 @@
       "text": {
         "en": "Place a The Unknown with the lowest number that is not on the game board in a connected room.",
         "th": "วาง The Unknown ที่มีหมายเลขต่ำสุดซึ่งยังไม่อยู่บนกระดานเกมลงในห้องที่เชื่อมกัน"
+      },
+      "image": {
+        "th": "assets/killers/power-th/unknown.webp",
+        "en": "assets/killers/power-en/unknown.webp"
       }
     },
     "passive": {
@@ -1575,6 +1951,10 @@
         "text": {
           "en": "At the start of the planning phase, choose a movement card that you only have a single copy of. Take another copy of that card from outside of the game and add it to your hand.",
           "th": "เมื่อเริ่มเฟส Planning, ให้เลือกการ์ดเคลื่อนที่ที่คุณมีเพียงใบเดียว, แล้ว หยิบการ์ดใบเดียวกันอีกใบจากนอกเกมมาเพิ่มในมือ"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/unknown-1.webp",
+          "en": "assets/killers/perks-en/unknown-1.webp"
         }
       },
       {
@@ -1587,6 +1967,10 @@
         "text": {
           "en": "When progress would be added to a generator in your space. one less progress is added instead (can be 0).",
           "th": "เมื่อจะเพิ่มความคืบหน้าให้ เครื่องปั่นไฟ ในห้องของคุณ, ให้เพิ่มน้อยลง 1 แต้มแทน (อาจเหลือ 0 ได้)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/unknown-2.webp",
+          "en": "assets/killers/perks-en/unknown-2.webp"
         }
       },
       {
@@ -1599,6 +1983,10 @@
         "text": {
           "en": "When a generator is completed, move directly to that generator's space.",
           "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้เคลื่อนที่ตรงไปยังห้องของ เครื่องปั่นไฟ นั้น"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/unknown-3.webp",
+          "en": "assets/killers/perks-en/unknown-3.webp"
         }
       }
     ],
@@ -1607,6 +1995,10 @@
       "boardEn": "assets/killers/board-en/unknown.webp",
       "boardTh": "assets/killers/board-th/unknown.webp",
       "mini": "assets/killers/mini/unknown.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/unknown.webp",
+      "en": "assets/killers/passive-en/unknown.webp"
     }
   },
   {
@@ -1634,6 +2026,10 @@
       "text": {
         "en": "Move directly to a space that is not connected to your space.",
         "th": "เคลื่อนที่ตรงไปยังห้องที่ไม่ได้เชื่อมกับห้องของคุณ"
+      },
+      "image": {
+        "th": "assets/killers/power-th/wraith.webp",
+        "en": "assets/killers/power-en/wraith.webp"
       }
     },
     "passive": null,
@@ -1648,6 +2044,10 @@
         "text": {
           "en": "At the end of the planning phase, place a third movement card. (This will allow you to take a third turn.) You cannot take Killer bonus turns this round.",
           "th": "เมื่อจบเฟส Planning, ให้วางการ์ดเคลื่อนที่ใบที่สาม (ทำให้คุณเล่นเทิร์นที่สามได้), รอบนี้คุณใช้ Killer bonus turn ไม่ได้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/wraith-1.webp",
+          "en": "assets/killers/perks-en/wraith-1.webp"
         }
       },
       {
@@ -1660,6 +2060,10 @@
         "text": {
           "en": "After you sacrifice a Survivor, they lose a {BP} and you gain a {BP}. (You still gain {BP}, even if they do not have any to lose.)",
           "th": "หลังจากคุณสังเวยผู้รอดชีวิต, เขาเสีย 1 {BP} และคุณได้รับ 1 {BP} (คุณยังได้รับ {BP} แม้เขาไม่มี {BP} ให้เสีย)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/wraith-2.webp",
+          "en": "assets/killers/perks-en/wraith-2.webp"
         }
       },
       {
@@ -1672,6 +2076,10 @@
         "text": {
           "en": "At the end of the planning phase, choose a Survivor. They discard their set movement card, then replace it with a new one.",
           "th": "เมื่อจบเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, เขาต้องทิ้งการ์ดเคลื่อนที่ที่วางไว้, แล้ว เปลี่ยนเป็นใบใหม่"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/wraith-3.webp",
+          "en": "assets/killers/perks-en/wraith-3.webp"
         }
       }
     ],
