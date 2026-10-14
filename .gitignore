@@ -26,3 +26,6 @@ dist-ssr
 # Raw asset dump (source for scripts/build_assets.py; too large for git)
 _extract_dbd_assets/
 
+
+# Full game build (play/), not deployed
+dist-play

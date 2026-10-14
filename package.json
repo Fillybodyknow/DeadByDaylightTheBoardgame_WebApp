@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:play": "vite -c vite.play.config.ts",
+    "build:play": "vue-tsc -p play/tsconfig.json --noEmit && vite build -c vite.play.config.ts",
+    "test:play": "vitest run play"
   },
   "dependencies": {
     "marked": "^18.1.1",
@@ -20,6 +23,7 @@
     "@vue/tsconfig": "^0.9.1",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
+    "vitest": "^5.0.4",
     "vue-tsc": "^3.3.11"
   }
 }

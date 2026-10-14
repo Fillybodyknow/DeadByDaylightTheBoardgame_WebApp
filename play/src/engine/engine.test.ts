@@ -1,0 +1,351 @@
+import { describe, expect, it } from 'vitest'
+import { macmillan } from './boards'
+import { apply, createGame, isFailure, killerInteractions, propsIn, survivorMoves, type GameConfig } from './engine'
+import { legalActions } from './legal'
+import type { GameState, Prop, PropKind } from './types'
+
+const config = (seed = 1, players: GameConfig['players'] = 5, killer = 'trapper'): GameConfig => ({
+  board: 'macmillan',
+  survivors: ['dwight', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })),
+  killer: { id: killer, name: killer },
+  players,
+  seed,
+})
+
+/** A game past the setup reveals, waiting for survivor planning. Core-rule tests play without perks. */
+function planned(seed = 1, perks = false): GameState {
+  let st = createGame(config(seed))
+  if (!perks) {
+    st.survivors.forEach((sv) => (sv.perks = []))
+    st.killer.perks = []
+  }
+  while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+  return st
+}
+
+/** Put a revealed prop of `kind` into `room` (taking one from the supply on the board). */
+function placeProp(st: GameState, kind: PropKind, room: string): Prop {
+  const p = st.props.find((x) => x.kind === kind && !x.removed && !x.done && x.occupant === null && x.room !== room)!
+  Object.assign(p, { room, path: null, revealed: true })
+  return p
+}
+
+/** Hand the turn to survivor `s`, ready to interact. */
+function survivorInteracting(st: GameState, s: number) {
+  st.phase = 'survivors'
+  st.activeSurvivor = s
+  st.canInteract = true
+  st.step = { t: 'survivorInteract', s, canInteract: true }
+  st.queue = [{ k: 'endSurvivorTurn', s }]
+  st.survivors.forEach((sv) => Object.assign(sv, { planned: 'sneak', plannedRevealed: true }))
+  st.killer.planned = ['wait', 'wait']
+}
+
+function killerInteracting(st: GameState) {
+  st.phase = 'killer'
+  st.canInteract = true
+  st.killer.planned = ['wait', 'sneak']
+  st.killer.revealedCount = 1
+  st.step = { t: 'killerInteract', turn: 0, canInteract: true }
+  st.queue = [{ k: 'endKillerTurn', turn: 0 }]
+}
+
+/** Try rng seeds until `pick` accepts the result of `run`. */
+function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => boolean): GameState {
+  for (let rng = 1; rng < 500; rng++) {
+    const st = make(rng)
+    if (pick(st)) return st
+  }
+  throw new Error('outcome never happened')
+}
+
+describe('MacMillan board', () => {
+  it('has the props of the box, by category (p.3)', () => {
+    const count = (c: string) => macmillan.rooms.flatMap((r) => r.props).filter((p) => p === c).length
+    expect([count('objective'), count('survival'), count('altruism'), count('boldness')]).toEqual([10, 12, 12, 10])
+  })
+
+  it('has 4 breakable walls, start faces 0–5 and valid paths', () => {
+    expect(macmillan.paths.filter((p) => p.wall)).toHaveLength(4)
+    expect(macmillan.rooms.map((r) => r.startFace).filter((f) => f !== null).sort()).toEqual([0, 1, 2, 3, 4, 5])
+    const ids = new Set(macmillan.rooms.map((r) => r.id))
+    for (const p of macmillan.paths) expect(ids.has(p.a) && ids.has(p.b)).toBe(true)
+  })
+
+  it('connects every room', () => {
+    const seen = new Set([macmillan.rooms[0].id])
+    for (let changed = true; changed; ) {
+      changed = false
+      for (const p of macmillan.paths)
+        if (seen.has(p.a) !== seen.has(p.b)) {
+          seen.add(p.a).add(p.b)
+          changed = true
+        }
+    }
+    expect(seen.size).toBe(macmillan.rooms.length)
+  })
+})
+
+describe('setup', () => {
+  it('deals all 44 props face down and starts minis in start rooms', () => {
+    const st = createGame(config(7))
+    expect(st.props).toHaveLength(44)
+    expect(st.props.every((p) => !p.revealed)).toBe(true)
+    const startRooms = macmillan.rooms.filter((r) => r.startFace !== null).map((r) => r.id)
+    for (const sv of st.survivors) expect(startRooms).toContain(sv.room)
+    expect(startRooms).toContain(st.killer.room)
+    expect(st.step).toEqual({ t: 'setupReveal', s: st.firstPlayer })
+  })
+
+  it('lets each survivor reveal one prop, then plans', () => {
+    const st = planned(3)
+    expect(st.props.filter((p) => p.revealed)).toHaveLength(4)
+    expect(st.step.t).toBe('planSurvivors')
+  })
+
+  it('shares one hand between two survivors of one player (p.19)', () => {
+    let st = createGame(config(1, 3))
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    expect(() => apply(st, { t: 'planSurvivors', cards: ['sneak', 'sneak', 'crouch', 'vault'] })).toThrow()
+    expect(apply(st, { t: 'planSurvivors', cards: ['sneak', 'sprint', 'sneak', 'vault'] }).step.t).toBe('planKiller')
+  })
+})
+
+describe('movement', () => {
+  it('stops survivors at breakable walls (p.13)', () => {
+    const st = planned()
+    st.survivors[0].room = 'mine-depths'
+    expect(survivorMoves(st, 0, 'sneak')).toHaveLength(0)
+  })
+
+  it('vault paths are one-way', () => {
+    const st = planned()
+    st.survivors[0].room = 'mine-entrance'
+    expect(survivorMoves(st, 0, 'vault')).toHaveLength(0)
+    st.survivors[0].room = 'foundry-upper'
+    expect(survivorMoves(st, 0, 'vault').map((m) => m.to)).toEqual(['mine-entrance'])
+  })
+
+  it('lets the killer break walls', () => {
+    let st = planned()
+    st.killer.room = 'mine-depths'
+    st.phase = 'killer'
+    st.killer.planned = ['sneak', 'wait']
+    st.step = { t: 'killerMove', turn: 0, card: 'sneak' }
+    st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+    st.survivors.forEach((sv) => (sv.item = null))
+    st = apply(st, { t: 'move', path: 'p4' })
+    expect(st.killer.room).toBe('shack')
+    expect(st.paths.p4.wall).toBe(false)
+  })
+
+  it('a pallet stops the killer and costs the interaction (p.14)', () => {
+    let st = planned()
+    st.survivors[0].room = 'ancient-tree'
+    const pallet = placeProp(st, 'pallet', 'ancient-tree')
+    survivorInteracting(st, 0)
+    st = apply(st, { t: 'interact', i: { k: 'dropPallet', prop: pallet.id, path: 'p14' } })
+    expect(st.props.find((p) => p.id === pallet.id)!.path).toBe('p14')
+
+    st.killer.room = 'scrapyard'
+    st.phase = 'killer'
+    st.killer.planned = ['sneak', 'wait']
+    st.step = { t: 'killerMove', turn: 0, card: 'sneak' }
+    st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+    st = apply(st, { t: 'move', path: 'p14' })
+    expect(st.killer.room).toBe('scrapyard')
+    expect(st.props.find((p) => p.id === pallet.id)!.removed).toBe(true)
+    expect(st.step).toEqual({ t: 'killerInteract', turn: 0, canInteract: false })
+  })
+})
+
+describe('The Trapper', () => {
+  const trapped = (rng: number) => {
+    const st = planned()
+    st.survivors.forEach((sv) => (sv.item = null))
+    st.survivors[0].room = 'ancient-tree'
+    st.paths.p14.trap = true
+    st.killer.trapsInSupply = 3
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.step = { t: 'survivorMove', s: 0, card: 'sneak' }
+    st.queue = [{ k: 'survivorInteract', s: 0 }]
+    st.rng = rng
+    return apply(st, { t: 'move', path: 'p14' })
+  }
+
+  it('wounds a survivor and takes the trap back on a failure', () => {
+    const st = findOutcome(trapped, (s) => s.survivors[0].wounded)
+    expect(st.paths.p14.trap).toBe(false)
+    expect(st.killer.trapsInSupply).toBe(4)
+    expect(st.survivors[0].woundedThisRound).toBe(true)
+    expect(isFailure(st.log.findLast((l) => l.dice)!.dice![0])).toBe(true)
+  })
+
+  it('keeps the trap on a great success', () => {
+    const st = findOutcome(trapped, (s) => !s.survivors[0].wounded)
+    expect(st.paths.p14.trap).toBe(true)
+    expect(st.survivors[0].room).toBe('scrapyard')
+  })
+
+  it('places a trap on a connected free path once per round', () => {
+    let st = planned()
+    st.killer.room = 'shack'
+    st.survivors.forEach((sv) => (sv.item = null))
+    killerInteracting(st)
+    st = apply(st, { t: 'interact', i: { k: 'power', path: 'p16' } })
+    expect(st.paths.p16.trap).toBe(true)
+    expect(st.killer.trapsInSupply).toBe(3)
+    expect(st.killer.powerUsed).toBe(true)
+  })
+})
+
+describe('attack and sacrifice', () => {
+  it('lets the killer hang at once on a free hook in the room, or carry on', () => {
+    let st = planned()
+    st.killer.room = 'shack'
+    st.survivors.forEach((sv) => Object.assign(sv, { item: null, room: 'backlot' }))
+    Object.assign(st.survivors[1], { room: 'shack', wounded: true })
+    placeProp(st, 'hook', 'shack')
+    killerInteracting(st)
+    st = apply(st, { t: 'interact', i: { k: 'pickUp', target: 1 } })
+    // House rule: the killer may hang here or carry on (the rulebook hangs at once).
+    expect(st.step).toEqual({ t: 'carryDice', s: 1 })
+    st = apply(st, { t: 'hang' })
+    expect(st.survivors[1].status).toBe('hooked')
+    expect(st.sacrifice).toBe(1)
+    expect(st.survivors[1].sacrificeToken).toBe(false)
+  })
+
+  it('cannot pick up a survivor wounded this round', () => {
+    let st = planned()
+    st.killer.room = 'shack'
+    st.survivors.forEach((sv) => Object.assign(sv, { item: null, room: 'backlot' }))
+    st.survivors[1].room = 'shack'
+    killerInteracting(st)
+    st = apply(st, { t: 'interact', i: { k: 'attack', target: 1 } })
+    expect(st.survivors[1].wounded).toBe(true)
+    expect(() => apply({ ...st, step: { t: 'killerInteract', turn: 0, canInteract: true } }, { t: 'interact', i: { k: 'pickUp', target: 1 } })).toThrow()
+  })
+
+  it('carries a survivor when there is no hook, then cleanup adds sacrifice per hooked survivor', () => {
+    let st = planned()
+    st.killer.room = 'mine-depths'
+    st.survivors.forEach((sv) => Object.assign(sv, { item: null, room: 'backlot' }))
+    Object.assign(st.survivors[2], { room: 'mine-depths', wounded: true })
+    for (const p of st.props) if (p.kind === 'hook') Object.assign(p, { room: 'mine-entrance', revealed: true })
+    killerInteracting(st)
+    st = apply(st, { t: 'interact', i: { k: 'pickUp', target: 2 } })
+    expect(st.step).toEqual({ t: 'carryDice', s: 2 })
+    const make = (rng: number) => apply({ ...st, rng }, { t: 'carryDice', n: 1 })
+    const carried = findOutcome(make, (s) => s.step.t === 'carryMove')
+    let after = apply(carried, { t: 'move', path: 'p1' })
+    while (after.step.t === 'revealProp') after = apply(after, legalActions(after)[0])
+    expect(after.survivors[2].status).toBe('hooked')
+    expect(after.sacrifice).toBe(1)
+    // Finish the killer's turns: cleanup adds 1 for the hooked survivor.
+    while (after.phase === 'killer') {
+      const a = legalActions(after).find((x) => x.t === 'endTurn' || x.t === 'declineBonus' || x.t === 'move') ?? legalActions(after)[0]
+      after = apply(after, a)
+    }
+    expect(after.sacrifice).toBe(2)
+    expect(after.round).toBe(2)
+    expect(after.step.t).toBe('planSurvivors')
+  })
+
+  it('carrying past a free hook with steps left: hang there or keep going', () => {
+    let st = planned()
+    st.killer.room = 'mine-depths'
+    st.survivors.forEach((sv) => Object.assign(sv, { item: null, room: 'backlot' }))
+    Object.assign(st.survivors[2], { room: 'mine-depths', wounded: true })
+    for (const p of st.props) if (p.kind === 'hook') Object.assign(p, { room: 'mine-entrance', revealed: true })
+    killerInteracting(st)
+    st = apply(st, { t: 'interact', i: { k: 'pickUp', target: 2 } })
+    const carried = findOutcome((rng) => apply({ ...st, rng }, { t: 'carryDice', n: 2 }), (s) => s.step.t === 'carryMove')
+    let mid = apply(carried, { t: 'move', path: 'p1' })
+    while (mid.step.t === 'revealProp') mid = apply(mid, legalActions(mid)[0])
+    expect(mid.step).toEqual({ t: 'carryMove', s: 2, steps: 1 })
+    expect(legalActions(mid)).toContainEqual({ t: 'hang' })
+    // Keep going instead: no hook further on, so the survivor drops after the last step.
+    let on = apply(mid, { t: 'move', path: 'p7' })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.survivors[2].status).toBe('board')
+    // Or hang right there.
+    expect(apply(mid, { t: 'hang' }).survivors[2].status).toBe('hooked')
+  })
+
+  it('the killer can damage a generator with no progress (p.14)', () => {
+    const st = planned()
+    st.killer.room = 'scrapyard'
+    const gen = placeProp(st, 'generator', 'scrapyard')
+    gen.progress = 0
+    killerInteracting(st)
+    expect(killerInteractions(st)).toContainEqual({ k: 'damage', prop: gen.id })
+  })
+
+  it('a rescue frees the survivor and gives the rescuer 1 ▲ (p.13)', () => {
+    let st = planned()
+    st.survivors.forEach((sv) => Object.assign(sv, { item: null, room: 'backlot', bp: 2 }))
+    const hook = placeProp(st, 'hook', 'shack')
+    Object.assign(st.survivors[3], { room: 'shack', status: 'hooked', wounded: true })
+    hook.occupant = 3
+    st.survivors[0].room = 'shack'
+    survivorInteracting(st, 0)
+    st = apply(st, { t: 'interact', i: { k: 'sabotage', prop: hook.id } })
+    expect(st.survivors[3].status).toBe('board')
+    expect(st.survivors[0].bp).toBe(3)
+    expect(st.entity).toEqual({ prop: hook.id })
+    expect(st.step).toEqual({ t: 'anyMove', s: 0 })
+  })
+})
+
+describe('winning', () => {
+  it('survivors win when an exit gate reaches 3 progress', () => {
+    const base = planned()
+    base.survivors.forEach((sv) => Object.assign(sv, { item: null }))
+    const gens = base.props.filter((p) => p.kind === 'generator').slice(0, 4)
+    gens.forEach((g) => Object.assign(g, { done: true, progress: 3 }))
+    const gate = placeProp(base, 'exitGate', base.survivors[0].room)
+    gate.progress = 2
+    survivorInteracting(base, 0)
+    const won = findOutcome(
+      (rng) => apply({ ...base, rng }, { t: 'interact', i: { k: 'openGate', prop: gate.id } }),
+      (s) => s.phase === 'over',
+    )
+    expect(won.step).toEqual({ t: 'gameOver', winner: 'survivors' })
+  })
+
+  it('needs 4 repaired generators before a gate can be opened', () => {
+    const st = planned()
+    const gate = placeProp(st, 'exitGate', st.survivors[0].room)
+    survivorInteracting(st, 0)
+    expect(() => apply(st, { t: 'interact', i: { k: 'openGate', prop: gate.id } })).toThrow()
+  })
+})
+
+describe('random playthroughs', () => {
+  it('only ever offers legal actions and keeps the invariants', () => {
+    let finished = 0
+    for (let seed = 1; seed <= 40; seed++) {
+      let st = createGame(config(seed, ([3, 4, 5] as const)[seed % 3], ['trapper', 'nurse', 'huntress', 'hillbilly'][seed % 4]))
+      let rng = seed * 7919
+      for (let n = 0; n < 4000 && st.phase !== 'over'; n++) {
+        const options = legalActions(st)
+        expect(options.length).toBeGreaterThan(0)
+        rng = (rng * 1103515245 + 12345) >>> 0
+        const prev = st
+        const act = options[rng % options.length]
+        st = apply(st, act)
+        // A round ends once: nothing left over to run cleanup again later.
+        if (st.phase === 'planning') expect(st.queue.some((t) => t.k === 'cleanup')).toBe(false)
+        if (act.t === 'planKiller') expect(st.round).toBe(prev.round)
+        expect(st.killer.bp).toBeLessThanOrEqual(12)
+        expect(st.sacrifice).toBeLessThanOrEqual(8)
+        for (const sv of st.survivors) expect(sv.bp).toBeLessThanOrEqual(6)
+        for (const r of macmillan.rooms) expect(propsIn(st, r.id).filter((p) => p.occupant !== null).length).toBeLessThanOrEqual(4)
+      }
+      if (st.phase === 'over') finished++
+    }
+    expect(finished).toBeGreaterThan(25)
+  }, 180_000)
+})
