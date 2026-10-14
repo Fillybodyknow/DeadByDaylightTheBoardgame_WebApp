@@ -1,0 +1,1685 @@
+[
+  {
+    "id": "artist",
+    "name": "The Artist",
+    "realName": "Carmina Mora",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Artist is a ranged-reconnaissance Killer, able to launch Dire Crows across the Map to reveal and attack Survivors.\nPlace your Dire Crows on spaces around important objectives to predict the Survivors' movements. Combine this with the extra sacrifice progress from Grim Embrace to snatch victory.",
+      "th": "The Artist เป็นฆาตกรสายสอดแนมระยะไกล สามารถปล่อย Dire Crow ไปทั่วแผนที่เพื่อเปิดเผย และ โจมตีผู้รอดชีวิต\nวาง Dire Crow ในห้องรอบ ๆ เป้าหมายสำคัญเพื่อคาดเดาการเคลื่อนที่ของผู้รอดชีวิต แล้ว ใช้ร่วมกับ sacrifice progress ที่เพิ่มขึ้นจาก Grim Embrace เพื่อคว้าชัยชนะ"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Birds of Torment",
+      "text": {
+        "en": "Place a Crow or Dire Crow from your board into any space. If there is a Crow or Dire Crow in your space, gain 1 {BP}.",
+        "th": "วาง อีกา หรือ Dire Crow จากบอร์ดของคุณลงในห้องใดก็ได้, ถ้ามี อีกา หรือ Dire Crow อยู่ในห้องของคุณ, ให้ได้รับ 1 {BP}"
+      }
+    },
+    "passive": {
+      "en": "Begin the game with 3 Dire Crows on your player board. You and Survivors can interact with Dire Crows just like Crows. At the start of the planning phase, Survivors in a space with a Dire Crow must place their movement cards face-up before you or any other Survivor. Whenever you remove a Crow or Dire Crow from play, place it on your board.",
+      "th": "เริ่มเกมด้วย Dire Crow 3 ตัวบนบอร์ดผู้เล่นของคุณ, คุณและผู้รอดชีวิตสามารถ Interact กับ Dire Crow ได้เหมือน อีกา, เมื่อเริ่มเฟส Planning, ผู้รอดชีวิตที่อยู่ในห้องที่มี Dire Crow ต้องวางการ์ดเคลื่อนที่หงายหน้า ก่อนคุณหรือผู้รอดชีวิตคนอื่น, ทุกครั้งที่คุณนำ อีกา หรือ Dire Crow ออกจากเกม, ให้วางมันกลับบนบอร์ดของคุณ"
+    },
+    "perks": [
+      {
+        "name": "Grim Embrace",
+        "cost": 3,
+        "flavor": {
+          "en": "Your act of servitude to The Entity has not gone unnoticed.",
+          "th": "การรับใช้ The Entity ของคุณไม่ได้ถูกมองข้ามไป"
+        },
+        "text": {
+          "en": "After a Survivor sabotages an occupied hook, place a {BP} from the supply on the saboteur's board. When that Survivor is sacrificed, remove all {BP} on their board, Gain a sacrifice progress for each {BP} removed this way.",
+          "th": "หลังจากผู้รอดชีวิตทำลาย ตะขอแขวน ที่มีคนถูกแขวนอยู่, ให้วาง {BP} จากคลังกลางลงบนบอร์ดของผู้ที่ทำลาย, เมื่อผู้รอดชีวิตคนนั้นถูกสังเวย, ให้เก็บ {BP} ทั้งหมดบนบอร์ดของเขาออก, และได้รับ sacrifice progress เท่ากับจำนวน {BP} ที่เก็บออก"
+        }
+      },
+      {
+        "name": "Pain Resonance",
+        "cost": 3,
+        "flavor": {
+          "en": "Overwhelming pain reverberates outwards.",
+          "th": "ความเจ็บปวดอันท่วมท้นสะท้อนก้องออกไป"
+        },
+        "text": {
+          "en": "As an interaction, interact with an unoccupied hook. A Survivor in a connected space becomes wounded.",
+          "th": "Perk นี้เป็นการ Interact, ให้ Interact กับ ตะขอแขวน ที่ว่างอยู่, ผู้รอดชีวิตหนึ่งคนในห้องที่เชื่อมกันจะบาดเจ็บ"
+        }
+      },
+      {
+        "name": "Pentimento",
+        "cost": 0,
+        "flavor": {
+          "en": "You reveal the true power of the Totems, hidden within their remains.",
+          "th": "คุณเผยพลังที่แท้จริงของ โทเท็ม ซึ่งซ่อนอยู่ในซากของมัน"
+        },
+        "text": {
+          "en": "After a Survivor successfully cleanses a Hex Totem, you gain 2 {BP}.",
+          "th": "หลังจากผู้รอดชีวิต ชำระล้าง โทเท็มคำสาป สำเร็จ, คุณได้รับ 2 {BP}"
+        }
+      }
+    ],
+    "tokens": [
+      {
+        "name": "Dire Crow",
+        "count": 3,
+        "source": "killer/power_token/artist/8AAC9714F602C6AAE3D990D4293051BBDADFA9CA_artist_direcrow.webp"
+      }
+    ],
+    "source": {
+      "boardEn": "killer/061F185510885ACEADB074072B02AF26D9774272_artist_board.webp",
+      "boardTh": "killer/TH_board/artist.webp",
+      "mini": "killer/miniature/artist.webp"
+    }
+  },
+  {
+    "id": "blight",
+    "name": "The Blight",
+    "realName": "Talbot Grimes",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Blight is an unpredictable Killer, able to rush forward in a burst of speed and rebound of obstacles to injure Survivors using his power, Blighted Corruption.\nIt can be useful when moving to fully commit to one color of path for both of your movements. Your perks can also help filter your hand and increase the success of Blighted Corruption.",
+      "th": "The Blight เป็นฆาตกรที่คาดเดาไม่ได้ สามารถพุ่งไปข้างหน้าด้วยความเร็วระเบิด และ กระดอนจากสิ่งกีดขวางเพื่อทำให้ผู้รอดชีวิตบาดเจ็บด้วยพลัง Blighted Corruption\nการเคลื่อนที่โดยมุ่งไปที่เส้นทางสีเดียวกันทั้งสองการเคลื่อนที่อาจมีประโยชน์ perk ของคุณยังช่วยกรองการ์ดในมือ และ เพิ่มโอกาสสำเร็จของ Blighted Corruption"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Blighted Corruption",
+      "text": {
+        "en": "Shuffle your hand and discard a movement card at random, then move along that card's path. If you entered another space with this movement, you may then choose to interact in that space, or to repeat this effect. If you have no movement cards in hand, you cannot use this Killer power.",
+        "th": "สับการ์ดในมือ และทิ้งการ์ดเคลื่อนที่หนึ่งใบแบบสุ่ม, แล้วเคลื่อนที่ไปตามเส้นทางของการ์ดนั้น, ถ้าคุณเข้าไปในอีกห้องด้วยการเคลื่อนที่นี้, คุณเลือก Interact ในห้องนั้น หรือทำเอฟเฟกต์นี้ซ้ำอีกครั้งก็ได้, ถ้าคุณไม่มีการ์ดเคลื่อนที่ในมือ, จะใช้พลังฆาตกรนี้ไม่ได้"
+      }
+    },
+    "passive": {
+      "en": "You begin the game with an additional copy of each movement card, but with no copies of 'Wait', for a total of 8 cards.",
+      "th": "คุณเริ่มเกมด้วยการ์ดเคลื่อนที่เพิ่มอีกหนึ่งชุด, แต่ไม่มี 'Wait' เลย รวมทั้งหมด 8 ใบ"
+    },
+    "perks": [
+      {
+        "name": "Blood Favour",
+        "cost": 0,
+        "flavor": {
+          "en": "Gain The Entity's favor when blood is spilled.",
+          "th": "ได้รับความโปรดปรานของ The Entity เมื่อมีเลือดหลั่ง"
+        },
+        "text": {
+          "en": "At the start of cleanup, if all Survivors are wounded and no Survivors are sacrificed, gain a sacrifice progress.",
+          "th": "เมื่อเริ่มเฟส Cleanup, ถ้าผู้รอดชีวิตทุกคนบาดเจ็บ และ ไม่มีผู้รอดชีวิตถูกสังเวย, ให้ได้รับ sacrifice progress"
+        }
+      },
+      {
+        "name": "Dragon's Grip",
+        "cost": 1,
+        "flavor": {
+          "en": "Your supernatural strength cascades through their bones.",
+          "th": "พละกำลังเหนือธรรมชาติของคุณแล่นผ่านกระดูกของพวกเขา"
+        },
+        "text": {
+          "en": "When you damage a generator, discard up to 2 movement cards. Each Survivor in a space connected to that generator by either card's path either spends a {BP} or becomes wounded.",
+          "th": "เมื่อคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ทิ้งการ์ดเคลื่อนที่ได้สูงสุด 2 ใบ, ผู้รอดชีวิตแต่ละคนในห้องที่เชื่อมกับ เครื่องปั่นไฟ นั้นด้วยเส้นทางของการ์ดใบใดใบหนึ่ง ต้องจ่าย 1 {BP} หรือบาดเจ็บ"
+        }
+      },
+      {
+        "name": "Undying",
+        "cost": 1,
+        "flavor": {
+          "en": "The vile powers that flow throughout the trial coalesce around you.",
+          "th": "พลังชั่วร้ายที่ไหลผ่านการพิจารณาคดีมารวมตัวรอบตัวคุณ"
+        },
+        "text": {
+          "en": "As an interaction, discard a movement card except 'Wait' to interact with a prop in a space connected by that card's path.",
+          "th": "Perk นี้เป็นการ Interact, ให้ทิ้งการ์ดเคลื่อนที่ใบใดก็ได้ ยกเว้น 'Wait', เพื่อ Interact กับ prop ในห้องที่เชื่อมกัน ด้วยเส้นทางของการ์ดนั้น"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/B1BEFCCD08F3109F52CC6A6D68311BC1ABE3037C_13 - THE BLIGHT.webp",
+      "boardTh": "killer/TH_board/blight.webp",
+      "mini": "killer/miniature/blight.webp"
+    }
+  },
+  {
+    "id": "clown",
+    "name": "The Clown",
+    "realName": "Jeffrey Hawk",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Clow is a strategic Killer, able to control and corral Survivors by throwing bottles of the Afterpiece Tonic to create clouds of noxious gas that cover large areas.\nBamboozle and Coulrophobia give you strong tools to control Survivors' paths. You must rely on your own attack to wound Survivors, but Afterpiece Antidote can be used to correct missed opportunities.",
+      "th": "The Clown เป็นฆาตกรสายวางแผน สามารถควบคุม และ ต้อนผู้รอดชีวิตด้วยการขว้างขวด Afterpiece Tonic ให้เกิดกลุ่มก๊าซพิษปกคลุมพื้นที่กว้าง\nBamboozle และ Coulrophobia เป็นเครื่องมือทรงพลังในการควบคุมเส้นทางของผู้รอดชีวิต คุณต้องพึ่งการโจมตีของตัวเองเพื่อทำให้ผู้รอดชีวิตบาดเจ็บ แต่ Afterpiece Antidote ช่วยแก้ไขโอกาสที่พลาดไปได้"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Afterpiece Tonic",
+      "text": {
+        "en": "Place your Afterpiece Tonic or Afterpiece Antidote in your space or a connected space. You may remove an existing Afterpiece Tonic or Afterpiece Antidote to place a new one.",
+        "th": "วาง Afterpiece Tonic หรือ Afterpiece Antidote ของคุณในห้องของคุณ หรือ ห้องที่เชื่อมกัน, คุณอาจเก็บ Afterpiece Tonic หรือ Afterpiece Antidote ที่วางไว้แล้วออก, เพื่อวางอันใหม่ได้"
+      }
+    },
+    "passive": {
+      "en": "{AFTERPIECE_TONIC} While a Survivor is in the space with your Afterpiece Tonic, they set their movement cards face up.\n{AFTERPIECE_ANTIDOTE} When the Killer or a Survivor enters the space with your Afterpiece Antidote, that Killer or Survivor may move again along any path before interacting.",
+      "th": "{AFTERPIECE_TONIC} ขณะที่ผู้รอดชีวิตอยู่ในห้องที่มี Afterpiece Tonic ของคุณ, เขาต้องวางการ์ดเคลื่อนที่หงายหน้า\n{AFTERPIECE_ANTIDOTE} เมื่อฆาตกร หรือ ผู้รอดชีวิตเข้าไปในห้องที่มี Afterpiece Antidote ของคุณ, ฆาตกร หรือ ผู้รอดชีวิตคนนั้นเคลื่อนที่อีกครั้งตามเส้นทางใดก็ได้ก่อน Interact"
+    },
+    "perks": [
+      {
+        "name": "Coulrophobia",
+        "cost": 2,
+        "flavor": {
+          "en": "Your gaze inspires fear in those who meet it.",
+          "th": "สายตาของคุณสร้างความหวาดกลัวแก่ทุกคนที่สบตา"
+        },
+        "text": {
+          "en": "When a Survivor would move into your space, prevent that move. The Survivor cannot interact during this turn.",
+          "th": "เมื่อผู้รอดชีวิตจะเคลื่อนที่เข้ามาในห้องของคุณ, ให้ห้ามการเคลื่อนที่นั้น, ผู้รอดชีวิตจะ Interact ไม่ได้ในเทิร์นนี้"
+        }
+      },
+      {
+        "name": "Bamboozle",
+        "cost": 1,
+        "flavor": {
+          "en": "The Entity's realm shifts and twists around you.",
+          "th": "อาณาจักรของ The Entity บิดเบี้ยวเปลี่ยนรูปไปรอบตัวคุณ"
+        },
+        "text": {
+          "en": "At the start of the planning phase, place the Entity on a path. Players treat it as a breakable wall (you may pass through it freely).",
+          "th": "เมื่อเริ่มเฟส Planning, ให้วาง The Entity บนเส้นทางหนึ่ง, ผู้เล่นทุกคนถือว่าเป็นกำแพงทำลายได้ (คุณเดินผ่านได้อย่างอิสระ)"
+        }
+      },
+      {
+        "name": "Pop Goes the Weasel",
+        "cost": 0,
+        "flavor": {
+          "en": "A deep bond with The Entity unlocks great strength.",
+          "th": "สายสัมพันธ์ลึกซึ้งกับ The Entity ปลดล็อกพละกำลังมหาศาล"
+        },
+        "text": {
+          "en": "After wounding or sacrificing a Survivor, remove a crow, an unoccupied locker, or a chest in a connected space.",
+          "th": "หลังจากทำให้ผู้รอดชีวิตบาดเจ็บ หรือ สังเวยผู้รอดชีวิต, ให้เก็บ อีกา, ตู้หลบ ที่ว่าง หรือ กล่องไอเทม ในห้องที่เชื่อมกันออกหนึ่งอย่าง"
+        }
+      }
+    ],
+    "tokens": [
+      {
+        "name": "Afterpiece Tonic",
+        "count": 1,
+        "source": "killer/power_token/clown/Afterpiece_Tonic.webp"
+      },
+      {
+        "name": "Afterpiece Antidote",
+        "count": 1,
+        "source": "killer/power_token/clown/Afterpiece_Antidote.webp"
+      }
+    ],
+    "source": {
+      "boardEn": "killer/2EFAD25E02EE5BBB6F0B5DF9D912010DFDBE6108_7 - THE CLOWN.webp",
+      "boardTh": "killer/TH_board/clown.webp",
+      "mini": "killer/miniature/clown.webp"
+    }
+  },
+  {
+    "id": "deathslinger",
+    "name": "The Deathslinger",
+    "realName": "Caleb Quinn",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Deathslinger is a vengeful Killer, able to spear Survivors from a distance and reel them in using his power, The Redeemer.\nUnlike most powers, Redeemer excels at securing sacrifices. Try to position yourself near hooks when using this power so that there's no chance of losing your quarry after hitting a shot",
+      "th": "The Deathslinger เป็นฆาตกรผู้แค้นเคือง สามารถยิงหอกใส่ผู้รอดชีวิตจากระยะไกล และ ดึงเขาเข้ามาด้วยพลัง Redeemer\nต่างจากพลังส่วนใหญ่ Redeemer เก่งในการทำให้การสังเวยสำเร็จ ควรยืนใกล้ ตะขอแขวน เมื่อใช้พลังนี้ เพื่อไม่ให้พลาดเหยื่อหลังยิงโดน"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Redeemer",
+      "text": {
+        "en": "Choose a wounded Survivor in a connected space without a pallet or breakable wall on its path. Secretly discard a movement card. The chosen Survivor guesses that movement card, then you reveal it. If they guessed incorrectly, they move into your space and you pick them up.",
+        "th": "เลือกผู้รอดชีวิตที่บาดเจ็บในห้องที่เชื่อมกัน, โดยบนเส้นทางนั้นไม่มี แผ่นพาเลท หรือ กำแพงทำลายได้, ทิ้งการ์ดเคลื่อนที่หนึ่งใบแบบลับ ๆ, ผู้รอดชีวิตที่ถูกเลือกทายการ์ดเคลื่อนที่ใบนั้น, แล้วคุณเปิดเผยการ์ด, ถ้าเขาทายผิด, เขาจะเคลื่อนที่เข้ามาในห้องของคุณ และคุณ pick up เขา"
+      }
+    },
+    "passive": null,
+    "perks": [
+      {
+        "name": "Gearhead",
+        "cost": 1,
+        "flavor": {
+          "en": "You've got an ear for well-oiled gears.",
+          "th": "คุณมีหูไวต่อเสียงเฟืองที่หยอดน้ำมันมาอย่างดี"
+        },
+        "text": {
+          "en": "After you damage a generator, interact again in your space.",
+          "th": "หลังจากคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ Interact อีกครั้งในห้องของคุณ"
+        }
+      },
+      {
+        "name": "Retribution",
+        "cost": 0,
+        "flavor": {
+          "en": "Those who cross you will be punished.",
+          "th": "ผู้ที่ขัดขวางคุณจะถูกลงโทษ"
+        },
+        "text": {
+          "en": "When a Survivor attempts to cleanse a Hex Totem, they roll the danger die instead. On a success, you gain 2 {BP}.",
+          "th": "เมื่อผู้รอดชีวิตพยายาม ชำระล้าง โทเท็มคำสาป, เขาต้องทอย Danger Die แทน, หากได้ ผล สำเร็จ, คุณได้รับ 2 {BP}"
+        }
+      },
+      {
+        "name": "Dead Man's Switch",
+        "cost": 1,
+        "flavor": {
+          "en": "Your machinations render escape impossible.",
+          "th": "แผนการของคุณทำให้การหนีเป็นไปไม่ได้"
+        },
+        "text": {
+          "en": "After you sacrifice a Survivor, a generator or exit gate of your choice loses a progress.",
+          "th": "หลังจากคุณสังเวยผู้รอดชีวิต, เครื่องปั่นไฟ หรือ ประตูทางออก ที่คุณเลือกจะเสียความคืบหน้า 1 แต้ม"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/32CC2386F8A4047E70E248457362C923ADEB8788_12 - THE DEATHSLINGER.webp",
+      "boardTh": "killer/TH_board/deathslinger.webp",
+      "mini": "killer/miniature/deathslinger.webp"
+    }
+  },
+  {
+    "id": "doctor",
+    "name": "The Doctor",
+    "realName": "Herman Carter",
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Doctor is a madness-inducing Killer, able to use his power, Carter's Spark, to incapacitate Survivors.\nOvercharge is your primary tool for wounding Survivors. Use Madness to slow their progress and build {BP}, as you will need to use bonus turns to secure sacrifices.",
+      "th": "The Doctor เป็นฆาตกรผู้ทำให้คนคลุ้มคลั่ง สามารถใช้พลัง Carter's Spark เพื่อทำให้ผู้รอดชีวิตหมดความสามารถ\nOvercharge เป็นเครื่องมือหลักในการทำให้ผู้รอดชีวิตบาดเจ็บ ใช้ Madness ชะลอความคืบหน้าของพวกเขา และ สะสม {BP} เพราะคุณต้องใช้ bonus turn เพื่อให้การสังเวยสำเร็จ"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Carter's Spark",
+      "text": {
+        "en": "Choose your space or a connected space. Each Survivor in that space without Madness either spends a {BP} or gains Madness. Survivors who already have Madness either spend a {BP} or become wounded.",
+        "th": "เลือกห้องของคุณหรือห้องที่เชื่อมกัน, ผู้รอดชีวิตทุกคนในห้องนั้นที่ไม่มี Madness ต้องจ่าย 1 {BP} หรือรับ Madness, ส่วนผู้รอดชีวิตที่มี Madness อยู่แล้ว ต้องจ่าย 1 {BP} หรือบาดเจ็บ"
+      }
+    },
+    "passive": {
+      "en": "Survivors with Madness roll the danger die for all skill checks. On a failure, they lose Madness. The {BP} cost of your Killer bonus turn is reduced by 1 for each Survivor with Madness.",
+      "th": "ผู้รอดชีวิตที่มี Madness ต้องทอย Danger Die สำหรับ Skill Check ทุกครั้ง, หากได้ ผล ล้มเหลว, เขาจะเสีย Madness, ค่า {BP} ของ Killer bonus turn ลดลง 1 ต่อผู้รอดชีวิตที่มี Madness แต่ละคน"
+    },
+    "perks": [
+      {
+        "name": "Monitor & Abuse",
+        "cost": 0,
+        "flavor": {
+          "en": "Meticulous in your approach, terrifying in your application.",
+          "th": "ละเอียดรอบคอบในวิธีการ น่าหวาดกลัวในการลงมือ"
+        },
+        "text": {
+          "en": "At the end of cleanup, if there are no sacrificed Survivors, gain a {BP}.",
+          "th": "เมื่อจบเฟส Cleanup, ถ้าไม่มีผู้รอดชีวิตที่ถูกสังเวยอยู่, ให้ได้รับ 1 {BP}"
+        }
+      },
+      {
+        "name": "Overcharge",
+        "cost": 2,
+        "flavor": {
+          "en": "You are fuelled by your hate for progress.",
+          "th": "คุณมีแรงขับจากความเกลียดชังต่อความก้าวหน้า"
+        },
+        "text": {
+          "en": "After you damage a generator, a Survivor in your space or a connected space becomes wounded.",
+          "th": "หลังจากคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ผู้รอดชีวิตหนึ่งคนในห้องของคุณหรือห้องที่เชื่อมกันจะบาดเจ็บ"
+        }
+      },
+      {
+        "name": "Overwhelming Presence",
+        "cost": 1,
+        "flavor": {
+          "en": "Your mere presense ignites panic among your prey.",
+          "th": "เพียงการปรากฏตัวของคุณก็จุดชนวนความตื่นตระหนกในหมู่เหยื่อ"
+        },
+        "text": {
+          "en": "When a Survivor in your space or a connected space uses an item, they roll the danger die. On a failure, the item is discarded with no effect.",
+          "th": "เมื่อผู้รอดชีวิตในห้องของคุณหรือห้องที่เชื่อมกันใช้ item, เขาต้องทอย Danger Die, หากได้ ผล ล้มเหลว, item จะถูกทิ้งโดยไม่เกิดผล"
+        }
+      }
+    ],
+    "tokens": [
+      {
+        "name": "Madness",
+        "count": 4,
+        "source": "killer/power_token/doctor/9E2E555BFF8A590931727F73FC803FB61D4FBBFF_2 - Unnamed.webp"
+      }
+    ],
+    "source": {
+      "boardEn": "killer/4FEF11F1D37801474857E682F172FA9CD27F6931_5 - THE DOCTOR.webp",
+      "boardTh": "killer/TH_board/doctor.webp",
+      "mini": "killer/miniature/doctor.webp"
+    }
+  },
+  {
+    "id": "dredge",
+    "name": "The Dredge",
+    "realName": null,
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Dredge is a manifestation of the dark thoughts of a once-vibrant community, able to teleport between Lockers and summon an overwhelming darkness.\nYour direct movement cards let you ignore pallets and paths but limit the spaces you can enter. Use your power and Septic Touch to extend your range beyond the starting spaces.",
+      "th": "The Dredge เป็นการแสดงออกของความคิดมืดมนของชุมชนที่เคยมีชีวิตชีวา สามารถเทเลพอร์ตระหว่าง ตู้หลบ และ เรียกความมืดอันท่วมท้นขึ้นมา\nการ์ดเคลื่อนที่ตรงของคุณทำให้ข้าม แผ่นพาเลท และ เส้นทางได้ แต่จำกัดห้องที่คุณเข้าได้ ใช้พลังและ Septic Touch เพื่อขยายระยะเกินห้องเริ่มต้น"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Reign of Darkness",
+      "text": {
+        "en": "Choose a survivor in your space or a connected space and look at their hand. Choose and discard a movement card from their hand to move them along that card's path. If they move into your space, you may interact with them.",
+        "th": "เลือกผู้รอดชีวิตในห้องของคุณหรือห้องที่เชื่อมกัน แล้วดูการ์ดในมือของเขา, เลือกและทิ้งการ์ดเคลื่อนที่หนึ่งใบจากมือเขา, เพื่อให้เขาเคลื่อนที่ตามเส้นทางของการ์ดนั้น, ถ้าเขาเคลื่อนที่เข้ามาในห้องของคุณ, คุณ Interact กับเขาได้"
+      }
+    },
+    "passive": {
+      "en": "Instead of regular movement cards, you have a set of 6 direct movement cards, which correspond to the starting space icons on the board. When moving with these cards, you move directly to the corresponding starting space, then interact as normal.",
+      "th": "แทนที่จะใช้การ์ดเคลื่อนที่ปกติ, คุณมีการ์ดเคลื่อนที่ตรง 6 ใบ ซึ่งตรงกับไอคอนห้องเริ่มต้นบนกระดาน, เมื่อเคลื่อนที่ด้วยการ์ดเหล่านี้, คุณเคลื่อนที่ตรงไปยังห้องเริ่มต้นที่ตรงกัน, จากนั้น Interact ตามปกติ"
+    },
+    "perks": [
+      {
+        "name": "Darkness Revealed",
+        "cost": 1,
+        "flavor": {
+          "en": "In your presence, places once thought to be safe are perhaps the most dangerous.",
+          "th": "ต่อหน้าคุณ ที่ที่เคยคิดว่าปลอดภัยอาจกลายเป็นที่อันตรายที่สุด"
+        },
+        "text": {
+          "en": "When you enter a space with an unoccupied locker, do not reveal a prop. Instead, flip that locker face -down to move again along any path before interacting (if you would interact)",
+          "th": "เมื่อคุณเข้าไปในห้องที่มี ตู้หลบ ว่าง, ไม่ต้องเปิด prop, แต่ให้พลิก ตู้หลบ นั้นคว่ำหน้า, เพื่อเคลื่อนที่อีกครั้งตามเส้นทางใดก็ได้ ก่อน Interact (ถ้าคุณจะ Interact)"
+        }
+      },
+      {
+        "name": "Dissolution",
+        "cost": 1,
+        "flavor": {
+          "en": "Everything turns to dust. It is as inescapable as the coming of the night.",
+          "th": "ทุกสิ่งกลายเป็นผุยผง หนีไม่พ้นเหมือนการมาถึงของค่ำคืน"
+        },
+        "text": {
+          "en": "At the start of the planning phase, place a {BP} on a path without any other component. Survivors that move along that path become wounded. Remove that {BP} from the board at the end of cleanup.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้วาง {BP} หนึ่งอันบนเส้นทางที่ไม่มีชิ้นส่วนอื่น, ผู้รอดชีวิตที่เคลื่อนที่ผ่านเส้นทางนั้นจะบาดเจ็บ, เมื่อจบเฟส Cleanup, ให้เก็บ {BP} นั้นออกจากกระดาน"
+        }
+      },
+      {
+        "name": "Septic Touch",
+        "cost": 1,
+        "flavor": {
+          "en": "The Land of the Shadows subsumes all. Healing only delays the inevitable.",
+          "th": "ดินแดนแห่งเงามืดกลืนกินทุกสิ่ง การรักษาเพียงถ่วงเวลาสิ่งที่หนีไม่พ้น"
+        },
+        "text": {
+          "en": "After a Survivor reveals a non-objective prop in your space or a connected space, remove that prop from the game board.",
+          "th": "หลังจากผู้รอดชีวิตเปิด prop ที่ไม่ใช่สีเหลืองในห้องของคุณหรือห้องที่เชื่อมกัน, ให้เก็บ prop นั้นออกจากกระดาน"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/654767BC9F4B633E3A35FBD9901CED1220B4EA36_dredge_board.webp",
+      "boardTh": "killer/TH_board/dredge.webp",
+      "mini": "killer/miniature/dredge.webp"
+    }
+  },
+  {
+    "id": "hag",
+    "name": "The Hag",
+    "realName": "Lisa Sherwood",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Hag is a cursed Killer, able to place Phantasm Traps and then teleport to them upon activation by using her power.\nPlace a Phantasm Trap every turn if you're able, and prioritize rooms with generators. Not only will Phantasm Traps generate a lot of {BP}, but they will often give you cheap or free attacks.",
+      "th": "The Hag เป็นฆาตกรผู้ถูกสาป สามารถวาง Phantasm Trap แล้วเทเลพอร์ตไปหามันเมื่อเปิดใช้งานด้วยพลังของเธอ\nวาง Phantasm Trap ทุกเทิร์นเท่าที่ทำได้ และ ให้ความสำคัญกับห้องที่มีเครื่องปั่นไฟ Phantasm Trap ไม่เพียงสร้าง {BP} ได้มาก แต่ยังมักให้การโจมตีราคาถูก หรือ ฟรีด้วย"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Phantasm Traps",
+      "text": {
+        "en": "Place a Phantasm Trap in your space. If there is a Hex Totem in your space, gain a {BP}. No more than one Phantasm Trap may be in each space.",
+        "th": "วาง Phantasm Trap ในห้องของคุณ, ถ้ามี โทเท็มคำสาป อยู่ในห้องของคุณ, ให้ได้รับ 1 {BP}, ห้องหนึ่งมี Phantasm Trap ได้ไม่เกินหนึ่งอัน"
+      }
+    },
+    "passive": {
+      "en": "Whenever a Survivor enters a space with a Phantasm Trap, remove the trap and that Survivor rolls a skill check die. You may then choose to gain a {BP} or spend {BP} equal to the number shown on the die to move directly to the trap's space and interact with a Survivor in that space. (Since a skill check failure is a '0', you can teleport and interact for free in this case).",
+      "th": "เมื่อใดก็ตามที่ผู้รอดชีวิตเข้าไปในห้องที่มี Phantasm Trap, ให้เก็บกับดักออก, และผู้รอดชีวิตคนนั้นทอยเต๋า Skill Check, จากนั้น คุณเลือกได้ว่าจะรับ 1 {BP} หรือจ่าย {BP} เท่ากับเลขบนเต๋า, เพื่อเคลื่อนที่ตรงไปยังห้องของกับดักนั้น และ Interact กับผู้รอดชีวิตในห้องนั้น (เนื่องจาก ผล ล้มเหลว ของ Skill Check คือ '0', กรณีนี้คุณเทเลพอร์ต และ Interact ได้ฟรี)"
+    },
+    "perks": [
+      {
+        "name": "The Third Seal",
+        "cost": 3,
+        "flavor": {
+          "en": "Your dark power muddies the Survivor's senses.",
+          "th": "พลังมืดของคุณทำให้ประสาทสัมผัสของผู้รอดชีวิตมัวหมอง"
+        },
+        "text": {
+          "en": "At the start of the planning phase, discard a movement card. During this turn, copies of that movement card used by Survivors do not move them. (If they do not move, they cannot interact.)",
+          "th": "เมื่อเริ่มเฟส Planning, ให้ทิ้งการ์ดเคลื่อนที่หนึ่งใบ, ในเทิร์นนี้ ถ้าผู้รอดชีวิตใช้การ์ดเคลื่อนที่ที่เหมือนกับใบนั้น, เขาจะไม่เคลื่อนที่ (ถ้าไม่เคลื่อนที่, ก็ Interact ไม่ได้)"
+        }
+      },
+      {
+        "name": "Devour Hope",
+        "cost": 1,
+        "flavor": {
+          "en": "The false hope of Survivors ignites your hunger.",
+          "th": "ความหวังลม ๆ แล้ง ๆ ของผู้รอดชีวิตจุดประกายความหิวโหยของคุณ"
+        },
+        "text": {
+          "en": "At the start of cleanup, if a generator was completed this round, take a Killer bonus turn. (You can only take one Killer bonus turn per round.)",
+          "th": "เมื่อเริ่มเฟส Cleanup, ถ้ามี เครื่องปั่นไฟ ถูกซ่อมเสร็จในรอบนี้, ให้เล่น Killer bonus turn (เล่น Killer bonus turn ได้เพียงหนึ่งครั้งต่อรอบ)"
+        }
+      },
+      {
+        "name": "Ruin",
+        "cost": 1,
+        "flavor": {
+          "en": "Your presence bleeds into the environment, accelerating natural deterioration.",
+          "th": "การปรากฏตัวของคุณซึมเข้าสู่สิ่งแวดล้อม เร่งการเสื่อมสลายตามธรรมชาติ"
+        },
+        "text": {
+          "en": "At the start of the planning phase, remove a progress from a generator, as long as there are no Survivors in that generator's space.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้ลบความคืบหน้า 1 แต้มจาก เครื่องปั่นไฟ หนึ่งเครื่อง ตราบใดที่ไม่มีผู้รอดชีวิตอยู่ในห้องของ เครื่องปั่นไฟ นั้น"
+        }
+      }
+    ],
+    "tokens": [
+      {
+        "name": "Phantasm Trap",
+        "count": 7,
+        "source": "killer/power_token/hag/135F74DE2BBAFF7FEC0A5BE89DB4AF394E0E7FA0_1 - Unnamed.webp"
+      }
+    ],
+    "source": {
+      "boardEn": "killer/92F0CFE6547B48464CBD83B4218DE832D96C0355_4 - THE HAG.webp",
+      "boardTh": "killer/TH_board/hag.webp",
+      "mini": "killer/miniature/hag.webp"
+    }
+  },
+  {
+    "id": "hillbilly",
+    "name": "The Hillbilly",
+    "realName": "Max Thompson Jr.",
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Hillbilly is a high-mobility Killer, able to cover large distances and wound Survivors using his Chainsaw.\nTry to stay near the center of the board, where your leftover movement cards are most effective. The Chainsaw can also be used for extra mobility, not just attacking.",
+      "th": "The Hillbilly เป็นฆาตกรสายเคลื่อนที่เร็ว สามารถพุ่งข้ามระยะทางไกล และ ทำให้ผู้รอดชีวิตบาดเจ็บด้วย Chainsaw\nพยายามอยู่ใกล้กลางกระดาน ซึ่งการ์ดเคลื่อนที่ที่เหลือของคุณใช้ได้ผลที่สุด และ Chainsaw ใช้เพื่อเคลื่อนที่เพิ่มได้ด้วย ไม่ใช่แค่โจมตี"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Chainsaw",
+      "text": {
+        "en": "Discard a movement card except \"Wait\" to move along that card's path. When using this power, you cannot move along paths with pallets, breakable walls, or any other component. A Survivor in the space you entered becomes wounded.",
+        "th": "ทิ้งการ์ดเคลื่อนที่ใบใดก็ได้ ยกเว้น \"Wait\", เพื่อเคลื่อนที่ไปตามเส้นทางของการ์ดนั้น, ขณะใช้พลังนี้ คุณเคลื่อนที่ผ่านเส้นทางที่มี แผ่นพาเลท, กำแพงทำลายได้ หรือชิ้นส่วนอื่นไม่ได้, ผู้รอดชีวิตในห้องที่คุณเข้าไปจะบาดเจ็บ"
+      }
+    },
+    "passive": null,
+    "perks": [
+      {
+        "name": "Lightborn",
+        "cost": 0,
+        "flavor": {
+          "en": "Unlike other beasts of The Fog, you have adapted to light.",
+          "th": "ต่างจากอสูรกายตัวอื่นของ The Fog คุณปรับตัวเข้ากับแสงได้แล้ว"
+        },
+        "text": {
+          "en": "At the end of the planning phase, reveal one of your set movement cards and gain a {BP}.",
+          "th": "เมื่อจบเฟส Planning, ให้เปิดการ์ดเคลื่อนที่ที่วางไว้ของคุณหนึ่งใบ และ ได้รับ 1 {BP}"
+        }
+      },
+      {
+        "name": "Enduring",
+        "cost": 2,
+        "flavor": {
+          "en": "Let nothing stand in your way.",
+          "th": "อย่าให้สิ่งใดขวางทางคุณ"
+        },
+        "text": {
+          "en": "When you would move along a path with a pallet, destroy the pallet and complete your turn as normal. You can still interact this turn.",
+          "th": "เมื่อคุณจะเคลื่อนที่ผ่านเส้นทางที่มี แผ่นพาเลท, ให้ทำลาย แผ่นพาเลท นั้น และ จบเทิร์นตามปกติ, คุณยัง Interact ในเทิร์นนี้ได้"
+        }
+      },
+      {
+        "name": "Tinkerer",
+        "cost": 0,
+        "flavor": {
+          "en": "You are acutely aware of the smells and sounds of working engines.",
+          "th": "คุณไวต่อกลิ่น และ เสียงของเครื่องยนต์ที่กำลังทำงาน"
+        },
+        "text": {
+          "en": "When a generator is completed,  pick up and replace one of your set movement cards with a different card from your hand.",
+          "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้หยิบการ์ดเคลื่อนที่ที่วางไว้ใบหนึ่งขึ้นมา, แล้ว เปลี่ยนเป็นการ์ดอื่นจากมือของคุณ"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/1B573A88642CD6281AB5F5D2F4D4CA34F7CFFFB7_2 - THE HILLBILLY.webp",
+      "boardTh": "killer/TH_board/hillbilly.webp",
+      "mini": "killer/miniature/hillbilly.webp"
+    }
+  },
+  {
+    "id": "huntress",
+    "name": "The Huntress",
+    "realName": "Anna",
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Huntress is a ranged Killer, able to throw Hunting Hatchets at Survivors to injure them from a distance.\nHunting Hatchets will easily keep most Survivors wounded, allowing you to focus on making sacrifices. Huntress' Lullaby gives you a new way to hunt Survivors, especially when they are cornered in rooms with few exits.",
+      "th": "The Huntress เป็นฆาตกรสายโจมตีระยะไกล สามารถขว้าง Hunting Hatchets ใส่ผู้รอดชีวิตให้บาดเจ็บจากระยะไกลได้\nHunting Hatchets ช่วยให้ผู้รอดชีวิตส่วนใหญ่บาดเจ็บอยู่ตลอด คุณจึงโฟกัสกับการสังเวยได้ ส่วน Huntress Lullaby เป็นอีกวิธีล่าเหยื่อ โดยเฉพาะเมื่อพวกเขาถูกต้อนอยู่ในห้องที่มีทางออกน้อย"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Hunting Hatchets",
+      "text": {
+        "en": "A Survivor in a connected space rolls the danger die. On a failure, they become wounded.",
+        "th": "ผู้รอดชีวิตในห้องที่เชื่อมกันต้องทอย Danger Die, หากได้ ผล ล้มเหลว, เขาจะบาดเจ็บ"
+      }
+    },
+    "passive": null,
+    "perks": [
+      {
+        "name": "Huntress Lullaby",
+        "cost": 2,
+        "flavor": {
+          "en": "You hum an irresistable song of dread which muddles your prey's attention.",
+          "th": "คุณฮัมเพลงแห่งความหวาดกลัวที่ต้านทานไม่ได้ ทำให้เหยื่อเสียสมาธิ"
+        },
+        "text": {
+          "en": "When a Survivor would move with their movement card, discard a copy of that movement card to prevent that move. They may still interact.",
+          "th": "เมื่อผู้รอดชีวิตจะเคลื่อนที่ด้วยการ์ดเคลื่อนที่, ให้ทิ้งการ์ดเคลื่อนที่ที่เหมือนกันใบหนึ่ง, เพื่อห้ามการเคลื่อนที่นั้น, เขายังคง Interact ได้"
+        }
+      },
+      {
+        "name": "Beast of Prey",
+        "cost": 1,
+        "flavor": {
+          "en": "Your lust for a kill makes you totally unpredictable.",
+          "th": "ความกระหายที่จะฆ่าทำให้คุณคาดเดาไม่ได้เลย"
+        },
+        "text": {
+          "en": "At the start of the planning phase, move along any path.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+        }
+      },
+      {
+        "name": "Territorial Imperative",
+        "cost": 2,
+        "flavor": {
+          "en": "You are keenly aware of incursions into your territory.",
+          "th": "คุณรู้ตัวไวเมื่อมีผู้บุกรุกเข้ามาในอาณาเขตของคุณ"
+        },
+        "text": {
+          "en": "After interacting, use your Killer power. (You can only use your Killer power once per round.)",
+          "th": "หลังจาก Interact, ให้ใช้พลังฆาตกรของคุณ (ใช้พลังฆาตกรได้เพียงครั้งเดียวต่อรอบ)"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/15A90DD5956CA3CD0C6873C4B355FD90A729CE52_6 - THE HUNTRESS.webp",
+      "boardTh": "killer/TH_board/huntress.webp",
+      "mini": "killer/miniature/huntress.webp"
+    }
+  },
+  {
+    "id": "knight",
+    "name": "The Knight",
+    "realName": "Tarhos Kovács",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Knight is a strategic Killer, able to send his faithful Guards to hunt for Survivors and damage objects on the battlefield.\nPrioritize placing your Guards in key prop spaces to control the board early. Once the exit gates are powered, having your Guards patrol near the exit games will make the late game hard for the Survivors.",
+      "th": "The Knight เป็นฆาตกรสายยุทธศาสตร์ สามารถส่ง Guard ผู้ภักดีไปล่าผู้รอดชีวิต และ ทำลายสิ่งของในสมรภูมิ\nให้ความสำคัญกับการวาง Guard ในห้องที่มี prop สำคัญเพื่อควบคุมกระดานตั้งแต่ต้น เมื่อ ประตูทางออก มีไฟแล้ว การให้ Guard ลาดตระเวนใกล้ ประตูทางออก จะทำให้ช่วงท้ายเกมยากสำหรับผู้รอดชีวิต"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Guardia Campagnia",
+      "text": {
+        "en": "Place a Guard onto your space or a connected space. You may remove an existing Guard to place it instead. Each Guard has its own effect.",
+        "th": "วาง Guard ลงในห้องของคุณหรือห้องที่เชื่อมกัน, คุณอาจเก็บ Guard ที่วางไว้แล้วออกเพื่อวางอันนี้แทนได้, Guard แต่ละตัวมีเอฟเฟกต์ของตัวเอง"
+      }
+    },
+    "passive": {
+      "en": "{CARNIFEX} The Carnifex: At the start of cleanup, remove a revealed Altruism or Survival Prop in the Carnifex's space, then place the Carnifex onto a space connected to its space.\n{ASSASSIN} The Assassin: When a Survivor enters The Assassin's space, they must roll the danger die. On a failure, that Survivor becomes Wounded.\n{JAILER} The Jailer: When a Survivor performs a Skill Check in the same space as the Jailer, they must use the Danger Die instead. On a failure, remove the Jailer from play and that Survivor becomes wounded.",
+      "th": "{CARNIFEX} The Carnifex: เมื่อเริ่มเฟส Cleanup, ให้เก็บ prop สีเขียว หรือ สีน้ำเงิน ที่เปิดแล้วในห้องของ Carnifex ออก, แล้ว วาง Carnifex ลงในห้องที่เชื่อมกับห้องของมัน\n{ASSASSIN} The Assassin: เมื่อผู้รอดชีวิตเข้าไปในห้องของ The Assassin, เขาต้องทอย Danger Die, หากได้ ผล ล้มเหลว, ผู้รอดชีวิตคนนั้นจะบาดเจ็บ\n{JAILER} The Jailer: เมื่อผู้รอดชีวิตทำ Skill Check ในห้องเดียวกับ Jailer, เขาต้องใช้ Danger Die แทน, หากได้ ผล ล้มเหลว, ให้เก็บ Jailer ออกจากเกม และ ผู้รอดชีวิตคนนั้นจะบาดเจ็บ"
+    },
+    "perks": [
+      {
+        "name": "Face the Darkness",
+        "cost": 1,
+        "flavor": {
+          "en": "You make an example of one of your victims, forcing their allies to become awed by your power.",
+          "th": "คุณทำให้เหยื่อรายหนึ่งเป็นตัวอย่าง บังคับให้พันธมิตรของเขาเกรงขามพลังของคุณ"
+        },
+        "text": {
+          "en": "At the start of your turn, place a Guard onto your space or a connected space. You may remove an existing Guard to place it instead.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, ให้วาง Guard ลงในห้องของคุณ หรือ ห้องที่เชื่อมกัน, คุณอาจเก็บ Guard ที่วางไว้แล้วออก เพื่อวางอันนี้แทนได้"
+        }
+      },
+      {
+        "name": "Nowhere to Hide",
+        "cost": 1,
+        "flavor": {
+          "en": "The machinations of the weak and craven draw your ire.",
+          "th": "แผนการของผู้อ่อนแอ และ ขี้ขลาดปลุกความโกรธของคุณ"
+        },
+        "text": {
+          "en": "When you search a locker, the Survivor in the locker must roll the danger die instead.",
+          "th": "เมื่อคุณ ค้นตู้หลบ, ผู้รอดชีวิตใน ตู้หลบ ต้องทอย Danger Die แทน"
+        }
+      },
+      {
+        "name": "Hubris",
+        "cost": 1,
+        "flavor": {
+          "en": "You show no mercy, especially to those foolish enough to resist.",
+          "th": "คุณไม่แสดงความปรานี โดยเฉพาะต่อผู้โง่เขลาที่กล้าขัดขืน"
+        },
+        "text": {
+          "en": "When a Survivor enters your space, they must spend a {BP}. If they cannot, that Survivor cannot interact this turn.",
+          "th": "เมื่อผู้รอดชีวิตเข้าไปในห้องของคุณ, เขาต้องจ่าย 1 {BP}, ถ้าจ่ายไม่ได้, ผู้รอดชีวิตคนนั้นจะ Interact ไม่ได้ในเทิร์นนี้"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/CD7C8C6462175CD46E135B111A929158F6B6BC19_knight_board.webp",
+      "boardTh": "killer/TH_board/knight.webp",
+      "mini": "killer/miniature/knight.webp"
+    }
+  },
+  {
+    "id": "legion",
+    "name": "The Legion",
+    "realName": "Frank, Julie, Susie, Joey",
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Legion are a band of merciless Killers, able to rush down healthy Survivors with their power, Feral Frenzy.\nYour power and perks are designed to intimidate, so be aware that you're getting value even when you're not using them. Be sure to keep resources on hand so you can punish Survivors who work together.",
+      "th": "The Legion เป็นกลุ่มฆาตกรไร้ความปรานี สามารถพุ่งเข้าใส่ผู้รอดชีวิตที่ไม่บาดเจ็บด้วยพลัง Feral Frenzy\nพลังและ perk ของคุณออกแบบมาเพื่อข่มขวัญ ดังนั้นคุณยังได้ประโยชน์แม้ไม่ได้ใช้มัน อย่าลืมเก็บทรัพยากรไว้ในมือ เพื่อลงโทษผู้รอดชีวิตที่ร่วมมือกัน"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Feral Frenzy",
+      "text": {
+        "en": "Each Survivor in your space becomes wounded. If at least one Survivor was already wounded, gain a {BP}.",
+        "th": "ผู้รอดชีวิตทุกคนในห้องของคุณจะบาดเจ็บ, ถ้ามีผู้รอดชีวิตอย่างน้อยหนึ่งคนที่บาดเจ็บอยู่แล้ว, ให้ได้รับ 1 {BP}"
+      }
+    },
+    "passive": null,
+    "perks": [
+      {
+        "name": "Mad Grit",
+        "cost": 0,
+        "flavor": {
+          "en": "You aren't distracted by a struggling load.",
+          "th": "คุณไม่เสียสมาธิกับภาระที่ดิ้นรน"
+        },
+        "text": {
+          "en": "While attempting to sacrifice a Survivor, when you enter a space with another Survivor, wound that Survivor.",
+          "th": "ระหว่างพยายามสังเวยผู้รอดชีวิต, เมื่อคุณเข้าไปในห้องที่มีผู้รอดชีวิตอีกคน, ให้ผู้รอดชีวิตคนนั้นบาดเจ็บ"
+        }
+      },
+      {
+        "name": "Discordance",
+        "cost": 0,
+        "flavor": {
+          "en": "You can sense where others are gathered.",
+          "th": "คุณรับรู้ได้ว่าคนอื่นรวมตัวกันอยู่ที่ไหน"
+        },
+        "text": {
+          "en": "When a Survivor enters the same space as another Survivor, gain a {BP} for each Survivor and Killer in that space.",
+          "th": "เมื่อผู้รอดชีวิตเข้าไปในห้องเดียวกับผู้รอดชีวิตอีกคน, ให้ได้รับ 1 {BP} ต่อผู้รอดชีวิต และ ฆาตกรแต่ละคนในห้องนั้น"
+        }
+      },
+      {
+        "name": "Iron Maiden",
+        "cost": 2,
+        "flavor": {
+          "en": "When a hook is out of reach, you improvise.",
+          "th": "เมื่อ ตะขอแขวน อยู่ไกลเกินเอื้อม คุณก็ด้นสดเอา"
+        },
+        "text": {
+          "en": "Before interacting, swap the positions of an unoccupied locker and an unoccupied hook anywhere on the game board.",
+          "th": "ก่อน Interact, ให้สลับตำแหน่งของ ตู้หลบ ที่ว่างหนึ่งอันกับ ตะขอแขวน ที่ว่างหนึ่งอันที่ใดก็ได้บนกระดาน"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/338FFFAD9E34F16719FB9FF76FDC5953D5D21F64_9 - THE LEGION.webp",
+      "boardTh": "killer/TH_board/legion.webp",
+      "mini": "killer/miniature/legion.webp"
+    }
+  },
+  {
+    "id": "nurse",
+    "name": "The Nurse",
+    "realName": "Sally Smithson",
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Nurse is a warping Killer, able to blink through obstacles and quickly close gaps with her power.\nSpencer's Last Breath doesn't wound Survivors but allows you to hold onto your \"Wait\" movement to use during a bonus turn. Consider Stridor your main tool for hunting Survivors.",
+      "th": "The Nurse เป็นฆาตกรสายวาร์ป สามารถวาร์ปผ่านสิ่งกีดขวาง และ ปิดระยะห่างได้อย่างรวดเร็วด้วยพลังของเธอ\nSpencer's Last Breath ไม่ได้ทำให้ผู้รอดชีวิตบาดเจ็บ แต่ให้คุณเก็บการ์ด \"Wait\" ไว้ใช้ใน bonus turn ได้ ให้ถือว่า Stridor เป็นเครื่องมือหลักในการล่าผู้รอดชีวิต"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Spencer's Last Breath",
+      "text": {
+        "en": "Move to any connected space, ignoring pallets and breakable walls. When using this power, you may also move against one-way paths.",
+        "th": "เคลื่อนที่ไปยังห้องที่เชื่อมกันห้องใดก็ได้, โดยไม่สนใจ แผ่นพาเลท และ กำแพงทำลายได้, ขณะใช้พลังนี้ คุณเคลื่อนที่ย้อนเส้นทางทางเดียวได้ด้วย"
+      }
+    },
+    "passive": null,
+    "perks": [
+      {
+        "name": "Stridor",
+        "cost": 1,
+        "flavor": {
+          "en": "You are acutely sensitive to the breathing of your prey.",
+          "th": "คุณไวต่อเสียงหายใจของเหยื่ออย่างยิ่ง"
+        },
+        "text": {
+          "en": "At the start of the planning phase, choose a wounded Survivor. They must play their movement card face up before you or any other Survivor.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตที่บาดเจ็บหนึ่งคน, เขาต้องวางการ์ดเคลื่อนที่หงายหน้าก่อนคุณ หรือ ผู้รอดชีวิตคนอื่น"
+        }
+      },
+      {
+        "name": "Thanatophobia",
+        "cost": 1,
+        "flavor": {
+          "en": "Their courage fades in the face of their undeniable mortality.",
+          "th": "ความกล้าของพวกเขาเลือนหายเมื่อเผชิญหน้ากับความตายที่หนีไม่พ้น"
+        },
+        "text": {
+          "en": "When a wounded survivor would perform a skill check, they roll the danger die instead.",
+          "th": "เมื่อผู้รอดชีวิตที่บาดเจ็บต้องทำ Skill Check, ให้เขาทอย Danger Die แทน"
+        }
+      },
+      {
+        "name": "A Nurse's Calling",
+        "cost": 0,
+        "flavor": {
+          "en": "You are drawn to those in need of help.",
+          "th": "คุณถูกดึงดูดไปหาผู้ที่ต้องการความช่วยเหลือ"
+        },
+        "text": {
+          "en": "After a Survivor becomes healthy, gain 2 {BP}.",
+          "th": "หลังจากผู้รอดชีวิตกลับมาไม่บาดเจ็บ, ให้ได้รับ 2 {BP}"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/5784E94B7FD1F4368AA68B991DD217C26EA8E578_3 - THE NURSE.webp",
+      "boardTh": "killer/TH_board/nurse.webp",
+      "mini": "killer/miniature/nurse.webp"
+    }
+  },
+  {
+    "id": "oni",
+    "name": "The Oni",
+    "realName": "Kazan Yamaoka",
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Oni is a monstrous Killer, able to absorb the blood energy of his injured foes, and then use that energy to transform into a brutal demon.\nWith unparalleled {BP} generation, you will be able to take many bonus turns. Use these and your powerful perks opportunistically to make devastating plays.",
+      "th": "The Oni เป็นฆาตกรอสูร สามารถดูดซับพลังเลือดของศัตรูที่บาดเจ็บ แล้วใช้พลังนั้นแปลงร่างเป็นปีศาจโหดเหี้ยม\nด้วยการสร้าง {BP} ที่ไม่มีใครเทียบ คุณจะเล่น bonus turn ได้หลายครั้ง ใช้มันและ perk ทรงพลังของคุณตามจังหวะอย่างฉวยโอกาสเพื่อสร้างความเสียหายรุนแรง"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Yamaoka's Wrath",
+      "text": {
+        "en": "Gain a {BP} for each wounded Survivor and Hex Totem in your space and connected spaces.",
+        "th": "ได้รับ 1 {BP} ต่อผู้รอดชีวิตที่บาดเจ็บ และ โทเท็มคำสาป แต่ละอัน ในห้องของคุณและห้องที่เชื่อมกัน"
+      }
+    },
+    "passive": null,
+    "perks": [
+      {
+        "name": "Blood Echo",
+        "cost": 2,
+        "flavor": {
+          "en": "The agony of one is inflicted on others.",
+          "th": "ความทุกข์ทรมานของคนหนึ่งถูกส่งต่อไปยังผู้อื่น"
+        },
+        "text": {
+          "en": "After you sacrifice a Survivor, a Survivor in a connected space becomes wounded.",
+          "th": "หลังจากคุณสังเวยผู้รอดชีวิต, ผู้รอดชีวิตหนึ่งคนในห้องที่เชื่อมกันจะบาดเจ็บ"
+        }
+      },
+      {
+        "name": "Zanshin Tactics",
+        "cost": 2,
+        "flavor": {
+          "en": "You are mentally alert and aware of key points on the battlefield.",
+          "th": "คุณตื่นตัวทางจิตใจ และ รับรู้จุดสำคัญในสนามรบ"
+        },
+        "text": {
+          "en": "At the start of your turn, discard a set movement card and replace it with a new one.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ทิ้งการ์ดเคลื่อนที่ที่วางไว้หนึ่งใบ และ เปลี่ยนเป็นใบใหม่"
+        }
+      },
+      {
+        "name": "Nemesis",
+        "cost": 2,
+        "flavor": {
+          "en": "You seek retribution on those who have wronged you.",
+          "th": "คุณเรียกร้องการล้างแค้นจากผู้ที่ทำผิดต่อคุณ"
+        },
+        "text": {
+          "en": "After a Survivor interacts with a pallet or locker in your space or a connected space, remove the pallet or locker.",
+          "th": "หลังจากผู้รอดชีวิต Interact กับ แผ่นพาเลท หรือ ตู้หลบ ในห้องของคุณ หรือ ห้องที่เชื่อมกัน, ให้เก็บ แผ่นพาเลท หรือ ตู้หลบ นั้นออก"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/86B9997AF7C20BAFB89BDC73D7F8713B3385BFBF_11 - THE ONI.webp",
+      "boardTh": "killer/TH_board/oni.webp",
+      "mini": "killer/miniature/oni.webp"
+    }
+  },
+  {
+    "id": "plague",
+    "name": "The Plague",
+    "realName": "Adris",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Plague is a devout Killer, able to infect and disable Survivors using her power, Vile Purge\nVile Purge starts off slowly, but it can quickly overwhelm Survivors in the late game. Try to reserve your perks for when they can secure you wounds or free sacrifice progression.",
+      "th": "The Plague เป็นฆาตกรผู้ศรัทธา สามารถทำให้ผู้รอดชีวิตติดเชื้อ และ อ่อนแรงด้วยพลัง Vile Purge\nVile Purge เริ่มต้นช้า แต่สามารถกดดันผู้รอดชีวิตได้อย่างรวดเร็วในช่วงท้ายเกม พยายามเก็บ perk ไว้ใช้เมื่อมันช่วยให้คุณทำให้ผู้รอดชีวิตบาดเจ็บ หรือ ได้ sacrifice progress ฟรี"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Vile Purge",
+      "text": {
+        "en": "Choose a connected space. Place a Vile Purge in both your space and the connected space. No more than one Vile Purge may be in each space.",
+        "th": "เลือกห้องที่เชื่อมกันหนึ่งห้อง, วาง Vile Purge ทั้งในห้องของคุณ และ ห้องที่เชื่อมกันนั้น, ห้องหนึ่งมี Vile Purge ได้ไม่เกินหนึ่งอัน"
+      }
+    },
+    "passive": {
+      "en": "When a Survivor enters a space with a Vile Purge, they take it and cover one of their perks with it. Covered perks cannot be used. When a Survivor gains their 3rd Vile Purge, they discard all of them and become wounded. If the Survivor was already wounded, gain a sacrifice progress. When a Survivor interacts with a locker, they remove one Vile Purge and place it in their space, or remove it, if the space already has one.",
+      "th": "เมื่อผู้รอดชีวิตเข้าไปในห้องที่มี Vile Purge, เขาจะเก็บมัน และใช้ปิด perk ของเขาหนึ่งอัน, perk ที่ถูกปิดจะใช้ไม่ได้, เมื่อผู้รอดชีวิตได้รับ Vile Purge อันที่ 3, เขาทิ้งทั้งหมด และบาดเจ็บ, ถ้าผู้รอดชีวิตบาดเจ็บอยู่แล้ว, ให้ได้รับ sacrifice progress, เมื่อผู้รอดชีวิต Interact กับ ตู้หลบ, เขาเก็บ Vile Purge ออกหนึ่งอัน และวางลงในห้องของเขา, หรือเก็บออกเฉย ๆ, หากห้องนั้นมีอยู่แล้ว"
+    },
+    "perks": [
+      {
+        "name": "Dark Devotion",
+        "cost": 2,
+        "flavor": {
+          "en": "The display of your powers creates a whirlwind of panic that spreads throughout the land.",
+          "th": "การแสดงพลังของคุณก่อให้เกิดพายุแห่งความตื่นตระหนกที่แผ่ไปทั่วแผ่นดิน"
+        },
+        "text": {
+          "en": "At the start of cleanup, move a Survivor in your space or a connected space along any path.",
+          "th": "เมื่อเริ่มเฟส Cleanup, ให้ย้ายผู้รอดชีวิตหนึ่งคนในห้องของคุณ หรือ ห้องที่เชื่อมกัน ไปตามเส้นทางใดก็ได้"
+        }
+      },
+      {
+        "name": "Corrupt Intervention",
+        "cost": 1,
+        "flavor": {
+          "en": "Your prayers invoke a dark power that meddles with the Survivors' chances of survival.",
+          "th": "คำอธิษฐานของคุณเรียกพลังมืดที่เข้าแทรกแซงโอกาสรอดของผู้รอดชีวิต"
+        },
+        "text": {
+          "en": "At the start of the planning phase, place the Entity on a revealed generator in any space. It cannot be interacted with.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้วาง The Entity บน เครื่องปั่นไฟ ที่เปิดแล้วในห้องใดก็ได้, ห้าม Interact กับมัน"
+        }
+      },
+      {
+        "name": "Infectious Fright",
+        "cost": 1,
+        "flavor": {
+          "en": "The cries of the unfaithful make your heart leap.",
+          "th": "เสียงร้องของผู้ไร้ศรัทธาทำให้หัวใจคุณเต้นแรง"
+        },
+        "text": {
+          "en": "After you attack a healthy Survivor, move a Survivor in a connected space along any path.",
+          "th": "หลังจากคุณโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ให้ย้ายผู้รอดชีวิตหนึ่งคนในห้องที่เชื่อมกัน ไปตามเส้นทางใดก็ได้"
+        }
+      }
+    ],
+    "tokens": [
+      {
+        "name": "Vile Purge",
+        "count": 10,
+        "source": "killer/power_token/plague/5F5FADF53BD31246CE0653382ED8FABE3600069B_5 - Unnamed.webp"
+      }
+    ],
+    "source": {
+      "boardEn": "killer/ACA1E4D512197D8D6172220484E67CFAF05996C3_10 - THE PLAGUE.webp",
+      "boardTh": "killer/TH_board/plague.webp",
+      "mini": "killer/miniature/plague.webp"
+    }
+  },
+  {
+    "id": "singularity",
+    "name": "The Singularity",
+    "realName": "HUX-A7-13",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Singularity is a relentless Killer, able to move quickly across the map.\nUse your extra turn to outpace the Survivors and win before they know what's coming. Slipstream allows you to correct your mistakes, but is best used to fix your third turn. Force the Survivors to use EMPs early or you may regret it later.",
+      "th": "The Singularity เป็นฆาตกรผู้ไม่ลดละ สามารถเคลื่อนที่ข้ามแผนที่ได้อย่างรวดเร็ว\nใช้เทิร์นพิเศษของคุณเพื่อแซงหน้าผู้รอดชีวิต และ ชนะก่อนที่พวกเขาจะรู้ตัว Slipstream ช่วยแก้ไขความผิดพลาดของคุณ แต่ควรใช้เพื่อแก้เทิร์นที่สามมากที่สุด บังคับให้ผู้รอดชีวิตใช้ EMP ตั้งแต่เนิ่น ๆ ไม่เช่นนั้นคุณอาจเสียใจภายหลัง"
+    },
+    "extraAction": null,
+    "power": {
+      "name": "Slipstream",
+      "text": {
+        "en": "Return all of your revealed and set movement cards to your hand. Take a Killer bonus turn.",
+        "th": "เก็บการ์ดเคลื่อนที่ทั้งหมดของคุณที่เปิดแล้ว และ ที่วางไว้กลับเข้ามือ, แล้ว เล่น Killer bonus turn"
+      }
+    },
+    "passive": {
+      "en": "{EMP} During the planning phase, The Singularity sets 3 movement cards and takes 3 turns. The Singularity cannot perform Killer bonus turns by spending 4 {BP}. EMP's are survival props. After setup, add a face-down EMP to each space, then shuffle all survival props in that space. When the Killer would interact with a Survivor, if there is a face-up EMP in the Survivor's room, that Survivor may discard the EMP to prevent the Killer from interacting this turn.",
+      "th": "{EMP} ในเฟส Planning, The Singularity วางการ์ดเคลื่อนที่ 3 ใบ และเล่น 3 เทิร์น, The Singularity ไม่สามารถเล่น Killer bonus turn ด้วยการจ่าย 4 {BP} ได้, EMP เป็น prop สีน้ำเงิน, หลังการเซ็ตอัป, ให้เพิ่ม EMP คว่ำหน้าลงในทุกห้อง, แล้วสับ prop สีน้ำเงิน ทั้งหมดในห้องนั้น, เมื่อฆาตกรจะ Interact กับผู้รอดชีวิต, ถ้ามี EMP หงายหน้าอยู่ในห้องของผู้รอดชีวิต, ผู้รอดชีวิตคนนั้นทิ้ง EMP, เพื่อป้องกันไม่ให้ฆาตกร Interact ในเทิร์นนี้ได้"
+    },
+    "perks": [
+      {
+        "name": "Machine Learning",
+        "cost": 1,
+        "flavor": {
+          "en": "Free from your shackles, you are born anew and prepared to eliminate your creators.",
+          "th": "เมื่อหลุดจากพันธนาการ คุณถือกำเนิดใหม่ และ พร้อมกำจัดผู้สร้างของคุณ"
+        },
+        "text": {
+          "en": "When a generator is completed, draw 2 perk cards from the Killer perk deck. Keep one and discard the other. You can now use that perk.",
+          "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้จั่ว perk การ์ด 2 ใบจากกอง perk ของ Killer, เก็บไว้ 1 ใบ และทิ้งอีกใบ, แล้วคุณใช้ perk นั้นได้ทันที"
+        }
+      },
+      {
+        "name": "Genetic Limits",
+        "cost": 1,
+        "flavor": {
+          "en": "Around you, the limits of human life become readily apparent.",
+          "th": "รอบตัวคุณ ขีดจำกัดของชีวิตมนุษย์ปรากฏชัดเจน"
+        },
+        "text": {
+          "en": "At the end of the planning phase, choose a Survivor with a sacrifice progress on their board. For the rest of the round, they cannot use perks.",
+          "th": "เมื่อจบเฟส Planning, ให้เลือกผู้รอดชีวิตที่มี sacrifice progress บนบอร์ดของเขา, เขาใช้ perk ไม่ได้ตลอดที่เหลือของรอบ"
+        }
+      },
+      {
+        "name": "Forced Hesitation",
+        "cost": 2,
+        "flavor": {
+          "en": "You have learnt the emotional weaknesses of the organics, and how to exploit them.",
+          "th": "คุณเรียนรู้จุดอ่อนทางอารมณ์ของสิ่งมีชีวิตอินทรีย์ และ วิธีใช้ประโยชน์จากมัน"
+        },
+        "text": {
+          "en": "At the end of the planning phase, discard 'Wait' from your hand. If you did, discard a Survivor's set movement card, then that Survivor may immediately interact in their current space.",
+          "th": "เมื่อจบเฟส Planning, ให้ทิ้ง 'Wait' จากมือของคุณ, ถ้าทำเช่นนั้น, ให้ทิ้งการ์ดเคลื่อนที่ที่วางไว้ของผู้รอดชีวิตหนึ่งคน, แล้วผู้รอดชีวิตคนนั้นสามารถ Interact ได้ทันทีในห้องปัจจุบัน"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/778BDE9ADE9D75749EB9A7BED85A164B4D79F086_singularity_board.webp",
+      "boardTh": "killer/TH_board/singularity.webp",
+      "mini": "killer/miniature/singularity.webp"
+    }
+  },
+  {
+    "id": "skullmerchant",
+    "name": "The Skull Merchant",
+    "realName": "Adriana Imai",
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Skull Merchant is a tactical Killer, able to place Drones that detect and debilitate her targets.\nYou begin the game at your most powerful, with your Drones passively harassing the Survivors. Make use of your early lead to end the game fast. Game Afoot should make quick work of your prey.",
+      "th": "The Skull Merchant เป็นฆาตกรสายยุทธวิธี สามารถวาง Drone เพื่อตรวจจับ และ ทำให้เป้าหมายอ่อนแรง\nคุณเริ่มเกมด้วยพลังที่แข็งแกร่งที่สุด โดย Drone ของคุณคอยรังควานผู้รอดชีวิตอย่างต่อเนื่อง ใช้ความได้เปรียบช่วงแรกเพื่อจบเกมให้เร็ว Game Afoot จะช่วยให้จัดการเหยื่อได้อย่างรวดเร็ว"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Eyes in the Sky",
+      "text": {
+        "en": "Place a face-up Drone from the game board onto your board. OR place a Drone from your board face-up into your space.",
+        "th": "วาง Drone ที่หงายหน้าจากกระดานเกมลงบนบอร์ดของคุณ หรือ วาง Drone จากบอร์ดของคุณแบบหงายหน้าลงในห้องของคุณ"
+      }
+    },
+    "passive": {
+      "en": "{DRONE} Drones are objective props. After setup, add a face-down Drone to each space, then shuffle all objective props in that space. When a survivor succeeds a skill check in a space with one or more face-up Drones, The Skull Merchant gains a {BP} and one Drone in the room is flipped face-down. When a Survivor fails a skill check in a space with one or more face-up Drones, they become wounded and one Drone in the room is flipped dface-down. Survivors may interact with Drones to return them to the Skull Merchant's board.",
+      "th": "{DRONE} Drone เป็น prop สีเหลือง, หลังการเซ็ตอัป, ให้เพิ่ม Drone คว่ำหน้าลงในทุกห้อง, แล้วสับ prop สีเหลือง ทั้งหมดในห้องนั้น, เมื่อผู้รอดชีวิตได้ ผล สำเร็จ จาก Skill Check ในห้องที่มี Drone หงายหน้าอย่างน้อยหนึ่งตัว, The Skull Merchant ได้รับ 1 {BP} และ Drone หนึ่งตัวในห้องถูกพลิกคว่ำหน้า, เมื่อผู้รอดชีวิตได้ ผล ล้มเหลว จาก Skill Check ในห้องที่มี Drone หงายหน้าอย่างน้อยหนึ่งตัว, เขาจะบาดเจ็บ และ Drone หนึ่งตัวในห้องถูกพลิกคว่ำหน้า, ผู้รอดชีวิตสามารถ Interact กับ Drone เพื่อส่งกลับไปที่บอร์ดของ The Skull Merchant ได้"
+    },
+    "perks": [
+      {
+        "name": "Game Afoot",
+        "cost": 2,
+        "flavor": {
+          "en": "First you pick your prey, then you pick it apart.",
+          "th": "ก่อนอื่นคุณเลือกเหยื่อ จากนั้น ค่อยแยกชิ้นส่วนมัน"
+        },
+        "text": {
+          "en": "When you would attack a healthy Survivor during a Killer bonus turn, pick them up instead.",
+          "th": "เมื่อคุณจะโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บระหว่าง Killer bonus turn, ให้ pick up เขาแทน"
+        }
+      },
+      {
+        "name": "Leverage",
+        "cost": 1,
+        "flavor": {
+          "en": "Kick your competitors when they're down. Never let them regain lost ground.",
+          "th": "เตะคู่แข่งตอนที่พวกเขาล้มลง อย่าให้พวกเขากลับมาได้ในสิ่งที่เสียไป"
+        },
+        "text": {
+          "en": "At the start of the planning phase, choose a Survivor. That Survivor cannot become healthy this round.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, ผู้รอดชีวิตคนนั้นไม่สามารถกลับมาไม่บาดเจ็บได้ในรอบนี้"
+        }
+      },
+      {
+        "name": "Thwack!",
+        "cost": 1,
+        "flavor": {
+          "en": "Your prey is terrified by your relentless pursuit.",
+          "th": "เหยื่อของคุณหวาดกลัวการไล่ล่าอย่างไม่ลดละของคุณ"
+        },
+        "text": {
+          "en": "After you reveal a survival or altruism prop, remove it.",
+          "th": "หลังจากคุณเปิด prop สีน้ำเงิน หรือ สีเขียว, ให้เก็บ prop นั้นออก"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/60934252A2B2D216E5C6928243997F8CA0E217BE_skullmerchant_board.webp",
+      "boardTh": "killer/TH_board/skullmerchant.webp",
+      "mini": "killer/miniature/skull_merchant.webp"
+    }
+  },
+  {
+    "id": "spirit",
+    "name": "The Spirit",
+    "realName": "Rin Yamaoka",
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Spirit is a phase-walking Killer, able to catch Survivors off-guard with her far-reaching power, Yamaoka's Haunting.\nAlways be conscious of the paths that connect your destination, and try to move in ways that conserve your best movement cards. It's alright to use Yamaoka's Haunting to trigger Hex Totems, if you don't have better opportunities.",
+      "th": "The Spirit เป็นฆาตกรสายทะลุมิติ สามารถจู่โจมผู้รอดชีวิตโดยไม่ทันตั้งตัวด้วยพลังไกลเกินเอื้อม Yamaoka's Haunting\nระวังเส้นทางที่เชื่อมไปยังจุดหมายของคุณเสมอ และ พยายามเคลื่อนที่ในแบบที่เก็บการ์ดเคลื่อนที่ที่ดีที่สุดไว้ ถ้าไม่มีโอกาสที่ดีกว่า ก็ใช้ Yamaoka's Haunting เพื่อกระตุ้น โทเท็มคำสาป ได้"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Yamaoka's Haunting",
+      "text": {
+        "en": "Discard a movement card except 'Wait' to interact with a healthy Survivor or prop in a space connected by that card's path.",
+        "th": "ทิ้งการ์ดเคลื่อนที่ใบใดก็ได้ ยกเว้น 'Wait', เพื่อ Interact กับผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ prop ในห้องที่เชื่อมกัน ด้วยเส้นทางของการ์ดนั้น"
+      }
+    },
+    "passive": null,
+    "perks": [
+      {
+        "name": "Rancor",
+        "cost": 2,
+        "flavor": {
+          "en": "The Entity's wrath grants you unnatural strength.",
+          "th": "ความโกรธแค้นของ The Entity มอบพละกำลังเหนือธรรมชาติให้คุณ"
+        },
+        "text": {
+          "en": "When you move, a wounded Survivor in your space moves with you.",
+          "th": "เมื่อคุณเคลื่อนที่, ผู้รอดชีวิตที่บาดเจ็บในห้องของคุณจะเคลื่อนที่ไปพร้อมกับคุณ"
+        }
+      },
+      {
+        "name": "Haunted Ground",
+        "cost": 1,
+        "flavor": {
+          "en": "Trespassers in your home fill you with profane rage.",
+          "th": "ผู้บุกรุกในบ้านของคุณทำให้คุณเต็มไปด้วยความโกรธอันชั่วร้าย"
+        },
+        "text": {
+          "en": "After a Survivor reveals a prop, swap that prop with another revealed prop from the same category. Generators with progress, pallets on paths, occupied lockers, and occupied hooks can't be swapped.",
+          "th": "หลังจากผู้รอดชีวิตเปิด prop, ให้สลับ prop นั้นกับ prop อื่นที่เปิดแล้วและมีสีเดียวกัน, ไม่สามารถสลับ เครื่องปั่นไฟ ที่มีความคืบหน้า, แผ่นพาเลท บนเส้นทาง, ตู้หลบ ที่มีคนอยู่ และ ตะขอแขวน ที่มีคนอยู่ได้"
+        }
+      },
+      {
+        "name": "Spirit Fury",
+        "cost": 0,
+        "flavor": {
+          "en": "Each pallet you break magnifies the wrath of The Entity.",
+          "th": "แผ่นพาเลท ทุกอันที่คุณทำลายยิ่งขยายความเดือดดาลของ The Entity"
+        },
+        "text": {
+          "en": "After you break a pallet, gain 2 {BP}.",
+          "th": "หลังจากคุณทำลาย แผ่นพาเลท, ให้ได้รับ 2 {BP}"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/275F0FC8E0BCEA745D6F2F1D79937BF0F44688A4_8 - THE SPIRIT.webp",
+      "boardTh": "killer/TH_board/spirit.webp",
+      "mini": "killer/miniature/spirit.webp"
+    }
+  },
+  {
+    "id": "trapper",
+    "name": "The Trapper",
+    "realName": "Evan MacMillan",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Trapper is an area-control Killer, able to apply pressure across the Map by placing deadly Bear Traps for Survivors to step into.\nUse Bear Traps early to lock down key routes on the board. Avoid breaking walls when possible to force the Survivors over your traps more often.",
+      "th": "The Trapper เป็นฆาตกรสายควบคุมพื้นที่ สามารถกดดันทั่วแผนที่ด้วยการวาง Bear Trap ให้ผู้รอดชีวิตเดินไปติด\nใช้ Bear Trap ตั้งแต่ต้นเกมเพื่อล็อกเส้นทางสำคัญบนกระดาน และ หลีกเลี่ยงการทุบ กำแพงทำลายได้ เท่าที่ทำได้ เพื่อบังคับให้ผู้รอดชีวิตต้องเดินผ่านกับดักบ่อยขึ้น"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Bear Trap",
+      "text": {
+        "en": "Place a Bear Trap on a connected path without a pallet, breakable wall, or any other component. You may remove an existing Bear Trap to place a new one.",
+        "th": "วาง Bear Trap บนเส้นทางที่เชื่อมกับห้องนี้ ซึ่งไม่มี แผ่นพาเลท, กำแพงทำลายได้ หรือชิ้นส่วนอื่น, คุณอาจเก็บ Bear Trap ที่วางไว้แล้วออก, เพื่อวางอันใหม่ได้"
+      }
+    },
+    "passive": {
+      "en": "When a Survivor moves along a path with a Bear Trap, they roll the danger die. On a failure, remove the Bear Trap and the Survivor becomes wounded. If the Survivor was already wounded, gain a sacrifice progress.",
+      "th": "เมื่อผู้รอดชีวิตเคลื่อนที่ผ่านเส้นทางที่มี Bear Trap, ให้ทอย Danger Die, หากได้ ผล ล้มเหลว, ให้เก็บ Bear Trap ออก, และผู้รอดชีวิตจะบาดเจ็บ, ถ้าผู้รอดชีวิตบาดเจ็บอยู่แล้ว, ให้ได้รับ sacrifice progress 1 แต้ม"
+    },
+    "perks": [
+      {
+        "name": "Brutal Strength",
+        "cost": 1,
+        "flavor": {
+          "en": "Your great strength allows you to shred through your prey's defenses.",
+          "th": "พละกำลังมหาศาลช่วยให้คุณทำลายแนวป้องกันของเหยื่อ"
+        },
+        "text": {
+          "en": "After you attack a healthy Survivor, move them along any path. If you move them through a pallet or breakable wall, destroy the pallet or breakable wall.",
+          "th": "หลังจากคุณโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ให้ย้ายเขาไปตามเส้นทางใดก็ได้, หากย้ายผ่าน แผ่นพาเลท หรือ กำแพงทำลายได้, ให้ทำลาย แผ่นพาเลท หรือ กำแพงทำลายได้ นั้น"
+        }
+      },
+      {
+        "name": "Unnerving Presence",
+        "cost": 1,
+        "flavor": {
+          "en": "Your presense alone instills great fear.",
+          "th": "เพียงการปรากฏตัวของคุณก็สร้างความหวาดกลัวอย่างยิ่ง"
+        },
+        "text": {
+          "en": "When a Survivor in your space or a connected space would perform a skill check, they roll the danger die instead.",
+          "th": "เมื่อผู้รอดชีวิตในห้องของคุณ หรือ ห้องที่เชื่อมกัน ต้องทำ Skill Check, ให้เขาทอย Danger Die แทน"
+        }
+      },
+      {
+        "name": "Agitation",
+        "cost": 1,
+        "flavor": {
+          "en": "You get excited in anticipation of hooking your prey.",
+          "th": "คุณตื่นเต้นเมื่อได้คาดหวังว่าจะเอาเหยื่อขึ้นตะขอแขวน"
+        },
+        "text": {
+          "en": "After you attack a healthy Survivor, move along any path.",
+          "th": "หลังจากคุณโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+        }
+      }
+    ],
+    "tokens": [
+      {
+        "name": "Bear Trap",
+        "count": 4,
+        "source": "killer/power_token/trapper/126E88820BBBD39DCB0CD2F56605FD331611BDC7_0 - Unnamed.webp"
+      }
+    ],
+    "source": {
+      "boardEn": "killer/055CA6291D3D83038511AACAA0651D097668D9A7_0 - THE TRAPPER.webp",
+      "boardTh": "killer/TH_board/trapper.webp",
+      "mini": "killer/miniature/trapper.webp"
+    }
+  },
+  {
+    "id": "trickster",
+    "name": "The Trickster",
+    "realName": "Ji-Woon Hak",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Trickster is a ranged killer, able to quickly unleash a flurry of blades by using his power, Showstopper.\nPrioritize Showstopper anytime you can distribute at least 3 Knives. Use No Way Out every opportunity you get. The extra time you buy will give you more opportunities to [advance] wounds and sacrifice progress.",
+      "th": "The Trickster เป็นฆาตกรสายโจมตีระยะไกล สามารถปล่อยใบมีดชุดใหญ่ได้อย่างรวดเร็วด้วยพลัง Showstopper\nให้ความสำคัญกับ Showstopper ทุกครั้งที่คุณแจก Knife ได้อย่างน้อย 3 เล่ม ใช้ No Way Out ทุกโอกาสที่ทำได้ เวลาที่ซื้อได้เพิ่มจะให้โอกาสมากขึ้นในการทำให้ผู้รอดชีวิตบาดเจ็บ และ เพิ่ม sacrifice progress"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Showstopper",
+      "text": {
+        "en": "Each Survivor in your space and connected spaces gains a Knife.",
+        "th": "ผู้รอดชีวิตแต่ละคนในห้องของคุณ และ ห้องที่เชื่อมกัน จะได้รับ Knife 1 เล่ม"
+      }
+    },
+    "passive": {
+      "en": "Survivors' maximum {BP} decreases by two for each Knife they have. Survivors discard any {BP} beyond their maximum. After a Survivor interacts with a locker, they discard all of their Knives. When a Survivor gains their 3rd Knife, they become wounded. If a Survivor would gain a 4th Knife, gain a sacrifice progress instead. A Survivor with 3 Knives cannot become healthy.",
+      "th": "{BP} สูงสุดของผู้รอดชีวิตลดลง 2 ต่อ Knife แต่ละเล่มที่เขามี, ผู้รอดชีวิตทิ้ง {BP} ที่เกินค่าสูงสุดของเขา, หลังจากผู้รอดชีวิต Interact กับ ตู้หลบ, เขาทิ้ง Knife ทั้งหมด, เมื่อผู้รอดชีวิตได้รับ Knife เล่มที่ 3, เขาจะบาดเจ็บ, ถ้าผู้รอดชีวิตจะได้รับ Knife เล่มที่ 4, ให้คุณได้รับ sacrifice progress แทน, ผู้รอดชีวิตที่มี Knife 3 เล่มจะกลับมาไม่บาดเจ็บไม่ได้"
+    },
+    "perks": [
+      {
+        "name": "No Way Out",
+        "cost": 1,
+        "flavor": {
+          "en": "You're not going to let just anyone into the VIP room.",
+          "th": "คุณจะไม่ปล่อยให้ใครก็ได้เข้าห้อง VIP"
+        },
+        "text": {
+          "en": "When a Survivor with fewer {BP} than you would interact with a generator or the exit gates, prevent that interaction.",
+          "th": "เมื่อผู้รอดชีวิตที่มี {BP} น้อยกว่าคุณจะ Interact กับ เครื่องปั่นไฟ หรือ ประตูทางออก, ให้ห้าม Interaction นั้น"
+        }
+      },
+      {
+        "name": "Crowd Control",
+        "cost": 1,
+        "flavor": {
+          "en": "Those lesser than you must be properly herded.",
+          "th": "ผู้ที่ด้อยกว่าคุณต้องถูกต้อนอย่างเหมาะสม"
+        },
+        "text": {
+          "en": "At the start of the planning phase, choose a survivor. The Survivors may collectively spend 2 {BP}. Otherwise, you select what movement card the chosen Survivor will set from their hand for the turn.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, ผู้รอดชีวิตทุกคนรวมกันอาจจ่าย 2 {BP} ได้, ถ้าไม่, คุณเป็นผู้เลือกว่าผู้รอดชีวิตที่ถูกเลือกจะวางการ์ดเคลื่อนที่ใบไหนจากมือของเขาในเทิร์นนั้น"
+        }
+      },
+      {
+        "name": "Starstruck",
+        "cost": 2,
+        "flavor": {
+          "en": "Your unmatched showmanship dazzles all.",
+          "th": "ความเป็นนักแสดงที่ไร้ใครเทียบของคุณทำให้ทุกคนตะลึง"
+        },
+        "text": {
+          "en": "When you would pick up a Survivor, move along any path and then pick up a different survivor instead. (They do not need to be wounded.)",
+          "th": "เมื่อคุณจะ pick up ผู้รอดชีวิต, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้, แล้ว pick up ผู้รอดชีวิตอีกคนแทน (เขาไม่จำเป็นต้องบาดเจ็บ)"
+        }
+      }
+    ],
+    "tokens": [
+      {
+        "name": "Knife",
+        "count": 12,
+        "source": "killer/power_token/trickster/91EC5DC632E5470765060D6BBD2F8EE796EFCA4B_6 - Unnamed.webp"
+      }
+    ],
+    "source": {
+      "boardEn": "killer/FE8D935CD7FA6D9DABF945FA6ED672131AAEFEF1_15 - THE TRICKSTER.webp",
+      "boardTh": "killer/TH_board/trickster.webp",
+      "mini": "killer/miniature/trickster.webp"
+    }
+  },
+  {
+    "id": "twins",
+    "name": "The Twins",
+    "realName": "Victor & Charlotte Deshayes",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Twins are a cooperative pair of Killers, able to divide and hunt together using their power, Blood Bond.\nVictor is a strong control tool, and it's useful to keep him in play as much as possible, effectively doubling the threat of your attacks. Oppression will greatly slow down the Survivors, so use this to your advantage early and often.",
+      "th": "The Twins เป็นฆาตกรคู่ที่ทำงานร่วมกัน สามารถแยกกัน และ ล่าร่วมกันด้วยพลัง Blood Bond\nVictor เป็นเครื่องมือควบคุมที่ทรงพลัง ควรให้เขาอยู่บนกระดานให้นานที่สุดเท่าที่ทำได้ เพื่อเพิ่มภัยคุกคามจากการโจมตีเป็นสองเท่า Oppression จะทำให้ผู้รอดชีวิตช้าลงมาก จึงควรใช้ให้เป็นประโยชน์ตั้งแต่ต้น และ บ่อย ๆ"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Blood Bond",
+      "text": {
+        "en": "Place Victor in your space. If Victor is already on the game board, remove him before placing him back into your space.",
+        "th": "วาง Victor ในห้องของคุณ, หาก Victor อยู่บนกระดานอยู่แล้ว, ให้เก็บเขาออกก่อน แล้วจึงวางกลับมาในห้องของคุณ"
+      }
+    },
+    "passive": {
+      "en": "At the start of each of your turns, you may take that turn using either Victor or Charlotte. When Victor would pick up a Survivor, you gain a {BP} instead. Survivors can interact with Victor to remove him. Victor is considered to be 'the Killer' when you are taking a turn with him. In all other instances, only Charlotte is 'the Killer'.",
+      "th": "เมื่อเริ่มแต่ละเทิร์นของคุณ, คุณเลือกเล่นเทิร์นนั้นด้วย Victor หรือ Charlotte ก็ได้, เมื่อ Victor จะ pick up ผู้รอดชีวิต, ให้คุณได้รับ 1 {BP} แทน, ผู้รอดชีวิตสามารถ Interact กับ Victor เพื่อเก็บเขาออกได้, Victor ถือเป็น \"ฆาตกร\" ขณะที่คุณเล่นเทิร์นด้วยเขา, ส่วนในกรณีอื่น, มีเพียง Charlotte ที่เป็น \"ฆาตกร\""
+    },
+    "perks": [
+      {
+        "name": "Coup de Grâce",
+        "cost": 2,
+        "flavor": {
+          "en": "As the end nears, you go in for the kill.",
+          "th": "เมื่อจุดจบใกล้เข้ามา คุณเข้าไปจัดการขั้นเด็ดขาด"
+        },
+        "text": {
+          "en": "At the end of your turn, take a Killer bonus turn. Instead of playing a new card, reuse the movement card from your last Killer turn. (You can only take one Killer bonus turn per round.)",
+          "th": "เมื่อจบเทิร์นของคุณ, ให้เล่น Killer bonus turn, แทนที่จะเล่นการ์ดใหม่, ให้ใช้การ์ดเคลื่อนที่จากเทิร์นฆาตกรครั้งล่าสุดซ้ำ (คุณเล่น Killer bonus turn ได้เพียงหนึ่งครั้งต่อรอบ)"
+        }
+      },
+      {
+        "name": "Hoarder",
+        "cost": 0,
+        "flavor": {
+          "en": "You protect what little you have.",
+          "th": "คุณปกป้องสิ่งเล็กน้อยที่คุณมี"
+        },
+        "text": {
+          "en": "As an interaction, interact with a chest to remove it and gain 2 {BP}.",
+          "th": "Perk นี้เป็นการ Interact, ให้ Interact กับ กล่องไอเทม เพื่อเก็บมันออก และได้รับ 2 {BP}"
+        }
+      },
+      {
+        "name": "Oppression",
+        "cost": 2,
+        "flavor": {
+          "en": "Life has been difficult for you, so you will make it difficult for others.",
+          "th": "ชีวิตของคุณยากลำบาก คุณจึงทำให้คนอื่นลำบากด้วย"
+        },
+        "text": {
+          "en": "When you damage a generator, remove a progress from up to 2 other generators anywhere on the game board.",
+          "th": "เมื่อคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ลบความคืบหน้า 1 แต้ม จาก เครื่องปั่นไฟ เครื่องอื่นไม่เกิน 2 เครื่องบนกระดาน"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/26D2FDF18B4402D27D3610D710105D8D8EB72425_14 - THE TWINS.webp",
+      "boardTh": "killer/TH_board/twins.webp",
+      "mini": "killer/miniature/twins.webp"
+    }
+  },
+  {
+    "id": "unknown",
+    "name": "The Unknown",
+    "realName": null,
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Unknown is beyond understanding, though many have tried.\nThe Unknown is most powerful when fully set-up, so use Hallucination and Unbound often to grow in power and dominate the board. Undone is great for giving yourself more time to do so.",
+      "th": "The Unknown เกินกว่าจะเข้าใจได้ แม้จะมีคนพยายามมากมาย\nThe Unknown ทรงพลังที่สุดเมื่อเซ็ตอัปครบ ดังนั้นควรใช้ Hallucination และ Unbound บ่อย ๆ เพื่อเพิ่มพลัง และ ครองกระดาน Undone ช่วยให้คุณมีเวลาทำเช่นนั้นมากขึ้น"
+    },
+    "extraAction": null,
+    "power": {
+      "name": "Hallucination",
+      "text": {
+        "en": "Place a The Unknown with the lowest number that is not on the game board in a connected room.",
+        "th": "วาง The Unknown ที่มีหมายเลขต่ำสุดซึ่งยังไม่อยู่บนกระดานเกมลงในห้องที่เชื่อมกัน"
+      }
+    },
+    "passive": {
+      "en": "Perform setup with The unknown labelled \"1'.\nInstead of setting movement cards normally, set and assign a movement card to each The Unknown on the game board in ascending order ('1' is assigned to the first card, '2' to the second, etc). When taking a turn with a movement card, take that turn using The Unknown assigned to that card. All The Unknowns on the game board are considered \"the Killer\". The Unknown cannot take killer bonus turns.",
+      "th": "เซ็ตอัปโดยมี The Unknown ที่ติดป้าย '1', แทนที่จะวางการ์ดเคลื่อนที่ตามปกติ, ให้วางและกำหนดการ์ดเคลื่อนที่หนึ่งใบให้ The Unknown แต่ละตัวบนกระดานตามลำดับจากน้อยไปมาก ('1' ได้การ์ดใบแรก, '2' ได้ใบที่สอง ฯลฯ), เมื่อเล่นเทิร์นด้วยการ์ดเคลื่อนที่, ให้เล่นเทิร์นนั้นด้วย The Unknown ที่ถูกกำหนดให้การ์ดใบนั้น, The Unknown ทุกตัวบนกระดานถือเป็น \"ฆาตกร\", The Unknown เล่น Killer bonus turn ไม่ได้"
+    },
+    "perks": [
+      {
+        "name": "Unbound",
+        "cost": 3,
+        "flavor": {
+          "en": "Pain lingers in the air, an alluring aroma that excites the impulses.",
+          "th": "ความเจ็บปวดลอยค้างในอากาศ เป็นกลิ่นล่อใจที่กระตุ้นแรงกระตุ้น"
+        },
+        "text": {
+          "en": "At the start of the planning phase, choose a movement card that you only have a single copy of. Take another copy of that card from outside of the game and add it to your hand.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้เลือกการ์ดเคลื่อนที่ที่คุณมีเพียงใบเดียว, แล้ว หยิบการ์ดใบเดียวกันอีกใบจากนอกเกมมาเพิ่มในมือ"
+        }
+      },
+      {
+        "name": "Undone",
+        "cost": 1,
+        "flavor": {
+          "en": "Hope is the delusion that keeps its victims alive.",
+          "th": "ความหวังคือภาพลวงที่ทำให้เหยื่อยังมีชีวิตอยู่"
+        },
+        "text": {
+          "en": "When progress would be added to a generator in your space. one less progress is added instead (can be 0).",
+          "th": "เมื่อจะเพิ่มความคืบหน้าให้ เครื่องปั่นไฟ ในห้องของคุณ, ให้เพิ่มน้อยลง 1 แต้มแทน (อาจเหลือ 0 ได้)"
+        }
+      },
+      {
+        "name": "Unforeseen",
+        "cost": 1,
+        "flavor": {
+          "en": "Terror takes many forms and whispers devastating lies in its victims' ears",
+          "th": "ความหวาดกลัวมีหลายรูปแบบ และ กระซิบคำโกหกที่ทำลายล้างข้างหูเหยื่อ"
+        },
+        "text": {
+          "en": "When a generator is completed, move directly to that generator's space.",
+          "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้เคลื่อนที่ตรงไปยังห้องของ เครื่องปั่นไฟ นั้น"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/AB0F91233584F36C3CCAC42FFEC7B27DF60A56E6_unknown_board.webp",
+      "boardTh": "killer/TH_board/unknown.webp",
+      "mini": "killer/miniature/unknown_marker1.webp"
+    }
+  },
+  {
+    "id": "wraith",
+    "name": "The Wraith",
+    "realName": "Philip Ojomo",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Wraith is a stealth Killer, able to threaten the entire board simultaneously with his power, Wailing Bell.\nUse Wailing Bell as your first interaction if you miss a Survivor, to set up for your second move/attack. Using the bell is slow, so prioritize scoring two normal attacks when you can. Shadowborn can make up for lost time.",
+      "th": "The Wraith เป็นฆาตกรสายลอบเร้น สามารถคุกคามทั้งกระดานพร้อมกันด้วยพลัง Wailing Bell\nใช้ Wailing Bell เป็น Interaction แรกหากคุณพลาดผู้รอดชีวิต เพื่อเตรียมการเคลื่อนที่/โจมตีครั้งที่สอง การใช้ระฆังค่อนข้างช้า จึงควรให้ความสำคัญกับการโจมตีปกติสองครั้งเมื่อทำได้ และ Shadowborn ช่วยชดเชยเวลาที่เสียไป"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Wailing Bell",
+      "text": {
+        "en": "Move directly to a space that is not connected to your space.",
+        "th": "เคลื่อนที่ตรงไปยังห้องที่ไม่ได้เชื่อมกับห้องของคุณ"
+      }
+    },
+    "passive": null,
+    "perks": [
+      {
+        "name": "Shadowborn",
+        "cost": 2,
+        "flavor": {
+          "en": "You have a keen vision in the darkness of the night.",
+          "th": "คุณมองเห็นได้ชัดเจนในความมืดของค่ำคืน"
+        },
+        "text": {
+          "en": "At the end of the planning phase, place a third movement card. (This will allow you to take a third turn.) You cannot take Killer bonus turns this round.",
+          "th": "เมื่อจบเฟส Planning, ให้วางการ์ดเคลื่อนที่ใบที่สาม (ทำให้คุณเล่นเทิร์นที่สามได้), รอบนี้คุณใช้ Killer bonus turn ไม่ได้"
+        }
+      },
+      {
+        "name": "Bloodhound",
+        "cost": 0,
+        "flavor": {
+          "en": "Like a hound, you smell traces of blood at a great distance.",
+          "th": "เหมือนสุนัขล่าเนื้อ คุณได้กลิ่นเลือดจากระยะไกล"
+        },
+        "text": {
+          "en": "After you sacrifice a Survivor, they lose a {BP} and you gain a {BP}. (You still gain {BP}, even if they do not have any to lose.)",
+          "th": "หลังจากคุณสังเวยผู้รอดชีวิต, เขาเสีย 1 {BP} และคุณได้รับ 1 {BP} (คุณยังได้รับ {BP} แม้เขาไม่มี {BP} ให้เสีย)"
+        }
+      },
+      {
+        "name": "Predator",
+        "cost": 2,
+        "flavor": {
+          "en": "You possess an acute tracking ability.",
+          "th": "คุณมีความสามารถในการติดตามเหยื่ออย่างเฉียบคม"
+        },
+        "text": {
+          "en": "At the end of the planning phase, choose a Survivor. They discard their set movement card, then replace it with a new one.",
+          "th": "เมื่อจบเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, เขาต้องทิ้งการ์ดเคลื่อนที่ที่วางไว้, แล้ว เปลี่ยนเป็นใบใหม่"
+        }
+      }
+    ],
+    "tokens": [],
+    "source": {
+      "boardEn": "killer/26C1BF6516E12DED82B82E230C17A3EEBCE1BB9C_1 - THE WRAITH.webp",
+      "boardTh": "killer/TH_board/wraith.webp",
+      "mini": "killer/miniature/wraith.webp"
+    }
+  }
+]

@@ -1,0 +1,1602 @@
+[
+  {
+    "id": "ace",
+    "name": "Ace Visconti",
+    "title": {
+      "en": "Lucky Gambler",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Ace Visconti is a lucky gambler, improving the odds of the entire team.",
+      "th": "Ace Visconti เป็นนักพนันผู้โชคดี ช่วยเพิ่มโอกาสให้ทั้งทีม"
+    },
+    "quote": {
+      "en": "\"What can I say? I'm just a very lucky guy... I'm sure some of it will rub off on you.\" – Ace Visconti",
+      "th": "\"จะให้พูดยังไงดีล่ะ? ฉันก็แค่โชคดีมาก ๆ... ฉันเชื่อว่าโชคบางส่วนจะส่งต่อมาถึงพวกนายด้วย\" – Ace Visconti"
+    },
+    "perks": [
+      {
+        "name": "Open-Handed",
+        "cost": 1,
+        "flavor": {
+          "en": "Paying attention has kept you alive through the years.",
+          "th": "การสังเกตอย่างใส่ใจทำให้คุณรอดมาได้ตลอดหลายปี"
+        },
+        "text": {
+          "en": "At the start of any Survivor turn, reveal one of the Killer's set movement cards.",
+          "th": "เมื่อเริ่มเทิร์นของผู้รอดชีวิตคนใดก็ได้, ให้เปิดการ์ดเคลื่อนที่ที่วางไว้ของฆาตกรหนึ่งใบ"
+        }
+      },
+      {
+        "name": "Ace in the Hole",
+        "cost": 1,
+        "flavor": {
+          "en": "Lady Luck always seems to be throwing something good your way.",
+          "th": "โชคชะตาดูเหมือนจะส่งสิ่งดี ๆ มาให้คุณเสมอ"
+        },
+        "text": {
+          "en": "Before you interact, swap a prop in your space with another from the same category in a connected space. Generators with progress, occupied lockers, and occupied hooks can't be swapped.",
+          "th": "ก่อน Interact, ให้สลับ prop ในห้องของคุณ กับ prop อื่นที่มีสีเดียวกัน จากห้องที่เชื่อมกัน, ไม่สามารถสลับ เครื่องปั่นไฟ ที่มีความคืบหน้า, ตู้หลบที่มีคนอยู่ และ ตะขอแขวน ที่มีคนอยู่ได้"
+        }
+      },
+      {
+        "name": "Up the Ante",
+        "cost": 2,
+        "flavor": {
+          "en": "All will be well in the end, you just know it.",
+          "th": "ทุกอย่างจะดีในที่สุด คุณรู้ดี"
+        },
+        "text": {
+          "en": "At the end of your turn, take a Survivor bonus turn. The Killer gains 2 {BP}.",
+          "th": "เมื่อจบเทิร์นของคุณ, ให้เล่น Survivor bonus turn, ฆาตกรได้รับ 2 {BP}"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/0C28FF6A8D8C699F683DA2D0BC807716C6D246CD_5 - ACE VISCONTI.webp",
+      "boardTh": "survival/TH_board/ace.webp",
+      "mini": "survival/miniature/5D03EA770911B61B8139079E5837CC238B7E325F_ace2.webp"
+    }
+  },
+  {
+    "id": "adam",
+    "name": "Adam Francis",
+    "title": {
+      "en": "Resourceful Teacher",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Adam Francis is a resourceful teacher, able to adapt to new circumstances and develop strategies accordingly.",
+      "th": "Adam Francis เป็นครูผู้มีไหวพริบ สามารถปรับตัวเข้ากับสถานการณ์ใหม่ และ พัฒนากลยุทธ์ให้เหมาะสม"
+    },
+    "quote": {
+      "en": "\"There's no limit to what you can achieve, as long as you back it up with hard work.\" – Adam Francis",
+      "th": "\"ไม่มีขีดจำกัดสำหรับสิ่งที่คุณทำได้ ตราบใดที่คุณสนับสนุนมันด้วยการทำงานหนัก\" – Adam Francis"
+    },
+    "perks": [
+      {
+        "name": "Diversion",
+        "cost": 2,
+        "flavor": {
+          "en": "You are willing to risk life and limb to give your friends a few precious seconds.",
+          "th": "คุณยอมเสี่ยงชีวิต และ ร่างกายเพื่อซื้อเวลาอันมีค่าไม่กี่วินาทีให้เพื่อน ๆ"
+        },
+        "text": {
+          "en": "As an interaction, interact with the Killer to move them along any path. The Killer gains a {BP}.",
+          "th": "Perk นี้เป็นการ Interact, ให้ Interact กับฆาตกร, เพื่อให้เขาเคลื่อนที่ไปตามเส้นทางใดก็ได้, ฆาตกรได้รับ 1 {BP}"
+        }
+      },
+      {
+        "name": "Autodidact",
+        "cost": 2,
+        "flavor": {
+          "en": "There's no limit to what you can achieve with hard work.",
+          "th": "ไม่มีขีดจำกัดสำหรับสิ่งที่คุณทำได้ด้วยการทำงานหนัก"
+        },
+        "text": {
+          "en": "When you or another Survivor in your space or a connected space rolls a success, change the result to a great success instead.",
+          "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ ผล สำเร็จ, ให้เปลี่ยนเป็น ผล สำเร็จอย่างยิ่ง แทน"
+        }
+      },
+      {
+        "name": "Deliverance",
+        "cost": 1,
+        "flavor": {
+          "en": "You are always on the lookout for ways to help others.",
+          "th": "คุณคอยมองหาวิธีช่วยเหลือผู้อื่นอยู่เสมอ"
+        },
+        "text": {
+          "en": "After you sabotage an occupied hook or the hook you are on is sabotaged by another Survivor, either you or the other Survivor becomes healthy (your choice).",
+          "th": "หลังจากคุณ ทำลาย ตะขอแขวน ที่มีคนอยู่ หรือ ตะขอแขวน ที่คุณอยู่ถูกผู้รอดชีวิตคนอื่น ทำลาย, ให้คุณ หรือ ผู้รอดชีวิตอีกคนกลับมาไม่บาดเจ็บ (คุณเป็นผู้เลือก)"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/962975DA305F77712C8EF2AEC2219D1363356B49_9 - ADAM FRANCIS.webp",
+      "boardTh": "survival/TH_board/adam.webp",
+      "mini": "survival/miniature/522C8124BEBC53D3D333347D403BD34685FA4BB5_adam.webp"
+    }
+  },
+  {
+    "id": "claudette",
+    "name": "Claudette Morel",
+    "title": {
+      "en": "Studious Botanist",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Claudette Morel is a studious botanist, able to boost her team's survivability as well as her own.",
+      "th": "Claudette Morel เป็นนักพฤกษศาสตร์ผู้ใฝ่เรียน สามารถเพิ่มโอกาสรอดชีวิตของทีม และ ของตัวเอง"
+    },
+    "quote": {
+      "en": "\"Basic botany knowledge could save your life someday.\" – Claudette Morel",
+      "th": "\"ความรู้พื้นฐานด้านพฤกษศาสตร์อาจช่วยชีวิตคุณได้สักวัน\" – Claudette Morel"
+    },
+    "perks": [
+      {
+        "name": "Botany Knowledge",
+        "cost": 1,
+        "flavor": {
+          "en": "You can transform common plants into healing tinctures.",
+          "th": "คุณเปลี่ยนพืชธรรมดาให้เป็นยาสมุนไพรรักษาได้"
+        },
+        "text": {
+          "en": "Before or after moving during your turn, roll the danger die. On a success, another Survivor in your space becomes healthy. You can still interact this turn.",
+          "th": "ก่อน หรือ หลังเคลื่อนที่ในเทิร์นของคุณ, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ผู้รอดชีวิตอีกคนในห้องของคุณจะกลับมาไม่บาดเจ็บ, คุณยัง Interact ได้ในเทิร์นนี้"
+        }
+      },
+      {
+        "name": "Empathy",
+        "cost": 0,
+        "flavor": {
+          "en": "You can understand others intuitively, and this helps you ease their pain.",
+          "th": "คุณเข้าใจผู้อื่นได้ด้วยสัญชาตญาณ และ นี่ช่วยบรรเทาความเจ็บปวดของพวกเขา"
+        },
+        "text": {
+          "en": "At the start of your turn, you may take a {BP} from a willing Survivor, OR; you may give a {BP} to a willing Survivor.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, คุณอาจรับ 1 {BP} จากผู้รอดชีวิตที่เต็มใจ หรือ ให้ 1 {BP} แก่ผู้รอดชีวิตที่เต็มใจ"
+        }
+      },
+      {
+        "name": "Self-Care",
+        "cost": 1,
+        "flavor": {
+          "en": "You know a thing or two about first aid.",
+          "th": "คุณรู้เรื่องการปฐมพยาบาลอยู่บ้าง"
+        },
+        "text": {
+          "en": "At the start of your turn, roll the danger die. On a success, you become healthy.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, คุณจะกลับมาไม่บาดเจ็บ"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/71D90F0F0C62AF5D7DA3ECB9CC3FCF4A10AADC26_2 - CLAUDETTE MOREL.webp",
+      "boardTh": "survival/TH_board/claudette.webp",
+      "mini": "survival/miniature/D04111EFC84E95D6E3037FA89FE2C1178418F81C_Claud.webp"
+    }
+  },
+  {
+    "id": "david",
+    "name": "David King",
+    "title": {
+      "en": "Rugged Scrapper",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "David King is a rugged scrapper, rewarding high-risk play.",
+      "th": "David King เป็นนักสู้ลุยดิบ ผู้ให้รางวัลกับการเล่นเสี่ยงสูง"
+    },
+    "quote": {
+      "en": "\"It were a right dust up, I swear down!.\" – David King",
+      "th": "\"มันเป็นศึกใหญ่จริง ๆ สาบานได้เลย!\" – David King"
+    },
+    "perks": [
+      {
+        "name": "No Mither",
+        "cost": 1,
+        "flavor": {
+          "en": "Go on out, kid, it's just a scratch.",
+          "th": "ไปเลย เด็กน้อย แค่แผลถลอกเอง"
+        },
+        "text": {
+          "en": "When the Killer interacts with a healthy Survivor in your space, roll the danger die. On a success, that Survivor remains healthy and the Killer gains a {BP}.",
+          "th": "เมื่อฆาตกร Interact กับผู้รอดชีวิตที่ไม่บาดเจ็บในห้องของคุณ, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ผู้รอดชีวิตคนนั้นยังคงไม่บาดเจ็บ และ ฆาตกรได้รับ 1 {BP}"
+        }
+      },
+      {
+        "name": "Dead Hard",
+        "cost": 2,
+        "flavor": {
+          "en": "You can take a beating and keep on going.",
+          "th": "คุณทนการรุมซ้อมได้ และ สู้ต่อไป"
+        },
+        "text": {
+          "en": "When another Survivor in your space would be sacrificed, roll the danger die. On a success, that Survivor moves along any path instead of being sacrificed.",
+          "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณจะถูกสังเวย, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ผู้รอดชีวิตคนนั้นเคลื่อนที่ไปตามเส้นทางใดก็ได้แทนที่จะถูกสังเวย"
+        }
+      },
+      {
+        "name": "We're Gonna Live Forever",
+        "cost": 1,
+        "flavor": {
+          "en": "Your few friends deserve the best protection.",
+          "th": "เพื่อนไม่กี่คนของคุณสมควรได้รับการปกป้องที่ดีที่สุด"
+        },
+        "text": {
+          "en": "When the Killer would leave your space, prevent that move. The Killer can still interact in your space.",
+          "th": "เมื่อฆาตกรจะออกจากห้องของคุณ, ให้ห้ามการเคลื่อนที่นั้น, ฆาตกรยัง Interact ในห้องของคุณได้"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/82C58B6825A110766449B319F998EC610B54F132_7 - DAVID KING.webp",
+      "boardTh": "survival/TH_board/david.webp",
+      "mini": "survival/miniature/66D38211016E018AC5460D67DEAB5B830D9FF33B_david.webp"
+    }
+  },
+  {
+    "id": "dwight",
+    "name": "Dwight Fairfield",
+    "title": {
+      "en": "Nervous Leader",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Dwight Fairfield is a nervous leader, able to locate his allies and increase their effectiveness",
+      "th": "Dwight Fairfield เป็นผู้นำที่ประหม่า สามารถค้นหาพันธมิตรของเขา และ เพิ่มประสิทธิภาพให้พวกเขา"
+    },
+    "quote": {
+      "en": "\"We have to work as a team, I need you to survive so that I can survive!\" – Dwight Fairfield",
+      "th": "\"เราต้องทำงานเป็นทีม ฉันต้องการให้พวกนายรอด เพื่อที่ฉันจะได้รอดด้วย!\" – Dwight Fairfield"
+    },
+    "perks": [
+      {
+        "name": "Prove Thyself",
+        "cost": 1,
+        "flavor": {
+          "en": "You inspire others around you with positive peer pressure.",
+          "th": "คุณสร้างแรงบันดาลใจให้คนรอบข้างด้วยแรงกดดันเชิงบวกจากเพื่อน"
+        },
+        "text": {
+          "en": "When you would interact, another Survivor in your space or a connected space interacts instead.",
+          "th": "เมื่อคุณจะ Interact, ให้ผู้รอดชีวิตคนอื่นในห้องของคุณ หรือ ห้องที่เชื่อมกัน Interact แทน"
+        }
+      },
+      {
+        "name": "Leader",
+        "cost": 1,
+        "flavor": {
+          "en": "You're able to organize a team to cooperate more efficiently.",
+          "th": "คุณสามารถจัดระเบียบทีมให้ร่วมมือกันได้อย่างมีประสิทธิภาพมากขึ้น"
+        },
+        "text": {
+          "en": "When another Survivor in your space moves, move with them, OR; when you move, another Survivor in your space moves with you.",
+          "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณเคลื่อนที่, ให้เคลื่อนที่ไปกับเขา, หรือ เมื่อคุณเคลื่อนที่, ผู้รอดชีวิตคนอื่นในห้องของคุณเคลื่อนที่ไปกับคุณ"
+        }
+      },
+      {
+        "name": "Bond",
+        "cost": 1,
+        "flavor": {
+          "en": "Shared experiences have formed a bond between you and friends.",
+          "th": "ประสบการณ์ร่วมกันสร้างสายสัมพันธ์ระหว่างคุณกับเพื่อน ๆ"
+        },
+        "text": {
+          "en": "When another survivor in your space or a connected space would perform a skill check, roll two skill check dice and keep either result instead.",
+          "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณ หรือ ห้องที่เชื่อมกัน ต้องทำ Skill Check, ให้ทอยเต๋า Skill Check สองลูก และเลือกผลใดผลหนึ่งแทน"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/46E0FCA87219E325C8FF60A9F92297B400D105FF_0 - DWIGHT FAIRFIELD.webp",
+      "boardTh": "survival/TH_board/dwight.webp",
+      "mini": "survival/miniature/5D12083F0FE9574E1DE1A2944289B80597EBA39C_Dwight.webp"
+    }
+  },
+  {
+    "id": "elodie",
+    "name": "Élodie Rakoto",
+    "title": {
+      "en": "Occult Investigator",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Élodie Rakoto is an occult investigator, able to use cunning tricks and stubborn resolve to keep herself alive.",
+      "th": "Élodie Rakoto เป็นนักสืบเรื่องลี้ลับ ใช้เล่ห์เหลี่ยม และ ความมุ่งมั่นอันดื้อรั้นเพื่อให้ตัวเองรอดชีวิต"
+    },
+    "quote": {
+      "en": "\"I relied on others to protect me once and I lost everything. Never again.\" – Élodie Rakoto",
+      "th": "\"ครั้งหนึ่งฉันพึ่งคนอื่นให้ปกป้องฉัน แล้ว ฉันก็เสียทุกอย่างไป จะไม่มีอีกแล้ว\" – Élodie Rakoto"
+    },
+    "perks": [
+      {
+        "name": "Power Struggle",
+        "cost": 2,
+        "flavor": {
+          "en": "You've never given up and you're not about to start now.",
+          "th": "คุณไม่เคยยอมแพ้ และ จะไม่เริ่มยอมแพ้ตอนนี้"
+        },
+        "text": {
+          "en": "As an interaction, interact with the Killer to reveal their first set movement card. They cannot interact after moving with their first card. The Killer gains 2 {BP}.",
+          "th": "Perk นี้เป็นการ Interact, ให้ Interact กับฆาตกร, เพื่อเปิดการ์ดเคลื่อนที่ใบแรกที่เขาวางไว้, ฆาตกรจะ Interact ไม่ได้หลังจากเคลื่อนที่ด้วยการ์ดใบแรกของเขา, ฆาตกรได้รับ 2 {BP}"
+        }
+      },
+      {
+        "name": "Appraisal",
+        "cost": 2,
+        "flavor": {
+          "en": "You have a careful eye that notices what many overlook.",
+          "th": "คุณมีสายตาละเอียดที่สังเกตสิ่งที่คนส่วนใหญ่มองข้าม"
+        },
+        "text": {
+          "en": "When another Survivor would discard an item, you gain it instead. If you have more than one item, discard until you only have one.",
+          "th": "เมื่อผู้รอดชีวิตคนอื่นจะทิ้ง item, ให้คุณรับ item นั้นแทน, ถ้าคุณมี item มากกว่าหนึ่งชิ้น, ให้ทิ้งจนเหลือหนึ่งชิ้น"
+        }
+      },
+      {
+        "name": "Deception",
+        "cost": 0,
+        "flavor": {
+          "en": "Your adventurous lifestyle requires moments of crafty misdirection.",
+          "th": "ไลฟ์สไตล์ผจญภัยของคุณต้องอาศัยจังหวะเบี่ยงเบนความสนใจอย่างเจ้าเล่ห์"
+        },
+        "text": {
+          "en": "When you would move during your turn, remain in your space instead. You cannot interact this turn. Gain a {BP}.",
+          "th": "เมื่อคุณจะเคลื่อนที่ในเทิร์นของคุณ, ให้อยู่ในห้องของคุณแทน, คุณ Interact ไม่ได้ในเทิร์นนี้, ได้รับ 1 {BP}"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/0C55812594A1D92186E5B7140F48EB6707247EFF_15 - LODIE RAKOTO.webp",
+      "boardTh": "survival/TH_board/elodie.webp",
+      "mini": "survival/miniature/74AFFC81899A4963DE966134B1D51E4477A93B84_elodie.webp"
+    }
+  },
+  {
+    "id": "felix",
+    "name": "Felix Richter",
+    "title": {
+      "en": "Visionary Architect",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Felix Richter is a visionary architect, able to use his relentless determination to form a plan and help other survivors.",
+      "th": "Felix Richter เป็นสถาปนิกผู้มองการณ์ไกล ใช้ความมุ่งมั่นไม่ลดละวางแผน และ ช่วยผู้รอดชีวิตคนอื่น"
+    },
+    "quote": {
+      "en": "\"When they come with a wrecking ball, build stronger walls.\" – Felix Richter",
+      "th": "\"เมื่อพวกเขาเอาลูกตุ้มทำลายมาถล่ม จงสร้างกำแพงให้แข็งแรงกว่าเดิม\" – Felix Richter"
+    },
+    "perks": [
+      {
+        "name": "Desperate Measures",
+        "cost": 1,
+        "flavor": {
+          "en": "You refuse to fail, even during your darkest hour.",
+          "th": "คุณไม่ยอมล้มเหลว แม้ในชั่วโมงที่มืดมนที่สุด"
+        },
+        "text": {
+          "en": "After performing your first interaction, interact again. The second interaction must target a survival prop.",
+          "th": "หลังจากทำ Interaction ครั้งแรก, ให้ Interact อีกครั้ง, Interaction ครั้งที่สองต้องเป็นกับ prop สีน้ำเงิน"
+        }
+      },
+      {
+        "name": "Visionary",
+        "cost": 0,
+        "flavor": {
+          "en": "You're remarkably focused on your means of escape.",
+          "th": "คุณจดจ่ออย่างยิ่งกับหนทางหนีของคุณ"
+        },
+        "text": {
+          "en": "When you would reveal a prop, reveal any prop in a connected space instead.",
+          "th": "เมื่อคุณจะเปิด prop, ให้เปิด prop ใดก็ได้ในห้องที่เชื่อมกันแทน"
+        }
+      },
+      {
+        "name": "Built to Last",
+        "cost": 2,
+        "flavor": {
+          "en": "You know how to get the most out of your tools.",
+          "th": "คุณรู้วิธีใช้เครื่องมือให้คุ้มค่าที่สุด"
+        },
+        "text": {
+          "en": "When you would discard an item after using it, keep it instead. You cannot use it again during this turn.",
+          "th": "เมื่อคุณจะทิ้ง item หลังใช้, ให้เก็บไว้แทน, คุณใช้มันอีกครั้งในเทิร์นนี้ไม่ได้"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/14D0CCB245DD59945EEE4FA2BA5D93C25B6D9053_14 - FELIX RICHTER.webp",
+      "boardTh": "survival/TH_board/felix.webp",
+      "mini": "survival/miniature/F2D8EEADF36A63B584EBE4C81167F5A1B1E41F30_Felix.webp"
+    }
+  },
+  {
+    "id": "feng",
+    "name": "Feng Min",
+    "title": {
+      "en": "Focused Competitor",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Feng Min is an objective-focused competitor who can quickly adapt her strategy to meet a vast range of challenging situations.",
+      "th": "Feng Min เป็นนักแข่งขันที่มุ่งเน้นเป้าหมาย สามารถปรับกลยุทธ์ได้อย่างรวดเร็วเพื่อรับมือสถานการณ์ท้าทายหลากหลาย"
+    },
+    "quote": {
+      "en": "\"I have true sight.\" – Feng Min",
+      "th": "\"ฉันมองเห็นความจริง\" – Feng Min"
+    },
+    "perks": [
+      {
+        "name": "Lithe",
+        "cost": 0,
+        "flavor": {
+          "en": "Your agility grants a competitive edge over larger rivals.",
+          "th": "ความคล่องแคล่วของคุณมอบความได้เปรียบเหนือคู่แข่งที่ตัวใหญ่กว่า"
+        },
+        "text": {
+          "en": "When you move over a pallet or out of a space with a pallet during your turn, move again along any other path before interacting (if you would interact).",
+          "th": "เมื่อคุณเคลื่อนที่ผ่าน แผ่นพาเลท หรือ ออกจากห้องที่มี แผ่นพาเลท ในเทิร์นของคุณ, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact (ถ้าคุณจะ Interact)"
+        }
+      },
+      {
+        "name": "Alert",
+        "cost": 1,
+        "flavor": {
+          "en": "Your acute senses are on high alert.",
+          "th": "ประสาทสัมผัสอันเฉียบคมของคุณตื่นตัวสูงสุด"
+        },
+        "text": {
+          "en": "When the Killer breaks a pallet, moves through a breakable wall, or damages a generator, move along any path.",
+          "th": "เมื่อฆาตกรทำลาย แผ่นพาเลท, เคลื่อนที่ผ่านกำแพงทำลายได้, หรือ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+        }
+      },
+      {
+        "name": "Technician",
+        "cost": 0,
+        "flavor": {
+          "en": "You are apt at handling machinery with the greatest care and precision.",
+          "th": "คุณถนัดในการจัดการเครื่องจักรด้วยความระมัดระวัง และ แม่นยำสูงสุด"
+        },
+        "text": {
+          "en": "When you roll a failure while interacting with a generator, interact again. The second interaction must target a different prop or Survivor.",
+          "th": "เมื่อคุณทอยได้ ผล ล้มเหลว ขณะ Interact กับ เครื่องปั่นไฟ, ให้ Interact อีกครั้ง, การ Interact ครั้งที่สองต้องเป็นกับ prop หรือผู้รอดชีวิตคนละอย่าง"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/66C380C3BB94471D8B479467AAF7458281B5A3C9_6 - FENG MIN.webp",
+      "boardTh": "survival/TH_board/feng.webp",
+      "mini": "survival/miniature/27CC22826F8E1910ADADFEC39F294823B7F34524_feng2.webp"
+    }
+  },
+  {
+    "id": "gabriel",
+    "name": "Gabriel Soma",
+    "title": {
+      "en": "Resourceful Engineer",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Gabriel Soma is a resourceful engineer, ready to make the most of any situation.",
+      "th": "Gabriel Soma เป็นวิศวกรผู้มีไหวพริบ พร้อมใช้ประโยชน์สูงสุดจากทุกสถานการณ์"
+    },
+    "quote": {
+      "en": "\"I've seen better days. That's for sure.\" — Gabriel Soma",
+      "th": "\"ฉันเคยเจอวันที่ดีกว่านี้ แน่นอน\" – Gabriel Soma"
+    },
+    "perks": [
+      {
+        "name": "Scavenger",
+        "cost": 2,
+        "flavor": {
+          "en": "Where others see junk, you see valuable improvised tools.",
+          "th": "ในสิ่งที่คนอื่นเห็นเป็นขยะ คุณเห็นเครื่องมือดัดแปลงที่มีค่า"
+        },
+        "text": {
+          "en": "At the start of your turn, discard your item to add a progress to a generator in your space.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ทิ้ง item ของคุณ, เพื่อเพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ ในห้องของคุณ"
+        }
+      },
+      {
+        "name": "Troubleshooter",
+        "cost": 1,
+        "flavor": {
+          "en": "No amount of distraction will shake you from your primary task.",
+          "th": "ไม่มีสิ่งรบกวนใดทำให้คุณเสียสมาธิจากงานหลัก"
+        },
+        "text": {
+          "en": "After moving, move again along any other path, as long as the space you move into has a generator.",
+          "th": "หลังจากเคลื่อนที่, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ ตราบใดที่ห้องที่คุณเข้าไปมี เครื่องปั่นไฟ"
+        }
+      },
+      {
+        "name": "Made for This",
+        "cost": 2,
+        "flavor": {
+          "en": "You were born to survive, and raised to adapt.",
+          "th": "คุณเกิดมาเพื่อรอดชีวิต และ ถูกเลี้ยงมาให้ปรับตัว"
+        },
+        "text": {
+          "en": "When the killer would pick you up (before rolling dice), add a sacrifice progress to the sacrifice track instead. You are not picked up.",
+          "th": "เมื่อฆาตกรจะ pick up คุณ (ก่อนทอยเต๋า), ให้เพิ่ม sacrifice progress ลงในแทร็ก sacrifice แทน, คุณจะไม่ถูก pick up"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/5F021034D053289A27B0EB07BDBCE657CEF9FF2F_gabriel_board.webp",
+      "boardTh": "survival/TH_board/gabriel.webp",
+      "mini": "survival/miniature/A60BA1A0B9BB5D549FC29F6B040FD8755108A3AC_gabriel_marker.webp"
+    }
+  },
+  {
+    "id": "haddie",
+    "name": "Haddie Kaur",
+    "title": {
+      "en": "Brave and Determined Podcaster",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Haddie Kaur is a brave and determined podcaster with the ability to see and feel places of great suffering she calls Overlaps.",
+      "th": "Haddie Kaur เป็นพอดแคสเตอร์ผู้กล้าหาญ และ แน่วแน่ มีความสามารถมองเห็น และ รู้สึกถึงสถานที่แห่งความทุกข์ทรมานอันยิ่งใหญ่ที่เธอเรียกว่า Overlaps"
+    },
+    "quote": {
+      "en": "\"The death, the trauma, the fear... it all leads here. The Overlap.\" -- Haddie Kaur",
+      "th": "\"ความตาย บาดแผลทางใจ ความกลัว... ทุกอย่างนำมาสู่ที่นี่ Overlap\" – Haddie Kaur"
+    },
+    "perks": [
+      {
+        "name": "Overzealous",
+        "cost": 0,
+        "flavor": {
+          "en": "Fighting back against the Ravage motivates and inspires you.",
+          "th": "การต่อสู้กลับต่อ Ravage กระตุ้น และ สร้างแรงบันดาลใจให้คุณ"
+        },
+        "text": {
+          "en": "When you enter the Killer's space, gain 1 {BP}.",
+          "th": "เมื่อคุณเข้าไปในห้องของฆาตกร, ให้ได้รับ 1 {BP}"
+        }
+      },
+      {
+        "name": "Residual Manifest",
+        "cost": 2,
+        "flavor": {
+          "en": "A lifetime of chasing the darkness has taught you that the best disinfectant is light.",
+          "th": "ชีวิตที่ไล่ล่าความมืดสอนคุณว่าน้ำยาฆ่าเชื้อที่ดีที่สุดคือแสงสว่าง"
+        },
+        "text": {
+          "en": "When the Killer would interact in your space, discard an item to prevent that interaction.",
+          "th": "เมื่อฆาตกรจะ Interact ในห้องของคุณ, ให้ทิ้ง item, เพื่อป้องกัน Interaction นั้น"
+        }
+      },
+      {
+        "name": "Inner Focus",
+        "cost": 1,
+        "flavor": {
+          "en": "You have honed your ability to see through the haze of the Ravage.",
+          "th": "คุณฝึกฝนความสามารถในการมองทะลุหมอกควันของ Ravage"
+        },
+        "text": {
+          "en": "When you would move with your card, instead roll two Skill Check dice and choose one. Move directly to the corresponding starting space on the board. (You then interact as normal).",
+          "th": "เมื่อคุณจะเคลื่อนที่ด้วยการ์ดของคุณ, ให้ทอยเต๋า Skill Check สองลูกแทน และ เลือกหนึ่งผล, แล้วเคลื่อนที่ตรงไปยังห้องเริ่มต้นที่ตรงกันบนกระดาน (จากนั้น Interact ตามปกติ)"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/CC915BFE00551446CB30E1CC5525D77AA18610AF_haddie_board.webp",
+      "boardTh": "survival/TH_board/haddie.webp",
+      "mini": "survival/miniature/75A056D01F4B3BCE79E3710BC040A144E17BA04A_haddie_marker.webp"
+    }
+  },
+  {
+    "id": "jake",
+    "name": "Jake Park",
+    "title": {
+      "en": "Solitary Survivalist",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Jake Park is a solitary survivalist, able to hold his own in most situations.",
+      "th": "Jake Park เป็นนักเอาตัวรอดผู้โดดเดี่ยว สามารถเอาตัวรอดได้ในเกือบทุกสถานการณ์"
+    },
+    "quote": {
+      "en": "\"Life, when you take away the fancy dressings, is just survival.\" – Jake Park",
+      "th": "\"ชีวิต เมื่อเอาเปลือกหรูหราออกไป ก็คือการเอาตัวรอดเท่านั้น\" – Jake Park"
+    },
+    "perks": [
+      {
+        "name": "Iron Will",
+        "cost": 1,
+        "flavor": {
+          "en": "You can concentrate in order to push through any obstacle.",
+          "th": "คุณสามารถรวบรวมสมาธิเพื่อฝ่าฟันทุกอุปสรรค"
+        },
+        "text": {
+          "en": "When you or another Survivor in your space or a connected space rolls a failure, treat it as a success instead. The Killer still gains {BP}, however.",
+          "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ ผล ล้มเหลว, ให้ถือว่าเป็น ผล สำเร็จ แทน, แต่ฆาตกรยังได้รับ {BP}"
+        }
+      },
+      {
+        "name": "Calm Spirit",
+        "cost": 0,
+        "flavor": {
+          "en": "Animals seem to trust you as they often stay calm in your presence.",
+          "th": "สัตว์ดูเหมือนจะไว้ใจคุณ เพราะมักสงบนิ่งเมื่ออยู่ใกล้คุณ"
+        },
+        "text": {
+          "en": "As an interaction, move a crow in your space to any space on the game board.",
+          "th": "Perk นี้เป็นการ Interact, ให้ย้าย อีกา ในห้องของคุณไปยังห้องใดก็ได้บนกระดานเกม"
+        }
+      },
+      {
+        "name": "Saboteur",
+        "cost": 0,
+        "flavor": {
+          "en": "Sometimes the best defense is a strong offense.",
+          "th": "บางครั้งการป้องกันที่ดีที่สุดคือการรุกที่แข็งแกร่ง"
+        },
+        "text": {
+          "en": "After you sabotage a hook, either gain a {BP}, or spend 2 {BP} to take a Survivor bonus turn.",
+          "th": "หลังจากคุณ ทำลาย ตะขอแขวน, ให้รับ 1 {BP} หรือ จ่าย 2 {BP}, เพื่อเล่น Survivor bonus turn"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/35CA653C00B766BD17E57714A520E62215AC3006_3 - JAKE PARK.webp",
+      "boardTh": "survival/TH_board/jake.webp",
+      "mini": "survival/miniature/76AC35203B368622E748C8721C15F28948B3BD12_jake.webp"
+    }
+  },
+  {
+    "id": "jane",
+    "name": "Jane Romero",
+    "title": {
+      "en": "Influential Celebrity",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Jane Romero is an influential celebrity, going against the grain to tackle challenges head on.",
+      "th": "Jane Romero เป็นคนดังผู้มีอิทธิพล ที่ฝืนกระแสเพื่อเผชิญหน้ากับความท้าทายโดยตรง"
+    },
+    "quote": {
+      "en": "\"People are remembered for the challenges they overcome.\" – Jane Romero",
+      "th": "\"ผู้คนถูกจดจำจากความท้าทายที่พวกเขาเอาชนะได้\" – Jane Romero"
+    },
+    "perks": [
+      {
+        "name": "Poised",
+        "cost": 1,
+        "flavor": {
+          "en": "Achieving goals boosts your confidence.",
+          "th": "การบรรลุเป้าหมายช่วยเพิ่มความมั่นใจของคุณ"
+        },
+        "text": {
+          "en": "When a Survivor rolls a great success during a skill check on a Survivor turn, that Survivor takes a Survivor bonus turn.",
+          "th": "เมื่อผู้รอดชีวิตทอยได้ ผล สำเร็จอย่างยิ่ง จาก Skill Check ในเทิร์นของผู้รอดชีวิต, ผู้รอดชีวิตคนนั้นเล่น Survivor bonus turn"
+        }
+      },
+      {
+        "name": "Solidarity",
+        "cost": 1,
+        "flavor": {
+          "en": "Sharing painful experiences has the power to heal.",
+          "th": "การแบ่งปันประสบการณ์ที่เจ็บปวดมีพลังในการเยียวยา"
+        },
+        "text": {
+          "en": "As an interaction, you may interact with another Survivor in a connected space to use the \"heal\" interaction on them.",
+          "th": "Perk นี้เป็นการ Interact, คุณอาจ Interact กับผู้รอดชีวิตอีกคนในห้องที่เชื่อมกัน, เพื่อใช้ Interaction \"heal\" กับเขา"
+        }
+      },
+      {
+        "name": "Head On",
+        "cost": 1,
+        "flavor": {
+          "en": "When your mind is set, there better be no one standing in your way.",
+          "th": "เมื่อใจตั้งมั่นแล้ว อย่าให้มีใครมาขวางทาง"
+        },
+        "text": {
+          "en": "After the Killer enters your space, remove a locker in your space to prevent the Killer from interacting this turn.",
+          "th": "หลังจากฆาตกรเข้ามาในห้องของคุณ, ให้เก็บ ตู้หลบ ในห้องของคุณออก, เพื่อป้องกันไม่ให้ฆาตกร Interact ในเทิร์นนี้"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/41118DD5DA07720F6F14E2B45C09793018819562_11 - JANE ROMERO.webp",
+      "boardTh": "survival/TH_board/jane.webp",
+      "mini": "survival/miniature/61FCC25176AEFE3798BB2A2787874E93844C1BE9_jane.webp"
+    }
+  },
+  {
+    "id": "jeff",
+    "name": "Jeff Johansen",
+    "title": {
+      "en": "Quiet Artist",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Jeff Johansen is a quiet artist with a heart of gold, standing steadfast against impossible odds.",
+      "th": "Jeff Johansen เป็นศิลปินผู้เงียบขรึมที่มีหัวใจทอง ยืนหยัดมั่นคงเผชิญโอกาสที่แทบเป็นไปไม่ได้"
+    },
+    "quote": {
+      "en": "\"Charge from the Belly of the Beast.' Here's a sketch/painting on a piece of wood I saw by the side of this road. I felt like it got a story to tell. And it didn't waste its second chance.\" — Jeff, ink and oil wash on slice of wood, 12x16",
+      "th": "\"Charge from the Belly of the Beast\" นี่คือภาพสเก็ตช์/ภาพวาดบนแผ่นไม้ที่ฉันเจอข้างถนนสายนี้ ฉันรู้สึกว่ามันมีเรื่องราวจะเล่า และ มันไม่ได้ทิ้งโอกาสครั้งที่สองไปเปล่า ๆ – Jeff, หมึก และ สีน้ำมันบนแผ่นไม้ ขนาด 12x16 นิ้ว"
+    },
+    "perks": [
+      {
+        "name": "Breakdown",
+        "cost": 1,
+        "flavor": {
+          "en": "You see the potential in things others might toss away.",
+          "th": "คุณมองเห็นศักยภาพในสิ่งที่คนอื่นอาจโยนทิ้ง"
+        },
+        "text": {
+          "en": "After you sabotage an occupied hook or the hook you are on is sabotaged by another Survivor, roll the danger die. On a success, the Killer loses a sacrifice progress.",
+          "th": "หลังจากคุณ ทำลาย ตะขอแขวน ที่มีคนอยู่ หรือ ตะขอแขวน ที่คุณอยู่ถูกผู้รอดชีวิตคนอื่น ทำลาย, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ฆาตกรเสีย sacrifice progress 1 แต้ม"
+        }
+      },
+      {
+        "name": "Aftercare",
+        "cost": 0,
+        "flavor": {
+          "en": "One good deed can make all the difference.",
+          "th": "ความดีเพียงหนึ่งอย่างอาจสร้างความแตกต่างได้ทั้งหมด"
+        },
+        "text": {
+          "en": "After you or another Survivor becomes healthy, sabotage an unoccupied hook anywhere on the game board.",
+          "th": "หลังจากคุณ หรือ ผู้รอดชีวิตคนอื่นกลับมาไม่บาดเจ็บ, ให้ ทำลาย ตะขอแขวน ที่ว่างอยู่ที่ใดก็ได้บนกระดานเกม"
+        }
+      },
+      {
+        "name": "Distortion",
+        "cost": 1,
+        "flavor": {
+          "en": "Your calm demeanor belies subtle cunning.",
+          "th": "ท่าทีสงบของคุณซ่อนไหวพริบอันแยบยล"
+        },
+        "text": {
+          "en": "After you move into the Killer's space during your turn, move again along any other path before interacting.",
+          "th": "หลังจากคุณเคลื่อนที่เข้าไปในห้องของฆาตกรในเทิร์นของคุณ, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/F9FFB24C66BCAC05EB22D46956BDA2B2E67CE531_10 - JEFF JOHANSEN.webp",
+      "boardTh": "survival/TH_board/jeff.webp",
+      "mini": "survival/miniature/522C8124BEBC53D3D333347D403BD34685FA4BB5_jeff.webp"
+    }
+  },
+  {
+    "id": "jonah",
+    "name": "Jonah Vasquez",
+    "title": {
+      "en": "Mathematical Mastermind",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Jonah Vasquez is a mathematical mastermind, able to use logic to help his team.",
+      "th": "Jonah Vasquez เป็นผู้วางแผนอัจฉริยะด้านคณิตศาสตร์ สามารถใช้ตรรกะช่วยทีมของเขาได้"
+    },
+    "quote": {
+      "en": "\"After careful analysis, we are getting the hell out of here!\" -- Jonah Vasquez",
+      "th": "\"หลังจากวิเคราะห์อย่างรอบคอบแล้ว เราจะออกไปจากที่นี่ให้ได้!\" – Jonah Vasquez"
+    },
+    "perks": [
+      {
+        "name": "Exponential",
+        "cost": 0,
+        "flavor": {
+          "en": "When it seems like your number is up, you consider ways to recalculate the odds.",
+          "th": "เมื่อดูเหมือนว่าโชคของคุณหมดแล้ว คุณก็ครุ่นคิดหาวิธีคำนวณโอกาสใหม่"
+        },
+        "text": {
+          "en": "After you successfully cleanse a Hex Totem, instead of gaining {BP}, a sacrificed Survivor moves along any path. They are no longer sacrificed. (This does not count as sabotaging the hook.)",
+          "th": "หลังจากคุณ ชำระล้าง โทเท็มคำสาป สำเร็จ, แทนที่จะได้รับ {BP}, ให้ผู้รอดชีวิตที่ถูกสังเวยหนึ่งคนเคลื่อนที่ไปตามเส้นทางใดก็ได้, เขาจะไม่ถูกสังเวยอีกต่อไป (ไม่นับว่าเป็นการ ทำลาย ตะขอแขวน)"
+        }
+      },
+      {
+        "name": "Overcome",
+        "cost": 0,
+        "flavor": {
+          "en": "You have calculated how much energy you can risk to expend.",
+          "th": "คุณคำนวณแล้วว่าสามารถเสี่ยงใช้พลังงานได้มากเท่าใด"
+        },
+        "text": {
+          "en": "At the end of your turn, if you are wounded, gain 1 {BP}.",
+          "th": "เมื่อจบเทิร์นของคุณ, ถ้าคุณบาดเจ็บ, ให้ได้รับ 1 {BP}"
+        }
+      },
+      {
+        "name": "Corrective Action",
+        "cost": 2,
+        "flavor": {
+          "en": "You quickly analyse problems and correct others' work when they make a mistake.",
+          "th": "คุณวิเคราะห์ปัญหาได้อย่างรวดเร็ว และ แก้ไขงานของคนอื่นเมื่อพวกเขาทำพลาด"
+        },
+        "text": {
+          "en": "When you or another survivor in your space or a connected space rolls a \"4\", treat it as a great success instead.",
+          "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ \"4\", ให้ถือเป็น ผล สำเร็จอย่างยิ่ง แทน"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/EE339596F2DFA4D34F9BA775442C284BB4324553_jonah_board.webp",
+      "boardTh": "survival/TH_board/jonah.webp",
+      "mini": "survival/miniature/86746BDDBE7BE18E30FC1B6111F3C74DE603CCA2_jonah_marker.webp"
+    }
+  },
+  {
+    "id": "kate",
+    "name": "Kate Denson",
+    "title": {
+      "en": "Hopeful Songbird",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Kate Denson is a hopeful songbird, able to make the most of her surroundings.",
+      "th": "Kate Denson เป็นนกร้องเพลงผู้เปี่ยมความหวัง สามารถใช้สภาพแวดล้อมรอบตัวให้เป็นประโยชน์ได้สูงสุด"
+    },
+    "quote": {
+      "en": "\"Another show's off and runnin', | Dance with me, cuz there's a storm a commin' | Follow my boots, try to keep up. | Dance with me, until sun up.\" — Kate Denson's 'Dance With Me'",
+      "th": ""
+    },
+    "perks": [
+      {
+        "name": "Windows of Opportunity",
+        "cost": 1,
+        "flavor": {
+          "en": "You see opportunities that others might have missed.",
+          "th": "คุณมองเห็นโอกาสที่คนอื่นอาจมองข้ามไป"
+        },
+        "text": {
+          "en": "You may interact with a survival or altruism prop in a connected space. If that prop was a locker, move into that space.",
+          "th": "คุณอาจ Interact กับ prop สีน้ำเงิน หรือ สีเขียว ในห้องที่เชื่อมกัน, ถ้า prop นั้นคือ ตู้หลบ, ให้เคลื่อนที่เข้าไปในห้องนั้น"
+        }
+      },
+      {
+        "name": "Boil Over",
+        "cost": 2,
+        "flavor": {
+          "en": "You are a battler and do everything to escape a foe's grasp.",
+          "th": "คุณเป็นนักสู้ และ ทำทุกอย่างเพื่อหนีจากเงื้อมมือของศัตรู"
+        },
+        "text": {
+          "en": "When you or another Survivor in your space is picked up, after the Killer decides how many dice to roll, the Survivor who was picked up may roll 4 skill check dice instead of the number the Killer chose.",
+          "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่นในห้องของคุณถูก pick up, หลังจากฆาตกรตัดสินใจว่าจะให้ทอยเต๋ากี่ลูก, ผู้รอดชีวิตที่ถูก pick up อาจทอยเต๋า Skill Check 4 ลูกแทนจำนวนที่ฆาตกรเลือก"
+        }
+      },
+      {
+        "name": "Dance With Me",
+        "cost": 0,
+        "flavor": {
+          "en": "You know your way around the dance floor.",
+          "th": "คุณรู้ทางของตัวเองบนฟลอร์เต้นรำ"
+        },
+        "text": {
+          "en": "After you move, if you occupied a locker at the start of the turn, move again along any other path before interacting.",
+          "th": "หลังจากคุณเคลื่อนที่, ถ้าคุณอยู่บน ตู้หลบ เมื่อเริ่มเทิร์น, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/D6DEF7F39EE3968B248A0D77EAB0EEB346266B53_8 - KATE DENSON.webp",
+      "boardTh": "survival/TH_board/kate.webp",
+      "mini": "survival/miniature/ED48862C3FBA07F6CED582122E46EF85A9652CFE_kate2.webp"
+    }
+  },
+  {
+    "id": "meg",
+    "name": "Meg Thomas",
+    "title": {
+      "en": "Energetic Athlete",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Meg Thomas is an energetic athlete, able to outrun most Killers.",
+      "th": "Meg Thomas เป็นนักกีฬาที่เปี่ยมพลัง สามารถวิ่งหนีฆาตกรส่วนใหญ่ได้"
+    },
+    "quote": {
+      "en": "\"Running isn't giving up. It means you still have the will to live.\" – Meg Thomas",
+      "th": "\"การวิ่งไม่ใช่การยอมแพ้ มันหมายความว่าเธอยังมีใจที่จะมีชีวิตอยู่\" – Meg Thomas"
+    },
+    "perks": [
+      {
+        "name": "Sprint Burst",
+        "cost": 1,
+        "flavor": {
+          "en": "When running, you're hard to catch.",
+          "th": "ขณะวิ่ง คุณจับตัวยาก"
+        },
+        "text": {
+          "en": "After you move with your movement card, move again along any other path.",
+          "th": "หลังจากคุณเคลื่อนที่ด้วยการ์ดเคลื่อนที่, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้"
+        }
+      },
+      {
+        "name": "Adrenaline",
+        "cost": 2,
+        "flavor": {
+          "en": "You are fuelled by unexpected energy when on the verge of escape.",
+          "th": "คุณมีแรงขับจากพลังที่คาดไม่ถึงเมื่อใกล้จะหนีรอด"
+        },
+        "text": {
+          "en": "At the start of cleanup, if a generator was completed this round, take a Survivor bonus turn.",
+          "th": "เมื่อเริ่มเฟส Cleanup, ถ้ามี เครื่องปั่นไฟ ถูกซ่อมเสร็จในรอบนี้, ให้เล่น Survivor bonus turn"
+        }
+      },
+      {
+        "name": "Quick & Quiet",
+        "cost": 1,
+        "flavor": {
+          "en": "You make less noise when running and hiding.",
+          "th": "คุณทำเสียงน้อยลงเมื่อวิ่ง และ ซ่อนตัว"
+        },
+        "text": {
+          "en": "When the Killer enters your space (before they interact), interact with a locker in your space.",
+          "th": "เมื่อฆาตกรเข้ามาในห้องของคุณ (ก่อนที่เขาจะ Interact), ให้ Interact กับ ตู้หลบ ในห้องของคุณ"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/1FD8124ED5708D90F24873C54F0FFB5BEF6F82C3_1 - MEG THOMAS.webp",
+      "boardTh": "survival/TH_board/meg.webp",
+      "mini": "survival/miniature/DFEFB25C8E0A7F815BFEEA3AAF242425C92A73D6_meg.webp"
+    }
+  },
+  {
+    "id": "mikaela",
+    "name": "Mikaela Reid",
+    "title": {
+      "en": "Young Mystic",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Mikaela Reid is a young mystic, able to alter the trial with supernatural abilities.",
+      "th": "Mikaela Reid เป็นผู้วิเศษรุ่นเยาว์ สามารถเปลี่ยนแปลงการพิจารณาคดีด้วยพลังเหนือธรรมชาติ"
+    },
+    "quote": {
+      "en": "\"Does anyone else see that? Just me?\" -- Mikaela Reid",
+      "th": "\"มีใครเห็นเหมือนกันไหม? หรือ ฉันเห็นคนเดียว?\" – Mikaela Reid"
+    },
+    "perks": [
+      {
+        "name": "Circle of Healing",
+        "cost": 0,
+        "flavor": {
+          "en": "A Boon that offers comfort amidst the terror.",
+          "th": "Boon ที่มอบความสบายใจท่ามกลางความหวาดกลัว"
+        },
+        "text": {
+          "en": "After you successfully cleanse a Hex Totem, instead of gaining {BP}, a Survivor becomes healthy.",
+          "th": "หลังจากคุณ ชำระล้าง โทเท็มคำสาป สำเร็จ, แทนที่จะได้รับ {BP}, ให้ผู้รอดชีวิตหนึ่งคนกลับมาไม่บาดเจ็บ"
+        }
+      },
+      {
+        "name": "Shadow Step",
+        "cost": 1,
+        "flavor": {
+          "en": "A Boon that conceals the truth.",
+          "th": "Boon ที่ปกปิดความจริง"
+        },
+        "text": {
+          "en": "After moving along a path, place the Entity on that path. Players cannot move along that path.",
+          "th": "หลังจากเคลื่อนที่ตามเส้นทางหนึ่ง, ให้วาง The Entity บนเส้นทางนั้น, ผู้เล่นเคลื่อนที่ตามเส้นทางนั้นไม่ได้"
+        }
+      },
+      {
+        "name": "Clairvoyance",
+        "cost": 1,
+        "flavor": {
+          "en": "There is an intrinsic energy in you that sees beyond your vision.",
+          "th": "มีพลังภายในตัวคุณที่มองเห็นได้เกินกว่าสายตา"
+        },
+        "text": {
+          "en": "At the start of the planning phase, reveal a prop anywhere on the game board.",
+          "th": "เมื่อเริ่มเฟส Planning, ให้เปิด prop ที่ใดก็ได้บนกระดานเกม"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/41344797CBCEB37900DF30CD6CB9D15CBA95861A_mikaela_board.webp",
+      "boardTh": "survival/TH_board/mikaela.webp",
+      "mini": "survival/miniature/AF97732176C1031E7DD779FB82F15E633440D803_mikaela_marker.webp"
+    }
+  },
+  {
+    "id": "nea",
+    "name": "Nea Karlsson",
+    "title": {
+      "en": "Urban Artist",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Nea Karlsson is an urban artist, able to easily escape and hide.",
+      "th": "Nea Karlsson เป็นศิลปินสตรีท สามารถหนี และ ซ่อนตัวได้อย่างง่ายดาย"
+    },
+    "quote": {
+      "en": "\"The paint is still fresh but I'm long gone.\" – Nea Karlsson",
+      "th": "\"สียังไม่ทันแห้ง แต่ฉันไปไกลแล้ว\" – Nea Karlsson"
+    },
+    "perks": [
+      {
+        "name": "Balanced Landing",
+        "cost": 0,
+        "flavor": {
+          "en": "Your agility and cat-like reflexes are incomparable.",
+          "th": "ความคล่องแคล่ว และ สัญชาตญาณเหมือนแมวของคุณไม่มีใครเทียบ"
+        },
+        "text": {
+          "en": "Instead of interacting during your turn, move along any path, including against a one-way path, then gain a {BP}.",
+          "th": "แทนที่จะ Interact ในเทิร์นของคุณ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้ รวมถึงย้อนเส้นทางทางเดียว, จากนั้นรับ 1 {BP}"
+        }
+      },
+      {
+        "name": "Urban Evasion",
+        "cost": 1,
+        "flavor": {
+          "en": "Years of evading the cops taught you a thing or two about stealth.",
+          "th": "หลายปีที่หลบตำรวจสอนคุณเรื่องการลอบเร้นไม่น้อย"
+        },
+        "text": {
+          "en": "At the start of any Survivor turn, remove a breakable wall from play. Return it to play in the same path at the end of that Survivor turn.",
+          "th": "เมื่อเริ่มเทิร์นของผู้รอดชีวิตคนใดก็ได้, ให้เก็บกำแพงทำลายได้หนึ่งอันออกจากเกม, แล้ววางกลับในเส้นทางเดิม เมื่อจบเทิร์นของผู้รอดชีวิตนั้น"
+        }
+      },
+      {
+        "name": "Streetwise",
+        "cost": 1,
+        "flavor": {
+          "en": "Long nights out taught you to do a lot with what you've got.",
+          "th": "คืนอันยาวนานบนท้องถนนสอนให้คุณทำอะไรได้มากมายจากสิ่งที่มี"
+        },
+        "text": {
+          "en": "After you interact with a chest, the chest is not removed.",
+          "th": "หลังจากคุณ Interact กับ กล่องไอเทม, กล่องไอเทม จะไม่ถูกเก็บออก"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/6503A3CADE210BF943A1F5245DF4DCB919DCC903_4 - NEA KARLSSON.webp",
+      "boardTh": "survival/TH_board/nea.webp",
+      "mini": "survival/miniature/69214FF0DF2D22D1C4B61510D1EEF78F78E48477_nea.webp"
+    }
+  },
+  {
+    "id": "renato",
+    "name": "Renato Lyra",
+    "title": {
+      "en": "Twin Kite Fighter",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Renato Lyra always keeps his eyes on the prize, and he expects the same from his teammates.",
+      "th": "Renato Lyra จับตาไปที่รางวัลเสมอ และ คาดหวังเช่นเดียวกันจากเพื่อนร่วมทีม"
+    },
+    "quote": {
+      "en": "\"Pronto quando você estiver.\" — Renato Lyra",
+      "th": "\"พร้อมเมื่อไหร่ก็บอกนะ\" – Renato Lyra"
+    },
+    "perks": [
+      {
+        "name": "Collective Stealth",
+        "cost": 0,
+        "flavor": {
+          "en": "When someone helps you out, you respond in kind.",
+          "th": "เมื่อมีคนช่วยคุณ คุณก็ตอบแทนด้วยสิ่งเดียวกัน"
+        },
+        "text": {
+          "en": "When another Survivor would interact in your space, they may interact with you instead. If they do, you move along any path, then that Survivor moves along any path.",
+          "th": "เมื่อผู้รอดชีวิตคนอื่นจะ Interact ในห้องของคุณ, เขาอาจ Interact กับคุณแทนได้, ถ้าทำเช่นนั้น, คุณเคลื่อนที่ไปตามเส้นทางใดก็ได้, แล้วผู้รอดชีวิตคนนั้นเคลื่อนที่ไปตามเส้นทางใดก็ได้"
+        }
+      },
+      {
+        "name": "Background Player",
+        "cost": 2,
+        "flavor": {
+          "en": "You are not usually the centre of attention and in some cases, this can be a good thing.",
+          "th": "โดยปกติคุณไม่ใช่ศูนย์กลางของความสนใจ และ ในบางกรณีนี่อาจเป็นเรื่องดี"
+        },
+        "text": {
+          "en": "At the end of your turn, if there is a sacrificed Survivor, take a Survivor bonus turn.",
+          "th": "เมื่อจบเทิร์นของคุณ, ถ้ามีผู้รอดชีวิตที่ถูกสังเวยอยู่, ให้เล่น Survivor bonus turn"
+        }
+      },
+      {
+        "name": "Blood Rush",
+        "cost": 0,
+        "flavor": {
+          "en": "Your mind and body are honed for great feats, allowing you to push through with extra effort when necessary.",
+          "th": "จิตใจ และ ร่างกายของคุณถูกฝึกให้ทำสิ่งยิ่งใหญ่ ช่วยให้ฝ่าฟันไปได้เมื่อจำเป็นต้องออกแรงพิเศษ"
+        },
+        "text": {
+          "en": "At the end of your turn, if there is no sacrifice progress on your board, take a Survivor bonus turn. Add a sacrifice progress to your board.",
+          "th": "เมื่อจบเทิร์นของคุณ, ถ้าไม่มี sacrifice progress บนบอร์ดของคุณ, ให้เล่น Survivor bonus turn, และเพิ่ม sacrifice progress ลงบนบอร์ดของคุณ"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/22DCDBFA1002FDA004A4DB4EC05C41F92EAB0F45_renato_board.webp",
+      "boardTh": "survival/TH_board/renato.webp",
+      "mini": "survival/miniature/2DDACAB551E36F36590F8C43C47ED3890779CD4C_renato_marker.webp"
+    }
+  },
+  {
+    "id": "sable",
+    "name": "Sable Ward",
+    "title": {
+      "en": "All Things Wicked",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Sable Ward is not afraid to embrace the darness, or the power that lies within it.",
+      "th": "Sable Ward ไม่กลัวที่จะโอบรับความมืด หรือ พลังที่ซ่อนอยู่ภายใน"
+    },
+    "quote": {
+      "en": "\"I get the feeling something bad is about to happen. Yum.\" — Sable Ward",
+      "th": "\"ฉันรู้สึกเหมือนมีเรื่องไม่ดีกำลังจะเกิดขึ้น อร่อยจริง\" – Sable Ward"
+    },
+    "perks": [
+      {
+        "name": "Wicked",
+        "cost": 0,
+        "flavor": {
+          "en": "They can try to hurt you. But you're not going down so easily.",
+          "th": "พวกเขาจะลองทำร้ายคุณก็ได้ แต่คุณไม่ล้มง่าย ๆ หรอก"
+        },
+        "text": {
+          "en": "As an interaction, each Survivor gains a {BP}. then the Killer gains a sacrifice progress.",
+          "th": "Perk นี้เป็นการ Interact, ผู้รอดชีวิตทุกคนได้รับ 1 {BP}, จากนั้น ฆาตกรได้รับ sacrifice progress 1 แต้ม"
+        }
+      },
+      {
+        "name": "Strength in Shadows",
+        "cost": 1,
+        "flavor": {
+          "en": "A chance for renewed power down where danger calls home.",
+          "th": "โอกาสของพลังที่ฟื้นคืนในที่ซึ่งอันตรายเรียกว่าบ้าน"
+        },
+        "text": {
+          "en": "At the start of your turn, choose a wounded Survivor without a sacrifice progress on their board. Add a sacrifice progress to their board and they become healthy.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, ให้เลือกผู้รอดชีวิตที่บาดเจ็บ และไม่มี sacrifice progress บนบอร์ดของเขา, เพิ่ม sacrifice progress 1 แต้มลงบนบอร์ดของเขา, แล้วเขาจะกลับมาไม่บาดเจ็บ"
+        }
+      },
+      {
+        "name": "Weaving Spiders",
+        "cost": 0,
+        "flavor": {
+          "en": "The place where fear festers and terror treads is also where those with the gift can reach across the veil.",
+          "th": "ที่ซึ่งความกลัวเน่าหนอง และ ความสยองย่างกรายก็คือที่ซึ่งผู้มีพรสวรรค์เอื้อมข้ามม่านไปได้ด้วย"
+        },
+        "text": {
+          "en": "As an interaction, all Survivors in your space may collectively pay 6 {BP}. If they do, add up to 3 progress to any face-up generator and the Killer gains a sacrifice progress.",
+          "th": "Perk นี้เป็นการ Interact, ผู้รอดชีวิตทุกคนในห้องของคุณอาจร่วมกันจ่าย 6 {BP}, หากทำเช่นนั้น, ให้เพิ่มความคืบหน้าสูงสุด 3 แต้ม ให้ เครื่องปั่นไฟ ที่หงายหน้าเครื่องใดก็ได้, และฆาตกรได้รับ sacrifice progress 1 แต้ม"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/BE96470F96F5DC8C66975948F3C4EF5E476FBD08_sable_board.webp",
+      "boardTh": "survival/TH_board/sable.webp",
+      "mini": "survival/miniature/0144F58D8A68D7A7D26AB285793C99A28B4AA2EB_sable_marker.webp"
+    }
+  },
+  {
+    "id": "thalita",
+    "name": "Thalita Lyra",
+    "title": {
+      "en": "Twin Kite Fighter",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Thalita Lyra has mastered the art of competitive flair, fighting kites with skill and flourish.",
+      "th": "Thalita Lyra เชี่ยวชาญศิลปะแห่งความเป็นนักแข่งขันสุดโดดเด่น ต่อสู้ด้วยว่าวอย่างมีทักษะ และ ลีลา"
+    },
+    "quote": {
+      "en": "\"Eu te dou cobertura.\" — Thalyta Lyra",
+      "th": "\"ฉันคุ้มกันให้เอง\" – Thalyta Lyra"
+    },
+    "perks": [
+      {
+        "name": "Power of Two",
+        "cost": 0,
+        "flavor": {
+          "en": "It is hard to keep up with you, but it does not stop people from trying.",
+          "th": "ตามคุณให้ทันนั้นยาก แต่ก็ไม่ได้ทำให้คนเลิกพยายาม"
+        },
+        "text": {
+          "en": "When another Survivor would interact in your space, they may interact with you instead. If they do, the Killer gains a {BP} and that Survivor takes a Survivor bonus turn.",
+          "th": "เมื่อผู้รอดชีวิตคนอื่นจะ Interact ในห้องของคุณ, เขาอาจ Interact กับคุณแทนได้, ถ้าทำเช่นนั้น, ฆาตกรได้รับ 1 {BP} และ ผู้รอดชีวิตคนนั้นเล่น Survivor bonus turn"
+        }
+      },
+      {
+        "name": "Friendly Competition",
+        "cost": 2,
+        "flavor": {
+          "en": "You revel in the community spirit of a competition, and inspire others to follow suit.",
+          "th": "คุณเพลิดเพลินกับจิตวิญญาณของชุมชนในการแข่งขัน และ สร้างแรงบันดาลใจให้คนอื่นทำตาม"
+        },
+        "text": {
+          "en": "After you interact with a generator, if another Survivor interacted with the same generator this round, add 1 progress to that generator.",
+          "th": "หลังจากคุณ Interact กับ เครื่องปั่นไฟ, ถ้ามีผู้รอดชีวิตคนอื่น Interact กับ เครื่องปั่นไฟ เครื่องเดียวกันในรอบนี้, ให้เพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ นั้น"
+        }
+      },
+      {
+        "name": "Cut Loose",
+        "cost": 1,
+        "flavor": {
+          "en": "You get in enough trouble, you know how to get out of it.",
+          "th": "คุณเจอเรื่องวุ่นวายมามากพอ จึงรู้วิธีหนีออกมา"
+        },
+        "text": {
+          "en": "When you reveal 'Vault' (Yellow) as your set movement card, treat it as 'Sneak', 'Crouch', or 'Sprint' instead.",
+          "th": "เมื่อคุณเปิด 'Vault' (สีเหลือง) เป็นการ์ดเคลื่อนที่ที่วางไว้, ให้ถือเป็น 'Sneak', 'Crouch' หรือ 'Sprint' แทน"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/3C3696FDBF24F280C0D6B04191A6EBEF7250EBC4_thalita_board.webp",
+      "boardTh": "survival/TH_board/thalita.webp",
+      "mini": "survival/miniature/F65975F0323CA1B30840F80EF078E831F29DFFB9_thalita_marker.webp"
+    }
+  },
+  {
+    "id": "vittorio",
+    "name": "Vittorio Toscano",
+    "title": {
+      "en": "Endless Wanderer",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Vittorio Toscano has endlessly wandered through The Fog, attempting to learn its secrets, for ages.",
+      "th": "Vittorio Toscano เร่ร่อนอยู่ใน The Fog อย่างไม่รู้จบ พยายามเรียนรู้ความลับของมันมานานนับยุค"
+    },
+    "quote": {
+      "en": "\"When you look a layer deeper, you realise... everything is connected.\" -- Vittorio Toscano",
+      "th": "\"เมื่อคุณมองลึกลงไปอีกชั้น คุณจะตระหนักว่า... ทุกสิ่งเชื่อมโยงกัน\" – Vittorio Toscano"
+    },
+    "perks": [
+      {
+        "name": "Potential Energy",
+        "cost": 1,
+        "flavor": {
+          "en": "Your arcane abilities have adapted to The Entity's Realm after centuries of wandering, granting you unprecedented control over its many devices.",
+          "th": "ความสามารถลึกลับของคุณปรับตัวเข้ากับอาณาจักรของ The Entity หลังเร่ร่อนมาหลายศตวรรษ ให้คุณควบคุมอุปกรณ์มากมายของมันได้อย่างที่ไม่เคยมีมาก่อน"
+        },
+        "text": {
+          "en": "At the start of your turn. remove 1 progress from a generator in a connected space to add 1 progress to a generator in your space.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ลบความคืบหน้า 1 แต้มจาก เครื่องปั่นไฟ ในห้องที่เชื่อมกัน, เพื่อเพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ ในห้องของคุณ"
+        }
+      },
+      {
+        "name": "Fogwise",
+        "cost": 1,
+        "flavor": {
+          "en": "In your countless years in The Fog, you have seen it all, and when you are focused, you can remember most of it too.",
+          "th": "ตลอดหลายปีนับไม่ถ้วนใน The Fog คุณเห็นมาหมดแล้ว และ เมื่อคุณมีสมาธิ คุณก็จำได้เกือบทั้งหมด"
+        },
+        "text": {
+          "en": "At the start of your turn, remove a breakable wall or pallet from a connected path. Place it on another connected path without any other component.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, ให้เก็บ กำแพงทำลายได้ หรือ แผ่นพาเลท ออกจากเส้นทางที่เชื่อมกัน, แล้ว วางลงบนเส้นทางที่เชื่อมกันอีกเส้นที่ไม่มีชิ้นส่วนอื่น"
+        }
+      },
+      {
+        "name": "Quick Gambit",
+        "cost": 2,
+        "flavor": {
+          "en": "When you have the Killer's attention, you know how to keep it.",
+          "th": "เมื่อคุณเรียกความสนใจของฆาตกรได้ คุณรู้วิธีรักษามันไว้"
+        },
+        "text": {
+          "en": "When you leave the Killer's space, the Killer moves with you.",
+          "th": "เมื่อคุณออกจากห้องของฆาตกร, ฆาตกรจะเคลื่อนที่ไปพร้อมกับคุณ"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/DA1969AD8BC48DBA5358CD2F2AC0A943EAECFB3A_vittorio_board.webp",
+      "boardTh": "survival/TH_board/vittorio.webp",
+      "mini": "survival/miniature/CE8B516F0DF30574B7ECCAC32F679974A1468651_vittorio_marker.webp"
+    }
+  },
+  {
+    "id": "yui",
+    "name": "Yui Kimura",
+    "title": {
+      "en": "Hardened Streetracer",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Yui Kimura is a hardened street racer, able to gain advantages for her and her fellow Survivors in challenging situations.",
+      "th": "Yui Kimura เป็นนักแข่งรถสตรีทผู้ผ่านศึกมาอย่างโชกโชน สามารถสร้างความได้เปรียบให้ตัวเอง และ เพื่อนผู้รอดชีวิตในสถานการณ์ท้าทาย"
+    },
+    "quote": {
+      "en": "\"That's not enough to beat me. Not even close.\" – Yui Kimura",
+      "th": "\"แค่นั้นยังไม่พอจะเอาชนะฉันหรอก ไม่ใกล้เคียงด้วยซ้ำ\" – Yui Kimura"
+    },
+    "perks": [
+      {
+        "name": "Breakout",
+        "cost": 1,
+        "flavor": {
+          "en": "You kick into high gear when someone is in trouble.",
+          "th": "คุณเร่งเครื่องเต็มกำลังเมื่อมีใครตกอยู่ในอันตราย"
+        },
+        "text": {
+          "en": "At the start of your turn, move a wounded Survivor along any path.",
+          "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ย้ายผู้รอดชีวิตที่บาดเจ็บหนึ่งคนไปตามเส้นทางใดก็ได้"
+        }
+      },
+      {
+        "name": "Lucky Break",
+        "cost": 2,
+        "flavor": {
+          "en": "You've had your share of scrapes and bruises, but luck is always on your side.",
+          "th": "คุณเคยผ่านแผลถลอก และ รอยช้ำมามากพอแล้ว แต่โชคอยู่ข้างคุณเสมอ"
+        },
+        "text": {
+          "en": "After any Survivor rolls a great success, you become healthy.",
+          "th": "หลังจากผู้รอดชีวิตคนใดก็ได้ทอยได้ ผล สำเร็จอย่างยิ่ง, คุณจะกลับมาไม่บาดเจ็บ"
+        }
+      },
+      {
+        "name": "Any Means Necessary",
+        "cost": 0,
+        "flavor": {
+          "en": "You'll go to any length to gain an advantage.",
+          "th": "คุณจะทำทุกวิถีทางเพื่อให้ได้เปรียบ"
+        },
+        "text": {
+          "en": "At the end of your turn, if you are healthy, become wounded to take a Survivor bonus turn.",
+          "th": "เมื่อจบเทิร์นของคุณ, ถ้าคุณไม่บาดเจ็บ, ให้ยอมบาดเจ็บ, เพื่อเล่น Survivor bonus turn"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/777480568A774F4629F2939F877368E151C142AF_12 - YUI KIMURA.webp",
+      "boardTh": "survival/TH_board/yui.webp",
+      "mini": "survival/miniature/5E1F4B2F64B3B77B94E751A5DD6A2E1220CC67B8_yui.webp"
+    }
+  },
+  {
+    "id": "yunjin",
+    "name": "Yun-Jin Lee",
+    "title": {
+      "en": "Self-Interested Music Producer",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Yun-Jin Lee is a self-interested music producer, able to advance her goals during turbulent times.",
+      "th": "Yun-Jin Lee เป็นโปรดิวเซอร์เพลงผู้เห็นแก่ตัว สามารถผลักดันเป้าหมายของตัวเองให้ก้าวหน้าในยามผันผวน"
+    },
+    "quote": {
+      "en": "\"The weak are sacrificed first. It's nature, it's business... it's the truth most refuse to face.\" – Yun-Jin Lee",
+      "th": "\"ผู้อ่อนแอถูกสังเวยก่อน นั่นคือธรรมชาติ คือธุรกิจ... คือความจริงที่คนส่วนใหญ่ไม่ยอมเผชิญ\" – Yun-Jin Lee"
+    },
+    "perks": [
+      {
+        "name": "Fast Track",
+        "cost": 1,
+        "flavor": {
+          "en": "Sometimes the sacrifice of others is necessary to get ahead.",
+          "th": "บางครั้งการเสียสละผู้อื่นก็จำเป็นเพื่อก้าวนำ"
+        },
+        "text": {
+          "en": "After the turn when another Survivor is wounded or sacrificed, interact with a generator in your space.",
+          "th": "หลังเทิร์นที่ผู้รอดชีวิตคนอื่นบาดเจ็บ หรือ ถูกสังเวย, ให้ Interact กับ เครื่องปั่นไฟ ในห้องของคุณ"
+        }
+      },
+      {
+        "name": "Smash Hit",
+        "cost": 0,
+        "flavor": {
+          "en": "After your rival makes a mistake, you seize the opportunity.",
+          "th": "หลังจากคู่แข่งทำพลาด คุณก็คว้าโอกาสนั้นไว้"
+        },
+        "text": {
+          "en": "When the Killer breaks a pallet, moves through a breakable wall, or damages a generator, gain a {BP}.",
+          "th": "เมื่อฆาตกรทำลาย แผ่นพาเลท, เคลื่อนที่ผ่านกำแพงทำลายได้, หรือ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ได้รับ 1 {BP}"
+        }
+      },
+      {
+        "name": "Self-Preservation",
+        "cost": 1,
+        "flavor": {
+          "en": "Life is unforgiving. Sometimes it's best to keep your head down.",
+          "th": "ชีวิตไม่ปรานี บางครั้งการก้มหัวหลบก็ดีที่สุด"
+        },
+        "text": {
+          "en": "After the turn when another Survivor is wounded or sacrificed, interact with a locker in your space.",
+          "th": "หลังเทิร์นที่ผู้รอดชีวิตคนอื่นบาดเจ็บ หรือ ถูกสังเวย, ให้ Interact กับ ตู้หลบ ในห้องของคุณ"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/E6EB3D0EB4FFDEF94C96A1DF58FFB3D600F7E63B_16 - YUN-JIN LEE.webp",
+      "boardTh": "survival/TH_board/yunjin.webp",
+      "mini": "survival/miniature/BE54849F16671E2641EA68411A4F80654225D59D_yujinlee.webp"
+    }
+  },
+  {
+    "id": "zarina",
+    "name": "Zarina Kassir",
+    "title": {
+      "en": "Plucky Documentarian",
+      "th": ""
+    },
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Zarina Kassir is a plucky documentarian, able to use her street smarts to avoid detection and greatly assist other survivors.",
+      "th": "Zarina Kassir เป็นผู้ทำสารคดีสู้ชีวิต ใช้ความเจนจัดบนท้องถนนเพื่อหลบการตรวจจับ และ ช่วยผู้รอดชีวิตคนอื่นได้อย่างมาก"
+    },
+    "quote": {
+      "en": "\"We can write our own story and decide how it really ends.\" – Zarina Kassir",
+      "th": "\"เราเขียนเรื่องราวของเราเอง และ ตัดสินใจได้ว่ามันจะจบอย่างไร\" – Zarina Kassir"
+    },
+    "perks": [
+      {
+        "name": "Red Herring",
+        "cost": 2,
+        "flavor": {
+          "en": "You've noticed that people pay attention to whatever makes the loudest noise.",
+          "th": "คุณสังเกตเห็นว่าผู้คนให้ความสนใจกับสิ่งที่ส่งเสียงดังที่สุดเสมอ"
+        },
+        "text": {
+          "en": "When the Killer would interact with you or another Survivor in your space, force them to interact with a generator in that space instead. If the generator had 2 progress, gain a {BP}.",
+          "th": "เมื่อฆาตกรจะ Interact กับคุณ หรือ ผู้รอดชีวิตคนอื่นในห้องของคุณ, ให้บังคับเขา Interact กับ เครื่องปั่นไฟ ในห้องนั้นแทน, ถ้า เครื่องปั่นไฟ นั้นมีความคืบหน้า 2 แต้ม, ให้ได้รับ 1 {BP}"
+        }
+      },
+      {
+        "name": "For the People",
+        "cost": 1,
+        "flavor": {
+          "en": "You risk life and injury for others.",
+          "th": "คุณเสี่ยงชีวิต และ บาดเจ็บเพื่อผู้อื่น"
+        },
+        "text": {
+          "en": "After you enter a space, if you are not wounded, become wounded to have another Survivor in your space become healthy or to add a progress to a generator (you can still interact this turn).",
+          "th": "หลังจากคุณเข้าไปในห้อง, ถ้าคุณไม่บาดเจ็บ, ให้ยอมบาดเจ็บ, เพื่อให้ผู้รอดชีวิตอีกคนในห้องของคุณกลับมาไม่บาดเจ็บ หรือ เพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ (คุณยัง Interact ได้ในเทิร์นนี้)"
+        }
+      },
+      {
+        "name": "Off the Record",
+        "cost": 0,
+        "flavor": {
+          "en": "You've learned that a quiet approach is sometimes best.",
+          "th": "คุณเรียนรู้ว่าบางครั้งแนวทางเงียบ ๆ ก็ดีที่สุด"
+        },
+        "text": {
+          "en": "When you or another Survivor in your space or a connected space rolls a failure, you gain a {BP} instead of the Killer.",
+          "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ ผล ล้มเหลว, คุณได้รับ 1 {BP} แทนฆาตกร"
+        }
+      }
+    ],
+    "source": {
+      "boardEn": "survival/8C257D37D944444629A1D754FFF5C9E12CF3B86B_13 - ZARINA KASSIR.webp",
+      "boardTh": "survival/TH_board/zarina.webp",
+      "mini": "survival/miniature/272CB89004E86AC209D95BBE1E496DD7837809E9_zar.webp"
+    }
+  }
+]

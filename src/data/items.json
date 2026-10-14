@@ -1,0 +1,172 @@
+[
+  {
+    "id": "broken_key",
+    "name": {
+      "en": "Broken Key",
+      "th": "Broken Key"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item a qualquer momento para permitir que qualquer Sobrevivente rerrole qualquer dado ou ganhe um {BP}.",
+      "th": "ทิ้ง item นี้ได้ทุกเมื่อ, เพื่อให้ผู้รอดชีวิตคนใดก็ได้ทอยเต๋าลูกใดก็ได้ใหม่, หรือได้รับ 1 {BP}"
+    },
+    "count": 1,
+    "images": {
+      "pt": "assets/items/pt/broken_key.webp",
+      "th": "assets/items/th/broken_key.webp"
+    }
+  },
+  {
+    "id": "commodious_toolbox",
+    "name": {
+      "en": "Commodious Toolbox",
+      "th": "Commodious Toolbox"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item durante o turno de qualquer Sobrevivente para adicionar uma Ficha de Progresso a um Gerador em seu espaço, depois compre um Item.",
+      "th": "ทิ้ง item นี้ในเทิร์นของผู้รอดชีวิตคนใดก็ได้, เพื่อเพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ ในห้องของคุณ, แล้วจั่ว item อีกใบ"
+    },
+    "count": 1,
+    "images": {
+      "pt": "assets/items/pt/commodious_toolbox.webp",
+      "th": "assets/items/th/commodious_toolbox.webp"
+    }
+  },
+  {
+    "id": "dull_key",
+    "name": {
+      "en": "Dull Key",
+      "th": "Dull Key"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item a qualquer momento para permitir que qualquer Sobrevivente rerrole qualquer dado ou ganhe 2 {BP}.",
+      "th": "ทิ้ง item นี้ได้ทุกเมื่อ, เพื่อให้ผู้รอดชีวิตคนใดก็ได้ทอยเต๋าลูกใดก็ได้ใหม่, หรือได้รับ 2 {BP}"
+    },
+    "count": 1,
+    "images": {
+      "pt": "assets/items/pt/dull_key.webp",
+      "th": "assets/items/th/dull_key.webp"
+    }
+  },
+  {
+    "id": "firecracker",
+    "name": {
+      "en": "Firecracker",
+      "th": "Firecracker"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item a qualquer momento para remover uma Parede Quebradiça em um espaço conectado ou para impedir que o Assassino se movimente para o seu espaço.",
+      "th": "ทิ้ง item นี้ได้ทุกเมื่อ, เพื่อเก็บ กำแพงทำลายได้ ในห้องที่เชื่อมกันออก, หรือเพื่อป้องกันไม่ให้ฆาตกรเคลื่อนที่เข้ามาในห้องของคุณ"
+    },
+    "count": 2,
+    "images": {
+      "pt": "assets/items/pt/firecracker.webp",
+      "th": "assets/items/th/firecracker.webp"
+    }
+  },
+  {
+    "id": "first_aid_kit",
+    "name": {
+      "en": "First-Aid Kit",
+      "th": "First-Aid Kit"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item durante o turno de qualquer Sobrevivente para fazer com que você ou outro Sobrevivente em seu espaço fique saudável.",
+      "th": "ทิ้ง item นี้ในเทิร์นของผู้รอดชีวิตคนใดก็ได้, เพื่อให้คุณ หรือ ผู้รอดชีวิตอีกคนในห้องของคุณ กลับมาไม่บาดเจ็บ"
+    },
+    "count": 3,
+    "images": {
+      "pt": "assets/items/pt/first_aid_kit.webp",
+      "th": "assets/items/th/first_aid_kit.webp"
+    }
+  },
+  {
+    "id": "flashlight",
+    "name": {
+      "en": "Flashlight",
+      "th": "Flashlight"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item durante o turno do Assassino para impedir uma Interação do Assassino em seu espaço.",
+      "th": "ทิ้ง item นี้ในเทิร์นของฆาตกร, เพื่อป้องกัน Interaction ของฆาตกรในห้องของคุณ"
+    },
+    "count": 3,
+    "images": {
+      "pt": "assets/items/pt/flashlight.webp",
+      "th": "assets/items/th/flashlight.webp"
+    }
+  },
+  {
+    "id": "map",
+    "name": {
+      "en": "Map",
+      "th": "Map"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item durante o turno de qualquer Sobrevivente para revelar até 3 Adereços em qualquer lugar do tabuleiro ou para comprar outro Item.",
+      "th": "ทิ้ง item นี้ในเทิร์นของผู้รอดชีวิตคนใดก็ได้, เพื่อเปิด prop สูงสุด 3 อันที่ใดก็ได้บนกระดาน, หรือเพื่อจั่ว item อีกใบ"
+    },
+    "count": 1,
+    "images": {
+      "pt": "assets/items/pt/map.webp",
+      "th": "assets/items/th/map.webp"
+    }
+  },
+  {
+    "id": "rainbow_map",
+    "name": {
+      "en": "Rainbow Map",
+      "th": "Rainbow Map"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item durante o turno de qualquer Sobrevivente para revelar até 3 Adereços em qualquer lugar do tabuleiro ou para revelar todas as Cartas de Movimento do Assassino.",
+      "th": "ทิ้ง item นี้ในเทิร์นของผู้รอดชีวิตคนใดก็ได้, เพื่อเปิด prop สูงสุด 3 อันที่ใดก็ได้บนกระดาน, หรือเพื่อเปิดการ์ดเคลื่อนที่ทั้งหมดของฆาตกร"
+    },
+    "count": 1,
+    "images": {
+      "pt": "assets/items/pt/rainbow_map.webp",
+      "th": "assets/items/th/rainbow_map.webp"
+    }
+  },
+  {
+    "id": "skeleton_key",
+    "name": {
+      "en": "Skeleton Key",
+      "th": "Skeleton Key"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item a qualquer momento para permitir que qualquer Sobrevivente rerrole qualquer dado ou ganhe 3 {BP}.",
+      "th": "ทิ้ง item นี้ได้ทุกเมื่อ, เพื่อให้ผู้รอดชีวิตคนใดก็ได้ทอยเต๋าลูกใดก็ได้ใหม่, หรือได้รับ 3 {BP}"
+    },
+    "count": 1,
+    "images": {
+      "pt": "assets/items/pt/skeleton_key.webp",
+      "th": "assets/items/th/skeleton_key.webp"
+    }
+  },
+  {
+    "id": "toolbox",
+    "name": {
+      "en": "Toolbox",
+      "th": "Toolbox"
+    },
+    "text": {
+      "en": null,
+      "pt": "Descarte este item durante o seu turno para adicionar uma Ficha de Progresso a um Gerador em seu espaço.",
+      "th": "ทิ้ง item นี้ในเทิร์นของคุณ, เพื่อเพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ ในห้องของคุณ"
+    },
+    "count": 2,
+    "images": {
+      "pt": "assets/items/pt/toolbox.webp",
+      "th": "assets/items/th/toolbox.webp"
+    }
+  }
+]

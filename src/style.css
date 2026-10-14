@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;800&display=swap');
+
+:root {
+  --bg: #0e0e10;
+  --bg-raised: #17171b;
+  --bg-hover: #24242a;
+  --line: #2e2e36;
+  --text: #ecebe8;
+  --muted: #9a98a0;
+  --blood: #d01c1f;
+  --blood-dim: #6e1214;
+  --ok: #3fae5a;
+  --warn: #d9a227;
+  --radius: 10px;
+  color-scheme: dark;
+  font-family: 'Sarabun', system-ui, sans-serif;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5rem;
+  line-height: 1.2;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-hover);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--blood);
+  border-color: var(--blood);
+  color: #fff;
+  font-weight: 600;
+}
+
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}

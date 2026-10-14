@@ -1,0 +1,128 @@
+{
+  "bloodpoint": {
+    "image": "assets/tokens/bloodpoint.webp",
+    "count": 1
+  },
+  "entity": {
+    "image": "assets/tokens/entity.webp",
+    "count": 1
+  },
+  "generatorProgress": {
+    "image": "assets/tokens/generator-progress.webp",
+    "count": 1
+  },
+  "sacrificeProgress": {
+    "image": "assets/tokens/sacrifice-progress.webp",
+    "count": 1
+  },
+  "firstPlayer": {
+    "image": "assets/tokens/first-player.webp",
+    "count": 1
+  },
+  "breakableWall": {
+    "image": "assets/tokens/breakable-wall.webp",
+    "count": 4
+  },
+  "generator": {
+    "image": "assets/props/generator.webp",
+    "count": 8
+  },
+  "exitGate": {
+    "image": "assets/props/exit-gate.webp",
+    "count": 2
+  },
+  "hook": {
+    "image": "assets/props/hook.webp",
+    "count": 5
+  },
+  "totem": {
+    "image": "assets/props/totem.webp",
+    "count": 5
+  },
+  "pallet": {
+    "image": "assets/props/pallet.webp",
+    "count": 6
+  },
+  "crow": {
+    "image": "assets/props/crow.webp",
+    "count": 6
+  },
+  "chest": {
+    "image": "assets/props/chest.webp",
+    "count": 6
+  },
+  "locker": {
+    "image": "assets/props/locker.webp",
+    "count": 6
+  },
+  "skullmerchantDrone": {
+    "image": "assets/props/skullmerchant-drone.webp",
+    "count": 12
+  },
+  "singularityEmp": {
+    "image": "assets/props/singularity-emp.webp",
+    "count": 12
+  },
+  "movementCards": {
+    "sneak": {
+      "image": "assets/movement/sneak.webp",
+      "count": 7
+    },
+    "sprint": {
+      "image": "assets/movement/sprint.webp",
+      "count": 7
+    },
+    "crouch": {
+      "image": "assets/movement/crouch.webp",
+      "count": 7
+    },
+    "vault": {
+      "image": "assets/movement/vault.webp",
+      "count": 7
+    },
+    "wait": {
+      "image": "assets/movement/wait.webp",
+      "count": 2
+    },
+    "one": {
+      "image": "assets/movement/back-one.webp",
+      "count": 1
+    },
+    "two": {
+      "image": "assets/movement/back-two.webp",
+      "count": 1
+    },
+    "three": {
+      "image": "assets/movement/back-three.webp",
+      "count": 1
+    },
+    "four": {
+      "image": "assets/movement/back-four.webp",
+      "count": 1
+    },
+    "five": {
+      "image": "assets/movement/back-five.webp",
+      "count": 1
+    },
+    "skull": {
+      "image": "assets/movement/back-skull.webp",
+      "count": 1
+    }
+  },
+  "dangerDieFaces": [
+    "assets/dice/danger-1.webp",
+    "assets/dice/danger-2.webp",
+    "assets/dice/danger-3.webp",
+    "assets/dice/danger-4.webp",
+    "assets/dice/danger-5.webp",
+    "assets/dice/danger-6.webp"
+  ],
+  "skillDieFaces": [
+    "assets/dice/skill-1.webp",
+    "assets/dice/skill-2.webp",
+    "assets/dice/skill-3.webp",
+    "assets/dice/skill-4.webp",
+    "assets/dice/skill-5.webp",
+    "assets/dice/skill-6.webp"
+  ]
+}
