@@ -2105,7 +2105,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
 }
 
 /** Dragon's Grip: healthy survivors in rooms joined to `room` by a path of one of `cards`' colours. */
-function gripTargets(st: GameState, room: string, cards: MoveCard[]): number[] {
+export function gripTargets(st: GameState, room: string, cards: MoveCard[]): number[] {
   const rooms = new Set(touchingPaths(st, room).filter((p) => cards.includes(p.kind)).map((p) => (p.a === room ? p.b : p.a)))
   return st.survivors.flatMap((sv, i) => (sv.status === 'board' && !sv.wounded && rooms.has(sv.room) ? [i] : []))
 }

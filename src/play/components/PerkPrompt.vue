@@ -5,7 +5,7 @@
 // a few facts sum it up, and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
-import { CARD_NAMES, ITEM_NAMES, KILLER_CARDS, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, roomName } from '../engine/engine'
+import { CARD_NAMES, ITEM_NAMES, KILLER_CARDS, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
 import { actionKey } from '../boardActions'
@@ -100,6 +100,60 @@ const handCards = computed(() => {
 const killerSide = computed(() => decider.value === 'killer')
 /** Dragon's Grip discards one or two cards: its choices are buttons, not the hand. */
 const isGrip = computed(() => step.value.t === 'offer' && step.value.perk === 'dragons_grip')
+// ---------- Dragon's Grip: one or two cards picked from the hand, then confirmed ----------
+
+const gripPick = ref<MoveCard[]>([])
+watch(
+  () => JSON.stringify(step.value),
+  () => (gripPick.value = []),
+)
+
+/** The damaged generator's room: the grip reaches out from there. */
+const gripRoom = computed(() => {
+  const s = step.value
+  if (s.t !== 'offer' || s.w.k !== 'killerBreak' || !s.w.prop) return null
+  const prop = s.w.prop
+  return props.st.props.find((p) => p.id === prop)?.room ?? null
+})
+
+/** The hand's path cards, one per kind with the copies left (The Blight holds two of each). */
+const gripHand = computed<HandCard[]>(() => {
+  if (!isGrip.value) return []
+  const hand = props.st.killer.hand.filter((c) => c !== 'wait')
+  return [...new Set(hand)].map((card) => {
+    const total = hand.filter((c) => c === card).length
+    const taken = gripPick.value.filter((c) => c === card).length
+    return { card, picked: taken > 0, ...(taken ? { badge: 'ทิ้ง' } : {}), ...(total > 1 ? { count: total - taken } : {}) }
+  })
+})
+
+function pickGrip(card: MoveCard) {
+  fxSound.flip()
+  const pick = gripPick.value
+  const total = props.st.killer.hand.filter((c) => c === card).length
+  const taken = pick.filter((c) => c === card).length
+  if (taken && (taken === total || pick.length === 2)) pick.splice(pick.lastIndexOf(card), 1)
+  else if (pick.length < 2) pick.push(card)
+  else pick.splice(1, 1, card)
+}
+
+/** The perk choice matching the cards picked (either order), if it reaches anyone. */
+const gripChoice = computed<PerkChoice | null>(() => {
+  const want = [...gripPick.value].sort().join()
+  return offerChoices.value.find((c) => [c.card, c.card2].filter(Boolean).sort().join() === want) ?? null
+})
+
+/** Who the picked cards reach, shown on the map. */
+const gripHits = computed(() => (gripRoom.value && gripPick.value.length ? gripTargets(props.st, gripRoom.value, gripPick.value) : []))
+watch(gripHits, (hits) => {
+  if (isGrip.value) preview.value = hits.length || gripPick.value.length ? { survivors: hits, rooms: gripRoom.value ? [gripRoom.value] : [] } : null
+})
+
+function confirmGrip() {
+  const s = step.value
+  if (s.t === 'offer' && gripChoice.value) act({ t: 'perk', perk: s.perk, use: true, choice: gripChoice.value })
+}
+
 /** Oppression: its generators are picked on the board (GameScreen confirms), not from a list. */
 const isOppression = computed(() => step.value.t === 'offer' && step.value.perk === 'oppression')
 
@@ -331,13 +385,22 @@ const boardCount = computed(() => {
             <p class="tinker-step">2. เปลี่ยน {{ CARD_NAMES[st.killer.planned[tinkerIndex]] }} (ใบที่ {{ tinkerIndex + 1 }}) เป็น — เลือกจากไพ่บนมือด้านล่าง</p>
           </template>
         </div>
+        <template v-else-if="isGrip">
+          <p class="hand-hint">👇 เลือกการ์ด 1–2 ใบจากไพ่บนมือด้านล่าง — แผนที่จะไฮไลต์ผู้รอดชีวิตที่โดน</p>
+          <p v-if="gripPick.length" class="small">
+            โดน: {{ gripHits.length ? gripHits.map((s) => st.survivors[s].name).join(', ') : 'ไม่มีใคร — เลือกการ์ดสีอื่น' }}
+          </p>
+        </template>
         <p v-else-if="handChoices.length" class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง{{ MOVE_PERKS.includes(step.perk) ? ' — ชี้เพื่อดูเส้นทาง' : '' }}</p>
         <div class="choices">
+          <button v-if="isGrip" class="primary" :disabled="!gripChoice" @click="confirmGrip">
+            {{ gripChoice ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, gripChoice)}` : 'เลือกการ์ดจากมือก่อน' }}
+          </button>
           <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
             {{ cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน' }}
           </button>
           <button
-            v-for="(c, i) in offerChoices.filter((c) => (!c.card || isGrip) && offerHere(c) && !isOppression)"
+            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression)"
             :key="i"
             class="primary"
             @mouseenter="hover(step.owner, c)"
@@ -473,6 +536,7 @@ const boardCount = computed(() => {
     </aside>
   </transition>
   <CardHand v-if="open && !collapsed && perkHand.length" :cards="perkHand" :label="handLabel" @pick="pickHandCard" @hover="hoverHandCard" />
+  <CardHand v-if="open && !collapsed && gripHand.length" :cards="gripHand" label="Dragon's Grip — เลือกการ์ดที่จะทิ้ง" @pick="pickGrip" @hover="() => {}" />
 </template>
 
 <style scoped>

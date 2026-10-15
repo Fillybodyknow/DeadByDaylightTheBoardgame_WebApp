@@ -19,6 +19,8 @@ export interface HandCard {
   badge?: string
   /** Picked by someone else sharing the hand: their portrait. */
   takenBy?: string
+  /** Copies of this card still to pick, when the hand holds several (The Blight's). */
+  count?: number
 }
 
 /** `label`: whose hand, for screen readers (the side panel shows it on screen). */
@@ -74,6 +76,7 @@ onBeforeUnmount(() => hands(-1))
             <img :src="asset(cardImage(c.card))" :alt="cardLabel(c.card)" draggable="false" />
             <span v-if="c.picked && c.badge" class="badge">{{ c.badge }}</span>
             <img v-if="c.takenBy" class="taken-by" :src="asset(c.takenBy)" alt="" />
+            <span v-if="c.count !== undefined" class="count" :class="{ none: !c.count }">×{{ c.count }}</span>
           </span>
         </button>
       </div>
@@ -212,6 +215,25 @@ onBeforeUnmount(() => hands(-1))
   border-radius: 50%;
   border: 2px solid var(--line-strong);
   background: #111;
+}
+/* copies left, on the top-left corner (the part of a resting card that shows) */
+.count {
+  position: absolute;
+  left: -0.45rem;
+  top: -0.45rem;
+  min-width: 1.7rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 99px;
+  border: 2px solid #f2efe6;
+  background: #8a1218;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.count.none {
+  background: #333;
+  color: var(--muted);
 }
 @media (prefers-reduced-motion: reduce) {
   .face {

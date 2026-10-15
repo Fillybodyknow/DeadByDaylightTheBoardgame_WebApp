@@ -101,36 +101,61 @@ function confirmSurvivors() {
 
 // ---------- killer ----------
 
-/** Picked cards by their place in the hand (The Blight's hand holds two of each card). */
-const killerPickIdx = ref<number[]>([])
-const killerPicks = computed(() => killerPickIdx.value.map((i) => props.st.killer.hand[i]))
+/**
+ * The two slots (left, right): the place in the hand of the card set there, or null. By place,
+ * as The Blight's hand holds two of each card.
+ */
+const killerSlots = ref<(number | null)[]>([null, null])
+const killerPicks = computed(() => killerSlots.value.map((h) => (h === null ? null : props.st.killer.hand[h])))
+const killerReady = computed(() => killerSlots.value.every((h) => h !== null))
 const SIDE = ['ซ้าย', 'ขวา']
 
+/** Places in the hand holding `card` (two for each card in The Blight's hand). */
+const copiesOf = (card: MoveCard) => props.st.killer.hand.flatMap((c, h) => (c === card ? [h] : []))
+
+/** One card per kind, with how many copies there are: The Blight's 8 cards show as 4. */
 const killerHand = computed<HandCard[]>(() =>
-  props.st.killer.hand.map((card, h) => {
-    const i = killerPickIdx.value.indexOf(h)
-    return { card, picked: i >= 0, ...(i >= 0 ? { badge: SIDE[i] } : {}) }
+  [...new Set(props.st.killer.hand)].map((card) => {
+    const copies = copiesOf(card)
+    const sides = killerSlots.value.flatMap((h, i) => (h !== null && copies.includes(h) ? [SIDE[i]] : []))
+    return { card, picked: sides.length > 0, ...(sides.length ? { badge: sides.join(' + ') } : {}), ...(copies.length > 1 ? { count: copies.length - sides.length } : {}) }
   }),
 )
 
-function pickKiller(_: MoveCard, h: number) {
+/**
+ * Click a kind in the hand: one more copy of it into the first empty slot while there is a copy
+ * and a slot; otherwise its right-most pick comes back. With both slots taken by other cards, it
+ * replaces the right-hand one. A slot's own card is taken back by clicking it in the panel.
+ */
+function pickKiller(card: MoveCard) {
   sfx.click()
-  const i = killerPickIdx.value.indexOf(h)
-  if (i >= 0) killerPickIdx.value.splice(i, 1)
-  else if (killerPickIdx.value.length < 2) killerPickIdx.value.push(h)
-  // a third pick replaces the right-hand card
-  else killerPickIdx.value.splice(1, 1, h)
+  const slots = killerSlots.value
+  const copies = copiesOf(card)
+  const mine = slots.flatMap((h, i) => (h !== null && copies.includes(h) ? [i] : []))
+  const free = copies.filter((h) => !slots.includes(h))
+  const empty = slots.indexOf(null)
+  if (mine.length && (!free.length || empty < 0)) slots[mine[mine.length - 1]] = null
+  else if (empty >= 0) slots[empty] = free[0]
+  else slots[1] = free[0]
+}
+
+/** Take back the card in one slot (left or right); the slot stays empty for the next pick. */
+function clearSlot(i: number) {
+  if (killerSlots.value[i] === null) return
+  sfx.click()
+  killerSlots.value[i] = null
 }
 
 function swapKiller() {
   sfx.click()
-  killerPickIdx.value.reverse()
+  killerSlots.value.reverse()
 }
 
 function confirmKiller() {
-  if (dispatch({ t: 'planKiller', cards: [...killerPicks.value] })) {
+  if (!killerReady.value) return
+  if (dispatch({ t: 'planKiller', cards: killerPicks.value as MoveCard[] })) {
     sfx.entity()
-    killerPickIdx.value = []
+    killerSlots.value = [null, null]
     preview.value = null
   }
 }
@@ -202,19 +227,21 @@ function confirmKiller() {
     <h2>{{ st.killer.name }}: เลือกการ์ด 2 ใบ</h2>
     <p class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
     <div class="slots">
-      <div v-for="i in [0, 1]" :key="i" class="slot">
+      <button v-for="i in [0, 1]" :key="i" type="button" class="slot" :class="{ filled: killerPicks[i] }" :disabled="!killerPicks[i]" :title="killerPicks[i] ? 'คลิกเพื่อเอาใบนี้ออก' : ''" @click="clearSlot(i)">
         <span class="muted small">{{ i === 0 ? 'เทิร์น 1 (ซ้าย)' : 'เทิร์น 2 (ขวา)' }}</span>
-        <img v-if="killerPicks[i]" :src="asset(cardImage(killerPicks[i]))" :alt="cardLabel(killerPicks[i])" />
+        <img v-if="killerPicks[i]" :src="asset(cardImage(killerPicks[i]!))" :alt="cardLabel(killerPicks[i]!)" />
         <img v-else class="empty" :src="asset(KILLER_CARD_BACK)" alt="" />
-      </div>
-      <button type="button" class="swap" :disabled="killerPicks.length !== 2" title="สลับซ้าย / ขวา" @click="swapKiller">⇄ สลับ</button>
+        <span v-if="killerPicks[i]" class="remove" aria-hidden="true">✕</span>
+      </button>
+      <button type="button" class="swap" :disabled="!killerReady" title="สลับซ้าย / ขวา" @click="swapKiller">⇄ สลับ</button>
     </div>
     <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดู · คลิกเพื่อเลือก (ใบแรก = ซ้าย)</p>
-    <button class="primary" :disabled="killerPicks.length !== 2" @click="confirmKiller">ยืนยัน — เริ่มรอบ</button>
+    <p class="muted small">คลิกการ์ดในช่องเพื่อเอาใบนั้นออก</p>
+    <button class="primary" :disabled="!killerReady" @click="confirmKiller">ยืนยัน — เริ่มรอบ</button>
 
     <CardHand
       :cards="killerHand"
-      :label="`มือของ ${st.killer.name} — เลือกแล้ว ${killerPicks.length}/2`"
+      :label="`มือของ ${st.killer.name} — เลือกแล้ว ${killerPicks.filter(Boolean).length}/2`"
       @pick="pickKiller"
       @hover="hover($event, 'killer')"
     />
@@ -337,6 +364,34 @@ function confirmKiller() {
 }
 .slot img.empty {
   opacity: 0.3;
+}
+button.slot {
+  position: relative;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+}
+button.slot:disabled {
+  opacity: 1;
+  cursor: default;
+}
+button.slot.filled:hover img {
+  outline: 2px solid #ff8a80;
+  filter: brightness(0.7);
+}
+.remove {
+  position: absolute;
+  right: -6px;
+  top: 1.1rem;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blood);
+  color: #fff;
+  font-size: 0.75rem;
 }
 .swap {
   align-self: center;
