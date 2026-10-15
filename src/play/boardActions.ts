@@ -63,6 +63,8 @@ export interface BoardModes {
   forkMoves: Ref<BoardAction[] | null>
   /** Oppression: the generators picked so far on the board (up to 2), before confirming. */
   multiPick: Ref<string[]>
+  /** Undying (The Blight): only its targets, in the connected rooms, are on the board. */
+  undyingOn: Ref<boolean>
 }
 
 type Run = (() => void) & { action?: Action }
@@ -284,9 +286,14 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
 
     case 'killerInteract': {
       if (!s.canInteract) break
+      // Undying: the props it reaches in the connected rooms, nothing else
+      if (modes.undyingOn.value) {
+        for (const i of killerInteractions(st)) if (i.k === 'undying') add(spotOf(i), killerInteractionLabel(st, i), go({ t: 'interact', i }, sfx.select))
+        break
+      }
       if (!powerMode(st, modes)) {
         for (const i of killerInteractions(st)) {
-          if (isPower(i)) continue
+          if (isPower(i) || i.k === 'undying') continue
           add(spotOf(i), killerInteractionLabel(st, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
         }
         if (killerInteractions(st).some(isPower)) add('killer', `ใช้พลัง: ${powerName(st)}`, () => ((modes.powerOn.value = true), sfx.click()))

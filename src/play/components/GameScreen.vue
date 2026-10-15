@@ -98,6 +98,8 @@ watch(
 
 /** The killer chose "use power": the power's targets are now on the board. */
 const powerOn = ref(false)
+/** Undying (The Blight): choosing which prop in a connected room to reach. */
+const undyingOn = ref(false)
 /** Bear trap placement when the supply is empty: the path picked, waiting for which trap to move. */
 const trapPath = ref<string | null>(null)
 /** The Hillbilly picked the card to discard for the chainsaw (in the panel). */
@@ -127,12 +129,13 @@ function confirmOppression() {
   multiPick.value = []
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick, powerCard, forkMoves, multiPick }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick, powerCard, forkMoves, multiPick, undyingOn }
 
 watch(
   () => view.value.step,
   () => {
     powerOn.value = false
+    undyingOn.value = false
     trapPath.value = null
     powerCard.value = null
     palletMode.value = null
@@ -148,7 +151,16 @@ watch(
 const powerMode = computed(() => isPowerMode(view.value, modes))
 
 /** While a perk or power is being decided, the board points at who and where. */
-const boardFocus = computed(() => decisionFocus(view.value, powerMode.value)?.focus ?? null)
+const boardFocus = computed(() => {
+  // Undying: the killer's room and the rooms it reaches, along the paths of the cards in hand
+  if (undyingOn.value) {
+    const st = view.value
+    const reach = actions.value.flatMap((a) => (a.key.startsWith('prop:') ? [st.props.find((p) => p.id === a.key.slice(5))?.room ?? ''] : []))
+    const paths = touchingPaths(st, st.killer.room).filter((p) => reach.includes(p.a === st.killer.room ? p.b : p.a) && st.killer.hand.includes(p.kind))
+    return { survivors: [], killer: true, rooms: [st.killer.room], paths: paths.map((p) => p.id), dests: [...new Set(reach)] }
+  }
+  return decisionFocus(view.value, powerMode.value)?.focus ?? null
+})
 
 /** Everything clickable on the board now, and the shapes the board takes them in. */
 const actions = computed(() => boardActions(view.value, modes))
@@ -201,6 +213,7 @@ const modeBar = computed(() => {
   if (trapPath.value) return { text: 'Bear Trap หมดมือ: คลิก Bear Trap บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
   if (itemPick.value !== null) return { text: 'เลือกเป้าหมายของ item บนแผนที่', cancel: () => (itemPick.value = null) }
   if (forkMoves.value) return { text: 'ทางแยก: คลิกห้องที่จะไปบนแผนที่', cancel: () => (forkMoves.value = null) }
+  if (undyingOn.value) return { text: 'Undying: คลิก prop ในห้องที่เชื่อมกันบนแผนที่ (ทิ้งการ์ดสีเดียวกับเส้นทาง)', cancel: () => (undyingOn.value = false) }
   return null
 })
 
@@ -533,6 +546,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           v-else-if="!over"
           :st="view"
           :power-on="powerOn"
+          :undying-on="undyingOn"
+          @undying-on="undyingOn = $event"
           :trap-path="trapPath"
           :power-card="powerCard"
           :on-board="onBoard"
