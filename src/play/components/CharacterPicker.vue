@@ -133,19 +133,23 @@ function onReelDone(id: string) {
     </div>
   </div>
 
-  <RouletteReel v-if="reel" :key="reel.key" :items="reel.items" :target="reel.target" :title="rollTitle || (kind === 'killer' ? 'สุ่มฆาตกร' : 'สุ่ม Survivor')" @done="onReelDone" />
+  <!-- To <body>: a parent .card's backdrop-filter would otherwise trap these fixed overlays
+       inside the card (the online room puts the picker in one). -->
+  <Teleport to="body">
+    <RouletteReel v-if="reel" :key="reel.key" :items="reel.items" :target="reel.target" :title="rollTitle || (kind === 'killer' ? 'สุ่มฆาตกร' : 'สุ่ม Survivor')" @done="onReelDone" />
 
-  <div v-if="preview" class="overlay" @click.self="preview = null">
-    <div class="modal">
-      <CharacterSheet :character="preview" :kind="kind" />
-      <div class="modal-actions">
-        <button type="button" @click="preview = null">ปิด</button>
-        <button type="button" class="primary choose" :disabled="locked" @click="choose">
-          {{ isMine(preview.id) ? `เอา ${preview.name} ออก` : `เลือก ${preview.name}` }}
-        </button>
+    <div v-if="preview" class="overlay" @click.self="preview = null">
+      <div class="modal">
+        <CharacterSheet :character="preview" :kind="kind" />
+        <div class="modal-actions">
+          <button type="button" @click="preview = null">ปิด</button>
+          <button type="button" class="primary choose" :disabled="locked" @click="choose">
+            {{ isMine(preview.id) ? `เอา ${preview.name} ออก` : `เลือก ${preview.name}` }}
+          </button>
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
