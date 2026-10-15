@@ -113,6 +113,8 @@ needs its graph in `boards.ts`), the 2-player rule, then bots from the automated
   (the rulebook, p.18, hangs at once). Ending the carry on a free hook still hangs.
 - The Hag's Phantasm Trap: when she doesn't teleport, she gains ▲ equal to the die (the card
   says "gain a ▲"). Teleporting still costs ▲ equal to the die.
+- After a rescue, the rescuer and the rescued survivor may each stay in the room instead of
+  moving along a path (the rulebook, p.13, has them move).
 
 ## Rulings
 

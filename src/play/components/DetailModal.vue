@@ -116,16 +116,8 @@ const item = computed(() => {
         </div>
       </section>
 
-      <!-- the printed character board, last -->
-      <template v-if="survivor">
-        <img v-if="survivor.data?.images.boardTh" class="board-img" :src="asset(survivor.data.images.boardTh)" :alt="survivor.sv.name" />
-      </template>
-      <template v-else-if="killer">
-        <img v-if="killer.images.boardTh" class="board-img" :src="asset(killer.images.boardTh)" :alt="killer.name" />
-      </template>
-
       <!-- prop -->
-      <template v-else-if="prop">
+      <template v-if="prop">
         <header>
           <img class="prop-img" :src="asset(PROP_IMAGE[prop.kind])" alt="" />
           <div>
@@ -316,10 +308,6 @@ header p {
 .small {
   font-size: 0.86rem;
   margin: 0.2rem 0 0;
-}
-.board-img {
-  width: 100%;
-  border-radius: 6px;
 }
 .powers {
   display: grid;

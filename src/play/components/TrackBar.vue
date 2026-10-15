@@ -18,7 +18,8 @@ defineProps<{ st: GameState }>()
     <div class="track" :title="`Generator ${generatorsDone(st)}/${GENERATORS_TO_POWER}`">
       <span class="label">Generator</span>
       <img v-for="i in GENERATORS_TO_POWER" :key="i" class="gen" :class="{ on: i <= generatorsDone(st) }" :src="asset(components.generator.image)" alt="" />
-      <span class="gate" :class="{ on: gatesPowered(st) }">{{ gatesPowered(st) ? 'ประตูมีไฟ' : 'ประตูยังไม่มีไฟ' }}</span>
+      <span class="gate long" :class="{ on: gatesPowered(st) }">{{ gatesPowered(st) ? 'ประตูมีไฟ' : 'ประตูยังไม่มีไฟ' }}</span>
+      <span class="gate short" :class="{ on: gatesPowered(st) }">{{ gatesPowered(st) ? 'ประตู ✓' : 'ประตู ✗' }}</span>
     </div>
   </div>
 </template>
@@ -78,5 +79,63 @@ defineProps<{ st: GameState }>()
 .gate.on {
   color: #f5c542;
   font-weight: 800;
+}
+.gate.short {
+  display: none;
+}
+/* in the left rail (GameScreen, wide screens): stacked, the pips wrapping in short rows */
+@media (min-width: 981px) and (min-aspect-ratio: 16/9) {
+  .tracks {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+  /* pips and generators two to a row */
+  .track {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    justify-content: center;
+    justify-items: center;
+    gap: 4px;
+  }
+  .label,
+  .count,
+  .gate.short {
+    grid-column: 1 / -1;
+  }
+  .gate.long {
+    display: none;
+  }
+  .gate.short {
+    display: inline;
+  }
+  .label,
+  .count,
+  .gate {
+    margin: 0;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .label {
+    margin-bottom: 0.15rem;
+    font-size: 0.58rem;
+    letter-spacing: 0.02em;
+  }
+  .count {
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+  }
+  .gate {
+    margin-top: 0.15rem;
+    font-size: 0.66rem;
+  }
+  .pip {
+    width: 14px;
+    height: 14px;
+  }
+  .gen {
+    width: 16px;
+    height: 16px;
+  }
 }
 </style>

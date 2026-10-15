@@ -323,10 +323,11 @@ const rollers = computed(() => rerollers(props.st))
     </template>
 
     <template v-else-if="step.t === 'anyMove'">
-      <p>ลงจาก Hook แล้ว: <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง (หน้า 13)</p>
+      <p>ช่วยลงจาก Hook แล้ว: <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง (หน้า 13) หรือจะอยู่ห้องเดิมก็ได้</p>
       <div class="buttons">
         <button v-for="m in moves" :key="m.path" @click="act({ t: 'move', path: m.path })">{{ m.label }}</button>
       </div>
+      <button class="primary" @click="act({ t: 'stop' })">อยู่ห้องเดิม</button>
     </template>
 
     <!-- survivor interact -->

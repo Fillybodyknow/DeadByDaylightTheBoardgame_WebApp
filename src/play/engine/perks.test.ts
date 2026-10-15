@@ -536,3 +536,26 @@ describe('The Oni, The Deathslinger, Yui and Zarina', () => {
     expect(perkChoices(st, 'blood_echo', 'killer', { k: 'afterHang', s: 0 })).toEqual([{ target: 1 }])
   })
 })
+
+describe('house rules', () => {
+  it('after a rescue, both survivors may stay in the room', () => {
+    let st = game('trapper')
+    only(st)
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    const room = st.survivors[0].room
+    const hook = placeProp(st, 'hook', room)
+    Object.assign(st.survivors[1], { status: 'hooked', room })
+    hook.occupant = 1
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    st = apply(st, { t: 'interact', i: { k: 'sabotage', prop: hook.id } })
+    expect(st.step).toEqual({ t: 'anyMove', s: 0 })
+    st = apply(st, { t: 'stop' })
+    expect(st.step).toEqual({ t: 'anyMove', s: 1 })
+    st = apply(st, { t: 'stop' })
+    expect(st.survivors[0].room).toBe(room)
+    expect(st.survivors[1].room).toBe(room)
+    expect(st.survivors[1].status).toBe('board')
+  })
+})

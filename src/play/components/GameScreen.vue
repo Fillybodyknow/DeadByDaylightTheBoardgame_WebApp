@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, sfx, startHeartbeat, stopHeartbeat } from '../../sound'
 import { boardOf, isGreat, PROGRESS_MAX, succeeded, touchingPaths } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
@@ -364,6 +364,24 @@ onBeforeUnmount(() => {
 
 const inspecting = ref<InspectTarget | null>(null)
 
+// ---------- player tiles: folded away, the map takes the whole height (remembered per device) ----------
+
+function readFolded(): boolean {
+  try {
+    return localStorage.getItem('dbdl-players-folded') === '1'
+  } catch {
+    return false
+  }
+}
+const playersFolded = ref(readFolded())
+watch(playersFolded, (f) => {
+  try {
+    localStorage.setItem('dbdl-players-folded', f ? '1' : '0')
+  } catch {
+    // storage unavailable: it just isn't remembered
+  }
+})
+
 // ---------- secret choices (Tinkerer swaps a face-down card) ----------
 
 const secretSeen = ref(false)
@@ -400,6 +418,19 @@ watch(over, (w) => {
   if (w === 'killer') sfx.sacrifice()
 })
 
+// ---------- full screen: hides the browser's bars, so the board gets bigger ----------
+
+const canFullscreen = typeof document !== 'undefined' && !!document.documentElement.requestFullscreen
+const fullscreen = ref(typeof document !== 'undefined' && !!document.fullscreenElement)
+const onFullscreen = () => (fullscreen.value = !!document.fullscreenElement)
+onMounted(() => document.addEventListener('fullscreenchange', onFullscreen))
+onBeforeUnmount(() => document.removeEventListener('fullscreenchange', onFullscreen))
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) void document.exitFullscreen()
+  else void document.documentElement.requestFullscreen().catch(() => {})
+}
+
 function leave() {
   if (online.value) {
     // the host can end the game for everyone; others just leave the room (and can rejoin)
@@ -418,13 +449,16 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <header class="top">
       <TrackBar :st="view" />
       <span class="spacer" />
-      <span class="phase">รอบ {{ view.round }} · {{ PHASE_TH[view.phase] }}</span>
+      <span class="phase">รอบ {{ view.round }}<span class="sep"> · </span><span class="phase-name">{{ PHASE_TH[view.phase] }}</span></span>
       <button v-if="over && !showOver" class="primary" @click="showOver = true">สรุปเกม</button>
-      <SyncBadge v-if="online" />
-      <span v-if="online" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
-      <button v-else :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶ ย้อน</button>
-      <button :title="muted ? 'เปิดเสียง' : 'ปิดเสียง'" @click="muted = !muted">{{ muted ? '🔇' : '🔊' }}</button>
-      <button @click="leave">ออก</button>
+      <div class="controls">
+        <SyncBadge v-if="online" />
+        <span v-if="online" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
+        <button v-else :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶<span class="btn-text"> ย้อน</span></button>
+        <button v-if="canFullscreen" :title="fullscreen ? 'ออกจากเต็มจอ' : 'เต็มจอ'" @click="toggleFullscreen">{{ fullscreen ? '🗗' : '⛶' }}</button>
+        <button :title="muted ? 'เปิดเสียง' : 'ปิดเสียง'" @click="muted = !muted">{{ muted ? '🔇' : '🔊' }}</button>
+        <button @click="leave">ออก</button>
+      </div>
     </header>
 
     <main class="layout">
@@ -438,22 +472,25 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           <button class="primary" :disabled="!revealing.props.length" @click="confirmReveal">เปิด</button>
           <button @click="revealing = null">ยกเลิก</button>
         </div>
-        <Board
-          :st="view"
-          :path-targets="targets.paths"
-          :prop-targets="targets.flip"
-          :interact-targets="targets.interact"
-          :room-targets="targets.rooms"
-          @room="onRoom"
-          @pointerdown.capture="trackPointer"
-          :picked="revealing?.props"
-          :focus="boardFocus"
-          @interact="onInteract"
-          @path="onPath"
-          @prop="onProp"
-          @inspect="inspecting = $event"
-        />
-        <StatusPanel :st="view" @use="onUse" @inspect="inspecting = $event" @pick="itemPick = $event" />
+        <!-- the player tiles beside the map, on its left -->
+        <div class="stage">
+          <StatusPanel :st="view" :collapsed="playersFolded" @collapse="playersFolded = $event" @use="onUse" @inspect="inspecting = $event" @pick="itemPick = $event" />
+          <Board
+            :st="view"
+            :path-targets="targets.paths"
+            :prop-targets="targets.flip"
+            :interact-targets="targets.interact"
+            :room-targets="targets.rooms"
+            @room="onRoom"
+            @pointerdown.capture="trackPointer"
+            :picked="revealing?.props"
+            :focus="boardFocus"
+            @interact="onInteract"
+            @path="onPath"
+            @prop="onProp"
+            @inspect="inspecting = $event"
+          />
+        </div>
       </div>
 
       <aside class="side">
@@ -515,13 +552,17 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 0.8rem;
-  padding: 0.5rem 1rem;
+  gap: 0.4rem 0.7rem;
+  padding: 0.3rem 0.75rem;
   border-bottom: 1px solid var(--line);
   background: rgb(7 8 10 / 0.88);
   position: sticky;
   top: 0;
   z-index: 10;
+}
+/* compact top-bar buttons: the height goes to the board */
+.top button {
+  padding: 0.25rem 0.65rem;
 }
 .phase {
   color: var(--blood-bright);
@@ -533,9 +574,9 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 1rem;
-  padding: 1rem;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
   align-items: start;
 }
 .board-col {
@@ -543,11 +584,105 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   display: grid;
   gap: 0.6rem;
 }
-/* The board shrinks to leave room for the player tiles under it on one screen
-   (top bar, padding and tiles take about 15rem). */
-.board-col > .board {
-  width: min(100%, max(22rem, calc((100vh - 15rem) * var(--aspect))));
-  justify-self: center;
+/* The player tiles on the left, the map beside them: as tall as the screen allows (the top bar
+   and padding take about 4rem), narrower if the width runs out. */
+.stage {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-width: 0;
+}
+.stage > .board {
+  flex: 0 1 auto;
+  min-width: 0;
+  width: max(22rem, calc((100vh - 4rem) * var(--aspect)));
+}
+@media (max-width: 980px) {
+  /* one column: the map, then the tiles under it */
+  .stage {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .stage > .board {
+    width: 100%;
+  }
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Wide screens (16:9 and wider): the board is limited by the height, so the top bar becomes a
+   slim rail on the left and the board takes the height. Narrower screens (16:10, iPad) are
+   limited by the width: they keep the bar on top. TrackBar switches with the same query. */
+@media (min-width: 981px) and (min-aspect-ratio: 16/9) {
+  .game {
+    flex-direction: row;
+  }
+  /* a narrow rail along the left edge */
+  .top {
+    flex: none;
+    width: 64px;
+    height: 100vh;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.6rem 0.2rem;
+    overflow-y: auto;
+    border-bottom: none;
+    border-right: 1px solid var(--line);
+  }
+  .phase {
+    order: -1;
+    text-align: center;
+    font-size: 0.74rem;
+    line-height: 1.25;
+  }
+  /* the round on one line, the phase under it */
+  .phase .sep {
+    display: none;
+  }
+  .phase-name {
+    display: block;
+    font-size: 0.68rem;
+  }
+  .btn-text {
+    display: none;
+  }
+  .controls {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .controls button {
+    width: 48px;
+    padding: 0.3rem 0;
+    font-size: 0.82rem;
+  }
+  .room-tag {
+    font-size: 0.66rem;
+    text-align: center;
+  }
+  .layout {
+    flex: 1;
+    min-width: 0;
+  }
+  .side {
+    top: 0.5rem;
+    max-height: calc(100vh - 1rem);
+  }
+  :global(body.hand-open) .side {
+    max-height: calc(100vh - 1rem - 215px);
+  }
+  /* no top bar to leave room for: only the padding */
+  .stage > .board {
+    width: max(22rem, calc((100vh - 1.25rem) * var(--aspect)));
+  }
 }
 .side {
   display: grid;
@@ -560,7 +695,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 /* a hand of cards in the bottom-right corner (CardHand): the panel stops above it and scrolls */
 @media (min-width: 981px) {
   :global(body.hand-open) .side {
-    max-height: calc(100vh - 5rem - 215px);
+    max-height: calc(100vh - 4rem - 215px);
   }
 }
 .reveal-bar {

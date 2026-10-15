@@ -42,6 +42,7 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'anyMove':
       for (const m of anyMoves(st, step.s)) out.push({ t: 'move', path: m.path.id })
+      out.push({ t: 'stop' })
       break
     case 'survivorInteract':
       if (step.canInteract) for (const i of survivorInteractions(st, step.s)) out.push({ t: 'interact', i })

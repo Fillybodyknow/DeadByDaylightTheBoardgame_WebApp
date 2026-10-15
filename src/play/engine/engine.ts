@@ -625,6 +625,11 @@ function handle(st: GameState, a: Action) {
       return
     }
     case 'anyMove': {
+      // House rule: after a rescue, staying in the room is allowed (see src/play/README.md).
+      if (a.t === 'stop') {
+        log(st, `${st.survivors[step.s].name} อยู่ห้องเดิม`, step.s)
+        return
+      }
       if (a.t !== 'move') break
       const m = anyMoves(st, step.s).find((e) => e.path.id === a.path) ?? fail('cannot move there')
       moveSurvivor(st, step.s, m.path, m.to)

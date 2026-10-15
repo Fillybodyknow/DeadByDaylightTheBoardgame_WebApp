@@ -96,16 +96,21 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   several survivors switches between them with tabs. The hand sits in the bottom-right corner,
   under the side panel. Each card's button stays still and only the card face inside it moves,
   so the card can't bounce under the pointer.
-- **Your own face-down cards can be peeked at:** press and hold one on the player tiles. Online
-  only the owner can; on one device anyone can, as at a real table.
+- **Your own face-down cards can be peeked at:** click one on the player tiles to see your cards
+  big in the middle of the screen (the killer sees all his planned cards); a click anywhere
+  turns them face down again. Online only the owner can; on one device anyone can, as at a real
+  table. Items open in a modal in the middle of the screen too.
 - **Secrets.** Hidden information (planned cards, Tinkerer / Zanshin swaps, the Redeemer card) gets
   a hand-off curtain in hot-seat (`secretFor` in `GameScreen`) and is never shown to other players
   online.
 - Perk decisions dock beside the board (`PerkPrompt`), never over the map. Character choices
   show the character's mini.
-- Layout: the tracks in the top bar, the board, the player tiles under it, the side panel on the
-  right. Player tiles don't list perks: clicking a tile opens the character details, with the
-  perks and whether they were used this round. There is no game log on screen.
+- Layout: the tracks and controls in a bar (on top; a slim rail on the left on 16:9 and wider
+  screens, where the height limits the board), the board as big as the screen allows, one row
+  of player tiles under it (foldable to a strip of portraits, remembered per device), the side
+  panel (320 px) on the right. Player tiles don't list perks: clicking a tile opens the
+  character details, with the perks and whether they were used this round. There is no game
+  log on screen. Pointing at a revealed prop enlarges it.
 - Fixed overlays inside a `.card` must `<Teleport to="body">`: `.card` has `backdrop-filter`,
   which traps `position: fixed` children.
 - The full game runs on computers and tablets only. Phones get a notice (`src/play/device.ts`:

@@ -30,7 +30,7 @@ const fan = computed(() => {
   return props.cards.map((_, i) => {
     const off = i - mid
     // up to 4 cards at full size; 5 (the killer's hand) a little smaller, to fit the corner
-    const w = props.cards.length > 4 ? 72 : 88
+    const w = props.cards.length > 4 ? 60 : 80
     return { '--w': `${w}px`, '--rot': `${off * 5}deg`, '--arc': `${Math.abs(off) * Math.abs(off) * 3}px`, zIndex: String(i + 1) }
   })
 })
@@ -101,16 +101,16 @@ onBeforeUnmount(() => hands(-1))
   justify-items: center;
   pointer-events: none;
 }
-/* the bottom-right corner, under the side panel (380 px wide, 1 rem from the edge) */
+/* the bottom-right corner, under the side panel (320 px wide, 0.75 rem from the edge) */
 @media (min-width: 981px) {
   .tray {
     left: auto;
-    width: calc(380px + 2rem);
+    width: calc(320px + 1.5rem);
   }
   .hand {
     left: auto;
-    right: 1rem;
-    width: 380px;
+    right: 0.75rem;
+    width: 320px;
     transform: none;
   }
 }

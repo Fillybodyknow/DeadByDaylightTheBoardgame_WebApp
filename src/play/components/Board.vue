@@ -64,13 +64,17 @@ interface Rect {
   w: number
 }
 
-// Within a room box: minis under the title, prop tiles along the bottom.
-const TILE = 0.16
-const MINI = 0.17
+// Within a room box: minis under the title, prop tiles along the bottom (four fit across).
+const TILE = 0.205
+const TILE_GAP = 0.018
+const MINI = 0.18
 
-function tileRect(box: number[], i: number): Rect {
+/** Tile `i` of `n` in a room: full size up to four, smaller so five still fit inside the room. */
+function tileRect(box: number[], i: number, n: number): Rect {
   const [x, y, w, h] = box
-  return { x: x + w * (0.03 + i * (TILE + 0.02)), y: y + h * 0.6, w: w * TILE }
+  const size = Math.min(TILE, (0.94 - TILE_GAP * (n - 1)) / n)
+  // a smaller tile sits as low as a full-size one
+  return { x: x + w * (0.03 + i * (size + TILE_GAP)), y: y + h * 0.575 + w * (TILE - size) * board.value.aspect, w: w * size }
 }
 
 function miniRect(box: number[], i: number, killer = false): Rect {
@@ -103,7 +107,7 @@ const rects = computed(() => {
   const minis = new Map<string, Rect>()
   const tiles = new Map<string, Rect>()
   for (const r of rooms.value) {
-    r.props.forEach((p, i) => tiles.set(p.id, tileRect(r.box, i)))
+    r.props.forEach((p, i) => tiles.set(p.id, tileRect(r.box, i, r.props.length)))
     r.survivors.forEach((s, i) => minis.set(`s${s}`, miniRect(r.box, i)))
     if (r.killer) minis.set('k', miniRect(r.box, 0, true))
   }
@@ -438,7 +442,7 @@ function guard(e: MouseEvent) {
         class="tile"
         :data-prop="p.id"
         :class="[p.category, { down: !p.revealed, target: propTargets.includes(p.id), act: canAct(p.id), picked: picked?.includes(p.id), flip: flipping.includes(p.id) }]"
-        :style="rectStyle(tileRect(r.box, i))"
+        :style="rectStyle(tileRect(r.box, i, r.props.length))"
         :title="p.revealed ? (interactTargets[p.id] ?? 'คลิกขวาดูรายละเอียด') : `เปิด prop สี${CATEGORY_TH[p.category]}`"
         @click="clickTile(p.id, r.id)"
         @contextmenu.prevent="p.revealed && emit('inspect', { k: 'prop', id: p.id })"
@@ -449,7 +453,14 @@ function guard(e: MouseEvent) {
         <img :src="asset(propImage(p))" alt="" draggable="false" />
         <span v-if="p.revealed && (p.kind === 'generator' || p.kind === 'exitGate')" class="progress">{{ p.progress }}/3</span>
         <img v-if="entityProp === p.id" class="entity" :src="asset(components.entity.image)" alt="Entity" />
-        <Mini v-if="p.occupant !== null" class="occupant" :class="{ hooked: p.kind === 'hook' }" :src="asset(survivorMini(st, p.occupant))" :alt="st.survivors[p.occupant].name" />
+        <Mini
+          v-if="p.occupant !== null"
+          class="occupant"
+          :class="{ hooked: p.kind === 'hook', hiding: p.kind === 'locker', wounded: st.survivors[p.occupant].wounded }"
+          :src="asset(survivorMini(st, p.occupant))"
+          :alt="st.survivors[p.occupant].name"
+        />
+        <span v-if="p.occupant !== null && p.kind === 'locker'" class="occupant-tag">ซ่อน</span>
       </component>
       <component
         :is="canAct(`s:${s}`) || roomTarget(r.id) ? 'button' : 'div'"
@@ -610,6 +621,14 @@ button.room-hit.pick:hover:not(:disabled) {
   border: none;
   background: none;
   border-radius: 50%;
+  transition: transform 0.15s ease;
+}
+/* pointing at a revealed prop brings it up to look at (it grows from its centre, so the
+   pointer stays on it) */
+.tile:not(.down):hover {
+  z-index: 6;
+  transform: scale(1.6);
+  animation: none;
 }
 button.tile {
   cursor: pointer;
@@ -680,13 +699,48 @@ button.tile {
   height: 80%;
   object-fit: contain;
 }
+/* someone on the tile: their mini, big and ringed, over the hook or locker */
 .occupant {
-  opacity: 0.55;
-  filter: grayscale(0.4);
+  inset: -8%;
+  width: 116%;
+  height: 116%;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px #f2efe6,
+    0 0 0 4px rgb(0 0 0 / 0.65);
+}
+.occupant.hiding {
+  box-shadow:
+    0 0 0 3px #7fc8ff,
+    0 0 0 5px rgb(0 0 0 / 0.65),
+    0 0 14px 4px rgb(90 170 255 / 0.7);
+}
+.occupant.hiding.wounded {
+  box-shadow:
+    0 0 0 3px var(--blood-bright),
+    0 0 0 5px rgb(0 0 0 / 0.65),
+    0 0 14px 4px rgb(90 170 255 / 0.7);
 }
 .occupant.hooked {
-  opacity: 1;
-  filter: drop-shadow(0 0 6px rgb(255 30 30 / 0.9));
+  box-shadow:
+    0 0 0 3px var(--blood-bright),
+    0 0 0 5px rgb(0 0 0 / 0.65),
+    0 0 16px 5px rgb(255 30 30 / 0.85);
+}
+.occupant-tag {
+  position: absolute;
+  left: 50%;
+  bottom: -22%;
+  translate: -50% 0;
+  padding: 0.05em 0.4em;
+  border-radius: 99px;
+  background: #1b4d77;
+  color: #e6f4ff;
+  font-size: 0.95cqw;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .mini {
@@ -702,23 +756,46 @@ button.tile {
     top 0.45s ease;
   filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.9));
 }
-.mini.survivor.wounded {
-  box-shadow: 0 0 0 3px var(--blood-bright);
-}
-.mini.survivor.active {
+/* every survivor wears a light ring (red when wounded), so minis stand out from the room art */
+.mini.survivor {
   box-shadow:
-    0 0 0 3px #ffe9b0,
-    0 0 16px 3px rgb(255 214 140 / 0.7);
+    0 0 0 2px #f2efe6,
+    0 0 0 4px rgb(0 0 0 / 0.65);
+}
+.mini.survivor.wounded {
+  box-shadow:
+    0 0 0 3px var(--blood-bright),
+    0 0 0 5px rgb(0 0 0 / 0.65);
+}
+/* whose turn it is: gold, a little bigger, breathing */
+.mini.survivor.active {
+  z-index: 4;
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 3px #ffd56a,
+    0 0 0 5px rgb(0 0 0 / 0.7),
+    0 0 22px 6px rgb(255 200 90 / 0.85);
+  animation: turn-glow 1.6s ease-in-out infinite;
 }
 .mini.survivor.wounded.active {
   box-shadow:
     0 0 0 3px var(--blood-bright),
-    0 0 16px 3px rgb(255 214 140 / 0.8);
+    0 0 0 5px rgb(0 0 0 / 0.7),
+    0 0 22px 6px rgb(255 200 90 / 0.9);
+}
+@keyframes turn-glow {
+  50% {
+    filter: drop-shadow(0 0 10px rgb(255 214 140 / 0.9)) brightness(1.12);
+  }
 }
 .mini.survivor.carried {
   transform: translate(25%, -25%) rotate(-25deg);
 }
 .mini.killer {
+  box-shadow:
+    0 0 0 3px #ff4a3d,
+    0 0 0 5px rgb(0 0 0 / 0.7),
+    0 0 18px 5px rgb(255 30 30 / 0.7);
   filter: drop-shadow(0 0 8px rgb(255 30 30 / 0.85));
 }
 /* crop the square art to its printed ring (same as Mini.vue) */
@@ -743,9 +820,13 @@ button.tile.act {
     0 0 18px 5px rgb(255 120 40 / 0.75);
   animation: pulse 1.2s ease-in-out infinite;
 }
-.mini.act:hover,
-.tile.act:hover {
+.mini.act:hover {
   transform: scale(1.15);
+  animation: none;
+}
+.tile.act:hover {
+  z-index: 6;
+  transform: scale(1.6);
   animation: none;
 }
 
