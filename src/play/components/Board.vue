@@ -269,6 +269,7 @@ function play(ev: GameEvent, delay: number): number {
       flipping.value = [...flipping.value, ev.prop]
       window.setTimeout(() => (flipping.value = flipping.value.filter((p) => p !== ev.prop)), 800)
       fxSound.flip()
+      if (ev.kind === 'crow') fxSound.crow()
       return delay
     case 'wound': {
       const at = whereIs(ev.s)
@@ -318,17 +319,25 @@ function play(ev: GameEvent, delay: number): number {
       const gate = props.st.props.find((p) => p.kind === 'exitGate' && p.revealed && p.progress === ev.progress)
       const t = gate && rects.value.tiles.get(gate.id)
       if (t) addFx('float', centre(t), { text: `🚪 ${ev.progress}/3`, tone: 'gold' }, delay)
+      if (ev.progress >= 3) fxSound.gateOpen()
+      else fxSound.lever()
       return delay
     }
     case 'palletBreak':
     case 'wallBreak':
       addFx('debris', pathAt(ev.path), {}, delay)
-      fxSound.crack()
+      fxSound.palletBreak()
       shake()
       return delay
     case 'palletDrop':
       addFx('debris', pathAt(ev.path), {}, delay)
-      fxSound.crack()
+      fxSound.palletDrop()
+      return delay
+    case 'pickUp':
+      fxSound.pickUp()
+      return delay
+    case 'cleanse':
+      fxSound.cleanse()
       return delay
     case 'phantasmSet':
       addFx('float', roomCentre(ev.room), { text: '👻', tone: 'white' }, delay)
@@ -346,7 +355,7 @@ function play(ev: GameEvent, delay: number): number {
     case 'damage': {
       const t = rects.value.tiles.get(ev.prop)
       if (t) addFx('float', centre(t), { text: '⚡ 0', tone: 'red' }, delay)
-      fxSound.crack()
+      fxSound.damage()
       return delay
     }
     case 'bp': {

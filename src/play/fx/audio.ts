@@ -1,6 +1,8 @@
-// Sound effects for the full game, synthesised with Web Audio like the companion's
-// src/sound.ts (whose mute toggle this follows). Kept here so the companion is untouched.
+// Sound effects for the full game. Recorded clips (public/assets/app/sound/game/) where there
+// is one, otherwise synthesised with Web Audio like the companion's src/sound.ts (whose mute
+// toggle this follows). Kept here so the companion is untouched.
 
+import { asset } from '../../i18n'
 import { muted } from '../../sound'
 
 let ctx: AudioContext | null = null
@@ -8,13 +10,59 @@ let ctx: AudioContext | null = null
 function audio(): AudioContext | null {
   if (muted.value) return null
   try {
-    ctx ??= new AudioContext()
+    if (!ctx) {
+      ctx = new AudioContext()
+      void loadClips(ctx)
+    }
     if (ctx.state === 'suspended') void ctx.resume()
     return ctx
   } catch {
     return null
   }
 }
+
+// ---------- recorded clips ----------
+
+const CLIPS = [
+  'crow-caw', 'item', 'skill-warn', 'skill-good', 'skill-great', 'skill-fail', 'damage', 'gen-done',
+  'cleanse', 'pallet-drop', 'pallet-break', 'pick-up', 'hook', 'lever', 'gate-open', 'gates-powered',
+] as const
+type Clip = (typeof CLIPS)[number]
+
+const buffers = new Map<Clip, AudioBuffer>()
+let clipsLoaded: Promise<void> | null = null
+
+function loadClips(c: AudioContext): Promise<void> {
+  clipsLoaded ??= Promise.all(
+    CLIPS.map(async (name) => {
+      try {
+        const res = await fetch(asset(`assets/app/sound/game/${name}.mp3`))
+        if (res.ok) buffers.set(name, await c.decodeAudioData(await res.arrayBuffer()))
+      } catch {
+        // missing or undecodable: the synthesised sound is used
+      }
+    }),
+  ).then(() => undefined)
+  return clipsLoaded
+}
+
+/** Play a recorded clip, or `fallback` (synthesised) when it didn't load. */
+function clip(name: Clip, fallback: () => void = () => {}, gain = 0.7) {
+  const a = audio()
+  if (!a) return
+  void loadClips(a).then(() => {
+    const buf = buffers.get(name)
+    if (!buf) return fallback()
+    const src = a.createBufferSource()
+    src.buffer = buf
+    const g = a.createGain()
+    g.gain.value = gain
+    src.connect(g).connect(a.destination)
+    src.start()
+  })
+}
+
+// ---------- synthesised ----------
 
 interface ToneOpts {
   type?: OscillatorType
@@ -67,7 +115,8 @@ function noise(dur: number, o: NoiseOpts = {}) {
   src.start(t)
 }
 
-export const fxSound = {
+/** Every effect drawn with oscillators and noise: the sound itself, or a clip's stand-in. */
+const synth = {
   /** A footstep per room moved. */
   step() {
     noise(0.05, { type: 'lowpass', freq: 500, gain: 0.25 })
@@ -154,4 +203,32 @@ export const fxSound = {
     tone(140, 0.5, { type: 'sawtooth', gain: 0.18, slideTo: 50 })
     noise(0.3, { freq: 2200, q: 0.8, gain: 0.25, at: 0.03 })
   },
+}
+
+export const fxSound = {
+  ...synth,
+  hook: () => clip('hook', synth.hook),
+  generator: () => clip('gen-done', synth.generator),
+  powered: () => clip('gates-powered', synth.powered),
+  item: () => clip('item', synth.item),
+  skillWarn: () => clip('skill-warn', synth.skillWarn),
+  skillGood: () => clip('skill-good', synth.skillGood),
+  skillGreat: () => clip('skill-great', synth.skillGreat),
+  skillFail: () => clip('skill-fail', synth.skillFail),
+  /** Generator damaged: sparks and the engine dying. */
+  damage: () => clip('damage', synth.crack),
+  /** Pallet thrown down. */
+  palletDrop: () => clip('pallet-drop', synth.crack),
+  /** Pallet or breakable wall smashed. */
+  palletBreak: () => clip('pallet-break', synth.crack),
+  /** A crow revealed: it caws. */
+  crow: () => clip('crow-caw', undefined, 0.5),
+  /** Hex totem cleansed. */
+  cleanse: () => clip('cleanse', undefined, 0.6),
+  /** The killer picks a survivor up (or drags one out of a locker). */
+  pickUp: () => clip('pick-up'),
+  /** An exit gate's lever pulled a notch. */
+  lever: () => clip('lever'),
+  /** An exit gate fully open. */
+  gateOpen: () => clip('gate-open', undefined, 0.6),
 }
