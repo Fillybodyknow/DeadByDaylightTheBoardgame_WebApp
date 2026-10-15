@@ -218,6 +218,29 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
         facts.push({ who: w.s, icon: '🎒', text: `${where(st, w.s)} · ถือ ${st.survivors[w.s].item ? ITEM_NAMES[st.survivors[w.s].item!] : '-'}` })
         facts.push(killerFact(st, w.s))
         break
+      case 'killerTurnBegin':
+        f.killer = true
+        facts.push({ who: 'killer', icon: '🃏', text: `การ์ดที่วางไว้: ${st.killer.planned.map((c, i) => (i < w.turn ? `${CARD_NAMES[c]} (เล่นแล้ว)` : CARD_NAMES[c])).join(', ')}` })
+        facts.push(killerFact(st))
+        break
+      case 'preKillerInteract':
+        f.killer = true
+        f.survivors.push(w.target)
+        f.rooms.push(st.survivors[w.target].room)
+        facts.push({ who: w.target, icon: '🔪', text: `${st.killer.name} กำลังจะทำร้าย ${where(st, w.target)}` })
+        break
+      case 'afterHang':
+      case 'afterPalletLocker':
+      case 'entered':
+      case 'rollFail':
+      case 'greatRoll':
+        f.survivors.push(w.s)
+        facts.push({ who: w.s, icon: '📍', text: where(st, w.s) })
+        facts.push(killerFact(st, w.s))
+        for (const c of choices) if (c.target !== undefined) facts.push({ who: c.target, icon: '🎯', text: where(st, c.target) })
+        for (const c of choices) if (c.prop) f.rooms.push(st.props.find((p) => p.id === c.prop)!.room!)
+        addChoices(choices, st.killer.room)
+        break
     }
     const cost = bpFact(st, owner, PERKS[step.perk].cost)
     if (cost) facts.push(cost)
@@ -247,6 +270,16 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
   if (step.t === 'replaceCard') {
     f.survivors.push(step.s)
     facts.push({ who: step.s, icon: '📍', text: where(st, step.s) })
+    return { focus: dedupe(f), facts }
+  }
+
+  if (step.t === 'redeemerGuess') {
+    f.survivors.push(step.s)
+    f.killer = true
+    f.dests.push(st.killer.room)
+    facts.push({ who: step.s, icon: '📍', text: where(st, step.s) })
+    facts.push(killerFact(st, step.s))
+    facts.push({ who: 'killer', icon: '🃏', text: `การ์ดในมือฆาตกรเหลือ ${st.killer.hand.length} ใบ (ทิ้งไป 1 ใบแบบคว่ำ)` })
     return { focus: dedupe(f), facts }
   }
 
@@ -290,6 +323,9 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   if (i.k === 'hatchet') f.survivors.push(i.target)
   if (i.k === 'spark' || i.k === 'bell') f.dests.push(i.room)
   if (i.k === 'phantasm') f.rooms.push(room)
+  // Yamaoka's Wrath counts this room and the connected ones.
+  if (i.k === 'wrath') f.rooms.push(room, ...touchingPaths(st, room).map((p) => (p.a === room ? p.b : p.a)))
+  if (i.k === 'redeemer') f.survivors.push(i.target)
   if (i.k === 'power' || i.k === 'blink' || i.k === 'chainsaw') {
     f.paths.push(i.path)
     f.dests.push(end(st, i.path, room))

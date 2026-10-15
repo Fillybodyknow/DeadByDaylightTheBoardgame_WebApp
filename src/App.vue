@@ -6,7 +6,9 @@ import Particles from './components/Particles.vue'
 import { quoteOrTip, showLoading } from './loading'
 import { asset, lang } from './i18n'
 import { game } from './play/game'
+import { isPhone } from './play/device'
 import { session } from './play/online/session'
+import PhoneBlock from './play/views/PhoneBlock.vue'
 import { muted, setAmbient, type AmbientTrack } from './sound'
 import { useLobbyStore } from './stores/lobby'
 
@@ -30,11 +32,15 @@ watch(section, (s) => (lastSection.value = s))
 
 const SUBTITLE: Record<Section, string> = { menu: '', companion: 'Companion', offline: 'Offline', online: 'Online' }
 
+/** The full game (Online / Offline) is for computers and tablets; a phone gets a notice. */
+const phone = isPhone()
+const phoneBlocked = computed(() => phone && (route.name === 'offline' || route.name === 'online'))
+
 /** A full game is on screen: it has its own top bar and takes the whole width. */
 const inGame = computed(
   () =>
-    (route.name === 'offline' && !!game.value && !session.room) ||
-    (route.name === 'online' && !!session.data?.game && !!game.value),
+    !phoneBlocked.value &&
+    ((route.name === 'offline' && !!game.value && !session.room) || (route.name === 'online' && !!session.data?.game && !!game.value)),
 )
 
 const links = computed(() => [
@@ -119,7 +125,8 @@ const scene = computed(() => {
   <main class="page" :class="{ full: inGame }">
     <RouterView v-slot="{ Component }">
       <Transition name="page" mode="out-in">
-        <component :is="Component" />
+        <PhoneBlock v-if="phoneBlocked" />
+        <component :is="Component" v-else />
       </Transition>
     </RouterView>
   </main>

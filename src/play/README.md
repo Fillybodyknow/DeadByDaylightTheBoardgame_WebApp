@@ -73,10 +73,11 @@ and the host starts the game.
 
 - Board: **MacMillan Estate** only (11 rooms, 22 paths, 4 breakable walls, all 44 props).
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
-  automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith** — with powers and passives.
-- Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea**. Others are locked in the
-  setup screen until their perks are written (`src/engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (42 perks).
+  automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger**
+  — with powers and passives.
+- Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir**.
+  Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
+- Mode **Adept**: each character plays the 3 perks printed on their board (54 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -92,8 +93,9 @@ use perks (p.12, p.15). Perks with a trigger are **offered** when it happens (`t
 each owner in turn: survivors in turn order, then the killer, p.16); the owner can also say "don't
 ask again this round". A few are **buttons** in the owner's own step: Self-Care, Empathy and Botany
 Knowledge at the start of the turn, Prove Thyself and Botany Knowledge before interacting, Iron
-Will on a roll. Calm Spirit is an interaction with a crow. A Nurse's Calling works by itself.
-Tinkerer changes a face-down card, so the device is handed to the killer first.
+Will on a roll, Breakout at the start of the turn. Calm Spirit is an interaction with a crow. A
+Nurse's Calling works by itself. Tinkerer, Zanshin Tactics and the Redeemer's discard are secret
+cards, so the device is handed to the killer first.
 
 When several perks trigger at the same moment (p.16, Timing), owners are asked in order: the
 survivors by turn order, then the killer, who decides after seeing theirs. When one owner has
@@ -181,3 +183,23 @@ Feng Min, Ace, Nea:
   kinds, at least one face up), before interacting; it doesn't use the interaction.
 - Urban Evasion's wall comes back when that survivor's turn ends; no pallet can be dropped on
   that path in the meantime.
+
+The Oni, The Deathslinger, Yui Kimura, Zarina Kassir:
+
+- "Sacrifice a Survivor" (Blood Echo, Dead Man's Switch) is hanging them on a hook (p.15).
+- Yamaoka's Wrath counts wounded survivors on the board (not in a locker) and revealed Hex
+  Totems; it is only offered when it gains at least 1 ▲.
+- Redeemer: any card in hand can be discarded, Wait included. The survivor guesses among the 5
+  card types. A wrong guess moves them into his room and he picks them up. Like any pick-up,
+  not a survivor wounded this round (p.15), so they can't be targeted. A right guess: nothing
+  else happens; the card stays discarded.
+- Zanshin Tactics swaps a card not yet played; the old card is discarded unseen.
+- Nemesis: a locker removed with a survivor inside lets them out into the room.
+- Gearhead: the second interaction may be any interaction or the power (if unused).
+- Retribution: "a success" is the cleanse succeeding; the totem is cleansed and the killer
+  gains 2 ▲.
+- Red Herring changes an attack or a pick-up (not a power, not a locker search) into damaging a
+  revealed generator in that room. It counts as damage (Overcharge, Gearhead, Alert).
+- Off the Record takes 1 ▲ of the killer's, even when the roll had several failed dice.
+- Lucky Break: any survivor's great success (the die kept; any die of the carry roll).
+- Yui's and Zarina's self-wounds count as wounded this round (no pick-up this round, p.15).

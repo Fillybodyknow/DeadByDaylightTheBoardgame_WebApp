@@ -1,6 +1,7 @@
 // The perks the engine implements: the printed perks (Adept mode, p.19) of the rulebook's
 // automated-mode cast (p.20–23: The Trapper, The Nurse, The Huntress, The Hillbilly, Dwight,
-// Meg, Jake, Claudette), plus The Doctor, The Hag, The Wraith, Feng Min, Ace and Nea. Names and costs match src/data; the rules
+// Meg, Jake, Claudette), plus The Doctor, The Hag, The Wraith, The Oni, The Deathslinger, Feng Min,
+// Ace, Nea, Yui and Zarina. Names and costs match src/data; the rules
 // text is shown from there by the UI.
 
 export type PerkId =
@@ -26,6 +27,12 @@ export type PerkId =
   | 'shadowborn'
   | 'bloodhound'
   | 'predator'
+  | 'blood_echo'
+  | 'zanshin_tactics'
+  | 'nemesis'
+  | 'gearhead'
+  | 'retribution'
+  | 'dead_mans_switch'
   // survivors
   | 'prove_thyself'
   | 'leader'
@@ -48,6 +55,12 @@ export type PerkId =
   | 'balanced_landing'
   | 'urban_evasion'
   | 'streetwise'
+  | 'breakout'
+  | 'lucky_break'
+  | 'any_means_necessary'
+  | 'red_herring'
+  | 'for_the_people'
+  | 'off_the_record'
 
 export interface PerkDef {
   id: PerkId
@@ -114,6 +127,18 @@ export const PERKS: Record<PerkId, PerkDef> = {
   balanced_landing: def('balanced_landing', 'Balanced Landing', 0, 'survivor', 'nea', 0, 'ปุ่มแทนการ Interact ในเทิร์นตัวเอง'),
   urban_evasion: def('urban_evasion', 'Urban Evasion', 1, 'survivor', 'nea', 1, 'ถามตอนเริ่มเทิร์นของผู้รอดชีวิตทุกคน'),
   streetwise: def('streetwise', 'Streetwise', 1, 'survivor', 'nea', 2, 'ถามหลังค้น Chest'),
+  blood_echo: def('blood_echo', 'Blood Echo', 2, 'killer', 'oni', 0, 'ถามหลังแขวนผู้รอดชีวิต'),
+  zanshin_tactics: def('zanshin_tactics', 'Zanshin Tactics', 2, 'killer', 'oni', 1, 'ถามตอนเริ่มเทิร์นฆาตกร ก่อนเปิดการ์ด'),
+  nemesis: def('nemesis', 'Nemesis', 2, 'killer', 'oni', 2, 'ถามหลังผู้รอดชีวิตทิ้ง Pallet / ซ่อนใน Locker ใกล้คุณ'),
+  gearhead: def('gearhead', 'Gearhead', 1, 'killer', 'deathslinger', 0, 'ถามหลังทำลาย Generator'),
+  retribution: def('retribution', 'Retribution', 0, 'killer', 'deathslinger', 1, 'ถามก่อนผู้รอดชีวิตทอยชำระ Hex Totem'),
+  dead_mans_switch: def('dead_mans_switch', "Dead Man's Switch", 1, 'killer', 'deathslinger', 2, 'ถามหลังแขวนผู้รอดชีวิต'),
+  breakout: def('breakout', 'Breakout', 1, 'survivor', 'yui', 0, 'ปุ่มตอนเริ่มเทิร์น'),
+  lucky_break: def('lucky_break', 'Lucky Break', 2, 'survivor', 'yui', 1, 'ถามเมื่อมีคนทอยได้สำเร็จอย่างยิ่ง ขณะคุณบาดเจ็บ'),
+  any_means_necessary: def('any_means_necessary', 'Any Means Necessary', 0, 'survivor', 'yui', 2, 'ถามตอนจบเทิร์นตัวเอง ถ้าไม่บาดเจ็บ'),
+  red_herring: def('red_herring', 'Red Herring', 2, 'survivor', 'zarina', 0, 'ถามเมื่อฆาตกรจะโจมตี / อุ้มคนในห้องคุณ'),
+  for_the_people: def('for_the_people', 'For the People', 1, 'survivor', 'zarina', 1, 'ถามหลังคุณเข้าห้อง ถ้าไม่บาดเจ็บ'),
+  off_the_record: def('off_the_record', 'Off the Record', 0, 'survivor', 'zarina', 2, 'ถามเมื่อคนในห้อง/ห้องติดกันทอยล้มเหลว'),
 }
 
 /** Printed perks by character (Adept mode). Characters not listed play without perks for now. */
@@ -123,4 +148,4 @@ export const PRINTED_PERKS: Record<string, PerkId[]> = Object.values(PERKS).redu
 }, {})
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger']

@@ -1,7 +1,7 @@
 // Thai labels for actions, steps and pieces.
 
 import { killerById, survivorById } from '../data'
-import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, pathDef, roomName } from './engine/engine'
+import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, pathDef, roomName, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import type { GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
 import type { Perk } from '../types'
@@ -128,6 +128,10 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `วาง Phantasm Trap ที่ ${roomName(st, st.killer.room)}`
     case 'bell':
       return `Wailing Bell → ${roomName(st, i.room)}`
+    case 'wrath':
+      return `Yamaoka's Wrath (+${wrathGain(st)} ▲)`
+    case 'redeemer':
+      return `Redeemer → ${st.survivors[i.target].name} (ทิ้ง ${CARD_NAMES[i.card]} แบบคว่ำ)`
   }
 }
 
@@ -269,6 +273,37 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     }
     case 'streetwise':
       return 'เก็บ Chest ไว้'
+    case 'blood_echo':
+      return `ทำให้ ${name(c.target!)} บาดเจ็บ (${roomName(st, st.survivors[c.target!].room)})`
+    case 'zanshin_tactics':
+      return `ทิ้งใบที่ ${c.index! + 1} (${CARD_NAMES[st.killer.planned[c.index!]]}) → ${CARD_NAMES[c.card!]}`
+    case 'nemesis': {
+      const p = prop(st, (w as { prop: string }).prop)
+      return `นำ ${PROP_NAMES_TH[p.kind]} ออก`
+    }
+    case 'gearhead':
+      return 'Interact อีกครั้งในห้องนี้'
+    case 'retribution':
+      return 'ให้ทอย Danger Die แทน (สำเร็จ = ฆาตกร +2 ▲)'
+    case 'dead_mans_switch': {
+      const p = prop(st, c.prop!)
+      return `${PROP_NAMES_TH[p.kind]} ที่ ${roomName(st, p.room!)} (${p.progress}/${PROGRESS_MAX} → ${p.progress - 1})`
+    }
+    case 'breakout':
+      return `ย้าย ${name(c.target!)} ไปทาง ${pathLabel(st, c.path!, st.survivors[c.target!].room)}`
+    case 'lucky_break':
+      return 'หายบาดเจ็บ'
+    case 'any_means_necessary':
+      return `ยอมบาดเจ็บ เล่น Bonus Turn ด้วย ${CARD_NAMES[c.card!]}`
+    case 'red_herring': {
+      const g = prop(st, c.prop!)
+      return `บังคับให้ทำลาย Generator แทน (${g.progress}/${PROGRESS_MAX})${g.progress === 2 ? ' +1 ▲' : ''}`
+    }
+    case 'for_the_people':
+      if (c.prop) return `ยอมบาดเจ็บ: Generator +1 (${prop(st, c.prop).progress}/${PROGRESS_MAX})`
+      return `ยอมบาดเจ็บ: รักษา ${name(c.target!)}`
+    case 'off_the_record':
+      return `รับ 1 ▲ แทน ${st.killer.name}`
     default:
       return 'ใช้'
   }
@@ -299,6 +334,10 @@ export function cardCaption(perk: PerkId, c: PerkChoice): string {
     case 'devour_hope':
     case 'shadowborn':
       return 'เทิร์นเพิ่ม'
+    case 'zanshin_tactics':
+      return `แทนใบที่ ${c.index! + 1}`
+    case 'any_means_necessary':
+      return 'ยอมบาดเจ็บ'
     default:
       return 'Bonus Turn'
   }
@@ -343,6 +382,20 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return `${st.survivors[w.s].name} ค้น Chest`
     case 'preItem':
       return `${st.survivors[w.s].name} กำลังจะใช้ ${st.survivors[w.s].item ? ITEM_NAMES[st.survivors[w.s].item!] : 'item'}`
+    case 'killerTurnBegin':
+      return `เริ่มเทิร์นที่ ${w.turn + 1} ของ ${st.killer.name}`
+    case 'preKillerInteract':
+      return `${st.killer.name} กำลังจะทำร้าย ${st.survivors[w.target].name}`
+    case 'afterHang':
+      return `${st.survivors[w.s].name} ถูกแขวน`
+    case 'afterPalletLocker':
+      return `${st.survivors[w.s].name} ใช้ ${PROP_NAMES_TH[prop(st, w.prop).kind]}`
+    case 'entered':
+      return `${st.survivors[w.s].name} เข้า ${roomName(st, st.survivors[w.s].room)}`
+    case 'rollFail':
+      return `${st.survivors[w.s].name} ทอยล้มเหลว (${st.killer.name} จะได้ +${w.fails} ▲)`
+    case 'greatRoll':
+      return `${st.survivors[w.s].name} ทอยได้สำเร็จอย่างยิ่ง`
     default:
       return ''
   }

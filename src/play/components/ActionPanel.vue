@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // What the current player can do now. Every button dispatches one engine action; moves can
 // also be made by clicking the highlighted paths on the board.
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import {
@@ -22,8 +22,9 @@ import {
   survivorInteractions,
   survivorMoves,
 } from '../engine/engine'
-import { PERKS } from '../engine/perks'
-import type { Action, GameState, KillerInteraction, MoveCard, PropCategory, SurvivorInteraction } from '../engine/types'
+import { PERKS, type PerkId } from '../engine/perks'
+import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
+import { actionKey } from '../boardActions'
 import { dispatch } from '../game'
 import {
   orderedChoices,
@@ -45,12 +46,20 @@ import {
   survivorMini,
   windowLabel,
 } from '../labels'
+import CardHand, { type HandCard } from './CardHand.vue'
 import DiceRow from './DiceRow.vue'
 import FaceLabel from './FaceLabel.vue'
-import { decisionFocus, powerPreview, preview } from '../focus'
+import { choicePreview, decisionFocus, powerPreview, preview } from '../focus'
 import Mini from './Mini.vue'
 
-const props = defineProps<{ st: GameState; powerOn: boolean; trapPath: string | null; powerCard: MoveCard | null }>()
+const props = defineProps<{ st: GameState; powerOn: boolean; trapPath: string | null; powerCard: MoveCard | null; onBoard: Set<string> }>()
+
+// Perk and power choices the board already offers are made there; the panel points at it.
+const here = (a: Action) => !props.onBoard.has(actionKey(a))
+const perkAct = (perk: PerkId, c: PerkChoice): Action => ({ t: 'perk', perk, use: true, choice: c })
+const powerAct = (i: KillerInteraction): Action => ({ t: 'interact', i })
+/** A choice of the perk on offer that isn't on the board. */
+const offerHere = (c: PerkChoice) => (props.st.step.t === 'offer' ? here(perkAct(props.st.step.perk, c)) : true)
 const emit = defineEmits<{ powerOn: [on: boolean]; trapPath: [path: string | null]; powerCard: [card: MoveCard | null] }>()
 
 const step = computed(() => props.st.step)
@@ -141,6 +150,7 @@ const POWER_HINT: Record<string, string> = {
   doctor: 'เลือกห้องนี้หรือห้องที่เชื่อมกัน — ทุกคนในห้องนั้นจ่าย 1 ▲ หรือติด Madness (มีแล้ว = บาดเจ็บ)',
   hag: 'วาง Phantasm Trap ในห้องนี้ (ห้องละ 1) — มี Hex Totem ในห้องได้ +1 ▲',
   wraith: 'วาร์ปไปห้องที่ไม่เชื่อมกับห้องนี้',
+  oni: 'รับ ▲ เท่ากับจำนวนผู้รอดชีวิตที่บาดเจ็บ และ Hex Totem ในห้องนี้กับห้องที่เชื่อมกัน',
 }
 
 const powerFacts = computed(() => (powerMode.value ? (decisionFocus(props.st, true)?.facts ?? []) : []))
@@ -149,8 +159,8 @@ function hoverPower(i: KillerInteraction | null) {
   preview.value = i ? powerPreview(props.st, i) : null
 }
 
-/** The Hillbilly: cards that have a chainsaw path. */
-const chainsawCards = computed(() => [...new Set(kInteractions.value.powers.flatMap((i) => (i.k === 'chainsaw' ? [i.card] : [])))])
+/** The Hillbilly: cards that have a chainsaw path. The Deathslinger: cards he may discard. */
+const powerCards = computed(() => [...new Set(kInteractions.value.powers.flatMap((i) => (i.k === 'chainsaw' || i.k === 'redeemer' ? [i.card] : [])))])
 
 /** Perk buttons in this step (start of turn, interact, a roll). */
 const buttons = computed(() => perkButtons(props.st))
@@ -182,6 +192,36 @@ const bonusCards = computed(() => {
   if (s.t === 'killerBonusOffer') return props.st.killer.hand
   return []
 })
+
+// ---------- bonus turn: the card is picked from the hand along the bottom, then confirmed ----------
+
+const bonusPick = ref<MoveCard | null>(null)
+watch(
+  () => JSON.stringify(step.value),
+  () => (bonusPick.value = null),
+)
+onBeforeUnmount(() => (preview.value = null))
+
+const bonusHand = computed<HandCard[]>(() => bonusCards.value.map((card) => ({ card, picked: bonusPick.value === card, ...(bonusPick.value === card ? { badge: 'Bonus Turn' } : {}) })))
+
+/** Who moves with the bonus card, for the map preview. */
+const bonusOwner = computed<number | 'killer'>(() => (step.value.t === 'bonusOffer' ? step.value.s : 'killer'))
+
+function pickBonus(card: MoveCard) {
+  sfx.click()
+  bonusPick.value = bonusPick.value === card ? null : card
+}
+
+function hoverBonus(card: MoveCard | null) {
+  const o = bonusOwner.value
+  preview.value = card ? choicePreview(props.st, { card }, o === 'killer' ? props.st.killer.room : props.st.survivors[o].room, o) : null
+}
+
+function confirmBonus() {
+  if (!bonusPick.value) return
+  preview.value = null
+  act({ t: 'bonus', card: bonusPick.value })
+}
 
 const rollers = computed(() => rerollers(props.st))
 </script>
@@ -222,7 +262,7 @@ const rollers = computed(() => rerollers(props.st))
           <p class="small">{{ perkText(step.perk) }}</p>
         </div>
       </div>
-      <p v-if="offerChoices.some((c) => c.path)" class="muted small">เลือกเส้นทางบนแผนที่หรือปุ่ม</p>
+      <p v-if="offerChoices.some((c) => !offerHere(c))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
         <div v-if="offerChoices.some((c) => c.card)" class="card-row">
           <button
             v-for="(c, i) in offerChoices.filter((c) => c.card)"
@@ -238,7 +278,7 @@ const rollers = computed(() => rerollers(props.st))
           </button>
         </div>
       <div class="buttons col">
-        <button v-for="(c, i) in offerChoices.filter((c) => !c.card)" :key="i" class="primary" @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })">
+        <button v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c))" :key="i" class="primary" @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })">
           <FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, step.perk, step.owner, step.w, c)" />
         </button>
         <button @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้</button>
@@ -249,9 +289,10 @@ const rollers = computed(() => rerollers(props.st))
     <!-- start of a survivor's turn: Self-Care, Empathy, Botany Knowledge -->
     <template v-else-if="step.t === 'turnStart'">
       <p>เริ่มเทิร์น — ใช้ perk ก่อนเดินได้</p>
+      <p v-if="buttons.some((b) => b.choices.some((c) => !here(perkAct(b.perk, c))))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
       <div v-for="b in buttons" :key="b.perk" class="perk-group">
         <span class="perk-name">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
-        <button v-for="(c, i) in b.choices" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+        <button v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
       </div>
       <button class="primary" @click="act({ t: 'continue' })">เปิดการ์ด แล้วเดิน</button>
     </template>
@@ -262,8 +303,9 @@ const rollers = computed(() => rerollers(props.st))
 
     <template v-else-if="step.t === 'pickSurvivor'">
       <p>Chainsaw — เลือกผู้รอดชีวิตในห้องที่จะบาดเจ็บ</p>
+      <p v-if="step.options.some((s) => !here({ t: 'pick', s }))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกผู้รอดชีวิตที่กระพริบ</p>
       <div class="buttons">
-        <button v-for="s in step.options" :key="s" class="primary" @click="act({ t: 'pick', s })"><FaceLabel :st="st" :who="s" :text="st.survivors[s].name" /></button>
+        <button v-for="s in step.options.filter((s) => here({ t: 'pick', s }))" :key="s" class="primary" @click="act({ t: 'pick', s })"><FaceLabel :st="st" :who="s" :text="st.survivors[s].name" /></button>
       </div>
     </template>
 
@@ -305,7 +347,8 @@ const rollers = computed(() => rerollers(props.st))
       </div>
       <div v-for="b in buttons" :key="b.perk" class="perk-group">
         <span class="perk-name">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
-        <button v-for="(c, i) in b.choices" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+        <button v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+        <span v-if="b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 หรือคลิกบนแผนที่</span>
       </div>
       <button class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
     </template>
@@ -314,12 +357,17 @@ const rollers = computed(() => rerollers(props.st))
     <template v-else-if="step.t === 'bonusOffer' || step.t === 'killerBonusOffer'">
       <p v-if="step.t === 'bonusOffer'">Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง (หน้า 9)</p>
       <p v-else>จ่าย {{ bonusCost(st) }} ▲ (มี {{ st.killer.bp }}) เพื่อเล่นเทิร์นที่ 3? (หน้า 10)</p>
-      <div class="buttons">
-        <button v-for="c in bonusCards" :key="c" class="cardbtn" :title="cardLabel(c)" @click="act({ t: 'bonus', card: c })">
-          <img :src="asset(cardImage(c))" :alt="cardLabel(c)" />
-        </button>
+      <p class="muted small">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทาง · คลิกเพื่อเลือก แล้วกดยืนยัน</p>
+      <div class="buttons col">
+        <button class="primary" :disabled="!bonusPick" @click="confirmBonus">{{ bonusPick ? `ยืนยัน: Bonus Turn ด้วย ${CARD_NAMES[bonusPick]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
+        <button @click="act({ t: 'declineBonus' })">ไม่เล่น</button>
       </div>
-      <button @click="act({ t: 'declineBonus' })">ไม่เล่น</button>
+      <CardHand
+        :cards="bonusHand"
+        :label="`Bonus Turn — มือของ ${step.t === 'bonusOffer' ? st.survivors[step.s].name : st.killer.name}`"
+        @pick="pickBonus"
+        @hover="hoverBonus"
+      />
     </template>
 
     <template v-else-if="step.t === 'keepItem'">
@@ -369,6 +417,7 @@ const rollers = computed(() => rerollers(props.st))
           </li>
         </ul>
         <p v-if="step.powerOnly"><b>Territorial Imperative</b> — ใช้พลังอีกครั้ง</p>
+        <p v-if="kInteractions.powers.some((i) => !here(powerAct(i)))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
         <template v-if="st.killer.characterId === 'trapper'">
           <p>
             <b>ใช้พลัง: Bear Trap</b> — เลือกเส้นทางที่เชื่อมกับห้อง (คลิกบนแผนที่หรือปุ่ม) เหลือในมือ {{ st.killer.trapsInSupply }} อัน{{
@@ -377,7 +426,7 @@ const rollers = computed(() => rerollers(props.st))
           </p>
           <div v-if="!trapPath" class="buttons">
             <template v-if="!mustMoveTrap">
-              <button v-for="(i, n) in kInteractions.traps" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
+              <button v-for="(i, n) in kInteractions.traps.filter((i) => here(powerAct(i)))" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
             </template>
             <template v-else>
               <button v-for="p in trapTargets" :key="p" @click="emit('trapPath', p)">{{ pathLabel(st, p, st.killer.room) }}</button>
@@ -393,14 +442,32 @@ const rollers = computed(() => rerollers(props.st))
         <template v-else-if="st.killer.characterId === 'hillbilly'">
           <p><b>ใช้พลัง: Chainsaw</b> — ทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามสีนั้น (ห้ามผ่าน Pallet / กำแพง / ของบนทาง) ผู้รอดชีวิตในห้องที่เข้าไปบาดเจ็บ</p>
           <div v-if="!powerCard" class="buttons">
-            <button v-for="c in chainsawCards" :key="c" class="cardbtn" :title="cardLabel(c)" @click="emit('powerCard', c)">
+            <button v-for="c in powerCards" :key="c" class="cardbtn" :title="cardLabel(c)" @click="emit('powerCard', c)">
               <img :src="asset(cardImage(c))" :alt="cardLabel(c)" />
             </button>
           </div>
           <div v-else class="buttons">
             <span class="small">ทิ้ง {{ CARD_NAMES[powerCard] }} — เลือกเส้นทาง (แผนที่หรือปุ่ม)</span>
             <template v-for="(i, n) in kInteractions.powers" :key="n">
-              <button v-if="i.k === 'chainsaw' && i.card === powerCard" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
+              <button v-if="i.k === 'chainsaw' && i.card === powerCard && here(powerAct(i))" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
+            </template>
+            <button @click="emit('powerCard', null)">เปลี่ยนการ์ด</button>
+          </div>
+        </template>
+        <template v-else-if="st.killer.characterId === 'deathslinger'">
+          <p>
+            <b>ใช้พลัง: Redeemer</b> — ทิ้งการ์ด 1 ใบแบบคว่ำ แล้วยิงผู้รอดชีวิตที่บาดเจ็บในห้องที่เชื่อมกัน (ทางนั้นไม่มี Pallet / กำแพง และไม่ได้เพิ่งบาดเจ็บในรอบนี้) ถ้าเขาทายการ์ดผิด จะถูกดึงเข้ามาและถูกอุ้ม
+          </p>
+          <div v-if="!powerCard" class="buttons">
+            <span class="small">1. เลือกการ์ดที่จะทิ้งแบบคว่ำ (อย่าให้ผู้รอดชีวิตเห็น)</span>
+            <button v-for="c in powerCards" :key="c" class="cardbtn" :title="cardLabel(c)" @click="emit('powerCard', c)">
+              <img :src="asset(cardImage(c))" :alt="cardLabel(c)" />
+            </button>
+          </div>
+          <div v-else class="buttons">
+            <span class="small">2. ทิ้ง {{ CARD_NAMES[powerCard] }} — เลือกผู้รอดชีวิตที่จะยิง (แผนที่หรือปุ่ม)</span>
+            <template v-for="(i, n) in kInteractions.powers" :key="n">
+              <button v-if="i.k === 'redeemer' && i.card === powerCard && here(powerAct(i))" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="`ยิง ${st.survivors[i.target].name}`" /></button>
             </template>
             <button @click="emit('powerCard', null)">เปลี่ยนการ์ด</button>
           </div>
@@ -411,7 +478,7 @@ const rollers = computed(() => rerollers(props.st))
             {{ POWER_HINT[st.killer.characterId] ?? '' }}
           </p>
           <div class="buttons">
-            <button v-for="(i, n) in kInteractions.powers" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
+            <button v-for="(i, n) in kInteractions.powers.filter((i) => here(powerAct(i)))" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
           </div>
         </template>
         <button v-if="!step.powerOnly" @click="emit('trapPath', null), emit('powerCard', null), emit('powerOn', false)">ยกเลิก ไม่ใช้พลัง</button>
@@ -498,6 +565,15 @@ p {
 }
 .warn {
   color: var(--warn);
+}
+.board-hint {
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px dashed #ff8a3d;
+  border-radius: 6px;
+  background: rgb(255 138 61 / 0.1);
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 .buttons {
   display: flex;

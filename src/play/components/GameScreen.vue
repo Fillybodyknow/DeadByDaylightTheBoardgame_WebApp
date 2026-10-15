@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { muted, sfx, startHeartbeat, stopHeartbeat } from '../../sound'
-import { isGreat, PROGRESS_MAX, succeeded, touchingPaths } from '../engine/engine'
+import { boardOf, isGreat, PROGRESS_MAX, succeeded, touchingPaths } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { canUndo, dispatch, myTurn, online, quitGame, undo } from '../game'
@@ -9,7 +9,7 @@ import { actorsOf } from '../engine/seats'
 import { closeOnlineGame, isHost, leaveRoom, session } from '../online/session'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { boardActions, boardTargets, powerMode as isPowerMode, type BoardAction, type BoardModes } from '../boardActions'
+import { boardActionKeys, boardActions, boardTargets, powerMode as isPowerMode, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
 import ActionPanel from './ActionPanel.vue'
 import BannerHost from './BannerHost.vue'
@@ -18,7 +18,7 @@ import ChoiceMenu from './ChoiceMenu.vue'
 import DetailModal from './DetailModal.vue'
 import DiceModal from './DiceModal.vue'
 import EndSummary from './EndSummary.vue'
-import GameLog from './GameLog.vue'
+import TrackBar from './TrackBar.vue'
 import PerkPrompt from './PerkPrompt.vue'
 import PerkReveal from './PerkReveal.vue'
 import Planning from './Planning.vue'
@@ -113,7 +113,7 @@ const aceFirst = ref<string | null>(null)
 /** A survivor's item whose target is being picked on the board. */
 const itemPick = ref<number | null>(null)
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick, powerCard }
 
 watch(
   () => view.value.step,
@@ -138,6 +138,8 @@ const boardFocus = computed(() => decisionFocus(view.value, powerMode.value)?.fo
 const actions = computed(() => boardActions(view.value, modes))
 // Online, only the player the game waits on gets clickable targets.
 const targets = computed(() => (myTurn.value ? boardTargets(actions.value) : boardTargets([])))
+/** What the board already offers: the side panels leave these out and point at the board. */
+const onBoard = computed(() => (myTurn.value ? boardActionKeys(actions.value) : new Set<string>()))
 
 /** Online: who the game is waiting on, for the side panel. */
 const waitingOn = computed(() => {
@@ -368,9 +370,17 @@ const secretSeen = ref(false)
 /** Who must hold the device alone: the killer swapping a hidden card, survivors picking one. */
 const secretFor = computed<'killer' | 'survivors' | null>(() => {
   const s = view.value.step
-  if (s.t === 'offer' && s.perk === 'tinkerer') return 'killer'
+  if (s.t === 'offer' && (s.perk === 'tinkerer' || s.perk === 'zanshin_tactics')) return 'killer'
+  // Redeemer: the card discarded face down is picked first.
+  if (s.t === 'killerInteract' && powerMode.value && view.value.killer.characterId === 'deathslinger') return 'killer'
   if (s.t === 'replaceCard') return 'survivors'
   return null
+})
+/** What the killer is about to do alone, for the curtain. */
+const secretWhat = computed(() => {
+  const s = view.value.step
+  if (s.t === 'offer') return `เลือกเปลี่ยนการ์ดที่คว่ำไว้ (${s.perk === 'tinkerer' ? 'Tinkerer' : 'Zanshin Tactics'})`
+  return 'เลือกการ์ดที่จะทิ้งแบบคว่ำ (Redeemer)'
 })
 // Online every player has their own screen: no hand-off curtain needed.
 const secret = computed(() => !online.value && secretFor.value !== null && !secretSeen.value)
@@ -406,9 +416,9 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 <template>
   <div class="game">
     <header class="top">
-      <strong class="title">ดบดล · เล่นเต็มเกม</strong>
-      <span class="phase">รอบ {{ view.round }} · {{ PHASE_TH[view.phase] }}</span>
+      <TrackBar :st="view" />
       <span class="spacer" />
+      <span class="phase">รอบ {{ view.round }} · {{ PHASE_TH[view.phase] }}</span>
       <button v-if="over && !showOver" class="primary" @click="showOver = true">สรุปเกม</button>
       <SyncBadge v-if="online" />
       <span v-if="online" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
@@ -418,7 +428,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     </header>
 
     <main class="layout">
-      <div class="board-col">
+      <div class="board-col" :style="{ '--aspect': String(boardOf(view).aspect) }">
         <div v-if="modeBar" class="reveal-bar card">
           <span>{{ modeBar.text }}</span>
           <button @click="modeBar.cancel()">ยกเลิก</button>
@@ -443,6 +453,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           @prop="onProp"
           @inspect="inspecting = $event"
         />
+        <StatusPanel :st="view" @use="onUse" @inspect="inspecting = $event" @pick="itemPick = $event" />
       </div>
 
       <aside class="side">
@@ -458,12 +469,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           :power-on="powerOn"
           :trap-path="trapPath"
           :power-card="powerCard"
+          :on-board="onBoard"
           @power-on="powerOn = $event"
           @trap-path="trapPath = $event"
           @power-card="powerCard = $event"
         />
-        <StatusPanel :st="view" @use="onUse" @inspect="inspecting = $event" @pick="itemPick = $event" />
-        <GameLog :st="view" />
       </aside>
     </main>
 
@@ -475,7 +485,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       <button v-if="secret" class="secret" @click="secretSeen = true">
         <template v-if="secretFor === 'killer'">
           <strong>ส่งเครื่องให้ฆาตกร ({{ view.killer.name }})</strong>
-          <span>ผู้รอดชีวิตห้ามดูจอ — เลือกเปลี่ยนการ์ดที่คว่ำไว้ (Tinkerer) · แตะเพื่อเริ่ม</span>
+          <span>ผู้รอดชีวิตห้ามดูจอ — {{ secretWhat }} · แตะเพื่อเริ่ม</span>
         </template>
         <template v-else>
           <strong>ส่งเครื่องให้ฝ่ายผู้รอดชีวิต</strong>
@@ -487,7 +497,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <BannerHost :paused="summaryRound !== null || !!over || fx.dice.length > 0 || fx.perks.length > 0" />
     <ChoiceMenu v-if="menu" :st="view" :actions="menu.actions" :x="menu.x" :y="menu.y" @close="menu = null" />
     <PerkReveal :st="view" />
-    <PerkPrompt :st="view" :hidden="secret || !!over || !myTurn" />
+    <PerkPrompt :st="view" :hidden="secret || !!over || !myTurn" :on-board="onBoard" />
     <DiceModal />
     <RoundSummary v-if="summaryRound !== null && !over && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" @close="summaryRound = null" />
     <DetailModal v-if="inspecting" :st="view" :target="inspecting" @close="inspecting = null" />
@@ -503,19 +513,15 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 }
 .top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.55rem 1rem;
+  gap: 0.5rem 0.8rem;
+  padding: 0.5rem 1rem;
   border-bottom: 1px solid var(--line);
-  background: rgb(7 8 10 / 0.85);
+  background: rgb(7 8 10 / 0.88);
   position: sticky;
   top: 0;
   z-index: 10;
-}
-.title {
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 .phase {
   color: var(--blood-bright);
@@ -537,6 +543,12 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   display: grid;
   gap: 0.6rem;
 }
+/* The board shrinks to leave room for the player tiles under it on one screen
+   (top bar, padding and tiles take about 15rem). */
+.board-col > .board {
+  width: min(100%, max(22rem, calc((100vh - 15rem) * var(--aspect))));
+  justify-self: center;
+}
 .side {
   display: grid;
   gap: 0.75rem;
@@ -544,6 +556,12 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   top: 4rem;
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
+}
+/* a hand of cards in the bottom-right corner (CardHand): the panel stops above it and scrolls */
+@media (min-width: 981px) {
+  :global(body.hand-open) .side {
+    max-height: calc(100vh - 5rem - 215px);
+  }
 }
 .reveal-bar {
   display: flex;

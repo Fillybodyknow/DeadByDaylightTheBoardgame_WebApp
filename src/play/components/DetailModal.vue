@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { items, killerById, survivorById } from '../../data'
 import { asset, tr } from '../../i18n'
 import { ITEM_NAMES, PROP_NAMES, SURVIVOR_BP, KILLER_BP, roomName } from '../engine/engine'
-import type { GameState } from '../engine/types'
+import type { GameState, PerkOwner } from '../engine/types'
 import { CATEGORY_TH, PROP_RULES, type InspectTarget } from '../inspect'
 import { PERKS } from '../engine/perks'
 import { BEAR_TRAP_IMAGE, PROP_IMAGE, itemImage, ownerLabel, perkImage, perkText, playerOf } from '../labels'
@@ -38,6 +38,15 @@ const prop = computed(() => {
 
 const perk = computed(() => (props.target.k === 'perk' ? props.target : null))
 
+/** A character's perks with this round's state (the player tiles don't list them). */
+const perkList = computed(() => {
+  const t = props.target
+  const owner: PerkOwner | null = t.k === 'survivor' ? t.s : t.k === 'killer' ? 'killer' : null
+  if (owner === null) return []
+  const perks = owner === 'killer' ? props.st.killer.perks : props.st.survivors[owner].perks
+  return perks.map((p) => ({ p, used: perkUsed(props.st, owner, p) }))
+})
+
 const item = computed(() => {
   const t = props.target
   return t.k === 'item' ? (items.find((i) => i.id === t.id) ?? null) : null
@@ -65,7 +74,7 @@ const item = computed(() => {
           <li>{{ survivor.sv.item ? `ถือ ${ITEM_NAMES[survivor.sv.item]}` : 'ไม่มี item' }}</li>
           <li>{{ survivor.sv.sacrificeToken ? 'ยังไม่เคยถูกแขวน' : 'เคยถูกแขวนแล้ว' }}</li>
         </ul>
-        <img v-if="survivor.data?.images.boardTh" class="board-img" :src="asset(survivor.data.images.boardTh)" :alt="survivor.sv.name" />
+        <p v-if="!perkList.length" class="muted small">ตัวละครนี้ยังไม่มี Perk ในโหมดนี้</p>
       </template>
 
       <!-- killer -->
@@ -88,6 +97,30 @@ const item = computed(() => {
         </div>
         <p class="rule"><b>Power — {{ killer.power.name }}:</b> {{ tr(killer.power.text) }}</p>
         <p v-if="killer.passive" class="rule"><b>Passive:</b> {{ tr(killer.passive) }}</p>
+      </template>
+
+      <!-- a character's perks, used or not this round -->
+      <section v-if="perkList.length" class="perk-list">
+        <h3>Perks</h3>
+        <div v-for="{ p, used } in perkList" :key="p" class="perk-row" :class="{ used }">
+          <img v-if="perkImage(p)" :src="asset(perkImage(p))" :alt="PERKS[p].name" />
+          <div>
+            <div class="perk-head">
+              <strong>{{ PERKS[p].name }}</strong>
+              <span class="cost">{{ PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี' }}</span>
+              <span class="state" :class="used ? 'bad' : 'good'">{{ used ? 'ใช้แล้วรอบนี้' : 'ยังใช้ได้รอบนี้' }}</span>
+            </div>
+            <p class="rule small">{{ perkText(p) }}</p>
+            <p class="muted small">{{ PERKS[p].when }}</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- the printed character board, last -->
+      <template v-if="survivor">
+        <img v-if="survivor.data?.images.boardTh" class="board-img" :src="asset(survivor.data.images.boardTh)" :alt="survivor.sv.name" />
+      </template>
+      <template v-else-if="killer">
         <img v-if="killer.images.boardTh" class="board-img" :src="asset(killer.images.boardTh)" :alt="killer.name" />
       </template>
 
@@ -229,6 +262,60 @@ header p {
 }
 .inline {
   width: 18px;
+}
+.perk-list {
+  display: grid;
+  gap: 0.5rem;
+}
+.perk-list h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #d8c2ff;
+}
+.perk-row {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.5rem;
+  border: 1px solid #6b4ca3;
+  border-radius: 8px;
+  background: rgb(120 70 200 / 0.08);
+}
+.perk-row.used {
+  opacity: 0.6;
+}
+.perk-row img {
+  width: 100%;
+  border-radius: 4px;
+}
+.perk-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  align-items: center;
+}
+.cost {
+  padding: 0 0.4rem;
+  border-radius: 4px;
+  background: rgb(255 138 128 / 0.15);
+  color: #ffd1cc;
+  font-size: 0.85rem;
+}
+.state {
+  font-size: 0.8rem;
+}
+.state.good {
+  color: var(--ok);
+}
+.state.bad {
+  color: #ff8a80;
+}
+.small {
+  font-size: 0.86rem;
+  margin: 0.2rem 0 0;
 }
 .board-img {
   width: 100%;

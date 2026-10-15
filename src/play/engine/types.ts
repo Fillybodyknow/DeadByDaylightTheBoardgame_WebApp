@@ -133,7 +133,8 @@ export interface Die {
 export type RollContext =
   | { k: 'repair'; s: number; prop: string }
   | { k: 'openGate'; s: number; prop: string }
-  | { k: 'cleanse'; s: number; prop: string }
+  /** `retribution`: The Deathslinger's perk made it a danger-die roll; a success pays him 2 ▲. */
+  | { k: 'cleanse'; s: number; prop: string; retribution?: boolean }
   | { k: 'heal'; s: number; target: number }
   | { k: 'trap'; s: number; path: string }
   | { k: 'search'; s: number; prop: string }
@@ -182,6 +183,10 @@ export type KillerInteraction =
   | { k: 'phantasm' }
   /** The Wraith: move to a room not connected to hers. */
   | { k: 'bell'; room: string }
+  /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
+  | { k: 'wrath' }
+  /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */
+  | { k: 'redeemer'; target: number; card: MoveCard }
 
 /** A moment when perks may be used, with what is needed to decide. */
 export type PerkWindow =
@@ -207,6 +212,20 @@ export type PerkWindow =
   | { k: 'afterRummage'; s: number; prop: string }
   /** A survivor is about to use an item (Overwhelming Presence). */
   | { k: 'preItem'; s: number }
+  /** Start of one of the killer's turns, before the card is revealed (Zanshin Tactics). */
+  | { k: 'killerTurnBegin'; turn: number }
+  /** The killer is about to attack or pick up `target` (Red Herring). */
+  | { k: 'preKillerInteract'; target: number }
+  /** A survivor was hung on a hook — "sacrificed" (Blood Echo, Dead Man's Switch). */
+  | { k: 'afterHang'; s: number }
+  /** A survivor dropped a pallet or hid in a locker (Nemesis). */
+  | { k: 'afterPalletLocker'; s: number; prop: string }
+  /** A survivor entered a room (For the People). */
+  | { k: 'entered'; s: number }
+  /** A roll had `fails` failures; the killer gains them unless Off the Record takes one. */
+  | { k: 'rollFail'; s: number; fails: number }
+  /** A survivor rolled a great success (Lucky Break). */
+  | { k: 'greatRoll'; s: number }
   /** Buttons rather than questions: start of a survivor's turn, their interact step, a roll. */
   | { k: 'turnStart'; s: number }
   | { k: 'interact'; s: number }
@@ -285,6 +304,8 @@ export type Step =
   | { t: 'replaceCard'; s: number }
   /** The Hillbilly's chainsaw entered a room with several healthy survivors. */
   | { t: 'pickSurvivor'; why: 'chainsaw'; options: number[] }
+  /** The Deathslinger's Redeemer: survivor `s` guesses the card he discarded face down. */
+  | { t: 'redeemerGuess'; s: number }
   | { t: 'gameOver'; winner: 'survivors' | 'killer' }
 
 /** Queued work that runs once the current step has its input. */
@@ -293,8 +314,15 @@ export type Task =
   | { k: 'survivorInteract'; s: number }
   | { k: 'endSurvivorTurn'; s: number }
   | { k: 'anyMove'; s: number }
-  /** `extra`: a turn from Devour Hope at the start of cleanup (cleanup is already queued). */
-  | { k: 'killerTurn'; turn: number; extra?: boolean }
+  /**
+   * `extra`: a turn from Devour Hope at the start of cleanup (cleanup is already queued).
+   * `begun`: the start-of-turn perks were asked.
+   */
+  | { k: 'killerTurn'; turn: number; extra?: boolean; begun?: boolean }
+  /** The killer's interaction, after Red Herring had its chance to redirect it. */
+  | { k: 'killerDo'; i: KillerInteraction; turn: number | null }
+  /** A roll's result, after Off the Record had its chance at the killer's ▲. */
+  | { k: 'resolveRoll'; ctx: RollContext; dice: Die[]; fails: number }
   | { k: 'killerInteract'; turn: number }
   | { k: 'endKillerTurn'; turn: number; extra?: boolean }
   | { k: 'cleanup' }
@@ -351,6 +379,8 @@ export type Action =
   /** Phantasm Trap: gain 1 ▲, or teleport (paying the face) and maybe interact. */
   | { t: 'phantasm'; teleport: boolean; i?: KillerInteraction }
   | { t: 'replace'; card: MoveCard }
+  /** Redeemer: the survivor's guess at The Deathslinger's discarded card. */
+  | { t: 'guess'; card: MoveCard }
   | { t: 'react'; s: number | null }
   | { t: 'useItem'; s: number; use: ItemUse }
 
@@ -375,7 +405,8 @@ export type GameEvent =
   | { k: 'reveal'; prop: string; kind: PropKind; room: string }
   /** `prop` / `target`: the generator, gate, totem or locker, or the survivor healed (for the screen). */
   | { k: 'roll'; s: number; ctx: RollContext['k']; prop?: string; target?: number }
-  | { k: 'wound'; s: number; by: 'attack' | 'trap' | 'power' }
+  /** `perk`: a perk wounded them (Blood Echo), or they wounded themselves (Yui, Zarina). */
+  | { k: 'wound'; s: number; by: 'attack' | 'trap' | 'power' | 'perk' }
   | { k: 'perk'; who: PerkOwner; perk: PerkId }
   | { k: 'heal'; s: number; by: number }
   | { k: 'pickUp'; s: number }
@@ -427,8 +458,11 @@ export interface GameState {
   perksMuted: string[]
   /** Huntress Lullaby stopped the next card move. */
   moveBlocked: boolean
-  /** Changes to the next skill check: danger die instead (Unnerving / Thanatophobia), two dice keep one (Bond). */
-  rollMods: { danger: boolean; keep: boolean }
+  /**
+   * Changes to the next skill check: danger die instead (Unnerving / Thanatophobia), two dice
+   * keep one (Bond), Retribution (danger die; a success pays the killer).
+   */
+  rollMods: { danger: boolean; keep: boolean; retribution?: boolean }
   /** Stridor: this survivor's planned card is played face up. */
   stridor: number | null
   /** Rooms with one of The Hag's Phantasm Traps (7 tokens, one per room). */
@@ -439,6 +473,11 @@ export interface GameState {
   evadedWall: string | null
   /** Overwhelming Presence failed: the item being used is wasted. */
   itemBlocked: boolean
+  /**
+   * Redeemer: the card The Deathslinger discarded face down, until the survivor's guess.
+   * Secret: the screens hide it from the survivors.
+   */
+  redeemer?: MoveCard | null
   rng: number
   log: LogEntry[]
   /** Online planning: cards set so far by survivor index (`planHand`), until every hand is in. */

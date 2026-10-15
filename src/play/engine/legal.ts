@@ -8,6 +8,7 @@ import {
   killerMoves,
   hookHere,
   isPower,
+  KILLER_CARDS,
   offeredPerks,
   perkButtons,
   perkChoices,
@@ -82,6 +83,9 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'replaceCard':
       for (const card of new Set(st.survivorHands[st.survivors[step.s].hand])) out.push({ t: 'replace', card })
+      break
+    case 'redeemerGuess':
+      for (const card of KILLER_CARDS) out.push({ t: 'guess', card })
       break
     case 'killerMove':
       for (const m of killerMoves(st, step.card)) out.push({ t: 'move', path: m.path.id })

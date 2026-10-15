@@ -1,7 +1,9 @@
 {
-  "name": "ดบดล Companion — Dead by Daylight Board Game",
-  "short_name": "ดบดล Companion",
-  "description": "ผู้ช่วยข้างโต๊ะสำหรับ Dead by Daylight: The Board Game",
+  "id": "./",
+  "name": "ดบดล — Dead by Daylight: The Board Game",
+  "short_name": "ดบดล",
+  "description": "เล่น Dead by Daylight: The Board Game แบบออนไลน์หรือเครื่องเดียว และผู้ช่วยข้างโต๊ะสำหรับบอร์ดเกมจริง",
+  "categories": ["games", "entertainment"],
   "lang": "th",
   "start_url": "./",
   "scope": "./",

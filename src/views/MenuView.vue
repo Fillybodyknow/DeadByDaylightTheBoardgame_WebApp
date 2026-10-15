@@ -7,6 +7,7 @@ import { asset } from '../i18n'
 import { sfx } from '../sound'
 import { game, online } from '../play/game'
 import { session } from '../play/online/session'
+import { canInstall, install, iosHint } from '../install'
 
 const router = useRouter()
 
@@ -75,7 +76,9 @@ function go(to: string) {
     <nav class="refs">
       <RouterLink to="/cards">🃏 การ์ดทั้งหมด</RouterLink>
       <RouterLink to="/rules">📖 กติกา</RouterLink>
+      <button v-if="canInstall" type="button" class="install" @click="install">📲 ติดตั้งเป็นแอป</button>
     </nav>
+    <p v-if="!canInstall && iosHint" class="ios-hint">📲 ติดตั้งเป็นแอป: กด <b>แชร์</b> ใน Safari แล้วเลือก <b>เพิ่มไปยังหน้าจอโฮม</b></p>
   </div>
 </template>
 
@@ -205,7 +208,23 @@ function go(to: string) {
   gap: 1.25rem;
   justify-content: center;
 }
+.refs {
+  flex-wrap: wrap;
+  align-items: center;
+}
 .refs a {
+  color: var(--muted);
+}
+.install {
+  padding: 0.35rem 0.9rem;
+  border-color: var(--blood);
+  color: #fff;
+  background: rgb(200 20 29 / 0.25);
+}
+.ios-hint {
+  margin: -0.75rem 0 0;
+  text-align: center;
+  font-size: 0.88rem;
   color: var(--muted);
 }
 @media (max-width: 560px) {

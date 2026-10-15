@@ -30,6 +30,7 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'turnStart':
     case 'sparkChoice':
     case 'replaceCard':
+    case 'redeemerGuess':
       return s.s
     case 'revealProp':
       return s.who

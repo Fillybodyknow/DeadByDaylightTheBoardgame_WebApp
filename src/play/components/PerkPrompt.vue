@@ -5,19 +5,27 @@
 // a few facts sum it up, and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
-import { CARD_NAMES, ITEM_NAMES, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, roomName } from '../engine/engine'
+import { CARD_NAMES, ITEM_NAMES, KILLER_CARDS, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
-import type { Action, GameState, KillerInteraction, PerkChoice, PerkOwner } from '../engine/types'
+import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
+import { actionKey } from '../boardActions'
 import { choicePreview, decisionFocus, preview } from '../focus'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { dispatch } from '../game'
 import { ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
+import CardHand, { type HandCard } from './CardHand.vue'
 import DiceRow from './DiceRow.vue'
 import FaceLabel from './FaceLabel.vue'
 import Mini from './Mini.vue'
 
-const props = defineProps<{ st: GameState; hidden: boolean }>()
+const props = defineProps<{ st: GameState; hidden: boolean; onBoard: Set<string> }>()
+
+// A choice the board already offers (a path, a prop, a survivor, a room) is made there, not here.
+const perkAct = (perk: PerkId, c: PerkChoice): Action => ({ t: 'perk', perk, use: true, choice: c })
+const here = (a: Action) => !props.onBoard.has(actionKey(a))
+/** A choice of the perk on offer that isn't on the board. */
+const offerHere = (c: PerkChoice) => (props.st.step.t === 'offer' ? here(perkAct(props.st.step.perk, c)) : true)
 
 const step = computed(() => props.st.step)
 const buttons = computed(() => perkButtons(props.st))
@@ -29,9 +37,9 @@ const offerChoices = computed(() => {
   return orderedChoices(props.st, s.perk, s.w, perkChoices(props.st, s.perk, s.owner, s.w))
 })
 
-// ---------- Tinkerer: pick the planned card, then what to put in its place ----------
+// ---------- Tinkerer, Zanshin Tactics: pick the planned card, then what to put in its place ----------
 
-const isTinkerer = computed(() => step.value.t === 'offer' && step.value.perk === 'tinkerer')
+const isTinkerer = computed(() => step.value.t === 'offer' && (step.value.perk === 'tinkerer' || step.value.perk === 'zanshin_tactics'))
 const tinkerIndex = ref<number | null>(null)
 watch(
   () => (isTinkerer.value ? JSON.stringify(step.value) : null),
@@ -52,12 +60,13 @@ const offerList = computed(() => {
 })
 
 /** What is being decided now, if anything worth the panel. */
-const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | null>(() => {
+const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | 'guess' | null>(() => {
   const s = step.value
   if (s.t === 'offer') return 'offer'
   if (s.t === 'sparkChoice') return 'spark'
   if (s.t === 'phantasmChoice') return 'phantasm'
   if (s.t === 'replaceCard') return 'replace'
+  if (s.t === 'redeemerGuess') return 'guess'
   if (s.t === 'turnStart' && buttons.value.length) return 'turnStart'
   if (s.t === 'roll' && (s.keep || buttons.value.length || keyHolders.value.length)) return 'roll'
   return null
@@ -69,7 +78,7 @@ const decider = computed<PerkOwner | null>(() => {
   if (s.t === 'offer') return s.owner
   if (s.t === 'turnStart') return s.s
   if (s.t === 'roll') return buttons.value[0]?.owner ?? s.ctx.s
-  if (s.t === 'sparkChoice' || s.t === 'replaceCard') return s.s
+  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess') return s.s
   if (s.t === 'phantasmChoice') return 'killer'
   return null
 })
@@ -89,6 +98,63 @@ const handCards = computed(() => {
 })
 
 const killerSide = computed(() => decider.value === 'killer')
+
+// ---------- movement cards: picked from the hand along the bottom, then confirmed ----------
+
+/** The card choice picked, waiting for "confirm". */
+const cardPick = ref<PerkChoice | null>(null)
+watch(
+  () => JSON.stringify(step.value),
+  () => (cardPick.value = null),
+)
+
+/** Perks whose card is then played to move: hovering it shows where it goes. */
+const MOVE_PERKS: PerkId[] = ['adrenaline', 'saboteur', 'up_the_ante', 'any_means_necessary', 'devour_hope', 'shadowborn']
+
+/** The cards to choose from: an offer's card choices (Tinkerer / Zanshin: for the planned card picked), or Predator's new card. */
+const handChoices = computed<PerkChoice[]>(() => {
+  const s = step.value
+  if (s.t === 'replaceCard') return handCards.value.map((card) => ({ card }))
+  if (s.t === 'redeemerGuess') return KILLER_CARDS.map((card) => ({ card }))
+  if (s.t !== 'offer' || offerList.value.length > 1) return []
+  return isTinkerer.value ? tinkerSwaps.value : offerChoices.value.filter((c) => c.card)
+})
+
+const perkHand = computed<HandCard[]>(() => {
+  const s = step.value
+  return handChoices.value.map((c) => {
+    const picked = cardPick.value?.card === c.card
+    return { card: c.card!, picked, ...(picked && s.t === 'offer' ? { badge: cardCaption(s.perk, c) } : {}) }
+  })
+})
+
+const handLabel = computed(() => {
+  const s = step.value
+  if (s.t === 'replaceCard') return `Predator — มือของ ${props.st.survivors[s.s].name}`
+  if (s.t === 'redeemerGuess') return `ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
+  return s.t === 'offer' ? `${PERKS[s.perk].name} — เลือกการ์ดจากมือ` : ''
+})
+
+function pickHandCard(card: MoveCard) {
+  fxSound.flip()
+  cardPick.value = cardPick.value?.card === card ? null : (handChoices.value.find((c) => c.card === card) ?? null)
+}
+
+function hoverHandCard(card: MoveCard | null) {
+  const s = step.value
+  const owner = s.t === 'replaceCard' ? s.s : s.t === 'offer' && MOVE_PERKS.includes(s.perk) ? s.owner : null
+  if (!card || owner === null) return (preview.value = null)
+  preview.value = choicePreview(props.st, { card }, owner === 'killer' ? props.st.killer.room : props.st.survivors[owner].room, owner)
+}
+
+function confirmCard() {
+  const s = step.value
+  const c = cardPick.value
+  if (!c) return
+  if (s.t === 'replaceCard') act({ t: 'replace', card: c.card! })
+  else if (s.t === 'redeemerGuess') act({ t: 'guess', card: c.card! })
+  else if (s.t === 'offer') act({ t: 'perk', perk: s.perk, use: true, choice: c })
+}
 
 // Wait for perk cards, dice and board animations to finish before asking.
 const open = computed(() => kind.value !== null && !props.hidden && fx.perks.length === 0 && fx.dice.length === 0 && !fx.boardBusy)
@@ -117,6 +183,7 @@ const summary = computed(() => {
   if (kind.value === 'turnStart') return 'Perk ตอนเริ่มเทิร์น'
   if (kind.value === 'roll') return 'ตัดสินใจเรื่องผลทอย'
   if (kind.value === 'replace') return 'เปลี่ยนการ์ดเคลื่อนที่'
+  if (kind.value === 'guess') return 'ทายการ์ดของ Redeemer'
   return 'ใช้พลัง?'
 })
 
@@ -151,7 +218,15 @@ const who = computed(() => {
 
 
 const cost = (p: PerkId) => (PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี')
-const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
+
+/** How many of this decision's choices are on the board (for the hint). */
+const boardCount = computed(() => {
+  const s = step.value
+  if (s.t === 'offer') return offerList.value.reduce((n, o) => n + o.choices.filter((c) => !here(perkAct(o.perk, c))).length, 0)
+  if (s.t === 'turnStart') return buttons.value.reduce((n, b) => n + b.choices.filter((c) => !here(perkAct(b.perk, c))).length, 0)
+  if (s.t === 'phantasmChoice') return [...hagMoves.value.map((i) => ({ t: 'phantasm', teleport: true, i }) as Action), { t: 'phantasm', teleport: true } as Action].filter((a) => !here(a)).length
+  return 0
+})
 </script>
 
 <template>
@@ -160,7 +235,7 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
       <header @click="collapsed && (collapsed = false)">
         <Mini class="face" :class="killerSide ? 'aura-killer' : 'aura-survivor'" :src="asset(face)" />
         <div class="head-text">
-          <p class="eyebrow">⚡ {{ kind === 'spark' || kind === 'phantasm' ? 'Power' : kind === 'replace' ? 'Predator' : 'Perk' }} — ถึงคราวตัดสินใจ</p>
+          <p class="eyebrow">⚡ {{ kind === 'spark' || kind === 'phantasm' || kind === 'guess' ? 'Power' : kind === 'replace' ? 'Predator' : 'Perk' }} — ถึงคราวตัดสินใจ</p>
           <strong class="who">{{ who }}</strong>
           <p v-if="collapsed" class="why">{{ summary }}</p>
           <p v-else-if="step.t === 'offer' && windowLabel(st, step.w)" class="why">{{ windowLabel(st, step.w) }}</p>
@@ -184,6 +259,8 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
         </li>
       </ul>
 
+      <p v-if="boardCount" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ ({{ boardCount }} ตัวเลือก)</p>
+
       <!-- several perks of one owner at the same moment: pick which to use first (p.16) -->
       <template v-if="step.t === 'offer' && offerList.length > 1">
         <p class="lead">มี {{ offerList.length }} Perk ที่ใช้ได้ในจังหวะนี้ — เลือกใช้ใบไหนก่อนก็ได้ ใบที่เหลือจะถามต่อ (หน้า 16)</p>
@@ -196,7 +273,7 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
             <p class="text small">{{ perkText(o.perk) }}</p>
             <div class="choices inline">
               <button
-                v-for="(c, i) in o.choices"
+                v-for="(c, i) in o.choices.filter((c) => here(perkAct(o.perk, c)))"
                 :key="i"
                 class="primary"
                 @mouseenter="hover(step.owner, c, o.perk)"
@@ -227,7 +304,6 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
             <p class="text">{{ perkText(step.perk) }}</p>
           </div>
         </div>
-        <p v-if="hasPaths" class="hint">เลือกปุ่ม หรือคลิกวงประบนแผนที่ — ชี้ที่ปุ่มเพื่อดูบนแผนที่</p>
         <!-- Tinkerer: the planned cards, then the hand -->
         <div v-if="isTinkerer" class="tinker">
           <p class="tinker-step">1. เลือกการ์ดที่วางไว้ที่จะเปลี่ยน</p>
@@ -245,38 +321,16 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
             </button>
           </div>
           <template v-if="tinkerIndex !== null">
-            <p class="tinker-step">2. เปลี่ยน {{ CARD_NAMES[st.killer.planned[tinkerIndex]] }} (ใบที่ {{ tinkerIndex + 1 }}) เป็น — การ์ดในมือ</p>
-            <div class="card-row">
-              <button
-                v-for="(c, i) in tinkerSwaps"
-                :key="`s${i}`"
-                class="card-btn"
-                :title="perkChoiceLabel(st, step.perk, step.owner, step.w, c)"
-                @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })"
-              >
-                <img :src="asset(cardImage(c.card!))" :alt="cardLabel(c.card!)" />
-                <span>{{ CARD_NAMES[c.card!] }}</span>
-              </button>
-            </div>
+            <p class="tinker-step">2. เปลี่ยน {{ CARD_NAMES[st.killer.planned[tinkerIndex]] }} (ใบที่ {{ tinkerIndex + 1 }}) เป็น — เลือกจากไพ่บนมือด้านล่าง</p>
           </template>
         </div>
-        <div v-else-if="offerChoices.some((c) => c.card)" class="card-row">
-          <button
-            v-for="(c, i) in offerChoices.filter((c) => c.card)"
-            :key="`card${i}`"
-            class="card-btn"
-            :title="perkChoiceLabel(st, step.perk, step.owner, step.w, c)"
-            @mouseenter="hover(step.owner, c)"
-            @mouseleave="hover(step.owner, null)"
-            @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })"
-          >
-            <img :src="asset(cardImage(c.card!))" :alt="cardLabel(c.card!)" />
-            <span>{{ cardCaption(step.perk, c) }}</span>
-          </button>
-        </div>
+        <p v-else-if="handChoices.length" class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง{{ MOVE_PERKS.includes(step.perk) ? ' — ชี้เพื่อดูเส้นทาง' : '' }}</p>
         <div class="choices">
+          <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
+            {{ cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน' }}
+          </button>
           <button
-            v-for="(c, i) in offerChoices.filter((c) => !c.card)"
+            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c))"
             :key="i"
             class="primary"
             @mouseenter="hover(step.owner, c)"
@@ -304,7 +358,7 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
             <p class="text small">{{ perkText(b.perk) }}</p>
             <div class="choices inline">
               <button
-                v-for="(c, i) in b.choices"
+                v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))"
                 :key="i"
                 @mouseenter="hover(b.owner, c)"
                 @mouseleave="hover(b.owner, null)"
@@ -339,7 +393,7 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
           <button @click="act({ t: 'phantasm', teleport: false })">ไม่วาร์ป — รับ +{{ step.face }} ▲</button>
           <template v-if="st.killer.bp >= step.face">
             <button
-              v-for="(i, n) in hagMoves"
+              v-for="(i, n) in hagMoves.filter((i) => here({ t: 'phantasm', teleport: true, i }))"
               :key="n"
               class="primary"
               @mouseenter="hoverHag(i, step.room)"
@@ -348,7 +402,7 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
             >
               <FaceLabel :st="st" :who="'target' in i ? i.target : null" :text="`วาร์ป (${step.face} ▲) แล้ว${killerInteractionLabel(st, i)}`" />
             </button>
-            <button @click="act({ t: 'phantasm', teleport: true })">วาร์ปเฉย ๆ ({{ step.face }} ▲)</button>
+            <button v-if="here({ t: 'phantasm', teleport: true })" @click="act({ t: 'phantasm', teleport: true })">วาร์ปเฉย ๆ ({{ step.face }} ▲)</button>
           </template>
           <p v-else class="small">▲ ไม่พอวาร์ป (มี {{ st.killer.bp }}, ต้องใช้ {{ step.face }})</p>
         </div>
@@ -357,11 +411,18 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
       <!-- Predator: pick a new card -->
       <template v-else-if="step.t === 'replaceCard'">
         <p class="lead">Predator ทิ้งการ์ดของ {{ st.survivors[step.s].name }} — เลือกการ์ดใบใหม่ (คว่ำไว้)</p>
-        <div class="cards">
-          <button v-for="c in handCards" :key="c" class="card-btn" :title="cardLabel(c)" @click="act({ t: 'replace', card: c })">
-            <img :src="asset(cardImage(c))" :alt="cardLabel(c)" />
-          </button>
-        </div>
+        <p class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง — ชี้เพื่อดูเส้นทาง</p>
+        <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: วาง ${CARD_NAMES[cardPick.card!]} (คว่ำ)` : 'เลือกการ์ดจากมือก่อน' }}</button>
+      </template>
+
+      <!-- The Deathslinger's Redeemer: guess the card he discarded face down -->
+      <template v-else-if="step.t === 'redeemerGuess'">
+        <p class="lead">
+          <b>Redeemer!</b> {{ st.killer.name }} ทิ้งการ์ด 1 ใบแบบคว่ำ — {{ st.survivors[step.s].name }} ทายว่าเป็นการ์ดอะไร
+        </p>
+        <p class="text small">ทายถูก: หลุดรอด · ทายผิด: ถูกดึงเข้าห้องของ {{ st.killer.name }} ({{ roomName(st, st.killer.room) }}) แล้วถูกอุ้ม</p>
+        <p class="hand-hint">👇 เลือกการ์ดที่ทายจากไพ่ด้านล่าง แล้วกดยืนยัน</p>
+        <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: ทาย ${CARD_NAMES[cardPick.card!]}` : 'เลือกการ์ดก่อน' }}</button>
       </template>
 
       <!-- a roll waiting on Iron Will, a key or Bond -->
@@ -397,6 +458,7 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
       </template>
     </aside>
   </transition>
+  <CardHand v-if="open && !collapsed && perkHand.length" :cards="perkHand" :label="handLabel" @pick="pickHandCard" @hover="hoverHandCard" />
 </template>
 
 <style scoped>
@@ -577,10 +639,22 @@ h3 {
   font-size: 0.85rem;
   margin: 0;
 }
-.hint {
+.hand-hint {
   margin: 0;
-  font-size: 0.82rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  font-size: 0.86rem;
   color: var(--muted);
+}
+.board-hint {
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  border: 1px dashed #ff8a3d;
+  border-radius: 6px;
+  background: rgb(255 138 61 / 0.1);
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 .lead {
   margin: 0;

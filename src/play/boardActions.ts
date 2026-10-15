@@ -21,7 +21,7 @@ import {
   survivorMoves,
 } from './engine/engine'
 import { PERKS } from './engine/perks'
-import type { Action, GameState, KillerInteraction, PerkOwner, SurvivorInteraction } from './engine/types'
+import type { Action, GameState, KillerInteraction, MoveCard, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
 import { itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
@@ -36,6 +36,8 @@ export interface BoardAction {
   /** Gold for flipping face-down tiles, orange for doing something. */
   style: 'flip' | 'act'
   run: () => void
+  /** The engine action it sends, when it sends one straight away (not entering a mode). */
+  action?: Action
 }
 
 /** What the screen is in the middle of choosing, beyond the engine's step. */
@@ -50,13 +52,37 @@ export interface BoardModes {
   aceFirst: Ref<string | null>
   /** An item whose target is being picked on the board. */
   itemPick: Ref<number | null>
+  /** The card picked in the panel for a power that discards one (Chainsaw, Redeemer). */
+  powerCard: Ref<MoveCard | null>
 }
 
-const go =
-  (a: Action, sound: () => void = sfx.click) =>
-  () => {
-    if (dispatch(a)) sound()
-  }
+type Run = (() => void) & { action?: Action }
+
+const go = (a: Action, sound: () => void = sfx.click): Run =>
+  Object.assign(
+    () => {
+      if (dispatch(a)) sound()
+    },
+    { action: a },
+  )
+
+/** The same action written any way (keys in any order) gives the same key. */
+export function actionKey(a: Action): string {
+  const norm = (v: unknown): unknown =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.keys(v)
+            .sort()
+            .map((k) => [k, norm((v as Record<string, unknown>)[k])]),
+        )
+      : v
+  return JSON.stringify(norm(a))
+}
+
+/** Actions the board offers right now, as keys: a panel leaves these to the board. */
+export function boardActionKeys(actions: BoardAction[]): Set<string> {
+  return new Set(actions.flatMap((a) => (a.action ? [actionKey(a.action)] : [])))
+}
 
 function spotOf(i: SurvivorInteraction | KillerInteraction): SpotKey {
   if ('target' in i) return `s:${i.target}`
@@ -71,8 +97,8 @@ export function powerMode(st: GameState, modes: BoardModes): boolean {
 
 export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   const out: BoardAction[] = []
-  const add = (key: SpotKey, label: string, run: () => void, style: BoardAction['style'] = 'act', who?: PerkOwner | null) =>
-    out.push({ key, label, run, style, who })
+  const add = (key: SpotKey, label: string, run: Run, style: BoardAction['style'] = 'act', who?: PerkOwner | null) =>
+    out.push({ key, label, run, style, who, action: run.action })
   const s = st.step
   const faceDown = (room?: string) =>
     st.props.filter((p) => !p.revealed && p.room !== null && (room === undefined || p.room === room) && propsIn(st, p.room).includes(p))
@@ -238,8 +264,13 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             add(`room:${i.room}`, label, run)
             break
           case 'phantasm':
+          case 'wrath':
             add(`room:${st.killer.room}`, label, run)
             add('killer', label, run)
+            break
+          case 'redeemer':
+            // the card is chosen first, in the panel (secretly)
+            if (modes.powerCard.value === i.card) add(`s:${i.target}`, `Redeemer: ยิง ${st.survivors[i.target].name}`, run, 'act', i.target)
             break
         }
       }
@@ -285,9 +316,10 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
     for (const c of b.choices) {
       const label = `${name}: ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)}`
       const run = go({ t: 'perk', perk: b.perk, use: true, choice: c }, sfx.select)
-      if (c.path) out.push({ key: `path:${c.path}`, label, style: 'act', run })
-      else if (c.target !== undefined) out.push({ key: `s:${c.target}`, label, style: 'act', run, who: c.target })
-      else if (b.perk === 'self_care') out.push({ key: `s:${b.owner}`, label, style: 'act', run, who: b.owner })
+      const action = run.action
+      if (c.path) out.push({ key: `path:${c.path}`, label, style: 'act', run, action })
+      else if (c.target !== undefined) out.push({ key: `s:${c.target}`, label, style: 'act', run, who: c.target, action })
+      else if (b.perk === 'self_care') out.push({ key: `s:${b.owner}`, label, style: 'act', run, who: b.owner, action })
     }
   }
 }
