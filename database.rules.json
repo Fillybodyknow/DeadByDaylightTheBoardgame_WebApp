@@ -1,0 +1,21 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$code": {
+        ".read": "$code.matches(/^[A-Z2-9]{4}$/)",
+        ".write": "$code.matches(/^[A-Z2-9]{4}$/)",
+        "lobby": {
+          ".validate": "newData.hasChildren(['host', 'createdAt'])"
+        },
+        "game": {
+          ".validate": "!newData.exists() || (newData.child('rev').isNumber() && newData.child('json').isString() && newData.child('json').val().length < 2000000)"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

@@ -83,7 +83,7 @@ const ending = ref(false)
 
 function rematchNow() {
   lobby.rematch()
-  router.push('/')
+  router.push('/lobby')
 }
 
 function rematch() {
@@ -95,7 +95,7 @@ function rematch() {
 <template>
   <div v-if="!lobby.ready" class="card">
     <p>ยังไม่ได้ตั้งเกม</p>
-    <RouterLink to="/"><button type="button" class="primary">ไป Lobby</button></RouterLink>
+    <RouterLink to="/lobby"><button type="button" class="primary">ไป Lobby</button></RouterLink>
   </div>
 
   <div v-else class="table">

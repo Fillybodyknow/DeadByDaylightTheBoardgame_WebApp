@@ -1,68 +1,82 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter, type RouteMeta } from 'vue-router'
 import LoadingVeil from './components/LoadingVeil.vue'
 import Particles from './components/Particles.vue'
-import { survivorById } from './data'
-import { showLoading, TIPS, type LoadingSlide } from './loading'
+import { quoteOrTip, showLoading } from './loading'
 import { asset, lang } from './i18n'
+import { game } from './play/game'
+import { session } from './play/online/session'
 import { muted, setAmbient, type AmbientTrack } from './sound'
 import { useLobbyStore } from './stores/lobby'
 
 const lobby = useLobbyStore()
 const route = useRoute()
 
-// Scene behind the app: the campfire lobby, or the chosen map's realm once the game is set.
-// Loading screen when entering table setup and when the trial starts: half the time a quote from
-// a survivor in this game, otherwise a rules tip.
-function loadingSlide(): LoadingSlide {
-  const inGame = lobby.state.survivorPicks.map((id) => (id ? survivorById.get(id) : undefined)).filter((c) => !!c)
-  const withQuote = inGame.filter((c) => c!.quote.th || c!.quote.en)
-  if (withQuote.length && Math.random() < 0.5) {
-    const c = withQuote[Math.floor(Math.random() * withQuote.length)]!
-    const raw = (lang.value === 'th' ? c.quote.th : c.quote.en) || c.quote.en || c.quote.th
-    // quotes end with "– Name"; show the name as the attribution instead
-    const text = raw.replace(/\s*[–—-]{1,2}\s*[^"”]+$/, '').trim()
-    return { kind: 'quote', text, by: c.name, image: c.images.mini }
-  }
-  return { kind: 'tip', text: TIPS[Math.floor(Math.random() * TIPS.length)] }
-}
-
+// Loading screen when entering the companion's table setup and when its trial starts: half the
+// time a quote from a survivor in this game, otherwise a rules tip. (The full game shows its own,
+// see play/components/TrialIntro.vue.)
 useRouter().afterEach((to, from) => {
-  if (to.name === 'setup' && from.name === 'lobby') showLoading('กำลังเตรียมโต๊ะ…', loadingSlide())
-  else if (to.name === 'table' && to.query.intro === '1') showLoading('กำลังเข้าสู่ Trial…', loadingSlide())
+  const slide = () => quoteOrTip(lobby.state.survivorPicks)
+  if (to.name === 'setup' && from.name === 'lobby') showLoading('กำลังเตรียมโต๊ะ…', slide())
+  else if (to.name === 'table' && to.query.intro === '1') showLoading('กำลังเข้าสู่ Trial…', slide())
 })
 
+// The part of the app the screen belongs to; shared screens (cards, rules) keep the last one.
+type Section = NonNullable<RouteMeta['section']>
+const lastSection = ref<Section>('menu')
+const section = computed<Section>(() => route.meta.section ?? lastSection.value)
+watch(section, (s) => (lastSection.value = s))
+
+const SUBTITLE: Record<Section, string> = { menu: '', companion: 'Companion', offline: 'Offline', online: 'Online' }
+
+/** A full game is on screen: it has its own top bar and takes the whole width. */
+const inGame = computed(
+  () =>
+    (route.name === 'offline' && !!game.value && !session.room) ||
+    (route.name === 'online' && !!session.data?.game && !!game.value),
+)
+
 const links = computed(() => [
-  { to: '/', label: 'Lobby', icon: '🔥' },
-  ...(lobby.ready
+  { to: '/', label: 'เมนู', icon: '🏠' },
+  ...(section.value === 'companion'
     ? [
-        { to: '/setup', label: 'จัดโต๊ะ', icon: '🧰' },
-        { to: '/table', label: 'ระหว่างเล่น', icon: '🎲' },
+        { to: '/lobby', label: 'Lobby', icon: '🔥' },
+        ...(lobby.ready
+          ? [
+              { to: '/setup', label: 'จัดโต๊ะ', icon: '🧰' },
+              { to: '/table', label: 'ระหว่างเล่น', icon: '🎲' },
+            ]
+          : []),
       ]
-    : []),
+    : section.value === 'offline'
+      ? [{ to: '/play', label: 'เล่นเครื่องเดียว', icon: '🎲' }]
+      : section.value === 'online'
+        ? [{ to: '/online', label: session.room ? `ห้อง ${session.room.code}` : 'ออนไลน์', icon: '🌐' }]
+        : []),
   { to: '/cards', label: 'การ์ด', icon: '🃏' },
   { to: '/rules', label: 'กติกา', icon: '📖' },
-  { to: '/history', label: 'ประวัติ', icon: '📜' },
+  ...(section.value === 'companion' ? [{ to: '/history', label: 'ประวัติ', icon: '📜' }] : []),
 ])
 
-// Ambience: the campfire before the trial (lobby, table setup), the trial's own track during
-// play; other screens (cards, rules, history) keep whatever is already playing.
-const AMBIENT_BY_ROUTE: Record<string, AmbientTrack> = { lobby: 'lobby', setup: 'lobby', table: 'play' }
+// Ambience: the campfire before a trial (menu, lobbies, rooms, table setup), the trial's own
+// track during play; other screens (cards, rules, history) keep whatever is already playing.
+const AMBIENT_BY_ROUTE: Record<string, AmbientTrack> = { menu: 'lobby', lobby: 'lobby', setup: 'lobby', table: 'play', offline: 'lobby', online: 'lobby' }
 watch(
-  () => route.name,
-  (name) => {
-    const track = AMBIENT_BY_ROUTE[String(name)]
+  () => (inGame.value ? 'play' : AMBIENT_BY_ROUTE[String(route.name)]),
+  (track) => {
     if (track) setAmbient(track)
   },
   { immediate: true },
 )
 
-const PARTICLES_BY_ROUTE: Record<string, 'embers' | 'spores'> = { lobby: 'embers', setup: 'embers', table: 'spores' }
-const particles = computed(() => PARTICLES_BY_ROUTE[String(route.name)] ?? null)
+const PARTICLES_BY_ROUTE: Record<string, 'embers' | 'spores'> = { menu: 'embers', lobby: 'embers', setup: 'embers', table: 'spores', offline: 'embers', online: 'embers' }
+const particles = computed(() => (inGame.value ? 'spores' : (PARTICLES_BY_ROUTE[String(route.name)] ?? null)))
 
+// Scene behind the app: the campfire, or the map's realm once a game is set.
 const MAP_SCENES = new Set(['setup', 'table'])
 const scene = computed(() => {
+  if (inGame.value && game.value) return `assets/app/background-img/background_${game.value.board}.webp`
   const mapId = lobby.state.mapId
   if (mapId && MAP_SCENES.has(String(route.name))) return `assets/app/background-img/background_${mapId}.webp`
   return 'assets/app/background-img/background_lobby.webp'
@@ -71,7 +85,7 @@ const scene = computed(() => {
 
 <template>
   <!-- cross-fading backdrop; keyed so a change of scene fades in -->
-  <div class="scene" aria-hidden="true">
+  <div class="scene" :class="{ dim: inGame }" aria-hidden="true">
     <Transition name="scene">
       <div :key="scene" class="scene-img" :style="{ backgroundImage: `url(${asset(scene)})` }" />
     </Transition>
@@ -81,10 +95,11 @@ const scene = computed(() => {
 
   <LoadingVeil />
 
-  <header class="topbar">
-    <RouterLink to="/" class="brand" aria-label="ดบดล Companion">
+  <!-- in a full game, the game's own top bar (round, room, mute, leave) takes over -->
+  <header v-if="!inGame" class="topbar">
+    <RouterLink to="/" class="brand" aria-label="ดบดล — เมนู">
       <img :src="asset('icon.svg')" alt="" />
-      <span>ดบดล <small>Companion</small></span>
+      <span>ดบดล <small v-if="SUBTITLE[section]">{{ SUBTITLE[section] }}</small></span>
     </RouterLink>
     <nav>
       <!-- on narrow screens each link becomes an icon over a small label -->
@@ -101,7 +116,7 @@ const scene = computed(() => {
       <span class="lang-label">การ์ด: </span>{{ lang === 'th' ? 'TH' : 'EN' }}
     </button>
   </header>
-  <main class="page">
+  <main class="page" :class="{ full: inGame }">
     <RouterView v-slot="{ Component }">
       <Transition name="page" mode="out-in">
         <component :is="Component" />
@@ -288,6 +303,14 @@ nav a.router-link-exact-active::after {
   max-width: 1200px;
   margin: 0 auto;
   padding: 1rem;
+}
+.page.full {
+  max-width: none;
+  padding: 0;
+}
+/* behind the game board, the realm stays dark so the board reads */
+.scene.dim .scene-img {
+  filter: saturate(0.8) brightness(0.4);
 }
 @media (max-width: 560px) {
   .topbar {

@@ -62,7 +62,7 @@ function start() {
 <template>
   <div v-if="!lobby.ready" class="card">
     <p>ยังเลือกตัวละครและแผนที่ไม่ครบ</p>
-    <RouterLink to="/"><button type="button" class="primary">กลับไป Lobby</button></RouterLink>
+    <RouterLink to="/lobby"><button type="button" class="primary">กลับไป Lobby</button></RouterLink>
   </div>
 
   <div v-else class="setup">

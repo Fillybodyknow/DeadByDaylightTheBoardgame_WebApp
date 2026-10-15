@@ -24,6 +24,8 @@ npm run build    # type-check + production build into dist/
 
 | Path | What |
 |---|---|
+| `src/views/MenuView.vue` | The first screen: Online, Offline (full game) or Companion |
+| `src/play/` | The full playable game, online and hot-seat — see [src/play/README.md](src/play/README.md) |
 | `src/stores/lobby.ts` | Pinia store: players, seats, picks, map, setup checklist (saved in localStorage) |
 | `src/views/LobbyView.vue`, `SetupView.vue`, `TableView.vue` | The three steps: lobby, table setup, and during play |
 | `src/rulesDoc.ts` | Splits `docs/rules-th.md` into sections for the summary and search |

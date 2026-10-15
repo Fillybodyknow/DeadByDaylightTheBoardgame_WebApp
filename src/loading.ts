@@ -1,4 +1,6 @@
 import { reactive } from 'vue'
+import { survivorById } from './data'
+import { lang } from './i18n'
 
 // A short game-style loading screen shown when entering table setup and when the trial starts.
 // It shows a quote from a survivor in the game or a rules tip; tap to skip.
@@ -52,3 +54,21 @@ export const TIPS: string[] = [
   'ถืออเทมได้ทีละ 1 ใบเท่านั้น (หน้า 12)',
   'ตอนแบกผู้รอดชีวิต ถ้าทอยได้ 5 แม้แต่ลูกเดียว ผู้รอดชีวิตดิ้นหลุด (หน้า 15)',
 ]
+
+/**
+ * A loading slide for a game with these survivors: half the time a quote from one of them,
+ * otherwise a rules tip.
+ */
+export function quoteOrTip(survivorIds: (string | null | undefined)[]): LoadingSlide {
+  const withQuote = survivorIds
+    .map((id) => (id ? survivorById.get(id) : undefined))
+    .filter((c) => !!c && (c.quote.th || c.quote.en))
+  if (withQuote.length && Math.random() < 0.5) {
+    const c = withQuote[Math.floor(Math.random() * withQuote.length)]!
+    const raw = (lang.value === 'th' ? c.quote.th : c.quote.en) || c.quote.en || c.quote.th
+    // quotes end with "– Name"; show the name as the attribution instead
+    const text = raw.replace(/\s*[–—-]{1,2}\s*[^"”]+$/, '').trim()
+    return { kind: 'quote', text, by: c.name, image: c.images.mini }
+  }
+  return { kind: 'tip', text: TIPS[Math.floor(Math.random() * TIPS.length)] }
+}
