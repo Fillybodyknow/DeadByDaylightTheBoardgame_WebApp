@@ -1,7 +1,7 @@
 // Thai labels for actions, steps and pieces.
 
 import { killerById, survivorById } from '../data'
-import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, pathDef, roomName, wrathGain } from './engine/engine'
+import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, boardOf, pathDef, roomName, tokenOf, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import type { GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
 import type { Perk } from '../types'
@@ -31,6 +31,8 @@ export const cardImage = (c: MoveCard) => `assets/movement/${c}.webp`
 export const SURVIVOR_CARD_BACK = 'assets/movement/back-one.webp'
 export const KILLER_CARD_BACK = 'assets/movement/back-skull.webp'
 export const BEAR_TRAP_IMAGE = 'assets/killers/tokens/trapper-bear-trap.webp'
+/** The Twins: Victor's own mini. */
+export const VICTOR_MINI = 'assets/killers/mini/twins_victor.webp'
 
 export function survivorMini(st: GameState, s: number): string {
   return survivorById.get(st.survivors[s].characterId)?.images.mini ?? ''
@@ -43,17 +45,35 @@ export function killerMini(st: GameState): string {
 export const itemImage = (id: string) => `assets/items/th/${id}.webp`
 
 /** "Sneak → Scrapyard" seen from `from`. */
+/** The rooms a path icon joins (three for a fork). */
+function iconRooms(st: GameState, path: string): string[] {
+  const b = boardOf(st)
+  const t = tokenOf(b, path)
+  return [...new Set(b.paths.filter((p) => tokenOf(b, p.id) === t).flatMap((p) => [p.a, p.b]))]
+}
+
+/** A move along a pair of rooms: the room at the other end. */
 export function pathLabel(st: GameState, path: string, from: string): string {
   const p = pathDef(st, path)
   const other = p.a === from ? p.b : p.a
   return `${CARD_NAMES[p.kind]} → ${roomName(st, other)}`
 }
 
+/** Something on a path icon (a pallet, a trap, a wall): every room it leads to from `from`. */
+export function iconLabel(st: GameState, path: string, from: string): string {
+  const p = pathDef(st, path)
+  return `${CARD_NAMES[p.kind]} → ${iconRooms(st, path).filter((r) => r !== from).map((r) => roomName(st, r)).join(' / ')}`
+}
+
 /** "Sneak: Shack ↔ Scrapyard" */
 export function pathName(st: GameState, path: string): string {
   const p = pathDef(st, path)
+  const rooms = iconRooms(st, path)
+  if (rooms.length > 2) return `${CARD_NAMES[p.kind]}: ${rooms.map((r) => roomName(st, r)).join(' / ')}`
   return `${CARD_NAMES[p.kind]}: ${roomName(st, p.a)} ${p.kind === 'vault' ? '→' : '↔'} ${roomName(st, p.b)}`
 }
+
+const PROP_CATEGORY_TH = { objective: 'เหลือง', survival: 'น้ำเงิน', altruism: 'เขียว', boldness: 'แดง' } as const
 
 const PROP_NAMES_TH: Record<PropKind, string> = {
   generator: 'Generator',
@@ -80,7 +100,7 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
     case 'crow':
       return 'ไล่ Crow (ฆาตกร +1 ▲, ได้ Bonus Turn)'
     case 'dropPallet':
-      return `ทิ้ง Pallet บนทาง ${pathLabel(st, i.path, room)}`
+      return `ทิ้ง Pallet บนทาง ${iconLabel(st, i.path, room)}`
     case 'repair':
       return `ซ่อม Generator (${prop(st, i.prop).progress}/${PROGRESS_MAX})`
     case 'openGate':
@@ -95,6 +115,10 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
       return `รักษา ${st.survivors[i.target].name}`
     case 'calmSpirit':
       return `Calm Spirit: ย้าย Crow ไป ${roomName(st, i.room)}`
+    case 'removeVictor':
+      return 'ไล่ Victor ออกจากกระดาน'
+    case 'powerStruggle':
+      return `Power Struggle: เปิดการ์ดใบแรกของ ${st.killer.name} (ฆาตกร +2 ▲)`
   }
 }
 
@@ -111,9 +135,9 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
     case 'attack':
       return `โจมตี ${st.survivors[i.target].name}`
     case 'pickUp':
-      return `อุ้ม ${st.survivors[i.target].name}`
+      return st.killer.asVictor ? `จับ ${st.survivors[i.target].name} (Victor อุ้มไม่ได้: +1 ▲)` : `อุ้ม ${st.survivors[i.target].name}`
     case 'power':
-      return `Bear Trap: ${pathLabel(st, i.path, st.killer.room)}`
+      return `Bear Trap: ${iconLabel(st, i.path, st.killer.room)}`
     case 'blink': {
       const p = pathDef(st, i.path)
       return `Blink → ${roomName(st, p.a === st.killer.room ? p.b : p.a)}`
@@ -132,6 +156,16 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Yamaoka's Wrath (+${wrathGain(st)} ▲)`
     case 'redeemer':
       return `Redeemer → ${st.survivors[i.target].name} (ทิ้ง ${CARD_NAMES[i.card]} แบบคว่ำ)`
+    case 'victor':
+      return `Blood Bond: ${st.killer.victorRoom ? 'ย้าย' : 'วาง'} Victor มาที่ ${roomName(st, st.killer.room)}`
+    case 'rush':
+      return `Blighted Corruption: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
+    case 'hoard':
+      return 'Hoarder: นำ Chest ออก (+2 ▲)'
+    case 'undying': {
+      const p = 'prop' in i.i ? prop(st, i.i.prop) : null
+      return `Undying: ทิ้ง ${CARD_NAMES[i.card]} → ${killerInteractionLabel(st, i.i)}${p?.room ? ` ที่ ${roomName(st, p.room)}` : ''}`
+    }
   }
 }
 
@@ -304,6 +338,27 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `ยอมบาดเจ็บ: รักษา ${name(c.target!)}`
     case 'off_the_record':
       return `รับ 1 ▲ แทน ${st.killer.name}`
+    case 'coup_de_grace':
+      return `Bonus Turn ด้วย ${CARD_NAMES[st.killer.planned[(w as { turn: number }).turn]]} อีกครั้ง`
+    case 'oppression':
+      return [c.prop!, c.prop2].filter((x): x is string => !!x).map((id) => `${roomName(st, prop(st, id).room!)} (${prop(st, id).progress}→${prop(st, id).progress - 1})`).join(' + ')
+    case 'dragons_grip':
+      return `ทิ้ง ${[c.card!, c.card2].filter((x): x is MoveCard => !!x).map((x) => CARD_NAMES[x]).join(' + ')}`
+    case 'appraisal': {
+      const d = w as { s: number; item: string }
+      const mine = typeof o === 'number' ? st.survivors[o].item : null
+      return `รับ ${ITEM_NAMES[d.item]} ที่ ${name(d.s)} ทิ้ง${mine ? ` (ทิ้ง ${ITEM_NAMES[mine]} ของคุณ)` : ''}`
+    }
+    case 'deception':
+      return 'อยู่ห้องเดิม ไม่ Interact (+1 ▲)'
+    case 'desperate_measures':
+      return 'Interact อีกครั้ง (Chest / Locker)'
+    case 'visionary': {
+      const p = prop(st, c.prop!)
+      return `เปิด prop สี${PROP_CATEGORY_TH[p.category]} ที่ ${roomName(st, p.room!)} แทน`
+    }
+    case 'built_to_last':
+      return `เก็บ ${ITEM_NAMES[(w as { item: string }).item]} ไว้`
     default:
       return 'ใช้'
   }
@@ -396,6 +451,16 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return `${st.survivors[w.s].name} ทอยล้มเหลว (${st.killer.name} จะได้ +${w.fails} ▲)`
     case 'greatRoll':
       return `${st.survivors[w.s].name} ทอยได้สำเร็จอย่างยิ่ง`
+    case 'killerTurnEnd':
+      return `จบเทิร์นที่ ${w.turn + 1} ของ ${st.killer.name}`
+    case 'itemUsed':
+      return `${st.survivors[w.s].name} ใช้ ${ITEM_NAMES[w.item]} แล้ว — กำลังจะทิ้ง`
+    case 'itemDiscard':
+      return `${st.survivors[w.s].name} ทิ้ง ${ITEM_NAMES[w.item]}`
+    case 'afterSurvivorInteract':
+      return `${st.survivors[w.s].name} Interact แล้ว`
+    case 'beforeReveal':
+      return `${st.survivors[w.s].name} เข้า ${roomName(st, w.room)} — กำลังจะเปิด prop`
     default:
       return ''
   }
@@ -411,7 +476,7 @@ export function itemUseLabel(st: GameState, s: number, item: string, u: ItemUse)
     case 'heal':
       return `${name}: รักษา ${st.survivors[u.target].name}`
     case 'wall':
-      return `${name}: ทำลายกำแพง ${pathLabel(st, u.path, st.survivors[s].room)}`
+      return `${name}: ทำลายกำแพง ${iconLabel(st, u.path, st.survivors[s].room)}`
     case 'reveal':
       return `${name}: เปิด prop สูงสุด 3 อัน`
     case 'draw':

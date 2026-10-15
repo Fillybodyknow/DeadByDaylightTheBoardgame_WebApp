@@ -9,6 +9,7 @@ import { CATEGORY_TH, PROP_RULES, type InspectTarget } from '../inspect'
 import { PERKS } from '../engine/perks'
 import { BEAR_TRAP_IMAGE, PROP_IMAGE, itemImage, ownerLabel, perkImage, perkText, playerOf } from '../labels'
 import { perkUsed } from '../engine/engine'
+import { itemsHidden } from '../game'
 import Mini from './Mini.vue'
 
 const props = defineProps<{ st: GameState; target: InspectTarget }>()
@@ -71,7 +72,7 @@ const item = computed(() => {
           <li :class="survivor.sv.wounded ? 'bad' : 'good'">{{ survivor.sv.wounded ? 'บาดเจ็บ' : 'ไม่บาดเจ็บ' }}</li>
           <li>{{ STATUS_TH[survivor.sv.status] }} · {{ roomName(st, survivor.sv.room) }}</li>
           <li>{{ survivor.sv.bp }}/{{ SURVIVOR_BP.max }} ▲</li>
-          <li>{{ survivor.sv.item ? `ถือ ${ITEM_NAMES[survivor.sv.item]}` : 'ไม่มี item' }}</li>
+          <li>{{ survivor.sv.item ? (itemsHidden ? 'ถือ item อยู่ (ไม่เปิดเผย)' : `ถือ ${ITEM_NAMES[survivor.sv.item]}`) : 'ไม่มี item' }}</li>
           <li>{{ survivor.sv.sacrificeToken ? 'ยังไม่เคยถูกแขวน' : 'เคยถูกแขวนแล้ว' }}</li>
         </ul>
         <p v-if="!perkList.length" class="muted small">ตัวละครนี้ยังไม่มี Perk ในโหมดนี้</p>

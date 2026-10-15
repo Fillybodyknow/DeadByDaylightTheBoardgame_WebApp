@@ -6,6 +6,9 @@ import type { Ref } from 'vue'
 import { sfx } from '../sound'
 import {
   anyMoves,
+  boardOf,
+  pathDef,
+  tokenOf,
   carryMoves,
   hookHere,
   isPower,
@@ -23,7 +26,7 @@ import {
 import { PERKS } from './engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -38,6 +41,8 @@ export interface BoardAction {
   run: () => void
   /** The engine action it sends, when it sends one straight away (not entering a mode). */
   action?: Action
+  /** A move along a path: the room it leads to (a fork's icon offers several). */
+  dest?: string
 }
 
 /** What the screen is in the middle of choosing, beyond the engine's step. */
@@ -54,6 +59,10 @@ export interface BoardModes {
   itemPick: Ref<number | null>
   /** The card picked in the panel for a power that discards one (Chainsaw, Redeemer). */
   powerCard: Ref<MoveCard | null>
+  /** A fork's icon was clicked: its moves, waiting for the room to go to. */
+  forkMoves: Ref<BoardAction[] | null>
+  /** Oppression: the generators picked so far on the board (up to 2), before confirming. */
+  multiPick: Ref<string[]>
 }
 
 type Run = (() => void) & { action?: Action }
@@ -84,9 +93,17 @@ export function boardActionKeys(actions: BoardAction[]): Set<string> {
   return new Set(actions.flatMap((a) => (a.action ? [actionKey(a.action)] : [])))
 }
 
+/** A path's spot is its icon: a fork's pairs share one (several actions there open a menu). */
+function spotKey(st: GameState, key: SpotKey): SpotKey {
+  return key.startsWith('path:') ? `path:${tokenOf(boardOf(st), key.slice(5))}` : key
+}
+
 function spotOf(i: SurvivorInteraction | KillerInteraction): SpotKey {
   if ('target' in i) return `s:${i.target}`
   if ('prop' in i) return `prop:${i.prop}`
+  // Undying: the prop in the other room
+  if (i.k === 'undying') return spotOf(i.i)
+  if (i.k === 'removeVictor') return 'victor'
   return 'killer'
 }
 
@@ -98,7 +115,7 @@ export function powerMode(st: GameState, modes: BoardModes): boolean {
 export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   const out: BoardAction[] = []
   const add = (key: SpotKey, label: string, run: Run, style: BoardAction['style'] = 'act', who?: PerkOwner | null) =>
-    out.push({ key, label, run, style, who, action: run.action })
+    out.push({ key: spotKey(st, key), label, run, style, who, action: run.action })
   const s = st.step
   const faceDown = (room?: string) =>
     st.props.filter((p) => !p.revealed && p.room !== null && (room === undefined || p.room === room) && propsIn(st, p.room).includes(p))
@@ -131,7 +148,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   if (modes.palletMode.value && s.t === 'survivorInteract') {
     for (const i of survivorInteractions(st, s.s))
       if (i.k === 'dropPallet' && i.prop === modes.palletMode.value)
-        add(`path:${i.path}`, `ทิ้ง Pallet: ${pathLabel(st, i.path, st.survivors[s.s].room)}`, () => {
+        add(`path:${i.path}`, `ทิ้ง Pallet: ${iconLabel(st, i.path, st.survivors[s.s].room)}`, () => {
           modes.palletMode.value = null
           go({ t: 'interact', i }, sfx.drop)()
         })
@@ -159,6 +176,13 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     return out
   }
 
+  // A fork's icon: its rooms are the targets now.
+  const fork = modes.forkMoves.value
+  if (fork) {
+    for (const a of fork) out.push({ ...a, key: `room:${a.dest}` })
+    return out
+  }
+
   if (modes.trapPath.value && s.t === 'killerInteract') {
     const to = modes.trapPath.value
     for (const id of Object.keys(st.paths))
@@ -172,8 +196,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
 
   // ---------- the engine's step ----------
 
-  const moves = (list: { path: { id: string } }[], from: string) =>
-    list.forEach((m) => add(`path:${m.path.id}`, pathLabel(st, m.path.id, from), go({ t: 'move', path: m.path.id }, sfx.drop)))
+  const moves = (list: { path: { id: string }; to: string }[], from: string) =>
+    list.forEach((m) => {
+      add(`path:${m.path.id}`, pathLabel(st, m.path.id, from), go({ t: 'move', path: m.path.id }, sfx.drop))
+      out[out.length - 1].dest = m.to
+    })
 
   switch (s.t) {
     case 'setupReveal':
@@ -224,6 +251,27 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
 
     case 'offer': {
       const name = PERKS[s.perk].name
+      // Oppression: click one or two generators, then confirm (GameScreen's bar)
+      if (s.perk === 'oppression') {
+        const picked = modes.multiPick
+        for (const c of perkChoices(st, s.perk, s.owner, s.w)) {
+          if (c.prop2) continue
+          const id = c.prop!
+          const on = picked.value.includes(id)
+          out.push({
+            key: `prop:${id}`,
+            label: on ? `${name}: เอาเครื่องนี้ออก` : `${name}: เลือกเครื่องนี้ (−1)`,
+            style: 'act',
+            run: () => {
+              sfx.click()
+              if (on) picked.value = picked.value.filter((x) => x !== id)
+              else if (picked.value.length < 2) picked.value = [...picked.value, id]
+              else picked.value = [picked.value[1], id]
+            },
+          })
+        }
+        break
+      }
       for (const c of perkChoices(st, s.perk, s.owner, s.w)) {
         const label = `${name}: ${perkChoiceLabel(st, s.perk, s.owner, s.w, c)}`
         const run = go({ t: 'perk', perk: s.perk, use: true, choice: c }, sfx.select)
@@ -253,9 +301,12 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             add(`path:${i.path}`, label, run)
             break
           case 'blink':
-          case 'chainsaw':
+          case 'chainsaw': {
             add(`path:${i.path}`, label, run)
+            const p = pathDef(st, i.path)
+            out[out.length - 1].dest = p.a === st.killer.room ? p.b : p.a
             break
+          }
           case 'hatchet':
             add(`s:${i.target}`, label, run, 'act', i.target)
             break
@@ -265,6 +316,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             break
           case 'phantasm':
           case 'wrath':
+          case 'victor':
+          case 'rush':
             add(`room:${st.killer.room}`, label, run)
             add('killer', label, run)
             break
@@ -278,7 +331,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       if (st.killer.characterId === 'trapper' && st.killer.trapsInSupply === 0)
         for (const i of killerInteractions(st))
           if (i.k === 'power' && i.remove && !out.some((a) => a.key === `path:${i.path}`))
-            add(`path:${i.path}`, `Bear Trap: ${pathLabel(st, i.path, st.killer.room)} (แล้วเลือกอันที่จะย้าย)`, () => ((modes.trapPath.value = i.path), sfx.click()))
+            add(`path:${i.path}`, `Bear Trap: ${iconLabel(st, i.path, st.killer.room)} (แล้วเลือกอันที่จะย้าย)`, () => ((modes.trapPath.value = i.path), sfx.click()))
       break
     }
 
@@ -289,6 +342,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       add(`room:${s.room}`, `วาร์ปไป ${roomName(st, s.room)} (${s.face} ▲)`, go({ t: 'phantasm', teleport: true }, sfx.drop))
       break
     }
+
+    case 'twinChoice':
+      add('killer', 'เล่นเทิร์นนี้ด้วย Charlotte', go({ t: 'twin', victor: false }, sfx.select))
+      add('victor', 'เล่นเทิร์นนี้ด้วย Victor', go({ t: 'twin', victor: true }, sfx.select))
+      break
 
     case 'pickSurvivor':
       for (const t of s.options) add(`s:${t}`, `${st.survivors[t].name} โดน Chainsaw`, go({ t: 'pick', s: t }, sfx.select), 'act', t)
@@ -317,7 +375,7 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
       const label = `${name}: ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)}`
       const run = go({ t: 'perk', perk: b.perk, use: true, choice: c }, sfx.select)
       const action = run.action
-      if (c.path) out.push({ key: `path:${c.path}`, label, style: 'act', run, action })
+      if (c.path) out.push({ key: spotKey(st, `path:${c.path}`), label, style: 'act', run, action })
       else if (c.target !== undefined) out.push({ key: `s:${c.target}`, label, style: 'act', run, who: c.target, action })
       else if (b.perk === 'self_care') out.push({ key: `s:${b.owner}`, label, style: 'act', run, who: b.owner, action })
     }

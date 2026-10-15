@@ -33,7 +33,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 
 | Path | What |
 |---|---|
-| `src/play/engine/` | Rules engine: `engine.ts` (pure reducer), `types.ts`, `perks.ts`, `legal.ts`, `seats.ts`, `boards.ts`, tests |
+| `src/play/engine/` | Rules engine: `engine.ts` (pure reducer), `types.ts`, `perks.ts`, `legal.ts`, `seats.ts`, `boards.ts` (board graphs, read from the map art; `boards.test.ts` checks them), tests |
 | `src/play/components/` | Game UI: `GameScreen` (layout), `Board`, `ActionPanel`, `PerkPrompt`, `Planning`, `CardHand`, `StatusPanel` (player tiles), `TrackBar`, modals |
 | `src/play/boardActions.ts` | Everything clickable on the board right now |
 | `src/play/focus.ts` | Board highlights and the facts listed for a decision |
@@ -93,16 +93,17 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 - **Movement cards are picked from the hand** (`CardHand`): point to draw a card up (the map shows
   where it goes), click to pick (it stays up), confirm in the side panel. This covers planning,
   bonus turns, every perk that picks a card, Predator and the Redeemer guess. A player with
-  several survivors switches between them with tabs. The hand sits in the bottom-right corner,
-  under the side panel. Each card's button stays still and only the card face inside it moves,
-  so the card can't bounce under the pointer.
+  several survivors switches between them with tabs. The hand floats in the bottom-right corner
+  (the side panel stops above it), with no label of its own. Each card's button stays still and only the card face inside it moves, so the card
+  can't bounce under the pointer.
 - **Your own face-down cards can be peeked at:** click one on the player tiles to see your cards
   big in the middle of the screen (the killer sees all his planned cards); a click anywhere
   turns them face down again. Online only the owner can; on one device anyone can, as at a real
   table. Items open in a modal in the middle of the screen too.
 - **Secrets.** Hidden information (planned cards, Tinkerer / Zanshin swaps, the Redeemer card) gets
   a hand-off curtain in hot-seat (`secretFor` in `GameScreen`) and is never shown to other players
-  online.
+  online. Online, the killer (and a spectator) sees only the back of the survivors' item cards
+  (`itemsHidden` in `src/play/game.ts`); an item shows when it is used.
 - Perk decisions dock beside the board (`PerkPrompt`), never over the map. Character choices
   show the character's mini.
 - Layout: the tracks and controls in a bar (on top; a slim rail on the left on 16:9 and wider

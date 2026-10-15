@@ -3,7 +3,7 @@
 
 import { computed, shallowRef } from 'vue'
 import { createGame, tryApply, type GameConfig } from './engine/engine'
-import { actorsOf, mayAct } from './engine/seats'
+import { KILLER_PLAYER, actorsOf, mayAct } from './engine/seats'
 import type { Action, GameState } from './engine/types'
 import type { Room } from './online/transport'
 
@@ -18,6 +18,15 @@ const history = shallowRef<GameState[]>([])
  * room's latest known game (to fall back on when a write doesn't go through).
  */
 export const online = shallowRef<{ room: Room; seat: number; latest: () => GameState | null } | null>(null)
+
+/**
+ * Online, the survivors' items are hidden from the killer's screen (and a spectator's): they see
+ * that an item is held, not which. Items show when used. One shared device can't hide anything.
+ */
+export const itemsHidden = computed(() => {
+  const o = online.value
+  return !!o && (o.seat === KILLER_PLAYER || !o.seat)
+})
 
 /** Online moves made on this device that the room hasn't confirmed yet. */
 export const pendingWrites = shallowRef(0)

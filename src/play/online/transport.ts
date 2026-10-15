@@ -41,6 +41,10 @@ export interface RoomData {
   seats: Record<string, SeatInfo>
   /** Number of players (3–5) once seated; 0 in the lobby. */
   players: number
+  /** Lobby with 3 survivor players: the member who plays two survivors (unset: the first to join). */
+  double?: string
+  /** The board the killer picked (unset: MacMillan Estate). */
+  board?: string
   /** Character picks: 'killer' → killer id, survivor slot '0'..'3' → survivor id. */
   picks: Record<string, string>
   /** Player number → picks confirmed. */

@@ -35,7 +35,8 @@ export function legalActions(st: GameState): Action[] {
       for (const cards of survivorPlans(st)) out.push({ t: 'planSurvivors', cards })
       break
     case 'planKiller':
-      for (const l of st.killer.hand) for (const r of st.killer.hand) if (l !== r) out.push({ t: 'planKiller', cards: [l, r] })
+      // by position in the hand, so The Blight's two copies of a card can both be planned
+      st.killer.hand.forEach((l, i) => st.killer.hand.forEach((r, j) => i !== j && out.push({ t: 'planKiller', cards: [l, r] })))
       break
     case 'survivorMove':
       for (const m of survivorMoves(st, step.s, step.card)) out.push({ t: 'move', path: m.path.id })
@@ -87,6 +88,9 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'redeemerGuess':
       for (const card of KILLER_CARDS) out.push({ t: 'guess', card })
+      break
+    case 'twinChoice':
+      out.push({ t: 'twin', victor: false }, { t: 'twin', victor: true })
       break
     case 'killerMove':
       for (const m of killerMoves(st, step.card)) out.push({ t: 'move', path: m.path.id })

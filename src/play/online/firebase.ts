@@ -1,6 +1,6 @@
 // Firebase Realtime Database backend.
 //
-// Layout:  rooms/<code>/lobby  { host, createdAt, phase, members, seats, players, picks, locked }
+// Layout:  rooms/<code>/lobby  { host, createdAt, phase, members, seats, players, picks, locked, double?, board? }
 //          rooms/<code>/game   { rev, json }
 //          rooms/<code>/log    { r1: json, r2: json, … }  log of finished rounds (see logArchive.ts)
 // The game is stored as a JSON string: the database drops null values and turns some arrays
@@ -42,7 +42,8 @@ type Lobby = Omit<RoomData, 'game' | 'rev'>
 
 /** The lobby node: everything in the room but the game. */
 function lobbyOf(r: RoomData): Lobby {
-  return { host: r.host, createdAt: r.createdAt, phase: r.phase, members: r.members, seats: r.seats, players: r.players, picks: r.picks, locked: r.locked }
+  // `double` is optional: the database rejects undefined, so it is only written when set
+  return { host: r.host, createdAt: r.createdAt, phase: r.phase, members: r.members, seats: r.seats, players: r.players, picks: r.picks, locked: r.locked, ...(r.double ? { double: r.double } : {}), ...(r.board ? { board: r.board } : {}) }
 }
 interface GameNode {
   rev: number

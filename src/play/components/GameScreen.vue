@@ -112,8 +112,22 @@ const calmCrow = ref<string | null>(null)
 const aceFirst = ref<string | null>(null)
 /** A survivor's item whose target is being picked on the board. */
 const itemPick = ref<number | null>(null)
+/** A fork's icon was clicked: its moves, waiting for the room to go to. */
+const forkMoves = shallowRef<BoardAction[] | null>(null)
+/** Oppression: generators picked on the board, waiting for confirm. */
+const multiPick = ref<string[]>([])
+const oppressing = computed(() => {
+  const s = view.value.step
+  return s.t === 'offer' && s.perk === 'oppression' && myTurn.value
+})
+function confirmOppression() {
+  const [prop, prop2] = multiPick.value
+  if (!prop) return
+  if (dispatch({ t: 'perk', perk: 'oppression', use: true, choice: prop2 ? { prop, prop2 } : { prop } })) sfx.select()
+  multiPick.value = []
+}
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick, powerCard }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick, powerCard, forkMoves, multiPick }
 
 watch(
   () => view.value.step,
@@ -125,6 +139,8 @@ watch(
     calmCrow.value = null
     aceFirst.value = null
     itemPick.value = null
+    forkMoves.value = null
+    multiPick.value = []
   },
 )
 
@@ -160,6 +176,14 @@ let pointer = { x: 0, y: 0 }
 
 function onSpot(key: string) {
   const found = actions.value.filter((a) => a.key === key)
+  // A fork's icon with moves to different rooms: pick the room on the board next.
+  const dests = new Set(found.map((a) => a.dest))
+  if (found.length > 1 && found.every((a) => a.dest) && dests.size === found.length) {
+    forkMoves.value = found
+    sfx.click()
+    return
+  }
+  if (forkMoves.value && key.startsWith('room:')) forkMoves.value = null
   if (found.length === 1) found[0].run()
   else if (found.length > 1) menu.value = { actions: found, x: pointer.x + 8, y: pointer.y + 8 }
 }
@@ -167,7 +191,7 @@ function onSpot(key: string) {
 const onPath = (id: string) => onSpot(`path:${id}`)
 const onProp = (id: string) => onSpot(`prop:${id}`)
 const onRoom = (id: string) => onSpot(`room:${id}`)
-const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'killer' ? key : `prop:${key}`)
+const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'killer' || key === 'victor' ? key : `prop:${key}`)
 
 /** The mode the board is in, for the bar above it (with a way out). */
 const modeBar = computed(() => {
@@ -176,6 +200,7 @@ const modeBar = computed(() => {
   if (aceFirst.value) return { text: 'Ace in the Hole: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
   if (trapPath.value) return { text: 'Bear Trap หมดมือ: คลิก Bear Trap บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
   if (itemPick.value !== null) return { text: 'เลือกเป้าหมายของ item บนแผนที่', cancel: () => (itemPick.value = null) }
+  if (forkMoves.value) return { text: 'ทางแยก: คลิกห้องที่จะไปบนแผนที่', cancel: () => (forkMoves.value = null) }
   return null
 })
 
@@ -467,6 +492,10 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           <span>{{ modeBar.text }}</span>
           <button @click="modeBar.cancel()">ยกเลิก</button>
         </div>
+        <div v-if="oppressing" class="reveal-bar card">
+          <span>Oppression: คลิก Generator บนแผนที่ 1–2 เครื่อง แต่ละเครื่อง −1 ({{ multiPick.length }}/2)</span>
+          <button class="primary" :disabled="!multiPick.length" @click="confirmOppression">ยืนยัน</button>
+        </div>
         <div v-if="revealing" class="reveal-bar card">
           <span>{{ view.survivors[revealing.s].name }}: คลิกไทล์คว่ำที่จะเปิด ({{ revealing.props.length }}/3)</span>
           <button class="primary" :disabled="!revealing.props.length" @click="confirmReveal">เปิด</button>
@@ -483,7 +512,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
             :room-targets="targets.rooms"
             @room="onRoom"
             @pointerdown.capture="trackPointer"
-            :picked="revealing?.props"
+            :picked="revealing?.props ?? (oppressing ? multiPick : undefined)"
             :focus="boardFocus"
             @interact="onInteract"
             @path="onPath"
@@ -676,9 +705,6 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     top: 0.5rem;
     max-height: calc(100vh - 1rem);
   }
-  :global(body.hand-open) .side {
-    max-height: calc(100vh - 1rem - 215px);
-  }
   /* no top bar to leave room for: only the padding */
   .stage > .board {
     width: max(22rem, calc((100vh - 1.25rem) * var(--aspect)));
@@ -692,10 +718,15 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
 }
-/* a hand of cards in the bottom-right corner (CardHand): the panel stops above it and scrolls */
+/* a hand of cards floating in the bottom-right corner (CardHand): the panel stops above it */
 @media (min-width: 981px) {
   :global(body.hand-open) .side {
-    max-height: calc(100vh - 4rem - 215px);
+    max-height: calc(100vh - 4rem - 220px);
+  }
+}
+@media (min-width: 981px) and (min-aspect-ratio: 16/9) {
+  :global(body.hand-open) .side {
+    max-height: calc(100vh - 1rem - 220px);
   }
 }
 .reveal-bar {

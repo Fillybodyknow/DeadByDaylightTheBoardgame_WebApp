@@ -4,9 +4,9 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components, items } from '../../data'
 import { asset } from '../../i18n'
-import { ITEM_NAMES, KILLER_BP, SURVIVOR_BP, itemUses, turnOrder } from '../engine/engine'
+import { ITEM_NAMES, KILLER_BP, SURVIVOR_BP, itemUses, roomName, turnOrder, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse } from '../engine/types'
-import { online } from '../game'
+import { itemsHidden, online } from '../game'
 import type { InspectTarget } from '../inspect'
 import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, survivorMini } from '../labels'
 import Mini from './Mini.vue'
@@ -135,6 +135,7 @@ function peek(owner: number | 'killer' | null) {
         >
         <span v-if="st.sealedCard" class="warn" title="The Third Seal">ห้ามใช้ {{ st.sealedCard }}</span>
         <span v-if="st.killer.powerUsed" class="muted">ใช้พลังแล้ว</span>
+        <span v-if="victorRoom(st)" class="victor-at" :title="`Victor อยู่ที่ ${roomName(st, victorRoom(st)!)}`">V · {{ roomName(st, victorRoom(st)!) }}</span>
       </div>
       <div class="cards">
         <template v-for="(c, i) in st.killer.planned" :key="i">
@@ -206,8 +207,10 @@ function peek(owner: number | 'killer' | null) {
             <span class="eye" aria-hidden="true">👁</span>
           </button>
         </template>
+        <!-- online, the killer sees the back of the item card: something is held, not what -->
+        <img v-if="st.survivors[s].item && itemsHidden" class="item hidden" :src="asset('assets/items/back.webp')" alt="ถือ item อยู่" title="ถือ item อยู่ 1 ใบ" />
         <button
-          v-if="st.survivors[s].item"
+          v-else-if="st.survivors[s].item"
           class="item"
           :class="{ usable: itemUses(st, s).length > 0 }"
           :title="ITEM_NAMES[st.survivors[s].item!]"
@@ -470,6 +473,10 @@ function peek(owner: number | 'killer' | null) {
   color: #9cff6b;
   font-weight: 700;
 }
+.victor-at {
+  color: #e0a3ff;
+  font-size: 0.7rem;
+}
 .ok {
   color: var(--ok);
 }
@@ -496,12 +503,16 @@ function peek(owner: number | 'killer' | null) {
 }
 .cards {
   display: flex;
-  gap: 0.25rem;
+  flex-wrap: wrap;
+  gap: 0.3rem;
   align-items: center;
 }
 .pcard {
-  width: 24px;
-  border-radius: 3px;
+  display: block;
+  width: 34px;
+  aspect-ratio: 0.72;
+  object-fit: cover;
+  border-radius: 4px;
 }
 .pcard.done {
   opacity: 0.45;
@@ -579,14 +590,30 @@ function peek(owner: number | 'killer' | null) {
   line-height: 1;
   filter: drop-shadow(0 0 2px #000);
 }
+/* the item's icon, cropped from the top of its card and enlarged (the whole card is in the modal) */
 .item {
+  position: relative;
+  overflow: hidden;
   padding: 0;
-  width: 28px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #1a1c20;
 }
-.item img {
+img.item.hidden {
   display: block;
-  width: 100%;
+  width: 34px;
+  height: auto;
+  border-radius: 4px;
+}
+button.item img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 290%;
+  max-width: none;
+  transform: translate(-50%, -27%);
 }
 .item.usable {
   border-color: #ffe9b0;

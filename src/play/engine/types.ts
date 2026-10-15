@@ -31,6 +31,12 @@ export interface PathDef {
   wall: boolean
   /** Centre of the path icon on the map image, as fractions. */
   at: [number, number]
+  /**
+   * The path icon this pair of rooms is joined by, when one icon has lines to three rooms (a
+   * fork): one PathDef per pair of rooms, all with the same `token` (the id of the first one).
+   * Walls, pallets and bear traps sit on the icon, so they are shared.
+   */
+  token?: string
 }
 
 export interface BoardDef {
@@ -111,6 +117,12 @@ export interface KillerState {
   /** Planned cards shown to the survivors early (Lightborn), by index. */
   shown: number[]
   perks: PerkId[]
+  /**
+   * The Twins: the room Victor stands in (null: not on the board). While a turn is taken with
+   * Victor (`asVictor`), `room` and `victorRoom` are swapped, so "the Killer" is Victor.
+   */
+  victorRoom?: string | null
+  asVictor?: boolean
 }
 
 export interface PathState {
@@ -161,6 +173,10 @@ export type SurvivorInteraction =
   | { k: 'heal'; target: number }
   /** Calm Spirit (Jake): move a crow in your space to any room. */
   | { k: 'calmSpirit'; prop: string; room: string }
+  /** Survivors can interact with Victor (The Twins) to remove him. */
+  | { k: 'removeVictor' }
+  /** Power Struggle (Élodie): interact with the killer to reveal their first card. */
+  | { k: 'powerStruggle' }
 
 export type KillerInteraction =
   | { k: 'search'; prop: string }
@@ -183,6 +199,14 @@ export type KillerInteraction =
   | { k: 'phantasm' }
   /** The Wraith: move to a room not connected to hers. */
   | { k: 'bell'; room: string }
+  /** The Twins: place Victor in Charlotte's room. */
+  | { k: 'victor' }
+  /** The Blight: discard a random card from the hand and move along its path. */
+  | { k: 'rush' }
+  /** Hoarder (The Twins): remove a chest in your room, gain 2 ▲. */
+  | { k: 'hoard'; prop: string }
+  /** Undying (The Blight): discard `card` to make interaction `i` in a room connected by its path. */
+  | { k: 'undying'; card: MoveCard; i: KillerInteraction }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
   | { k: 'wrath' }
   /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */
@@ -205,8 +229,18 @@ export type PerkWindow =
   /** Start / end of any survivor's turn (Open-Handed, Urban Evasion, Up the Ante). */
   | { k: 'turnBegin'; s: number }
   | { k: 'turnEnd'; s: number }
-  /** The killer broke a pallet or a wall, or damaged a generator (Alert, Overcharge). */
-  | { k: 'killerBreak'; what: 'pallet' | 'wall' | 'damage' }
+  /** The killer broke a pallet or a wall, or damaged generator `prop` (Alert, Overcharge, Oppression). */
+  | { k: 'killerBreak'; what: 'pallet' | 'wall' | 'damage'; prop?: string }
+  /** End of one of the killer's turns (Coup de Grâce). */
+  | { k: 'killerTurnEnd'; turn: number }
+  /** A survivor is about to discard the item they just used (Built to Last). */
+  | { k: 'itemUsed'; s: number; item: string }
+  /** A survivor discarded an item (Appraisal). */
+  | { k: 'itemDiscard'; s: number; item: string }
+  /** A survivor's first interaction is done (Desperate Measures). */
+  | { k: 'afterSurvivorInteract'; s: number }
+  /** A survivor entering `room` is about to reveal a prop there (Visionary). */
+  | { k: 'beforeReveal'; s: number; room: string }
   /** A repair roll failed (Technician). */
   | { k: 'repairFail'; s: number; prop: string }
   | { k: 'afterRummage'; s: number; prop: string }
@@ -238,9 +272,12 @@ export interface PerkChoice {
   card?: MoveCard
   index?: number
   prop?: string
-  /** Ace in the Hole: the prop to swap with. */
+  /** Ace in the Hole: the prop to swap with. Oppression: the second generator. */
   prop2?: string
-  mode?: 'bp' | 'bonus' | 'take' | 'give'
+  /** Dragon's Grip: the second card discarded. */
+  card2?: MoveCard
+  /** Appraisal: keep the item gained (`keepNew`) or the one already held (`keepOld`). */
+  mode?: 'bp' | 'bonus' | 'take' | 'give' | 'keepNew' | 'keepOld'
 }
 
 export type PerkOwner = number | 'killer'
@@ -265,17 +302,26 @@ export type Step =
   | { t: 'planSurvivors' }
   | { t: 'planKiller' }
   | { t: 'survivorMove'; s: number; card: PathKind }
-  /** `exclude`: Technician's second interaction can't target this prop again. */
-  | { t: 'survivorInteract'; s: number; canInteract: boolean; exclude?: string }
+  /**
+   * `exclude`: Technician's second interaction can't target this prop again.
+   * `survivalOnly`: Desperate Measures' second interaction targets a chest or a locker.
+   */
+  | { t: 'survivorInteract'; s: number; canInteract: boolean; exclude?: string; survivalOnly?: boolean }
   | { t: 'bonusOffer'; s: number }
   /** Move along any path (after a rescue, p.13). */
   | { t: 'anyMove'; s: number }
   | { t: 'keepItem'; s: number; drawn: string }
   /** `keep`: Bond rolled two dice and one must be kept. */
   | { t: 'roll'; ctx: RollContext; dice: Die[]; keep?: boolean }
-  | { t: 'killerMove'; turn: number; card: PathKind }
-  /** `powerOnly`: Territorial Imperative's extra power use. */
-  | { t: 'killerInteract'; turn: number; canInteract: boolean; powerOnly?: boolean }
+  /** `rush`: The Blight's power drew this card. */
+  | { t: 'killerMove'; turn: number; card: PathKind; rush?: boolean }
+  /**
+   * `powerOnly`: Territorial Imperative's extra power use. `rush`: The Blight entered a room with
+   * his power: interact there, or use it again.
+   */
+  | { t: 'killerInteract'; turn: number; canInteract: boolean; powerOnly?: boolean; rush?: boolean }
+  /** The Twins: take this turn with Charlotte or with Victor. */
+  | { t: 'twinChoice'; turn: number }
   | { t: 'killerBonusOffer' }
   | { t: 'carryDice'; s: number }
   | { t: 'carryMove'; s: number; steps: number }
@@ -296,8 +342,11 @@ export type Step =
     }
   /** Start of a survivor's turn, when start-of-turn perks can be used. */
   | { t: 'turnStart'; s: number }
-  /** Carter's Spark: this survivor pays 1 ▲ or takes the shock; `rest` are next. */
-  | { t: 'sparkChoice'; s: number; rest: number[] }
+  /**
+   * Carter's Spark: this survivor pays 1 ▲ or takes the shock; `rest` are next.
+   * `grip`: Dragon's Grip instead — pay 1 ▲ or be wounded.
+   */
+  | { t: 'sparkChoice'; s: number; rest: number[]; grip?: boolean }
   /** A survivor walked into a Phantasm Trap: The Hag takes ▲ or teleports for `face` ▲. */
   | { t: 'phantasmChoice'; s: number; room: string; face: number }
   /** Predator: this survivor sets a new movement card. */
@@ -316,15 +365,18 @@ export type Task =
   | { k: 'anyMove'; s: number }
   /**
    * `extra`: a turn from Devour Hope at the start of cleanup (cleanup is already queued).
-   * `begun`: the start-of-turn perks were asked.
+   * `begun`: the start-of-turn perks were asked. `chosen`: The Twins picked who takes it.
    */
-  | { k: 'killerTurn'; turn: number; extra?: boolean; begun?: boolean }
+  | { k: 'killerTurn'; turn: number; extra?: boolean; begun?: boolean; chosen?: boolean }
   /** The killer's interaction, after Red Herring had its chance to redirect it. */
   | { k: 'killerDo'; i: KillerInteraction; turn: number | null }
   /** A roll's result, after Off the Record had its chance at the killer's ▲. */
   | { k: 'resolveRoll'; ctx: RollContext; dice: Die[]; fails: number }
   | { k: 'killerInteract'; turn: number }
-  | { k: 'endKillerTurn'; turn: number; extra?: boolean }
+  /** `ended`: the end-of-turn perks were asked. */
+  | { k: 'endKillerTurn'; turn: number; extra?: boolean; ended?: boolean }
+  /** The Blight's power moved (or tried to): interact or go again if he entered a new room. */
+  | { k: 'rushArrive'; turn: number; from: string }
   | { k: 'cleanup' }
   | { k: 'reveal'; room: string; who: number | 'killer' }
   /** Carrying: after entering a room (and revealing), hang, keep going or drop the survivor. */
@@ -381,6 +433,8 @@ export type Action =
   | { t: 'replace'; card: MoveCard }
   /** Redeemer: the survivor's guess at The Deathslinger's discarded card. */
   | { t: 'guess'; card: MoveCard }
+  /** The Twins: take this turn with Victor (true) or Charlotte (false). */
+  | { t: 'twin'; victor: boolean }
   | { t: 'react'; s: number | null }
   | { t: 'useItem'; s: number; use: ItemUse }
 
@@ -398,8 +452,8 @@ export interface LogEntry {
 /** Something that happened, in structured form (the UI animates these). */
 export type GameEvent =
   | { k: 'round'; round: number }
-  /** `path` is empty for a teleport (Wailing Bell, a Phantasm Trap). */
-  | { k: 'move'; who: number | 'killer'; from: string; to: string; path: string }
+  /** `path` is empty for a teleport (Wailing Bell, a Phantasm Trap). `victor`: The Twins' Victor. */
+  | { k: 'move'; who: number | 'killer' | 'victor'; from: string; to: string; path: string }
   | { k: 'phantasmSet'; room: string }
   | { k: 'madness'; s: number; on: boolean }
   | { k: 'reveal'; prop: string; kind: PropKind; room: string }
@@ -478,6 +532,14 @@ export interface GameState {
    * Secret: the screens hide it from the survivors.
    */
   redeemer?: MoveCard | null
+  /** Power Struggle: the killer can't interact after moving with their first card this round. */
+  struggle?: boolean
+  /** Deception: the active survivor stays put this turn and can't interact. */
+  deception?: boolean
+  /** Built to Last: this survivor's kept item can't be used again this turn. */
+  itemLock?: number | null
+  /** The Blight's power: the card it drew, while that move is being made. */
+  rushCard?: PathKind | null
   rng: number
   log: LogEntry[]
   /** Online planning: cards set so far by survivor index (`planHand`), until every hand is in. */

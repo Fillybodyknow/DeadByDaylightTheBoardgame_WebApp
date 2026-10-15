@@ -1,12 +1,13 @@
 <script setup lang="ts">
 // Offline: the full game on one device passed around the table (hot-seat). Before a game, the
-// companion's lobby flow — players, survivors pick first, then the killer — on MacMillan Estate.
+// companion's lobby flow — players, survivors pick first, then the killer, then the map.
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { killerById, mapById, survivorById } from '../../data'
+import { killerById, survivorById } from '../../data'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import CharacterPicker from '../components/CharacterPicker.vue'
+import MapPicker from '../components/MapPicker.vue'
 import GameScreen from '../components/GameScreen.vue'
 import TrialIntro from '../components/TrialIntro.vue'
 import { macmillan } from '../engine/boards'
@@ -94,14 +95,14 @@ function goToStep(i: number) {
   killer.value = null
 }
 
-const map = mapById.get(macmillan.id)
+const board = ref(macmillan.id)
 
 function start() {
   const ids = picks.value
   if (ids.some((id) => !id) || !killer.value) return
   sfx.entity()
   newGame({
-    board: macmillan.id,
+    board: board.value,
     survivors: ids.map((id) => ({ id: id!, name: survivorById.get(id!)!.name })),
     killer: { id: killer.value, name: killerById.get(killer.value)!.name },
     players: players.value,
@@ -197,14 +198,7 @@ function start() {
 
     <!-- 4. the map, and in -->
     <template v-else>
-      <section v-if="map" class="card map-card">
-        <img :src="asset(map.image)" :alt="map.name" />
-        <div>
-          <small class="muted">แผนที่</small>
-          <h2>{{ map.name }}</h2>
-          <p class="muted">แผนที่ที่ระบบรองรับในตอนนี้ — ทุกตัวจะทอยหาห้องเริ่มต้นตอนเข้า Trial (หน้า 6)</p>
-        </div>
-      </section>
+      <MapPicker v-model="board" />
       <div class="actions">
         <button type="button" class="primary big" @click="start">เข้าสู่ Trial →</button>
       </div>

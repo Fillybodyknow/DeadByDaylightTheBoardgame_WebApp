@@ -1,7 +1,7 @@
 // The perks the engine implements: the printed perks (Adept mode, p.19) of the rulebook's
 // automated-mode cast (p.20–23: The Trapper, The Nurse, The Huntress, The Hillbilly, Dwight,
-// Meg, Jake, Claudette), plus The Doctor, The Hag, The Wraith, The Oni, The Deathslinger, Feng Min,
-// Ace, Nea, Yui and Zarina. Names and costs match src/data; the rules
+// Meg, Jake, Claudette), plus The Doctor, The Hag, The Wraith, The Oni, The Deathslinger, The Twins,
+// The Blight, Feng Min, Ace, Nea, Yui, Zarina, Élodie and Felix. Names and costs match src/data; the rules
 // text is shown from there by the UI.
 
 export type PerkId =
@@ -33,6 +33,12 @@ export type PerkId =
   | 'gearhead'
   | 'retribution'
   | 'dead_mans_switch'
+  | 'coup_de_grace'
+  | 'hoarder'
+  | 'oppression'
+  | 'blood_favour'
+  | 'dragons_grip'
+  | 'undying'
   // survivors
   | 'prove_thyself'
   | 'leader'
@@ -61,6 +67,12 @@ export type PerkId =
   | 'red_herring'
   | 'for_the_people'
   | 'off_the_record'
+  | 'power_struggle'
+  | 'appraisal'
+  | 'deception'
+  | 'desperate_measures'
+  | 'visionary'
+  | 'built_to_last'
 
 export interface PerkDef {
   id: PerkId
@@ -139,6 +151,18 @@ export const PERKS: Record<PerkId, PerkDef> = {
   red_herring: def('red_herring', 'Red Herring', 2, 'survivor', 'zarina', 0, 'ถามเมื่อฆาตกรจะโจมตี / อุ้มคนในห้องคุณ'),
   for_the_people: def('for_the_people', 'For the People', 1, 'survivor', 'zarina', 1, 'ถามหลังคุณเข้าห้อง ถ้าไม่บาดเจ็บ'),
   off_the_record: def('off_the_record', 'Off the Record', 0, 'survivor', 'zarina', 2, 'ถามเมื่อคนในห้อง/ห้องติดกันทอยล้มเหลว'),
+  coup_de_grace: def('coup_de_grace', 'Coup de Grâce', 2, 'killer', 'twins', 0, 'ถามตอนจบเทิร์นฆาตกร (ถ้ายังไม่ได้ใช้ Bonus Turn รอบนี้)'),
+  hoarder: def('hoarder', 'Hoarder', 0, 'killer', 'twins', 1, 'เป็น Interaction กับ Chest ในห้อง'),
+  oppression: def('oppression', 'Oppression', 2, 'killer', 'twins', 2, 'ถามหลังทำลาย Generator'),
+  blood_favour: def('blood_favour', 'Blood Favour', 0, 'killer', 'blight', 0, 'ทำงานเองตอนเริ่มเก็บกวาด ถ้าทุกคนบาดเจ็บและไม่มีใครบน Hook'),
+  dragons_grip: def('dragons_grip', "Dragon's Grip", 1, 'killer', 'blight', 1, 'ถามหลังทำลาย Generator'),
+  undying: def('undying', 'Undying', 1, 'killer', 'blight', 2, 'เป็น Interaction: ทิ้งการ์ดแล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น'),
+  power_struggle: def('power_struggle', 'Power Struggle', 2, 'survivor', 'elodie', 0, 'เป็น Interaction กับฆาตกรในห้องเดียวกัน'),
+  appraisal: def('appraisal', 'Appraisal', 2, 'survivor', 'elodie', 1, 'ถามเมื่อผู้รอดชีวิตคนอื่นทิ้ง item'),
+  deception: def('deception', 'Deception', 0, 'survivor', 'elodie', 2, 'ถามก่อนเดินในเทิร์นตัวเอง'),
+  desperate_measures: def('desperate_measures', 'Desperate Measures', 1, 'survivor', 'felix', 0, 'ถามหลัง Interact ครั้งแรกในเทิร์นตัวเอง'),
+  visionary: def('visionary', 'Visionary', 0, 'survivor', 'felix', 1, 'ถามเมื่อจะเปิด prop ตอนเข้าห้อง'),
+  built_to_last: def('built_to_last', 'Built to Last', 2, 'survivor', 'felix', 2, 'ถามเมื่อจะทิ้ง item หลังใช้'),
 }
 
 /** Printed perks by character (Adept mode). Characters not listed play without perks for now. */
@@ -148,4 +172,4 @@ export const PRINTED_PERKS: Record<string, PerkId[]> = Object.values(PERKS).redu
 }, {})
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight']

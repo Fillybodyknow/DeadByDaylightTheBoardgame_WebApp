@@ -9,13 +9,13 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { components } from '../../data'
 import { asset } from '../../i18n'
-import { boardOf, palletOn, pathDef, propsIn } from '../engine/engine'
+import { boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, victorRoom } from '../engine/engine'
 import type { GameEvent, GameState, Prop } from '../engine/types'
 import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { BEAR_TRAP_IMAGE, PROP_IMAGE, killerMini, survivorMini } from '../labels'
+import { BEAR_TRAP_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 
 const props = defineProps<{
@@ -77,6 +77,12 @@ function tileRect(box: number[], i: number, n: number): Rect {
   return { x: x + w * (0.03 + i * (size + TILE_GAP)), y: y + h * 0.575 + w * (TILE - size) * board.value.aspect, w: w * size }
 }
 
+/** Victor (The Twins): in the killer's corner, or beside Charlotte when she is there too. */
+function victorRect(box: number[], withCharlotte: boolean): Rect {
+  const [x, y, w, h] = box
+  return { x: x + w * (withCharlotte ? 0.6 : 0.8), y: y + h * 0.24, w: w * MINI * 0.95 }
+}
+
 function miniRect(box: number[], i: number, killer = false): Rect {
   const [x, y, w, h] = box
   return { x: x + w * (killer ? 0.78 : 0.03 + i * (MINI + 0.02)), y: y + h * 0.2, w: w * (killer ? MINI * 1.25 : MINI) }
@@ -98,7 +104,9 @@ const rooms = computed(() =>
     ...r,
     props: propsIn(props.st, r.id),
     survivors: props.st.survivors.flatMap((sv, i) => (sv.room === r.id && (sv.status === 'board' || sv.status === 'carried') ? [i] : [])),
-    killer: props.st.killer.room === r.id,
+    // The Twins: Charlotte is the killer's mini; Victor is a second, smaller one
+    killer: charlotteRoom(props.st) === r.id,
+    victor: victorRoom(props.st) === r.id,
   })),
 )
 
@@ -110,12 +118,14 @@ const rects = computed(() => {
     r.props.forEach((p, i) => tiles.set(p.id, tileRect(r.box, i, r.props.length)))
     r.survivors.forEach((s, i) => minis.set(`s${s}`, miniRect(r.box, i)))
     if (r.killer) minis.set('k', miniRect(r.box, 0, true))
+    if (r.victor) minis.set('v', victorRect(r.box, r.killer))
   }
   return { minis, tiles }
 })
 
+// One per path icon: a fork's other pairs share the first one's icon (and its state).
 const paths = computed(() =>
-  board.value.paths.map((p) => {
+  board.value.paths.filter((p) => tokenOf(board.value, p.id) === p.id).map((p) => {
     const ps = props.st.paths[p.id]
     const e = props.st.entity
     const token = ps.wall
@@ -160,7 +170,9 @@ const litRooms = computed(() => {
 
 const isFocused = (s: number) => props.focus?.survivors.includes(s) ?? false
 const isHot = (s: number) => preview.value?.survivors?.includes(s) ?? false
-const hotPaths = computed(() => new Set(preview.value?.paths ?? []))
+const hotPaths = computed(() => new Set((preview.value?.paths ?? []).map((p) => tokenOf(board.value, p))))
+/** The decision's highlighted paths, by icon. */
+const focusPaths = computed(() => new Set((props.focus?.paths ?? []).map((p) => tokenOf(board.value, p))))
 const hotDests = computed(() => new Set(preview.value?.dests ?? []))
 
 // ---------- effects ----------
@@ -264,7 +276,7 @@ function walk(events: GameEvent[], from: Map<string, Rect>): number {
   return longest
 }
 
-const key = (who: number | 'killer') => (who === 'killer' ? 'k' : `s${who}`)
+const key = (who: number | 'killer' | 'victor') => (who === 'killer' ? 'k' : who === 'victor' ? 'v' : `s${who}`)
 
 /** One event's effect; returns the delay for the next so a burst of events reads in order. */
 function play(ev: GameEvent, delay: number): number {
@@ -503,6 +515,18 @@ function guard(e: MouseEvent) {
       >
         <img :src="asset(killerMini(st))" :alt="st.killer.name" draggable="false" />
       </component>
+      <component
+        :is="canAct('victor') || roomTarget(r.id) ? 'button' : 'div'"
+        v-if="r.victor"
+        data-mini="v"
+        class="mini killer victor"
+        :class="{ act: canAct('victor') }"
+        :style="rectStyle(victorRect(r.box, r.killer))"
+        :title="interactTargets.victor ?? 'Victor'"
+        @click="clickPiece('victor', r.id)"
+      >
+        <img :src="asset(VICTOR_MINI)" alt="Victor" draggable="false" />
+      </component>
     </template>
 
     <img
@@ -518,7 +542,7 @@ function guard(e: MouseEvent) {
     <template v-for="p in paths" :key="p.id">
       <img v-if="p.token" class="path-token" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" :src="asset(p.token)" alt="" />
       <span
-        v-if="focus?.paths.includes(p.id) || hotPaths.has(p.id)"
+        v-if="focusPaths.has(p.id) || hotPaths.has(p.id)"
         class="path-preview"
         :class="{ hot: hotPaths.has(p.id) }"
         :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }"

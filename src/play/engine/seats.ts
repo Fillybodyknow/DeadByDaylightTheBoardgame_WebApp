@@ -46,6 +46,7 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'carryMove':
     case 'pickSurvivor':
     case 'phantasmChoice':
+    case 'twinChoice':
       return 'killer'
     default:
       return null

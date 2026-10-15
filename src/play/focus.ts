@@ -229,11 +229,25 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
         f.rooms.push(st.survivors[w.target].room)
         facts.push({ who: w.target, icon: '🔪', text: `${st.killer.name} กำลังจะทำร้าย ${where(st, w.target)}` })
         break
+      case 'killerTurnEnd':
+        f.killer = true
+        facts.push({ who: 'killer', icon: '🃏', text: `การ์ดที่เพิ่งเล่น: ${CARD_NAMES[st.killer.planned[w.turn]]}` })
+        facts.push(killerFact(st))
+        break
+      case 'beforeReveal':
+        f.survivors.push(w.s)
+        f.rooms.push(w.room)
+        facts.push({ who: w.s, icon: '🔍', text: `${st.survivors[w.s].name} เข้า ${roomName(st, w.room)} — ไม่ใช้ = เปิด prop ในห้องนี้` })
+        for (const c of choices) if (c.prop) f.dests.push(st.props.find((p) => p.id === c.prop)!.room!)
+        break
       case 'afterHang':
       case 'afterPalletLocker':
       case 'entered':
       case 'rollFail':
       case 'greatRoll':
+      case 'itemUsed':
+      case 'itemDiscard':
+      case 'afterSurvivorInteract':
         f.survivors.push(w.s)
         facts.push({ who: w.s, icon: '📍', text: where(st, w.s) })
         facts.push(killerFact(st, w.s))

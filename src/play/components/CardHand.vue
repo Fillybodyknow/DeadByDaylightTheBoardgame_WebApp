@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Movement cards held in a fan in the bottom-right corner, under the side panel. Pointing at a
-// card draws it up to look at; clicking picks it — it stays drawn up, glowing, until the choice
+// Movement cards held in a fan floating in the bottom-right corner. Pointing at a card draws it
+// up to look at; clicking picks it — it stays drawn up, glowing, until the choice
 // is confirmed in the panel (or clicked again to put it back).
 //
 // Each card is a button that never moves (its rotation in the fan aside); only the card face
@@ -21,22 +21,24 @@ export interface HandCard {
   takenBy?: string
 }
 
+/** `label`: whose hand, for screen readers (the side panel shows it on screen). */
 const props = defineProps<{ cards: HandCard[]; label: string }>()
-const emit = defineEmits<{ pick: [card: MoveCard]; hover: [card: MoveCard | null] }>()
+/** `pick`: the card, and its place in `cards` (The Blight's hand holds two of each). */
+const emit = defineEmits<{ pick: [card: MoveCard, index: number]; hover: [card: MoveCard | null] }>()
 
 /** Each card's place in the fan: a little turned and lower towards the ends. */
 const fan = computed(() => {
   const mid = (props.cards.length - 1) / 2
   return props.cards.map((_, i) => {
     const off = i - mid
-    // up to 4 cards at full size; 5 (the killer's hand) a little smaller, to fit the corner
-    const w = props.cards.length > 4 ? 60 : 80
+    // up to 4 cards at full size; 5 (the killer's hand) smaller; 8 (The Blight's) smaller still
+    const w = props.cards.length > 6 ? 74 : props.cards.length > 4 ? 98 : 112
     return { '--w': `${w}px`, '--rot': `${off * 5}deg`, '--arc': `${Math.abs(off) * Math.abs(off) * 3}px`, zIndex: String(i + 1) }
   })
 })
 
-// While a hand is out, the side panel leaves room under its content for it (GameScreen). Counted
-// on the body, as one hand can mount before the previous one unmounts.
+// While a hand is out, the side panel stops above it (GameScreen). Counted on the body, as one
+// hand can mount before the previous one unmounts.
 function hands(delta: number) {
   const b = document.body
   const n = Math.max(0, Number(b.dataset.hands ?? 0) + delta)
@@ -49,14 +51,13 @@ onBeforeUnmount(() => hands(-1))
 
 <template>
   <Teleport to="body">
-    <!-- a dark tray under the hand, so what's beneath doesn't show through -->
+    <!-- a soft shadow under the hand, so it reads over the map -->
     <div class="tray" aria-hidden="true" />
     <div class="hand" role="group" :aria-label="label">
-      <p class="hand-label">{{ label }}</p>
       <div class="fan">
         <button
           v-for="(c, i) in cards"
-          :key="c.card"
+          :key="`${c.card}-${i}`"
           type="button"
           class="slot"
           :class="{ picked: c.picked, taken: !!c.takenBy }"
@@ -67,7 +68,7 @@ onBeforeUnmount(() => hands(-1))
           @mouseleave="emit('hover', null)"
           @focus="emit('hover', c.card)"
           @blur="emit('hover', null)"
-          @click="emit('pick', c.card)"
+          @click="emit('pick', c.card, i)"
         >
           <span class="face">
             <img :src="asset(cardImage(c.card))" :alt="cardLabel(c.card)" draggable="false" />
@@ -81,64 +82,54 @@ onBeforeUnmount(() => hands(-1))
 </template>
 
 <style scoped>
-.tray {
-  position: fixed;
-  z-index: 14;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 215px;
-  pointer-events: none;
-  background: linear-gradient(to bottom, transparent, rgb(4 5 7 / 0.9) 35%, rgb(4 5 7 / 0.97));
-}
+.tray,
 .hand {
   position: fixed;
-  z-index: 15;
   bottom: 0;
   left: 50%;
-  transform: translateX(-50%);
-  display: grid;
-  justify-items: center;
+  translate: -50% 0;
   pointer-events: none;
 }
-/* the bottom-right corner, under the side panel (320 px wide, 0.75 rem from the edge) */
+.tray {
+  z-index: 14;
+  width: min(720px, 100vw);
+  height: 230px;
+  background: radial-gradient(ellipse 50% 70% at 50% 100%, rgb(4 5 7 / 0.92), rgb(4 5 7 / 0.6) 55%, transparent 75%);
+}
+.hand {
+  z-index: 15;
+  display: grid;
+  justify-items: center;
+}
+/* the bottom-right corner, floating over the foot of the side panel and the map */
 @media (min-width: 981px) {
-  .tray {
-    left: auto;
-    width: calc(320px + 1.5rem);
-  }
+  .tray,
   .hand {
     left: auto;
-    right: 0.75rem;
-    width: 320px;
-    transform: none;
+    right: 0.5rem;
+    translate: none;
   }
-}
-.hand-label {
-  max-width: 100%;
-  margin: 0 0 0.2rem;
-  padding: 0.2rem 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border: 1px solid var(--line-strong);
-  border-radius: 99px;
-  background: rgb(7 8 10 / 0.9);
-  font-size: 0.8rem;
-  color: var(--muted);
-  white-space: nowrap;
+  /* room for the outer cards' tilt */
+  .fan {
+    padding-right: 2rem;
+  }
+  .tray {
+    right: 0;
+    background: radial-gradient(ellipse 60% 70% at 70% 100%, rgb(4 5 7 / 0.92), rgb(4 5 7 / 0.6) 55%, transparent 75%);
+  }
 }
 .fan {
   display: flex;
   justify-content: center;
-  height: 168px;
+  height: 216px;
 }
 /* The button: the card's place, a bit taller than the card so the risen card is still on it. */
 .slot {
   position: relative;
   flex: none;
-  width: var(--w, 88px);
-  height: 160px;
-  margin: 0 -4px;
+  width: var(--w, 112px);
+  height: 210px;
+  margin: 0 -6px;
   padding: 0;
   border: none;
   background: none;
@@ -153,7 +144,7 @@ onBeforeUnmount(() => hands(-1))
 }
 /* The card itself: resting low, sliding up inside its button. */
 .face {
-  --lift: 46px;
+  --lift: 58px;
   position: absolute;
   left: 0;
   right: 0;

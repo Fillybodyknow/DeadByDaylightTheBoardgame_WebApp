@@ -98,6 +98,10 @@ const handCards = computed(() => {
 })
 
 const killerSide = computed(() => decider.value === 'killer')
+/** Dragon's Grip discards one or two cards: its choices are buttons, not the hand. */
+const isGrip = computed(() => step.value.t === 'offer' && step.value.perk === 'dragons_grip')
+/** Oppression: its generators are picked on the board (GameScreen confirms), not from a list. */
+const isOppression = computed(() => step.value.t === 'offer' && step.value.perk === 'oppression')
 
 // ---------- movement cards: picked from the hand along the bottom, then confirmed ----------
 
@@ -117,6 +121,8 @@ const handChoices = computed<PerkChoice[]>(() => {
   if (s.t === 'replaceCard') return handCards.value.map((card) => ({ card }))
   if (s.t === 'redeemerGuess') return KILLER_CARDS.map((card) => ({ card }))
   if (s.t !== 'offer' || offerList.value.length > 1) return []
+  // Dragon's Grip discards one or two cards: its choices stay buttons
+  if (s.perk === 'dragons_grip') return []
   return isTinkerer.value ? tinkerSwaps.value : offerChoices.value.filter((c) => c.card)
 })
 
@@ -222,6 +228,7 @@ const cost = (p: PerkId) => (PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี
 /** How many of this decision's choices are on the board (for the hint). */
 const boardCount = computed(() => {
   const s = step.value
+  if (isOppression.value) return offerChoices.value.filter((c) => !c.prop2).length
   if (s.t === 'offer') return offerList.value.reduce((n, o) => n + o.choices.filter((c) => !here(perkAct(o.perk, c))).length, 0)
   if (s.t === 'turnStart') return buttons.value.reduce((n, b) => n + b.choices.filter((c) => !here(perkAct(b.perk, c))).length, 0)
   if (s.t === 'phantasmChoice') return [...hagMoves.value.map((i) => ({ t: 'phantasm', teleport: true, i }) as Action), { t: 'phantasm', teleport: true } as Action].filter((a) => !here(a)).length
@@ -330,7 +337,7 @@ const boardCount = computed(() => {
             {{ cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน' }}
           </button>
           <button
-            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c))"
+            v-for="(c, i) in offerChoices.filter((c) => (!c.card || isGrip) && offerHere(c) && !isOppression)"
             :key="i"
             class="primary"
             @mouseenter="hover(step.owner, c)"
@@ -373,6 +380,13 @@ const boardCount = computed(() => {
       </template>
 
       <!-- Carter's Spark: pay or take it -->
+      <template v-else-if="step.t === 'sparkChoice' && step.grip">
+        <p class="lead"><b>Dragon's Grip!</b> {{ st.survivors[step.s].name }} จ่าย 1 ▲ หรือบาดเจ็บ</p>
+        <div class="choices">
+          <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 ▲ (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
+          <button @click="act({ t: 'spark', pay: false })">ไม่จ่าย — บาดเจ็บ</button>
+        </div>
+      </template>
       <template v-else-if="step.t === 'sparkChoice'">
         <p class="lead">
           <b>Carter's Spark!</b> {{ st.survivors[step.s].name }} จ่าย 1 ▲ หรือ{{ st.survivors[step.s].madness ? 'บาดเจ็บ (มี Madness อยู่แล้ว)' : 'ติด Madness' }}

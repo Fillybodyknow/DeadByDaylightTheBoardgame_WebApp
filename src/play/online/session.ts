@@ -8,7 +8,7 @@
 import { computed, reactive, toRaw } from 'vue'
 import { killerById, survivorById } from '../../data'
 import { createGame, handLayout } from '../engine/engine'
-import { macmillan } from '../engine/boards'
+import { boards, macmillan } from '../engine/boards'
 import { KILLER_PLAYER } from '../engine/seats'
 import { game, online, receive, restoreLocal } from '../game'
 import { firebaseBackend, firebaseConfigured } from './firebase'
@@ -219,13 +219,47 @@ export function setReady(ready: boolean) {
   })
 }
 
-/** Host: seat everyone (killer = player 1, survivors in join order) and go to character picks. */
+/**
+ * With 3 survivor players one of them plays two survivors (p.19): the member chosen in the lobby,
+ * or the first survivor to join. Null with any other number of survivor players.
+ */
+export const doubleId = computed(() => {
+  const d = session.data
+  if (!d) return null
+  const survivors = Object.entries(d.members)
+    .filter(([, m]) => m.side === 'survivor')
+    .sort((a, b) => a[1].joinedAt - b[1].joinedAt)
+  if (survivors.length !== 3) return null
+  return survivors.some(([id]) => id === d.double) ? d.double! : survivors[0][0]
+})
+
+/**
+ * Choose who plays two survivors: the host for anyone, a survivor player for themselves. Everyone
+ * says "ready" again, so the change is seen.
+ */
+export function setDouble(id: string) {
+  return update((cur) => {
+    const target = cur.members[id]
+    if (cur.phase !== 'lobby' || !target || target.side !== 'survivor') return null
+    if (session.me !== cur.host && session.me !== id) return null
+    const members = Object.fromEntries(Object.entries(cur.members).map(([k, m]) => [k, { ...m, ready: false }]))
+    return { ...cur, double: id, members }
+  })
+}
+
+/**
+ * Host: seat everyone (killer = player 1, survivors in join order, the one playing two survivors
+ * first as player 2) and go to character picks.
+ */
 export function proceedToPick() {
   if (!isHost.value || lobbyBlocker.value) return
   return update((cur) => {
     const ms = Object.entries(cur.members).sort((a, b) => a[1].joinedAt - b[1].joinedAt)
     const killer = ms.find(([, m]) => m.side === 'killer')
     const survivors = ms.filter(([, m]) => m.side === 'survivor')
+    // player 2 plays the first hand, which holds two survivors when there are 3 survivor players
+    const double = survivors.length === 3 ? survivors.findIndex(([id]) => id === cur.double) : -1
+    if (double > 0) survivors.unshift(...survivors.splice(double, 1))
     if (!killer || survivors.length < MIN_SURVIVOR_PLAYERS || ms.some(([, m]) => !m.side || !m.ready)) return null
     const seats: RoomData['seats'] = { [KILLER_PLAYER]: { id: killer[0], name: killer[1].name } }
     survivors.forEach(([id, m], i) => (seats[String(i + 2)] = { id, name: m.name }))
@@ -274,6 +308,15 @@ export const allLocked = computed(() => {
   return !!d && d.phase === 'pick' && pickWaiting.value.length === 0
 })
 
+/** The killer picks the board (any time before the game starts); everyone sees it. */
+export function setBoard(id: string) {
+  if (!boards[id]) return
+  return update((cur) => {
+    const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
+    return cur.phase === 'pick' && Number(seat) === KILLER_PLAYER ? { ...cur, board: id } : null
+  })
+}
+
 /** The killer starts the game once everyone has locked in. The seed is drawn here, once. */
 export function startOnlineGame() {
   const d = session.data
@@ -286,7 +329,7 @@ export function startOnlineGame() {
       cur
         ? null
         : createGame({
-            board: macmillan.id,
+            board: d.board && boards[d.board] ? d.board : macmillan.id,
             survivors: survivors.map((id) => ({ id, name: survivorById.get(id)!.name })),
             killer: { id: killer, name: killerById.get(killer)!.name },
             players: d.players as 3 | 4 | 5,

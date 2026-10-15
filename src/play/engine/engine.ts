@@ -20,6 +20,7 @@ import type {
   MoveCard,
   PathDef,
   PathKind,
+  PathState,
   PerkChoice,
   PerkOwner,
   PerkWindow,
@@ -51,6 +52,22 @@ export function bonusCost(st: GameState): number {
 export const BEAR_TRAPS = 4
 export const SURVIVOR_CARDS: PathKind[] = ['sneak', 'sprint', 'crouch', 'vault']
 export const KILLER_CARDS: MoveCard[] = ['sneak', 'sprint', 'crouch', 'vault', 'wait']
+
+/** The killer's hand each round: The Blight's passive gives two of each path card and no Wait. */
+export function killerDeck(killerId: string): MoveCard[] {
+  return killerId === 'blight' ? [...SURVIVOR_CARDS, ...SURVIVOR_CARDS] : [...KILLER_CARDS]
+}
+
+/** Take one copy of each card from `hand`; null when a card isn't there (enough times). */
+function takeCards(hand: MoveCard[], cards: MoveCard[]): MoveCard[] | null {
+  const left = [...hand]
+  for (const c of cards) {
+    const i = left.indexOf(c)
+    if (i < 0) return null
+    left.splice(i, 1)
+  }
+  return left
+}
 
 const PROPS_BY_CATEGORY: Record<PropCategory, [PropKind, number][]> = {
   objective: [['generator', 8], ['exitGate', 2]],
@@ -167,7 +184,7 @@ export function createGame(config: GameConfig): GameState {
       name: config.killer.name,
       room: board.rooms[0].id,
       bp: KILLER_BP.start,
-      hand: [...KILLER_CARDS],
+      hand: killerDeck(config.killer.id),
       planned: [],
       revealedCount: 0,
       plannedShown: false,
@@ -178,7 +195,8 @@ export function createGame(config: GameConfig): GameState {
       perks: [...(PRINTED_PERKS[config.killer.id] ?? [])],
     },
     props: [],
-    paths: Object.fromEntries(board.paths.map((p) => [p.id, { wall: p.wall, trap: false }])),
+    // one state per path icon (a fork's pairs share theirs)
+    paths: Object.fromEntries(board.paths.filter((p) => tokenOf(board, p.id) === p.id).map((p) => [p.id, { wall: p.wall, trap: false }])),
     entity: null,
     sacrifice: 0,
     firstPlayer: 0,
@@ -290,8 +308,24 @@ export function touchingPaths(st: GameState, room: string): PathDef[] {
   return boardOf(st).paths.filter((p) => p.a === room || p.b === room)
 }
 
+/** The icon a path belongs to (itself, or the first pair of a fork). */
+export function tokenOf(board: BoardDef, path: string): string {
+  return board.paths.find((p) => p.id === path)?.token ?? path
+}
+
+/** Wall and bear trap on a path's icon (shared by a fork's pairs). */
+export function pathState(st: GameState, path: string): PathState {
+  return st.paths[tokenOf(boardOf(st), path)]
+}
+
+/** Path icons touching `room`, once each (a fork has one icon for several pairs). */
+function touchingTokens(st: GameState, room: string): string[] {
+  return [...new Set(touchingPaths(st, room).map((p) => tokenOf(boardOf(st), p.id)))]
+}
+
 export function palletOn(st: GameState, path: string): Prop | undefined {
-  return st.props.find((p) => p.path === path && !p.removed)
+  const t = tokenOf(boardOf(st), path)
+  return st.props.find((p) => p.path !== null && tokenOf(boardOf(st), p.path) === t && !p.removed)
 }
 
 /** Props standing in a room (not removed, not on a path, not a repaired generator). */
@@ -307,7 +341,7 @@ function entityOn(st: GameState, place: { prop: string } | { path: string }): bo
 
 /** A path with nothing on it: no wall, pallet, bear trap or entity token. */
 function pathFree(st: GameState, path: string): boolean {
-  const ps = st.paths[path]
+  const ps = pathState(st, path)
   return !ps.wall && !ps.trap && !palletOn(st, path) && !entityOn(st, { path }) && st.evadedWall !== path
 }
 
@@ -349,12 +383,12 @@ export function succeeded(d: Die): boolean {
 
 /** Where a survivor can go with a movement card: walls block survivors (p.13). */
 export function survivorMoves(st: GameState, s: number, card: PathKind): { path: PathDef; to: string }[] {
-  return exits(st, st.survivors[s].room, card).filter((e) => !st.paths[e.path.id].wall)
+  return exits(st, st.survivors[s].room, card).filter((e) => !pathState(st, e.path.id).wall)
 }
 
 /** "Move along any path" (rescue, p.13): any colour, vault still one-way, walls block. */
 export function anyMoves(st: GameState, s: number): { path: PathDef; to: string }[] {
-  return exits(st, st.survivors[s].room, 'any').filter((e) => !st.paths[e.path.id].wall)
+  return exits(st, st.survivors[s].room, 'any').filter((e) => !pathState(st, e.path.id).wall)
 }
 
 /** The killer breaks walls and pallets (p.14), so every path of the colour is open. */
@@ -364,15 +398,21 @@ export function killerMoves(st: GameState, card: PathKind): { path: PathDef; to:
 
 /** While carrying: any path, but not over pallets or through walls (p.15). */
 export function carryMoves(st: GameState): { path: PathDef; to: string }[] {
-  return exits(st, st.killer.room, 'any').filter((e) => !st.paths[e.path.id].wall && !palletOn(st, e.path.id))
+  return exits(st, st.killer.room, 'any').filter((e) => !pathState(st, e.path.id).wall && !palletOn(st, e.path.id))
 }
 
 export function survivorInteractions(st: GameState, s: number): SurvivorInteraction[] {
   const sv = st.survivors[s]
   if (sv.status !== 'board') return []
   const step = st.step
-  const exclude = step.t === 'survivorInteract' && step.s === s ? step.exclude : undefined
-  return allSurvivorInteractions(st, s).filter((i) => !exclude || !('prop' in i) || i.prop !== exclude)
+  const mine = step.t === 'survivorInteract' && step.s === s ? step : null
+  const exclude = mine?.exclude
+  return allSurvivorInteractions(st, s).filter((i) => {
+    if (exclude && 'prop' in i && i.prop === exclude) return false
+    // Desperate Measures: the second interaction targets a survival prop (chest, locker)
+    if (mine?.survivalOnly) return 'prop' in i && st.props.find((p) => p.id === i.prop)!.category === 'survival'
+    return true
+  })
 }
 
 function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[] {
@@ -393,7 +433,7 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
         if (perkReady(st, s, 'calm_spirit')) for (const r of boardOf(st).rooms) if (r.id !== sv.room) out.push({ k: 'calmSpirit', prop: p.id, room: r.id })
         break
       case 'pallet':
-        for (const path of touchingPaths(st, sv.room)) if (pathFree(st, path.id)) out.push({ k: 'dropPallet', prop: p.id, path: path.id })
+        for (const path of touchingTokens(st, sv.room)) if (pathFree(st, path)) out.push({ k: 'dropPallet', prop: p.id, path })
         break
       case 'generator':
         out.push({ k: 'repair', prop: p.id })
@@ -410,13 +450,17 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
     }
   }
   for (const t of onBoardIn(st, sv.room)) if (t !== s && st.survivors[t].wounded) out.push({ k: 'heal', target: t })
+  // The Twins: Victor can be removed by a survivor in his room.
+  if (victorRoom(st) === sv.room) out.push({ k: 'removeVictor' })
+  // Power Struggle (Élodie): with the killer (Charlotte for The Twins), before their first card.
+  if (charlotteRoom(st) === sv.room && st.killer.revealedCount === 0 && st.killer.planned.length && perkReady(st, s, 'power_struggle')) out.push({ k: 'powerStruggle' })
   return out
 }
 
-export function killerInteractions(st: GameState): KillerInteraction[] {
-  const k = st.killer
+/** The killer's interactions with the props standing in `room`. */
+function propInteractions(st: GameState, room: string): KillerInteraction[] {
   const out: KillerInteraction[] = []
-  for (const p of propsIn(st, k.room)) {
+  for (const p of propsIn(st, room)) {
     if (!p.revealed) continue
     if (p.kind === 'locker' && p.occupant !== null) out.push({ k: 'search', prop: p.id })
     if (p.kind === 'crow') out.push({ k: 'scout', prop: p.id })
@@ -424,12 +468,31 @@ export function killerInteractions(st: GameState): KillerInteraction[] {
     if (p.kind === 'generator') out.push({ k: 'damage', prop: p.id })
     if (p.kind === 'totem') out.push({ k: 'venerate', prop: p.id })
   }
+  return out
+}
+
+/** `step`: the step being answered (handle() has already set the state's step to idle). */
+export function killerInteractions(st: GameState, step: Step = st.step): KillerInteraction[] {
+  const k = st.killer
+  const out: KillerInteraction[] = propInteractions(st, k.room)
+  // Hoarder (The Twins): a chest here, removed for 2 ▲.
+  if (perkReady(st, 'killer', 'hoarder'))
+    for (const p of propsIn(st, k.room)) if (p.kind === 'chest' && p.revealed) out.push({ k: 'hoard', prop: p.id })
   for (const t of onBoardIn(st, k.room)) {
     const sv = st.survivors[t]
     if (!sv.wounded) out.push({ k: 'attack', target: t })
     else if (!sv.woundedThisRound) out.push({ k: 'pickUp', target: t })
   }
+  // Undying (The Blight): discard a card (not Wait) to interact with a prop in a room joined to
+  // this one by a path of that card's colour.
+  if (perkReady(st, 'killer', 'undying'))
+    for (const card of new Set(k.hand))
+      if (card !== 'wait')
+        for (const p of touchingPaths(st, k.room))
+          if (p.kind === card) for (const i of propInteractions(st, p.a === k.room ? p.b : p.a)) out.push({ k: 'undying', card, i })
   out.push(...powerOptions(st))
+  // Blighted Corruption: after entering a room with it, the power can go again.
+  if (step.t === 'killerInteract' && step.rush && k.hand.length) out.push({ k: 'rush' })
   return out
 }
 
@@ -438,11 +501,11 @@ export function trapPlacements(st: GameState): KillerInteraction[] {
   const k = st.killer
   if (k.characterId !== 'trapper') return []
   const out: KillerInteraction[] = []
-  const placed = Object.keys(st.paths).filter((id) => st.paths[id].trap)
-  for (const path of touchingPaths(st, k.room)) {
-    if (!pathFree(st, path.id)) continue
-    if (k.trapsInSupply > 0) out.push({ k: 'power', path: path.id })
-    for (const r of placed) out.push({ k: 'power', path: path.id, remove: r })
+  const placed = Object.keys(st.paths).filter((id) => pathState(st, id).trap)
+  for (const path of touchingTokens(st, k.room)) {
+    if (!pathFree(st, path)) continue
+    if (k.trapsInSupply > 0) out.push({ k: 'power', path })
+    for (const r of placed) out.push({ k: 'power', path, remove: r })
   }
   return out
 }
@@ -454,7 +517,8 @@ function canUseItems(st: GameState, s: number): boolean {
 
 export function itemUses(st: GameState, s: number): ItemUse[] {
   const sv = st.survivors[s]
-  if (!sv.item || !canUseItems(st, s)) return []
+  // Built to Last: a kept item rests until the turn ends
+  if (!sv.item || !canUseItems(st, s) || st.itemLock === s) return []
   const survivorTurn = st.phase === 'survivors' && st.activeSurvivor !== null
   const ownTurn = survivorTurn && st.activeSurvivor === s
   const gens = propsIn(st, sv.room).filter((p) => p.kind === 'generator' && p.revealed)
@@ -475,7 +539,7 @@ export function itemUses(st: GameState, s: number): ItemUse[] {
       if (survivorTurn) for (const t of onBoardIn(st, sv.room)) if (st.survivors[t].wounded) out.push({ k: 'heal', target: t })
       break
     case 'firecracker':
-      for (const p of touchingPaths(st, sv.room)) if (st.paths[p.id].wall) out.push({ k: 'wall', path: p.id })
+      for (const path of touchingTokens(st, sv.room)) if (pathState(st, path).wall) out.push({ k: 'wall', path })
       break
     case 'map':
       if (survivorTurn) out.push({ k: 'reveal', props: [] }, { k: 'draw' })
@@ -491,7 +555,7 @@ export function itemUses(st: GameState, s: number): ItemUse[] {
 /** Survivors who may re-roll a die with a key (p.16; keys are "any time"). */
 export function rerollers(st: GameState): number[] {
   if (st.step.t !== 'roll' || st.step.dice.every((d) => d.rerolled)) return []
-  return st.survivors.flatMap((sv, i) => (sv.status === 'board' && sv.item && sv.item in KEY_BP ? [i] : []))
+  return st.survivors.flatMap((sv, i) => (sv.status === 'board' && sv.item && sv.item in KEY_BP && st.itemLock !== i ? [i] : []))
 }
 
 // ---------- apply ----------
@@ -599,9 +663,11 @@ function handle(st: GameState, a: Action) {
     case 'planKiller': {
       if (a.t !== 'planKiller') break
       const [l, r] = a.cards
-      if (a.cards.length !== 2 || l === r || !st.killer.hand.includes(l) || !st.killer.hand.includes(r)) fail('pick 2 different cards')
+      // two copies of one card only with The Blight's doubled hand
+      const left = a.cards.length === 2 ? takeCards(st.killer.hand, [l, r]) : null
+      if (!left) fail('pick 2 cards from the hand')
       st.killer.planned = [l, r]
-      st.killer.hand = st.killer.hand.filter((c) => c !== l && c !== r)
+      st.killer.hand = left
       log(st, 'วางแผนเสร็จ ทุกคนวางการ์ดคว่ำแล้ว', 'game')
       const first = turnOrder(st).find((i) => st.survivors[i].planned)
       st.queue.push({ k: 'trigger', w: { k: 'planningEnd' }, done: [] })
@@ -640,7 +706,10 @@ function handle(st: GameState, a: Action) {
       if (a.t !== 'interact' || !step.canInteract) break
       const i = a.i as SurvivorInteraction
       if (!survivorInteractions(st, step.s).some((o) => same(o, i))) fail('not a legal interaction')
+      // Desperate Measures comes after the interaction and everything it sets off.
+      const before = st.queue.length
       survivorInteract(st, step.s, i)
+      if (!step.survivalOnly) trigger(st, { k: 'afterSurvivorInteract', s: step.s }, st.queue.length - before)
       return
     }
     case 'bonusOffer': {
@@ -654,8 +723,10 @@ function handle(st: GameState, a: Action) {
     case 'keepItem': {
       if (a.t !== 'keepItem') break
       const sv = st.survivors[step.s]
+      const dropped = a.keep === 'new' ? sv.item! : step.drawn
       if (a.keep === 'new') sv.item = step.drawn
       log(st, `${sv.name} เก็บ ${ITEM_NAMES[sv.item!]}`, step.s)
+      discardItem(st, step.s, dropped, false)
       return
     }
     case 'roll': {
@@ -672,11 +743,19 @@ function handle(st: GameState, a: Action) {
       killerMove(st, a, m.path, m.to)
       return
     }
+    case 'twinChoice': {
+      if (a.t !== 'twin') break
+      if (a.victor) {
+        twinSwap(st)
+        log(st, `${st.killer.name} เล่นเทิร์นนี้ด้วย Victor`, 'killer')
+      } else log(st, `${st.killer.name} เล่นเทิร์นนี้ด้วย Charlotte`, 'killer')
+      return
+    }
     case 'killerInteract': {
       if (a.t === 'endTurn') return
       if (a.t !== 'interact' || !step.canInteract) break
       const i = a.i as KillerInteraction
-      const legal = killerInteractions(st).filter((o) => !step.powerOnly || isPower(o))
+      const legal = killerInteractions(st, step).filter((o) => !step.powerOnly || isPower(o))
       if (!legal.some((o) => same(o, i))) fail('not a legal interaction')
       killerInteract(st, i, a.reacted === true, step.turn)
       return
@@ -721,8 +800,9 @@ function handle(st: GameState, a: Action) {
       }
       if (!step.holders.includes(a.s)) fail('cannot react')
       const sv = st.survivors[a.s]
-      emit(st, { k: 'item', s: a.s, item: sv.item! }, a.s)
-      sv.item = null
+      const used = sv.item!
+      emit(st, { k: 'item', s: a.s, item: used }, a.s)
+      discardItem(st, a.s, used, true)
       st.canInteract = false
       if (step.item === 'firecracker') log(st, `${sv.name} ใช้ Firecracker — ${st.killer.name} เข้าห้องไม่ได้ และเสียการ Interact`, a.s)
       else log(st, `${sv.name} ใช้ Flashlight — กัน Interaction ของ ${st.killer.name}`, a.s)
@@ -734,12 +814,14 @@ function handle(st: GameState, a: Action) {
     case 'sparkChoice': {
       if (a.t !== 'spark') break
       const sv = st.survivors[step.s]
+      const what = step.grip ? "Dragon's Grip" : "Carter's Spark"
       if (a.pay) {
         if (sv.bp < 1) fail('no ▲ to pay')
         sv.bp--
-        log(st, `${sv.name} จ่าย 1 ▲ กัน Carter's Spark`, step.s)
-      } else sparkHit(st, step.s)
-      return sparkNext(st, step.rest)
+        log(st, `${sv.name} จ่าย 1 ▲ กัน ${what}`, step.s)
+      } else if (step.grip) wound(st, step.s, 'power', `${sv.name} โดน Dragon's Grip — บาดเจ็บ`)
+      else sparkHit(st, step.s)
+      return sparkNext(st, step.rest, step.grip)
     }
     case 'phantasmChoice': {
       if (a.t !== 'phantasm') break
@@ -790,7 +872,8 @@ function handle(st: GameState, a: Action) {
 /** The step a reaction interrupted, so the pending action can be replayed. */
 function reactedStep(st: GameState, step: Extract<Step, { t: 'reaction' }>): Step {
   const turn = st.killer.revealedCount - 1
-  if (step.pending.t === 'move') return { t: 'killerMove', turn, card: st.killer.planned[turn] as PathKind }
+  // The Blight's power moves with the card it drew, not the planned one.
+  if (step.pending.t === 'move') return { t: 'killerMove', turn, card: st.rushCard ?? (st.killer.planned[turn] as PathKind), ...(st.rushCard ? { rush: true } : {}) }
   return { t: 'killerInteract', turn, canInteract: true, powerOnly: false }
 }
 
@@ -825,6 +908,13 @@ function runTask(st: GameState, task: Task) {
       st.queue.unshift({ k: 'trigger', w: { k: 'cardMove', s: task.s, card: task.card }, done: [] }, { k: 'doMove', s: task.s, card: task.card })
       return
     case 'doMove':
+      // Deception (Élodie): she stays, gives up the interaction, and gains a ▲.
+      if (st.deception) {
+        st.deception = false
+        st.canInteract = false
+        log(st, `${st.survivors[task.s].name} อยู่ห้องเดิม (Deception) — Interact ไม่ได้เทิร์นนี้`, task.s)
+        return
+      }
       if (st.moveBlocked) {
         st.moveBlocked = false
         st.canInteract = true
@@ -843,7 +933,7 @@ function runTask(st: GameState, task: Task) {
         st.itemBlocked = false
         const sv = st.survivors[task.s]
         log(st, `${sv.name} ทำ ${ITEM_NAMES[sv.item!]} เสียเปล่า (Overwhelming Presence)`, task.s)
-        sv.item = null
+        discardItem(st, task.s, sv.item!, false)
         return
       }
       if (st.survivors[task.s].item) applyItem(st, task.s, task.use)
@@ -893,8 +983,10 @@ function runTask(st: GameState, task: Task) {
     }
     case 'endSurvivorTurn': {
       st.activeSurvivor = null
+      st.itemLock = null
+      st.deception = false
       if (st.evadedWall) {
-        st.paths[st.evadedWall].wall = true
+        pathState(st, st.evadedWall).wall = true
         log(st, 'กำแพงกลับเข้าที่ (Urban Evasion)', 'game')
         st.evadedWall = null
       }
@@ -914,16 +1006,22 @@ function runTask(st: GameState, task: Task) {
         st.queue.unshift({ k: 'trigger', w: { k: 'killerTurnBegin', turn: task.turn }, done: [] }, { ...task, begun: true })
         return
       }
+      // The Twins' passive: with Victor on the board, the turn may be taken with him.
+      if (!task.chosen && k.characterId === 'twins' && k.victorRoom) {
+        st.queue.unshift({ ...task, chosen: true })
+        wait(st, { t: 'twinChoice', turn: task.turn })
+        return
+      }
       const card = k.planned[task.turn]
       k.revealedCount = task.turn + 1
       st.canInteract = true
       st.queue.unshift({ k: 'killerInteract', turn: task.turn }, { k: 'endKillerTurn', turn: task.turn, extra: task.extra })
       if (card === 'wait') {
-        log(st, `${k.name} เปิด Wait — อยู่กับที่`, 'killer')
+        log(st, `${actorName(st)} เปิด Wait — อยู่กับที่`, 'killer')
         return
       }
       if (killerMoves(st, card).length === 0) {
-        log(st, `${k.name} เปิด ${CARD_NAMES[card]} แต่ไม่มีเส้นทาง — เสียการ Interact`, 'killer')
+        log(st, `${actorName(st)} เปิด ${CARD_NAMES[card]} แต่ไม่มีเส้นทาง — เสียการ Interact`, 'killer')
         st.canInteract = false
         return
       }
@@ -931,15 +1029,31 @@ function runTask(st: GameState, task: Task) {
       return
     }
     case 'killerInteract': {
-      wait(st, { t: 'killerInteract', turn: task.turn, canInteract: st.canInteract })
+      // Power Struggle: no interaction after moving with the first card.
+      const struggled = task.turn === 0 && st.struggle === true
+      if (struggled && st.canInteract) log(st, `${actorName(st)} Interact ไม่ได้เทิร์นนี้ (Power Struggle)`, 'killer')
+      wait(st, { t: 'killerInteract', turn: task.turn, canInteract: st.canInteract && !struggled })
       return
     }
+    case 'rushArrive':
+      // Blighted Corruption: entered a new room — interact there, or use the power again.
+      st.rushCard = null
+      if (st.killer.room !== task.from && st.canInteract) wait(st, { t: 'killerInteract', turn: task.turn, canInteract: true, rush: true })
+      return
     case 'endKillerTurn': {
       const k = st.killer
+      // A turn taken with Victor ends: Charlotte is "the Killer" again.
+      if (k.asVictor) twinSwap(st)
+      st.itemLock = null
+      // Coup de Grâce comes at the end of the turn, before the next one.
+      if (!task.ended) {
+        st.queue.unshift({ k: 'trigger', w: { k: 'killerTurnEnd', turn: task.turn }, done: [] }, { ...task, ended: true })
+        return
+      }
       if (task.extra) return // Devour Hope's turn: cleanup is already queued
       if (task.turn === 0) st.queue.unshift({ k: 'killerTurn', turn: 1 })
-      // Shadowborn placed a third card at the end of planning.
-      else if (task.turn === 1 && k.planned.length > 2) st.queue.unshift({ k: 'killerTurn', turn: 2 })
+      // Shadowborn placed a third card at the end of planning (or Coup de Grâce added one).
+      else if (task.turn + 1 < k.planned.length) st.queue.unshift({ k: 'killerTurn', turn: task.turn + 1 })
       else if (task.turn === 1 && !k.bonusUsed && k.bp >= bonusCost(st) && k.hand.length > 0) wait(st, { t: 'killerBonusOffer' })
       else queueCleanup(st)
       return
@@ -1025,16 +1139,20 @@ function moveSurvivor(st: GameState, s: number, path: PathDef, to: string) {
   }
   // For the People, once the room is revealed.
   if (sv.status === 'board') trigger(st, { k: 'entered', s }, after)
-  if (st.paths[path.id].trap) {
+  if (pathState(st, path.id).trap) {
     log(st, `${sv.name} เดินผ่าน Bear Trap — ทอย Danger Die`, s)
     startRoll(st, { k: 'trap', s, path: path.id }, 1, 'danger')
   }
 }
 
 /** Entering a space reveals one face-down prop (p.8); the player picks which tile. */
-function revealOnEnter(st: GameState, room: string, who: number | 'killer') {
+/** `asked`: Visionary was offered already (and passed). */
+function revealOnEnter(st: GameState, room: string, who: number | 'killer', asked = false) {
   const hidden = propsIn(st, room).filter((p) => !p.revealed)
   if (hidden.length === 0) return
+  // Visionary (Felix): reveal a prop in a connected room instead.
+  if (!asked && who !== 'killer' && perkChoices(st, 'visionary', who, { k: 'beforeReveal', s: who, room }).length && !st.perksMuted.includes(`${who}:visionary`))
+    return wait(st, { t: 'offer', perk: 'visionary', owner: who, w: { k: 'beforeReveal', s: who, room } })
   // Tiles of one colour are indistinguishable face down, so only a choice of colour matters.
   if (new Set(hidden.map((p) => p.category)).size === 1) return revealProp(st, hidden[0], who)
   wait(st, { t: 'revealProp', who, room })
@@ -1049,6 +1167,18 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction) {
   const sv = st.survivors[s]
   const prop = 'prop' in i ? st.props.find((p) => p.id === i.prop)! : null
   switch (i.k) {
+    case 'removeVictor':
+      st.killer.victorRoom = null
+      log(st, `${sv.name} ไล่ Victor ออกจากกระดาน`, s)
+      return
+    case 'powerStruggle': {
+      const k = st.killer
+      payPerk(st, s, 'power_struggle', `เปิดการ์ดใบแรกของ ${k.name}: ${CARD_NAMES[k.planned[0]]} — Interact ไม่ได้หลังเดินใบนี้`)
+      if (!k.shown.includes(0)) k.shown.push(0)
+      st.struggle = true
+      gainKiller(st, 2)
+      return
+    }
     case 'rummage': {
       prop!.removed = true
       trigger(st, { k: 'afterRummage', s, prop: prop!.id })
@@ -1126,7 +1256,7 @@ function killerMove(st: GameState, a: Extract<Action, { t: 'move' }>, path: Path
       return wait(st, { t: 'offer', perk: 'enduring', owner: 'killer', w: { k: 'palletBlock', path: path.id, to } })
     return palletStop(st, path.id)
   }
-  const holders = onBoardIn(st, to).filter((i) => st.survivors[i].item === 'firecracker')
+  const holders = onBoardIn(st, to).filter((i) => st.survivors[i].item === 'firecracker' && st.itemLock !== i)
   if (holders.length > 0 && !a.reacted) {
     wait(st, { t: 'reaction', item: 'firecracker', holders, pending: { t: 'move', path: path.id } })
     return
@@ -1143,9 +1273,9 @@ function palletStop(st: GameState, path: string) {
 }
 
 function finishKillerMove(st: GameState, path: PathDef, to: string) {
-  const wall = st.paths[path.id].wall
+  const wall = pathState(st, path.id).wall
   if (wall) {
-    st.paths[path.id].wall = false
+    pathState(st, path.id).wall = false
     log(st, `${st.killer.name} ทุบกำแพง`, 'killer', { ev: { k: 'wallBreak', path: path.id } })
   }
   killerEnter(st, path.id, to)
@@ -1158,7 +1288,7 @@ function killerEnter(st: GameState, path: string, to: string) {
   const k = st.killer
   const from = k.room
   k.room = to
-  log(st, `${k.name} → ${roomName(st, to)}`, 'killer', { ev: { k: 'move', who: 'killer', from, to, path } })
+  log(st, `${actorName(st)} → ${roomName(st, to)}`, 'killer', { ev: { k: 'move', who: k.asVictor ? 'victor' : 'killer', from, to, path } })
   st.queue.unshift({ k: 'reveal', room: to, who: 'killer' }, { k: 'trigger', w: { k: 'killerEntered', room: to }, done: [] })
 }
 
@@ -1166,7 +1296,7 @@ function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, t
   const k = st.killer
   if (isPower(i)) return usePower(st, i)
   {
-    const holders = onBoardIn(st, k.room).filter((s) => st.survivors[s].item === 'flashlight')
+    const holders = onBoardIn(st, k.room).filter((s) => st.survivors[s].item === 'flashlight' && st.itemLock !== s)
     if (holders.length > 0 && !reacted) {
       wait(st, { t: 'reaction', item: 'flashlight', holders, pending: { t: 'interact', i } })
       return
@@ -1198,7 +1328,7 @@ function doKillerInteraction(st: GameState, i: KillerInteraction) {
   switch (i.k) {
     case 'search': {
       const s = prop!.occupant!
-      log(st, `${k.name} ค้น Locker — ${st.survivors[s].name} ทอย Skill Check`, 'killer')
+      log(st, `${actorName(st)} ค้น Locker — ${st.survivors[s].name} ทอย Skill Check`, 'killer')
       return startCheck(st, { k: 'search', s, prop: prop!.id })
     }
     case 'scout':
@@ -1207,22 +1337,38 @@ function doKillerInteraction(st: GameState, i: KillerInteraction) {
       log(st, `${k.name} ไล่ Crow (+1 ▲)`, 'killer')
       return
     case 'damage':
-      trigger(st, { k: 'killerBreak', what: 'damage' })
+      trigger(st, { k: 'killerBreak', what: 'damage', prop: prop!.id })
       prop!.progress = 0
-      log(st, `${k.name} ทำลายความคืบหน้า Generator`, 'killer', { ev: { k: 'damage', prop: prop!.id } })
+      log(st, `${actorName(st)} ทำลายความคืบหน้า Generator`, 'killer', { ev: { k: 'damage', prop: prop!.id } })
       return
     case 'venerate':
       gainKiller(st, 2)
       log(st, `${k.name} บูชา Hex Totem (+2 ▲)`, 'killer')
       return
     case 'attack':
-      wound(st, i.target, 'attack', `${k.name} โจมตี ${st.survivors[i.target].name} — บาดเจ็บ`)
+      wound(st, i.target, 'attack', `${actorName(st)} โจมตี ${st.survivors[i.target].name} — บาดเจ็บ`)
       // Brutal Strength, Agitation.
       trigger(st, { k: 'afterAttack', target: i.target })
       return
     case 'pickUp':
+      // The Twins: Victor can't carry — a pick-up by him is worth a ▲ instead.
+      if (k.asVictor) {
+        gainKiller(st, 1)
+        log(st, `Victor จะอุ้ม ${st.survivors[i.target].name} — ได้ +1 ▲ แทน`, 'killer')
+        return
+      }
       log(st, `${k.name} อุ้ม ${st.survivors[i.target].name}`, 'killer', { ev: { k: 'pickUp', s: i.target } })
       return pickUp(st, i.target)
+    case 'hoard':
+      payPerk(st, 'killer', 'hoarder', 'นำ Chest ออก +2 ▲')
+      prop!.removed = true
+      gainKiller(st, 2)
+      return
+    case 'undying': {
+      payPerk(st, 'killer', 'undying', `ทิ้ง ${CARD_NAMES[i.card]}`)
+      k.hand.splice(k.hand.indexOf(i.card), 1)
+      return doKillerInteraction(st, i.i)
+    }
     default:
       return
   }
@@ -1318,6 +1464,12 @@ function gainSurvivor(st: GameState, s: number, n: number) {
 function cleanup(st: GameState) {
   st.phase = 'cleanup'
   const hooked = st.survivors.filter((s) => s.status === 'hooked').length
+  // Blood Favour (The Blight), at the start of cleanup: everyone wounded, nobody on a hook.
+  if (hooked === 0 && st.survivors.every((s) => s.wounded) && perkReady(st, 'killer', 'blood_favour')) {
+    payPerk(st, 'killer', 'blood_favour', 'ทุกคนบาดเจ็บ ไม่มีใครบน Hook — Sacrifice +1')
+    addSacrifice(st, 1)
+    if (st.step.t === 'gameOver') return
+  }
   if (hooked > 0) addSacrifice(st, hooked)
   if (st.step.t === 'gameOver') return
   if (hooked === 0 && perkReady(st, 'killer', 'monitor_and_abuse')) {
@@ -1333,8 +1485,8 @@ function cleanup(st: GameState) {
     sv.acted = false
     sv.woundedThisRound = false
   }
-  Object.assign(st.killer, { hand: [...KILLER_CARDS], planned: [], revealedCount: 0, plannedShown: false, powerUsed: false, bonusUsed: false, shown: [] })
-  Object.assign(st, { perksUsed: [], perksMuted: [], moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null })
+  Object.assign(st.killer, { hand: killerDeck(st.killer.characterId), planned: [], revealedCount: 0, plannedShown: false, powerUsed: false, bonusUsed: false, shown: [] })
+  Object.assign(st, { perksUsed: [], perksMuted: [], moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, rushCard: null })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
   startPlanning(st)
@@ -1374,7 +1526,7 @@ function reroll(st: GameState, s: number, die: number) {
   const sv = st.survivors[s]
   emit(st, { k: 'item', s, item: sv.item! }, s)
   log(st, `${sv.name} ทิ้ง ${ITEM_NAMES[sv.item!]} ทอยใหม่`, s)
-  sv.item = null
+  discardItem(st, s, sv.item!, true)
   step.dice[die] = { ...rollDie(st, d.kind), rerolled: true }
   if (rollSettled(st)) {
     st.step = { t: 'idle' }
@@ -1480,7 +1632,7 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
       return
     case 'trap': {
       if (ok) return
-      st.paths[ctx.path].trap = false
+      pathState(st, ctx.path).trap = false
       st.killer.trapsInSupply++
       if (sv.wounded) {
         log(st, `${sv.name} ติด Bear Trap ขณะบาดเจ็บ — Sacrifice +1`, 'killer', { ev: { k: 'trapSprung', s, path: ctx.path } })
@@ -1500,6 +1652,12 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
         locker.occupant = null
         sv.status = 'board'
         log(st, `${sv.name} รอด — Locker ถูกนำออก`, s)
+        return
+      }
+      // The Twins: Victor can't pick up — the survivor stays hidden and he gains a ▲.
+      if (st.killer.asVictor) {
+        gainKiller(st, 1)
+        log(st, `Victor เจอ ${sv.name} ใน Locker แต่อุ้มไม่ได้ — +1 ▲`, 'killer')
         return
       }
       log(st, `${st.killer.name} ลาก ${sv.name} ออกจาก Locker`, 'killer', { ev: { k: 'pickUp', s } })
@@ -1548,10 +1706,21 @@ function useItem(st: GameState, s: number, use: ItemUse) {
   applyItem(st, s, use)
 }
 
+/**
+ * A survivor's item goes to the discard. `used`: discarded after using it, so Built to Last may
+ * keep it (asked first); then Appraisal may take it. Items whose use draws a new one (Map's draw,
+ * Commodious Toolbox) can't be kept.
+ */
+function discardItem(st: GameState, s: number, item: string, used: boolean) {
+  if (st.survivors[s].item === item) st.survivors[s].item = null
+  trigger(st, { k: 'itemDiscard', s, item })
+  if (used) trigger(st, { k: 'itemUsed', s, item })
+}
+
 function applyItem(st: GameState, s: number, use: ItemUse) {
   const sv = st.survivors[s]
   const item = sv.item!
-  sv.item = null
+  discardItem(st, s, item, use.k !== 'draw' && item !== 'commodious_toolbox')
   const name = ITEM_NAMES[item]
   emit(st, { k: 'item', s, item }, s)
   switch (use.k) {
@@ -1569,7 +1738,7 @@ function applyItem(st: GameState, s: number, use: ItemUse) {
       makeHealthy(st, use.target, `${sv.name} ใช้ ${name} — ${st.survivors[use.target].name} หายบาดเจ็บ`, s)
       return
     case 'wall':
-      st.paths[use.path].wall = false
+      pathState(st, use.path).wall = false
       log(st, `${sv.name} ใช้ ${name} ทำลายกำแพง`, s, { ev: { k: 'wallBreak', path: use.path } })
       return
     case 'reveal': {
@@ -1678,7 +1847,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return [] // automatic, see makeHealthy
     // ----- The Huntress -----
     case 'huntress_lullaby':
-      if (w.k !== 'cardMove' || !k.hand.includes(w.card)) return []
+      if (w.k !== 'cardMove' || !k.hand.includes(w.card) || st.deception) return []
       return survivorMoves(st, w.s, w.card).length ? NONE : []
     case 'beast_of_prey':
       if (w.k !== 'planningStart') return []
@@ -1824,13 +1993,13 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     case 'balanced_landing': {
       if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract) return []
       return touchingPaths(st, me!.room)
-        .filter((p) => !st.paths[p.id].wall)
+        .filter((p) => !pathState(st, p.id).wall)
         .map((p) => ({ path: p.id }))
     }
     case 'urban_evasion':
       if (w.k !== 'turnBegin' || st.evadedWall) return []
       return Object.keys(st.paths)
-        .filter((id) => st.paths[id].wall)
+        .filter((id) => pathState(st, id).wall)
         .map((path) => ({ path }))
     case 'streetwise':
       return w.k === 'afterRummage' && w.s === o ? NONE : []
@@ -1879,7 +2048,66 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     }
     case 'off_the_record':
       return w.k === 'rollFail' && w.fails > 0 && inRange(st, me!.room, st.survivors[w.s].room) ? NONE : []
+    // ----- The Twins -----
+    case 'coup_de_grace':
+      return w.k === 'killerTurnEnd' && !k.bonusUsed ? NONE : []
+    case 'hoarder':
+      return [] // an interaction, see killerInteractions
+    case 'oppression': {
+      if (w.k !== 'killerBreak' || w.what !== 'damage') return []
+      const gens = st.props.filter((p) => p.kind === 'generator' && p.revealed && !p.done && !p.removed && p.progress > 0 && p.id !== w.prop)
+      const out: PerkChoice[] = gens.map((g) => ({ prop: g.id }))
+      gens.forEach((a2, i) => gens.slice(i + 1).forEach((b) => out.push({ prop: a2.id, prop2: b.id })))
+      return out
+    }
+    // ----- The Blight -----
+    case 'blood_favour':
+      return [] // automatic, see cleanup
+    case 'dragons_grip': {
+      if (w.k !== 'killerBreak' || w.what !== 'damage' || !w.prop) return []
+      const room = st.props.find((p) => p.id === w.prop)!.room!
+      const cards = k.hand.filter((c) => c !== 'wait')
+      const sets: MoveCard[][] = [...new Set(cards)].map((c) => [c])
+      ;[...new Set(cards)].forEach((a2, i, all) =>
+        all.slice(i).forEach((b) => (a2 !== b || cards.filter((c) => c === a2).length > 1) && sets.push([a2, b])),
+      )
+      return sets.filter((set) => gripTargets(st, room, set).length).map(([card, card2]) => ({ card, ...(card2 ? { card2 } : {}) }))
+    }
+    case 'undying':
+      return [] // an interaction, see killerInteractions
+    // ----- Élodie -----
+    case 'power_struggle':
+      return [] // an interaction, see survivorInteractions
+    case 'appraisal':
+      return w.k === 'itemDiscard' && w.s !== o && st.survivors[w.s].item !== w.item ? NONE : []
+    case 'deception':
+      return w.k === 'cardMove' && w.s === o && st.activeSurvivor === o ? NONE : []
+    // ----- Felix -----
+    case 'desperate_measures':
+      if (w.k !== 'afterSurvivorInteract' || w.s !== o || st.activeSurvivor !== o || me!.status !== 'board') return []
+      return allSurvivorInteractions(st, o).some((i) => 'prop' in i && st.props.find((p) => p.id === i.prop)!.category === 'survival') ? NONE : []
+    case 'visionary': {
+      if (w.k !== 'beforeReveal' || w.s !== o) return []
+      // one face-down tile per colour and room: which tile of a colour is flipped doesn't matter
+      const seen = new Set<string>()
+      const out: PerkChoice[] = []
+      for (const r of connectedRooms(st, w.room))
+        for (const p of propsIn(st, r))
+          if (!p.revealed && !seen.has(`${r}:${p.category}`)) {
+            seen.add(`${r}:${p.category}`)
+            out.push({ prop: p.id })
+          }
+      return out
+    }
+    case 'built_to_last':
+      return w.k === 'itemUsed' && w.s === o && me!.item === null ? NONE : []
   }
+}
+
+/** Dragon's Grip: healthy survivors in rooms joined to `room` by a path of one of `cards`' colours. */
+function gripTargets(st: GameState, room: string, cards: MoveCard[]): number[] {
+  const rooms = new Set(touchingPaths(st, room).filter((p) => cards.includes(p.kind)).map((p) => (p.a === room ? p.b : p.a)))
+  return st.survivors.flatMap((sv, i) => (sv.status === 'board' && !sv.wounded && rooms.has(sv.room) ? [i] : []))
 }
 
 /** Owners asked in a window: survivors in turn order, then the killer (p.16). */
@@ -1997,8 +2225,8 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
         pallet.removed = true
         log(st, 'Pallet พัง', 'killer', { ev: { k: 'palletBreak', path: e.path.id } })
       }
-      if (st.paths[e.path.id].wall) {
-        st.paths[e.path.id].wall = false
+      if (pathState(st, e.path.id).wall) {
+        pathState(st, e.path.id).wall = false
         log(st, 'กำแพงพัง', 'killer', { ev: { k: 'wallBreak', path: e.path.id } })
       }
       return moveSurvivor(st, t, e.path, e.to)
@@ -2007,8 +2235,8 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     case 'beast_of_prey': {
       const e = exits(st, k.room, 'any').find((x) => x.path.id === c.path)!
       payPerk(st, o, perk)
-      if (st.paths[e.path.id].wall) {
-        st.paths[e.path.id].wall = false
+      if (pathState(st, e.path.id).wall) {
+        pathState(st, e.path.id).wall = false
         log(st, `${k.name} ทุบกำแพง`, 'killer', { ev: { k: 'wallBreak', path: e.path.id } })
       }
       return killerEnter(st, e.path.id, e.to)
@@ -2197,7 +2425,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     }
     case 'urban_evasion':
       payPerk(st, o, perk, 'เอากำแพงออกชั่วคราว')
-      st.paths[c.path!].wall = false
+      pathState(st, c.path!).wall = false
       st.evadedWall = c.path!
       return
     case 'streetwise': {
@@ -2273,10 +2501,67 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       gainSurvivor(st, o as number, 1)
       return
     }
+    case 'coup_de_grace': {
+      // a bonus turn with the card just played, right after this turn
+      const turn = (w as Extract<PerkWindow, { k: 'killerTurnEnd' }>).turn
+      const card = k.planned[turn]
+      payPerk(st, o, perk, `Bonus Turn ด้วย ${CARD_NAMES[card]} อีกครั้ง`)
+      k.planned.splice(turn + 1, 0, card)
+      k.shown = k.shown.map((i) => (i > turn ? i + 1 : i))
+      k.bonusUsed = true
+      return
+    }
+    case 'oppression': {
+      const gens = [c.prop!, c.prop2].filter((x): x is string => !!x).map((id) => st.props.find((p) => p.id === id)!)
+      payPerk(st, o, perk, gens.map((g) => `Generator ที่ ${roomName(st, g.room!)} −1`).join(', '))
+      for (const g of gens) g.progress--
+      return
+    }
+    case 'dragons_grip': {
+      const room = st.props.find((p) => p.id === (w as Extract<PerkWindow, { k: 'killerBreak' }>).prop)!.room!
+      const cards = [c.card!, ...(c.card2 ? [c.card2] : [])] as PathKind[]
+      payPerk(st, o, perk, `ทิ้ง ${cards.map((x) => CARD_NAMES[x]).join(' + ')}`)
+      for (const x of cards) k.hand.splice(k.hand.indexOf(x), 1)
+      const order = turnOrder(st)
+      return sparkNext(st, gripTargets(st, room, cards).sort((a2, b) => order.indexOf(a2) - order.indexOf(b)), true)
+    }
+    case 'appraisal': {
+      const { s, item } = w as Extract<PerkWindow, { k: 'itemDiscard' }>
+      const me = st.survivors[o as number]
+      const old = me.item
+      payPerk(st, o, perk, `รับ ${ITEM_NAMES[item]} ที่ ${name(s)} ทิ้ง${old ? ` แล้วทิ้ง ${ITEM_NAMES[old]} ของตัวเอง` : ''}`)
+      me.item = item
+      return
+    }
+    case 'deception':
+      payPerk(st, o, perk, 'อยู่ห้องเดิม +1 ▲')
+      st.deception = true
+      gainSurvivor(st, o as number, 1)
+      return
+    case 'desperate_measures':
+      payPerk(st, o, perk, 'Interact อีกครั้ง (Chest / Locker)')
+      wait(st, { t: 'survivorInteract', s: o as number, canInteract: true, survivalOnly: true })
+      return
+    case 'visionary': {
+      const p = st.props.find((x) => x.id === c.prop)!
+      payPerk(st, o, perk, `เปิด prop ที่ ${roomName(st, p.room!)} แทน`)
+      return revealProp(st, p, o)
+    }
+    case 'built_to_last': {
+      const { s, item } = w as Extract<PerkWindow, { k: 'itemUsed' }>
+      payPerk(st, o, perk, `เก็บ ${ITEM_NAMES[item]} ไว้ — ใช้อีกไม่ได้ในเทิร์นนี้`)
+      st.survivors[s].item = item
+      st.itemLock = s
+      return
+    }
     case 'monitor_and_abuse':
     case 'bloodhound':
     case 'nurses_calling':
     case 'calm_spirit':
+    case 'hoarder':
+    case 'blood_favour':
+    case 'undying':
+    case 'power_struggle':
       return
   }
 }
@@ -2292,6 +2577,8 @@ function selfWound(st: GameState, s: number) {
 /** Saying no to a perk that interrupted something: carry on as without it. */
 function declinePerk(st: GameState, perk: PerkId, w: PerkWindow) {
   if (perk === 'enduring' && w.k === 'palletBlock') palletStop(st, w.path)
+  // Visionary passed: reveal in the room entered, as usual
+  if (perk === 'visionary' && w.k === 'beforeReveal') revealOnEnter(st, w.room, w.s, true)
 }
 
 /** Wounded → healthy, from any source; A Nurse's Calling pays the killer (once per round). */
@@ -2318,7 +2605,35 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
 // ---------- killer powers ----------
 
 export function isPower(i: KillerInteraction): boolean {
-  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer'].includes(i.k)
+  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush'].includes(i.k)
+}
+
+// ---------- The Twins ----------
+
+/** Where Charlotte (the killer's mini) stands, also during a turn taken with Victor. */
+export function charlotteRoom(st: GameState): string {
+  const k = st.killer
+  return k.asVictor ? k.victorRoom! : k.room
+}
+
+/** Where Victor stands, or null when he isn't on the board. */
+export function victorRoom(st: GameState): string | null {
+  const k = st.killer
+  return k.asVictor ? k.room : (k.victorRoom ?? null)
+}
+
+/** Hand "the Killer" over between Charlotte and Victor (their rooms swap places in the state). */
+function twinSwap(st: GameState) {
+  const k = st.killer
+  const other = k.victorRoom!
+  k.victorRoom = k.room
+  k.room = other
+  k.asVictor = !k.asVictor
+}
+
+/** Who acts as the killer now, for the log. */
+function actorName(st: GameState): string {
+  return st.killer.asVictor ? 'Victor' : st.killer.name
 }
 
 /** Yamaoka's Wrath: wounded survivors and Hex Totems in The Oni's room and connected rooms. */
@@ -2337,7 +2652,7 @@ export function redeemerTargets(st: GameState): number[] {
   const k = st.killer
   return st.survivors.flatMap((sv, i) => {
     if (sv.status !== 'board' || !sv.wounded || sv.woundedThisRound || sv.room === k.room) return []
-    const clear = touchingPaths(st, k.room).some((p) => (p.a === sv.room || p.b === sv.room) && !st.paths[p.id].wall && !palletOn(st, p.id))
+    const clear = touchingPaths(st, k.room).some((p) => (p.a === sv.room || p.b === sv.room) && !pathState(st, p.id).wall && !palletOn(st, p.id))
     return clear ? [i] : []
   })
 }
@@ -2362,6 +2677,12 @@ export function powerOptions(st: GameState): KillerInteraction[] {
       const rooms = [k.room, ...connectedRooms(st, k.room)]
       return rooms.filter((r) => onBoardIn(st, r).length).map((room) => ({ k: 'spark' as const, room }))
     }
+    case 'twins':
+      // Blood Bond: Victor into Charlotte's room (not on a turn taken with Victor).
+      return k.asVictor || k.victorRoom === k.room ? [] : [{ k: 'victor' }]
+    case 'blight':
+      // Blighted Corruption: needs a card to discard.
+      return k.hand.length ? [{ k: 'rush' }] : []
     case 'oni':
       // Yamaoka's Wrath: worth using only when it gains something.
       return wrathGain(st) > 0 ? [{ k: 'wrath' }] : []
@@ -2394,14 +2715,32 @@ export function powerOptions(st: GameState): KillerInteraction[] {
   return []
 }
 
+/**
+ * Blighted Corruption: a card from the shuffled hand, at random, is discarded and the Blight
+ * moves along its path; entering a room, he may interact there or go again (rushArrive).
+ */
+function blightRush(st: GameState) {
+  const k = st.killer
+  const card = k.hand.splice(Math.floor(random(st) * k.hand.length), 1)[0] as PathKind
+  const moves = killerMoves(st, card)
+  if (!moves.length) {
+    log(st, `${k.name} ใช้ Blighted Corruption สุ่มได้ ${CARD_NAMES[card]} — ไม่มีเส้นทาง จบพลัง`, 'killer')
+    return
+  }
+  log(st, `${k.name} ใช้ Blighted Corruption สุ่มได้ ${CARD_NAMES[card]}`, 'killer')
+  st.rushCard = card
+  st.queue.unshift({ k: 'rushArrive', turn: k.revealedCount - 1, from: k.room })
+  wait(st, { t: 'killerMove', turn: k.revealedCount - 1, card, rush: true })
+}
+
 function usePower(st: GameState, i: KillerInteraction) {
   const k = st.killer
   k.powerUsed = true
   switch (i.k) {
     case 'power': {
-      if (i.remove) st.paths[i.remove].trap = false
+      if (i.remove) pathState(st, i.remove).trap = false
       else k.trapsInSupply--
-      st.paths[i.path].trap = true
+      pathState(st, i.path).trap = true
       log(st, `${k.name} วาง Bear Trap${i.remove ? ' (ย้ายจากเส้นทางเดิม)' : ''}`, 'killer', { ev: { k: 'trapSet', path: i.path } })
       return
     }
@@ -2427,6 +2766,12 @@ function usePower(st: GameState, i: KillerInteraction) {
     case 'bell':
       log(st, `${k.name} ตี Wailing Bell`, 'killer')
       return killerEnter(st, '', i.room)
+    case 'victor':
+      log(st, `${k.name} ${k.victorRoom ? 'ย้าย' : 'วาง'} Victor ไปที่ ${roomName(st, k.room)}`, 'killer')
+      k.victorRoom = k.room
+      return
+    case 'rush':
+      return blightRush(st)
     case 'wrath': {
       const n = wrathGain(st)
       log(st, `${k.name} ใช้ Yamaoka's Wrath (+${n} ▲)`, 'killer')
@@ -2450,12 +2795,14 @@ function usePower(st: GameState, i: KillerInteraction) {
 }
 
 /** Carter's Spark, one survivor at a time: those with ▲ choose, the others take it. */
-function sparkNext(st: GameState, list: number[]) {
+/** `grip`: Dragon's Grip — the same choice, but refusing to pay wounds. */
+function sparkNext(st: GameState, list: number[], grip = false) {
   const rest = [...list]
   while (rest.length) {
     const s = rest.shift()!
-    if (st.survivors[s].bp >= 1) return wait(st, { t: 'sparkChoice', s, rest })
-    sparkHit(st, s)
+    if (st.survivors[s].bp >= 1) return wait(st, { t: 'sparkChoice', s, rest, ...(grip ? { grip } : {}) })
+    if (grip) wound(st, s, 'power', `${st.survivors[s].name} โดน Dragon's Grip — บาดเจ็บ`)
+    else sparkHit(st, s)
   }
 }
 
@@ -2493,7 +2840,7 @@ function redeemerGuess(st: GameState, s: number, guess: MoveCard) {
     return
   }
   log(st, `${sv.name} ทาย ${CARD_NAMES[guess]} — ผิด การ์ดคือ ${CARD_NAMES[card]}`, s)
-  const path = touchingPaths(st, k.room).find((p) => (p.a === sv.room || p.b === sv.room) && !st.paths[p.id].wall && !palletOn(st, p.id))
+  const path = touchingPaths(st, k.room).find((p) => (p.a === sv.room || p.b === sv.room) && !pathState(st, p.id).wall && !palletOn(st, p.id))
   const from = sv.room
   sv.room = k.room
   emit(st, { k: 'move', who: s, from, to: k.room, path: path?.id ?? '' }, s)

@@ -8,6 +8,8 @@ import {
   CARD_NAMES,
   ITEM_NAMES,
   bonusCost,
+  charlotteRoom,
+  victorRoom,
   anyMoves,
   carryMoves,
   hookHere,
@@ -35,6 +37,8 @@ import {
   interactionWho,
   killerInteractionLabel,
   killerMini,
+  VICTOR_MINI,
+  iconLabel,
   pathLabel,
   pathName,
   perkChoiceLabel,
@@ -151,6 +155,8 @@ const POWER_HINT: Record<string, string> = {
   hag: 'วาง Phantasm Trap ในห้องนี้ (ห้องละ 1) — มี Hex Totem ในห้องได้ +1 ▲',
   wraith: 'วาร์ปไปห้องที่ไม่เชื่อมกับห้องนี้',
   oni: 'รับ ▲ เท่ากับจำนวนผู้รอดชีวิตที่บาดเจ็บ และ Hex Totem ในห้องนี้กับห้องที่เชื่อมกัน',
+  twins: 'วาง Victor ในห้องนี้ (ถ้าอยู่ที่อื่นจะย้ายมา) — เทิร์นต่อไปเลือกเล่นด้วย Victor ได้',
+  blight: 'สุ่มทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามเส้นทางสีนั้น — เข้าห้องใหม่ได้: Interact ที่นั่น หรือพุ่งต่อ',
 }
 
 const powerFacts = computed(() => (powerMode.value ? (decisionFocus(props.st, true)?.facts ?? []) : []))
@@ -189,7 +195,7 @@ const revealChoices = computed(() => {
 const bonusCards = computed(() => {
   const s = step.value
   if (s.t === 'bonusOffer') return [...new Set(props.st.survivorHands[props.st.survivors[s.s].hand])]
-  if (s.t === 'killerBonusOffer') return props.st.killer.hand
+  if (s.t === 'killerBonusOffer') return [...new Set(props.st.killer.hand)] // The Blight holds two of each
   return []
 })
 
@@ -278,7 +284,7 @@ const rollers = computed(() => rerollers(props.st))
           </button>
         </div>
       <div class="buttons col">
-        <button v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c))" :key="i" class="primary" @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })">
+        <button v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !(step.t === 'offer' && step.perk === 'oppression'))" :key="i" class="primary" @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })">
           <FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, step.perk, step.owner, step.w, c)" />
         </button>
         <button @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้</button>
@@ -301,6 +307,21 @@ const rollers = computed(() => rerollers(props.st))
       <p class="muted">ตัดสินใจที่แผงด้านขวา</p>
     </template>
 
+    <!-- The Twins: who takes this turn -->
+    <template v-else-if="step.t === 'twinChoice'">
+      <p>เทิร์นที่ {{ step.turn + 1 }}: เล่นด้วยใคร? (คลิกที่มินิบนแผนที่ก็ได้)</p>
+      <div class="buttons col">
+        <button class="primary twin" @click="act({ t: 'twin', victor: false })">
+          <Mini class="twin-mini aura-killer" :src="asset(killerMini(st))" alt="" />
+          <span>Charlotte — {{ roomName(st, charlotteRoom(st)) }}</span>
+        </button>
+        <button class="primary twin" @click="act({ t: 'twin', victor: true })">
+          <Mini class="twin-mini aura-killer" :src="asset(VICTOR_MINI)" alt="" />
+          <span>Victor — {{ roomName(st, victorRoom(st)!) }} (อุ้มไม่ได้: จับแล้ว +1 ▲)</span>
+        </button>
+      </div>
+    </template>
+
     <template v-else-if="step.t === 'pickSurvivor'">
       <p>Chainsaw — เลือกผู้รอดชีวิตในห้องที่จะบาดเจ็บ</p>
       <p v-if="step.options.some((s) => !here({ t: 'pick', s }))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกผู้รอดชีวิตที่กระพริบ</p>
@@ -314,7 +335,9 @@ const rollers = computed(() => rerollers(props.st))
       <div class="flip">
         <img :src="asset(cardImage(step.card))" :alt="cardLabel(step.card)" />
         <p>
-          เปิดการ์ด <b>{{ cardLabel(step.card) }}</b><br /><span class="muted">เลือกเส้นทางที่ไฮไลต์บนแผนที่</span>
+          <template v-if="step.t === 'killerMove' && step.rush">Blighted Corruption สุ่มได้ <b>{{ cardLabel(step.card) }}</b></template>
+          <template v-else>เปิดการ์ด <b>{{ cardLabel(step.card) }}</b></template>
+          <br /><span class="muted">เลือกเส้นทางที่ไฮไลต์บนแผนที่</span>
         </p>
       </div>
       <div class="buttons">
@@ -430,7 +453,7 @@ const rollers = computed(() => rerollers(props.st))
               <button v-for="(i, n) in kInteractions.traps.filter((i) => here(powerAct(i)))" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
             </template>
             <template v-else>
-              <button v-for="p in trapTargets" :key="p" @click="emit('trapPath', p)">{{ pathLabel(st, p, st.killer.room) }}</button>
+              <button v-for="p in trapTargets" :key="p" @click="emit('trapPath', p)">{{ iconLabel(st, p, st.killer.room) }}</button>
             </template>
           </div>
           <div v-else class="buttons">
@@ -566,6 +589,17 @@ p {
 }
 .warn {
   color: var(--warn);
+}
+.twin {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  text-align: left;
+}
+.twin-mini {
+  flex: none;
+  width: 40px;
+  height: 40px;
 }
 .board-hint {
   margin: 0;

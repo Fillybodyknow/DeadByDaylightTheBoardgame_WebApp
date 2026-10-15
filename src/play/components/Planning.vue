@@ -101,34 +101,36 @@ function confirmSurvivors() {
 
 // ---------- killer ----------
 
-const killerPicks = ref<MoveCard[]>([])
+/** Picked cards by their place in the hand (The Blight's hand holds two of each card). */
+const killerPickIdx = ref<number[]>([])
+const killerPicks = computed(() => killerPickIdx.value.map((i) => props.st.killer.hand[i]))
 const SIDE = ['ซ้าย', 'ขวา']
 
 const killerHand = computed<HandCard[]>(() =>
-  props.st.killer.hand.map((card) => {
-    const i = killerPicks.value.indexOf(card)
+  props.st.killer.hand.map((card, h) => {
+    const i = killerPickIdx.value.indexOf(h)
     return { card, picked: i >= 0, ...(i >= 0 ? { badge: SIDE[i] } : {}) }
   }),
 )
 
-function pickKiller(c: MoveCard) {
+function pickKiller(_: MoveCard, h: number) {
   sfx.click()
-  const i = killerPicks.value.indexOf(c)
-  if (i >= 0) killerPicks.value.splice(i, 1)
-  else if (killerPicks.value.length < 2) killerPicks.value.push(c)
+  const i = killerPickIdx.value.indexOf(h)
+  if (i >= 0) killerPickIdx.value.splice(i, 1)
+  else if (killerPickIdx.value.length < 2) killerPickIdx.value.push(h)
   // a third pick replaces the right-hand card
-  else killerPicks.value.splice(1, 1, c)
+  else killerPickIdx.value.splice(1, 1, h)
 }
 
 function swapKiller() {
   sfx.click()
-  killerPicks.value.reverse()
+  killerPickIdx.value.reverse()
 }
 
 function confirmKiller() {
   if (dispatch({ t: 'planKiller', cards: [...killerPicks.value] })) {
     sfx.entity()
-    killerPicks.value = []
+    killerPickIdx.value = []
     preview.value = null
   }
 }

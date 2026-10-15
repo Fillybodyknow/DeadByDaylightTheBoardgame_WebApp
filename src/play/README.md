@@ -71,13 +71,18 @@ and the host starts the game.
 
 ## Scope
 
-- Board: **MacMillan Estate** only (11 rooms, 22 paths, 4 breakable walls, all 44 props).
+- Boards: **MacMillan Estate** (11 rooms, 22 paths), **Autohaven Wreckers** (10 rooms, 19 path
+  icons, two of them forks), **Ormond** (10 rooms, 22 paths), **Crotus Prenn Asylum** (10 rooms,
+  18 path icons, one fork) — each with 4 breakable walls and all 44 props. Offline the board is
+  picked before the trial; online the killer picks it. Forsaken Boneyard and Withered Isle are
+  not in yet.
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
-  automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger**
-  — with powers and passives.
-- Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir**.
+  automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
+  The Twins, The Blight** — with powers and passives.
+- Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
+  Élodie Rakoto, Felix Richter**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (54 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (66 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -131,6 +136,10 @@ The rulebook leaves these open (see the ⚠️ notes in `docs/rules-th.md`). The
 - Revealing a prop (entering a room, setup, Map / Rainbow Map): the player clicks the face-down
   tile, so they choose its colour (category). Which prop of that colour it is was fixed by the
   setup shuffle. With only one colour left face down in the room it flips automatically.
+- A fork (one path icon with lines to three rooms) joins every pair of those rooms with that
+  card; its wall, pallet or bear trap sits on the icon and blocks all of them.
+- Crotus Prenn's Receiving Desk holds O, B, S, A (as the user confirmed; the printed icons read
+  as two survival props, one more than the tiles allow).
 - Firecracker stopping the killer counts as a failed move: the killer stays and loses that
   turn's interaction. Flashlight uses up the killer's interaction for that turn.
 - A survivor in a locker who must move leaves the locker first, even if the move then fails.
@@ -205,3 +214,34 @@ The Oni, The Deathslinger, Yui Kimura, Zarina Kassir:
 - Off the Record takes 1 ▲ of the killer's, even when the roll had several failed dice.
 - Lucky Break: any survivor's great success (the die kept; any die of the carry roll).
 - Yui's and Zarina's self-wounds count as wounded this round (no pick-up this round, p.15).
+
+The Twins, The Blight, Élodie Rakoto, Felix Richter:
+
+- Victor is a second killer mini. At the start of each killer turn with Victor on the board, the
+  killer picks who takes it. On Victor's turn he is "the Killer" for everything (moves,
+  interactions, perks, items, Quick & Quiet); otherwise Charlotte is. Blood Bond is used on
+  Charlotte's turns only.
+- Victor never carries: his pick-up of a wounded survivor, or finding one in a locker, gains 1 ▲
+  instead and the survivor stays (in the locker).
+- Removing Victor is a survivor interaction in his room. He stays on the board between rounds.
+- Coup de Grâce: at the end of any killer turn (not with the round's bonus turn used), the card
+  just played is played again at once as the bonus turn; then the next planned card, if any.
+- Oppression: one or two other revealed generators with progress lose 1 each.
+- The Blight's power: a random card from the hand is discarded and he moves along its path (he
+  picks which path of that colour; walls break, a pallet stops him). Entering a new room, he may
+  interact there or use the power again (as long as cards are left). No path: the power ends.
+- Dragon's Grip: one or two path cards (not Wait); healthy survivors in rooms joined to the
+  damaged generator's room by a path of those colours pay 1 ▲ or are wounded (in turn order).
+- Undying: the killer's interaction for the turn, with a prop in a room joined to his by a path
+  of the discarded card's colour (either direction).
+- Blood Favour works by itself at the start of cleanup ("sacrificed" = on a hook).
+- Power Struggle needs the killer (Charlotte) in Élodie's room, before the killer's first card.
+- Appraisal: any discard of another survivor's item (used, re-rolled, chosen away, wasted); with
+  an item already, Élodie keeps the new one. Built to Last is asked before Appraisal.
+- Deception is offered before a move made with a card on her own turn, bonus turns included.
+- Desperate Measures: the second interaction is with a chest or a locker in her room; not after
+  hiding (in a locker she is off the board).
+- Visionary: when entering a room with a face-down prop, Felix may reveal one in a connected room
+  instead (colour by colour, as usual).
+- Built to Last: after using an item (key re-rolls and Flashlight / Firecracker too). Not for
+  items whose use draws a new one (Map's draw, Commodious Toolbox).

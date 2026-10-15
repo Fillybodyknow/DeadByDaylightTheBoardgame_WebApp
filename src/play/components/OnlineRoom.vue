@@ -12,6 +12,7 @@ import { KILLER_PLAYER } from '../engine/seats'
 import {
   allLocked,
   backToLobby,
+  doubleId,
   isHost,
   leaveRoom,
   lobbyBlocker,
@@ -23,6 +24,8 @@ import {
   pickWaiting,
   proceedToPick,
   session,
+  setBoard,
+  setDouble,
   setName,
   setReady,
   setSide,
@@ -30,6 +33,7 @@ import {
   startOnlineGame,
 } from '../online/session'
 import CharacterPicker from './CharacterPicker.vue'
+import MapPicker from './MapPicker.vue'
 import Mini from './Mini.vue'
 import SyncBadge from './SyncBadge.vue'
 
@@ -82,7 +86,7 @@ function toggleReady() {
 const splitNote = computed(() => {
   const n = survivorCount.value
   if (n === 4) return 'ผู้เล่นฝั่ง Survivor คุมคนละ 1 ตัว'
-  if (n === 3) return 'ผู้เล่น Survivor คนแรกคุม 2 ตัว อีก 2 คนคุมคนละ 1 ตัว'
+  if (n === 3) return 'ผู้เล่นที่มีป้าย 👥 คุม 2 ตัว อีก 2 คนคุมคนละ 1 ตัว — หัวห้องเลือกให้ใครก็ได้ หรือกดรับเองก็ได้'
   if (n === 2) return 'ผู้เล่นฝั่ง Survivor คุมคนละ 2 ตัว'
   return 'เกมมี Survivor 4 ตัวเสมอ — ต้องมีผู้เล่นฝั่งนี้ 2–4 คน'
 })
@@ -213,6 +217,18 @@ function start() {
             <strong>{{ m.name }}</strong>
             <span v-if="m.id === data.host" class="badge">หัวห้อง</span>
             <span class="muted small">{{ m.side === 'killer' ? 'Killer' : m.side === 'survivor' ? 'Survivor' : 'ยังไม่เลือกฝั่ง' }}</span>
+            <!-- 3 survivor players: one of them plays two survivors -->
+            <button
+              v-if="m.side === 'survivor' && doubleId"
+              type="button"
+              class="double"
+              :class="{ on: doubleId === m.id }"
+              :disabled="session.busy || doubleId === m.id || (!isHost && m.id !== session.me)"
+              :title="doubleId === m.id ? 'คนนี้คุม Survivor 2 ตัว' : 'ให้คนนี้คุม Survivor 2 ตัว'"
+              @click="setDouble(m.id)"
+            >
+              {{ doubleId === m.id ? '👥 คุม 2 ตัว' : 'ให้คุม 2 ตัว' }}
+            </button>
             <span class="status" :class="{ ok: m.ready }">{{ m.ready ? '✓ พร้อม' : 'ยังไม่พร้อม' }}</span>
           </li>
         </ul>
@@ -277,6 +293,9 @@ function start() {
           @unpick="pickCharacter('killer', null)"
         />
       </section>
+
+      <!-- the killer picks the board; everyone else sees it -->
+      <MapPicker :model-value="data.board ?? 'macmillan'" :readonly="!amKiller" @update:model-value="setBoard" />
 
       <section v-if="mySeat" class="card actions">
         <button class="lockbtn" :class="{ primary: !locked }" :disabled="session.busy || !myPicksComplete" @click="toggleLock">
@@ -433,6 +452,17 @@ input {
   margin-left: auto;
   font-size: 0.85rem;
   color: var(--muted);
+}
+.double {
+  padding: 0.15rem 0.55rem;
+  font-size: 0.8rem;
+  background: none;
+}
+.double.on {
+  border-color: #ffd56a;
+  color: #ffd56a;
+  background: rgb(255 214 106 / 0.1);
+  opacity: 1;
 }
 .status.ok {
   color: var(--ok);
