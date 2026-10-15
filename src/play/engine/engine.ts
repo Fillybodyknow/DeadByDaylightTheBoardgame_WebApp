@@ -1360,7 +1360,7 @@ function resolveRoll(st: GameState, ctx: RollContext, dice: Die[], failBp?: numb
   const s = ctx.s
   const sv = st.survivors[s]
   const ok = succeeded(dice[0])
-  log(st, `${sv.name} ทอย ${ROLL_LABEL[ctx.k]}${fails ? ` — ${st.killer.name} +${fails} ▲` : ''}`, s, { dice, ev: { k: 'roll', s, ctx: ctx.k } })
+  log(st, `${sv.name} ทอย ${ROLL_LABEL[ctx.k]}${fails ? ` — ${st.killer.name} +${fails} ▲` : ''}`, s, { dice, ev: { k: 'roll', s, ctx: ctx.k, ...('prop' in ctx ? { prop: ctx.prop } : {}), ...('target' in ctx ? { target: ctx.target } : {}) } })
   if (fails) gainKiller(st, fails)
   // Madness lasts until a failed (danger-die) skill check.
   if (SKILL_CHECKS.includes(ctx.k) && sv.madness && dice[0].kind === 'danger' && !ok) {

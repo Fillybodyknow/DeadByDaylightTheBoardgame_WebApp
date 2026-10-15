@@ -253,6 +253,34 @@ describe('perks', () => {
     expect(done.step.t).not.toBe('roll')
   })
 
+  it('Tinkerer swaps an unplayed planned card for one in hand when a generator is done', () => {
+    const offered = findOutcome(
+      (rng) => {
+        const st = game('hillbilly')
+        only(st, 'tinkerer')
+        st.survivors.forEach((sv) => Object.assign(sv, { room: 'scrapyard', planned: 'sneak', acted: true }))
+        const gen = placeProp(st, 'generator', 'scrapyard')
+        gen.progress = 2
+        st.phase = 'survivors'
+        st.activeSurvivor = 1
+        st.step = { t: 'survivorInteract', s: 1, canInteract: true }
+        st.queue = [{ k: 'endSurvivorTurn', s: 1 }]
+        st.killer.planned = ['sprint', 'sneak']
+        st.killer.revealedCount = 1
+        st.killer.hand = ['crouch', 'vault', 'wait']
+        st.rng = rng
+        return apply(st, { t: 'interact', i: { k: 'repair', prop: gen.id } })
+      },
+      (st) => st.step.t === 'offer' && st.step.perk === 'tinkerer',
+    )
+    // only the card still to come can change, for any card in hand
+    expect(perkChoices(offered, 'tinkerer', 'killer', { k: 'genDone' })).toEqual(['crouch', 'vault', 'wait'].map((card) => ({ index: 1, card })))
+    const after = apply(offered, { t: 'perk', perk: 'tinkerer', use: true, choice: { index: 1, card: 'crouch' } })
+    expect(after.killer.planned).toEqual(['sprint', 'crouch'])
+    expect(after.killer.hand).toContain('sneak')
+    expect(after.killer.hand).not.toContain('crouch')
+  })
+
   it('a perk is used once per round', () => {
     const st = game()
     only(st, 'self_care')

@@ -259,13 +259,30 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `Bonus Turn ด้วย ${CARD_NAMES[c.card!]} (ฆาตกร +2 ▲)`
     case 'balanced_landing':
       return `กระโดดไปทาง ${pathLabel(st, c.path!, from(o))} +1 ▲`
-    case 'urban_evasion':
-      return `เอากำแพงออก: ${pathName(st, c.path!)}`
+    case 'urban_evasion': {
+      // say which walls stand next to whoever is about to move (or next to Nea)
+      const p = pathDef(st, c.path!)
+      const turn = (w as { s: number }).s
+      const touches = (room: string) => p.a === room || p.b === room
+      const near = touches(st.survivors[turn].room) ? ` · ติดห้องของ ${name(turn)}` : typeof o === 'number' && o !== turn && touches(from(o)) ? ' · ติดห้องคุณ' : ''
+      return `เอากำแพงออก: ${pathName(st, c.path!)}${near}`
+    }
     case 'streetwise':
       return 'เก็บ Chest ไว้'
     default:
       return 'ใช้'
   }
+}
+
+/** A perk's choices in the order worth reading: Urban Evasion's walls next to whoever moves first. */
+export function orderedChoices(st: GameState, perk: PerkId, w: PerkWindow, choices: PerkChoice[]): PerkChoice[] {
+  if (perk !== 'urban_evasion' || w.k !== 'turnBegin') return choices
+  const room = st.survivors[w.s].room
+  const near = (c: PerkChoice) => {
+    const p = pathDef(st, c.path!)
+    return p.a === room || p.b === room ? 0 : 1
+  }
+  return [...choices].sort((a, b) => near(a) - near(b))
 }
 
 /** A few words under a movement-card choice (the card image says the rest). */

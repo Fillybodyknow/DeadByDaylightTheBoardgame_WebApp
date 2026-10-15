@@ -373,7 +373,8 @@ export type GameEvent =
   | { k: 'phantasmSet'; room: string }
   | { k: 'madness'; s: number; on: boolean }
   | { k: 'reveal'; prop: string; kind: PropKind; room: string }
-  | { k: 'roll'; s: number; ctx: RollContext['k'] }
+  /** `prop` / `target`: the generator, gate, totem or locker, or the survivor healed (for the screen). */
+  | { k: 'roll'; s: number; ctx: RollContext['k']; prop?: string; target?: number }
   | { k: 'wound'; s: number; by: 'attack' | 'trap' | 'power' }
   | { k: 'perk'; who: PerkOwner; perk: PerkId }
   | { k: 'heal'; s: number; by: number }

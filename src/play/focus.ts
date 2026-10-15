@@ -179,14 +179,26 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
         facts.push({ who: 'killer', icon: '🃏', text: `การ์ดที่วางไว้: ${st.killer.planned.map((c, i) => (i < st.killer.revealedCount ? `${CARD_NAMES[c]} (เล่นแล้ว)` : CARD_NAMES[c])).join(', ')}` })
         break
       case 'turnBegin':
-      case 'turnEnd':
+      case 'turnEnd': {
+        // whose turn it is, first: these perks are asked on other survivors' turns too
+        const sv = st.survivors[w.s]
         f.survivors.push(w.s)
+        facts.push({
+          who: w.s,
+          icon: '⏱',
+          text: `ตาของ ${sv.name} (ผู้เล่น ${st.handPlayers[sv.hand]})${w.k === 'turnBegin' ? ' — ยังไม่เปิดการ์ดเดิน' : ' — กำลังจะจบเทิร์น'}`,
+        })
         facts.push({ who: w.s, icon: '📍', text: where(st, w.s) })
         facts.push(killerFact(st, w.s))
-        if (step.perk === 'urban_evasion') for (const c of choices) if (c.path) f.paths.push(c.path)
+        if (step.perk === 'urban_evasion') {
+          for (const c of choices) if (c.path) f.paths.push(c.path)
+          f.rooms.push(sv.room)
+          facts.push({ icon: '🧱', text: `กำแพงที่เอาออกจะกลับมาเมื่อจบเทิร์นของ ${sv.name}` })
+        }
         if (step.perk === 'open_handed')
           facts.push({ who: 'killer', icon: '🃏', text: `การ์ดฆาตกร: ${st.killer.planned.map((c, i) => (i < st.killer.revealedCount || st.killer.shown.includes(i) ? CARD_NAMES[c] : '?')).join(', ')}` })
         break
+      }
       case 'killerBreak':
         f.killer = true
         if (typeof owner === 'number') {

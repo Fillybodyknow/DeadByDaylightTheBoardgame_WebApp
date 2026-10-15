@@ -12,7 +12,19 @@ export interface DiceShow {
   /** "+2 ความคืบหน้า!" */
   outcome: string
   tone: 'good' | 'great' | 'bad'
+  /** Where each die's skill-check needle lands. */
+  verdicts?: SkillVerdict[]
+  /** Only a great counts (danger dice, struggling free): no good zone. */
+  greatOnly?: boolean
+  /** "ซ่อม Generator": the action, under the skill check. */
+  action?: string
+  /** What the roll is on (a prop, a trap, a survivor or the killer), in the middle of the ring. */
+  icon?: { src: string; round: boolean }
+  /** Progress of the generator or gate, before and after this roll. */
+  progress?: { before: number; after: number; max: number }
 }
+
+export type SkillVerdict = 'great' | 'good' | 'fail'
 
 export interface Banner {
   id: number

@@ -26,6 +26,7 @@ import { PERKS } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PropCategory, SurvivorInteraction } from '../engine/types'
 import { dispatch } from '../game'
 import {
+  orderedChoices,
   cardCaption,
   cardImage,
   cardLabel,
@@ -156,7 +157,7 @@ const buttons = computed(() => perkButtons(props.st))
 
 const offerChoices = computed(() => {
   const s = step.value
-  return s.t === 'offer' ? perkChoices(props.st, s.perk, s.owner, s.w) : []
+  return s.t === 'offer' ? orderedChoices(props.st, s.perk, s.w, perkChoices(props.st, s.perk, s.owner, s.w)) : []
 })
 
 /** All traps on the board, when the supply is empty and one must be moved. */

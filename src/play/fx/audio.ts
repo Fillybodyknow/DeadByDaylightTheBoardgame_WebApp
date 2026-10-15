@@ -132,4 +132,26 @@ export const fxSound = {
   whoosh() {
     noise(0.35, { type: 'bandpass', freq: 600, q: 0.6, gain: 0.18 })
   },
+  /** Skill check coming up: the short high warning ding. */
+  skillWarn() {
+    tone(1760, 0.14, { type: 'sine', gain: 0.12 })
+    tone(2637, 0.1, { type: 'sine', gain: 0.05, at: 0.02 })
+  },
+  /** Needle stopped in the good zone: a soft click. */
+  skillGood() {
+    tone(1047, 0.1, { type: 'triangle', gain: 0.12 })
+    noise(0.04, { type: 'highpass', freq: 3000, gain: 0.12 })
+  },
+  /** Great skill check: a bright rising double chime. */
+  skillGreat() {
+    tone(1319, 0.18, { type: 'triangle', gain: 0.12 })
+    tone(1976, 0.3, { type: 'triangle', gain: 0.1, at: 0.08 })
+    noise(0.2, { type: 'highpass', freq: 5000, gain: 0.08, at: 0.05 })
+  },
+  /** Failed skill check: the generator's bang and a falling buzz. */
+  skillFail() {
+    noise(0.45, { type: 'lowpass', freq: 900, gain: 0.7 })
+    tone(140, 0.5, { type: 'sawtooth', gain: 0.18, slideTo: 50 })
+    noise(0.3, { freq: 2200, q: 0.8, gain: 0.25, at: 0.03 })
+  },
 }

@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { muted, sfx, startHeartbeat, stopHeartbeat } from '../../sound'
-import { isGreat, succeeded, touchingPaths } from '../engine/engine'
-import type { Die, GameState, ItemUse, MoveCard, RollContext } from '../engine/types'
-import { clearFx, flash, fx, showBanner, showDice, showPerk, type DiceShow } from '../fx/bus'
+import { isGreat, PROGRESS_MAX, succeeded, touchingPaths } from '../engine/engine'
+import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
+import { clearFx, flash, fx, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { canUndo, dispatch, myTurn, online, quitGame, undo } from '../game'
 import { actorsOf } from '../engine/seats'
 import { closeOnlineGame, isHost, leaveRoom, session } from '../online/session'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
 import { boardActions, boardTargets, powerMode as isPowerMode, type BoardAction, type BoardModes } from '../boardActions'
-import { PHASE_TH, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
+import { BEAR_TRAP_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
 import ActionPanel from './ActionPanel.vue'
 import BannerHost from './BannerHost.vue'
 import Board from './Board.vue'
@@ -58,7 +58,13 @@ watch(
       if (ev?.k === 'perk') showPerk({ perk: ev.perk, owner: ev.who, detail: e.text.split(' — ').slice(1).join(' — ') })
       // A roll already shown while it waited for a decision, and kept as it was, isn't shown twice.
       if (e.dice && ev?.k === 'roll' && JSON.stringify(e.dice) !== pendingShown)
-        showDice({ dice: e.dice, title: `${st.survivors[ev.s].name} · ${ROLL_TITLE[ev.ctx]}`, ...diceResult(ev.ctx, e.dice) })
+        showDice({
+          dice: e.dice,
+          title: st.survivors[ev.s].name,
+          ...diceResult(ev.ctx, e.dice),
+          ...skillCheck(ev.ctx, e.dice, rollProgress(prev, ev.ctx, ev.prop, fresh.slice(n + 1))),
+          icon: rollIcon(st, ev.ctx, ev.s, ev.target),
+        })
     }
     // A roll waiting on a decision (Iron Will, a key, Bond): roll it on screen first, then ask.
     const step = st.step
@@ -67,7 +73,14 @@ watch(
       if (sig !== pendingShown) {
         pendingShown = sig
         const res = step.keep ? { outcome: 'Bond — เลือกเก็บ 1 ลูก', tone: 'good' as const } : diceResult(step.ctx.k, step.dice)
-        showDice({ dice: step.dice, title: `${st.survivors[step.ctx.s].name} · ${ROLL_TITLE[step.ctx.k]}`, outcome: `${res.outcome} — รอการตัดสินใจ`, tone: res.tone })
+        showDice({
+          dice: step.dice,
+          title: st.survivors[step.ctx.s].name,
+          outcome: `${res.outcome} — รอการตัดสินใจ`,
+          tone: res.tone,
+          ...skillCheck(step.ctx.k, step.dice, rollProgress(st, step.ctx.k, 'prop' in step.ctx ? step.ctx.prop : undefined, [])),
+          icon: rollIcon(st, step.ctx.k, step.ctx.s, 'target' in step.ctx ? step.ctx.target : undefined),
+        })
       }
     } else if (prev.step.t !== 'roll') pendingShown = null
     if (!fx.perks.length && !fx.dice.length) view.value = st
@@ -184,6 +197,52 @@ function confirmReveal() {
 
 // ---------- dice, flashes and summaries from the log ----------
 
+
+/** Where each die's skill-check needle lands. Struggling free and danger dice count only a great. */
+function skillCheck(ctx: RollContext['k'], dice: Die[], progress?: DiceShow['progress']): Pick<DiceShow, 'verdicts' | 'greatOnly' | 'action' | 'progress'> {
+  const greatOnly = ctx === 'carry' || dice.every((d) => d.kind === 'danger')
+  const verdicts = dice.map((d): SkillVerdict => (isGreat(d) ? 'great' : succeeded(d) && (!greatOnly || d.asSuccess) ? 'good' : 'fail'))
+  return { verdicts, greatOnly, action: ROLL_TITLE[ctx], progress }
+}
+
+/** The icon in the middle of the skill check: what the survivor is working on, or up against. */
+function rollIcon(st: GameState, ctx: RollContext['k'], s: number, target: number | undefined): DiceShow['icon'] {
+  switch (ctx) {
+    case 'repair':
+      return { src: PROP_IMAGE.generator, round: false }
+    case 'openGate':
+      return { src: PROP_IMAGE.exitGate, round: false }
+    case 'cleanse':
+      return { src: PROP_IMAGE.totem, round: false }
+    case 'search':
+      return { src: PROP_IMAGE.locker, round: false }
+    case 'trap':
+      return { src: BEAR_TRAP_IMAGE, round: false }
+    case 'heal':
+    case 'botany':
+      return { src: survivorMini(st, target ?? s), round: true }
+    case 'selfCare':
+      return { src: survivorMini(st, s), round: true }
+    default:
+      // struggling, a hatchet, a phantasm trap, Overwhelming Presence: the killer
+      return { src: killerMini(st), round: true }
+  }
+}
+
+/**
+ * The progress bar under a roll on a generator or an exit gate: from the event right after the
+ * roll when it moved, otherwise as it stood before.
+ */
+function rollProgress(before: GameState, ctx: RollContext['k'], prop: string | undefined, after: LogEntry[]): DiceShow['progress'] {
+  if (ctx !== 'repair' && ctx !== 'openGate') return undefined
+  const nextRoll = after.findIndex((e) => e.ev?.k === 'roll')
+  const next = nextRoll === -1 ? after : after.slice(0, nextRoll)
+  const ev = next.find((e) => e.ev?.k === 'repair' || e.ev?.k === 'gate')?.ev
+  if (ev?.k === 'repair') return { before: ev.progress - ev.add, after: ev.progress, max: PROGRESS_MAX }
+  if (ev?.k === 'gate') return { before: ev.progress - 1, after: ev.progress, max: PROGRESS_MAX }
+  const p = prop ? before.props.find((x) => x.id === prop) : undefined
+  return p ? { before: p.progress, after: p.progress, max: PROGRESS_MAX } : undefined
+}
 
 function diceResult(ctx: RollContext['k'], dice: Die[]): Pick<DiceShow, 'outcome' | 'tone'> {
   const fail = !succeeded(dice[0])

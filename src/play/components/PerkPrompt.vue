@@ -3,16 +3,16 @@
 // roll still waiting on Iron Will, a key or Bond's choice. Docked beside the board (not over
 // it) so the map stays readable: the board lights up who is involved and where they could go,
 // a few facts sum it up, and hovering a choice previews it on the map.
-import { computed, onBeforeUnmount, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
-import { ITEM_NAMES, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, roomName } from '../engine/engine'
+import { CARD_NAMES, ITEM_NAMES, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, PerkChoice, PerkOwner } from '../engine/types'
 import { choicePreview, decisionFocus, preview } from '../focus'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { dispatch } from '../game'
-import { ROLL_TITLE, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
+import { ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
 import DiceRow from './DiceRow.vue'
 import FaceLabel from './FaceLabel.vue'
 import Mini from './Mini.vue'
@@ -25,8 +25,25 @@ const keyHolders = computed(() => rerollers(props.st))
 
 const offerChoices = computed(() => {
   const s = step.value
-  return s.t === 'offer' ? perkChoices(props.st, s.perk, s.owner, s.w) : []
+  if (s.t !== 'offer') return []
+  return orderedChoices(props.st, s.perk, s.w, perkChoices(props.st, s.perk, s.owner, s.w))
 })
+
+// ---------- Tinkerer: pick the planned card, then what to put in its place ----------
+
+const isTinkerer = computed(() => step.value.t === 'offer' && step.value.perk === 'tinkerer')
+const tinkerIndex = ref<number | null>(null)
+watch(
+  () => (isTinkerer.value ? JSON.stringify(step.value) : null),
+  () => (tinkerIndex.value = offerChoices.value.find((c) => c.index !== undefined)?.index ?? null),
+  { immediate: true },
+)
+/** The killer's planned cards: played, or still to come (and so changeable). */
+const plannedCards = computed(() => {
+  const k = props.st.killer
+  return k.planned.map((card, i) => ({ card, i, played: i < k.revealedCount, next: i === k.revealedCount }))
+})
+const tinkerSwaps = computed(() => offerChoices.value.filter((c) => c.index === tinkerIndex.value))
 
 /** Several perks of one owner at the same moment: each with its choices, used in any order (p.16). */
 const offerList = computed(() => {
@@ -80,12 +97,28 @@ watch(
   () => (open.value ? JSON.stringify(step.value) : null),
   (now, before) => {
     preview.value = null
-    if (now && now !== before) fxSound.perk(killerSide.value)
+    if (now && now !== before) {
+      fxSound.perk(killerSide.value)
+      collapsed.value = false // a new decision always opens the panel
+    }
   },
 )
 onBeforeUnmount(() => (preview.value = null))
 
 const facts = computed(() => (open.value ? (decisionFocus(props.st)?.facts ?? []) : []))
+
+/** Folded away to see the board: only the header stays, saying what is waiting. */
+const collapsed = ref(false)
+
+/** What is being decided, in a few words, for the folded panel. */
+const summary = computed(() => {
+  const s = step.value
+  if (s.t === 'offer') return `ใช้ ${offeredPerks(s).map((p) => PERKS[p].name).join(' / ')}?`
+  if (kind.value === 'turnStart') return 'Perk ตอนเริ่มเทิร์น'
+  if (kind.value === 'roll') return 'ตัดสินใจเรื่องผลทอย'
+  if (kind.value === 'replace') return 'เปลี่ยนการ์ดเคลื่อนที่'
+  return 'ใช้พลัง?'
+})
 
 function act(a: Action) {
   preview.value = null
@@ -123,14 +156,24 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
 
 <template>
   <transition name="dock">
-    <aside v-if="open" class="dock" :class="{ killer: killerSide }" role="dialog" aria-live="assertive">
-      <header>
+    <aside v-if="open" class="dock" :class="{ killer: killerSide, collapsed }" role="dialog" aria-live="assertive">
+      <header @click="collapsed && (collapsed = false)">
         <Mini class="face" :class="killerSide ? 'aura-killer' : 'aura-survivor'" :src="asset(face)" />
-        <div>
+        <div class="head-text">
           <p class="eyebrow">⚡ {{ kind === 'spark' || kind === 'phantasm' ? 'Power' : kind === 'replace' ? 'Predator' : 'Perk' }} — ถึงคราวตัดสินใจ</p>
           <strong class="who">{{ who }}</strong>
-          <p v-if="step.t === 'offer' && windowLabel(st, step.w)" class="why">{{ windowLabel(st, step.w) }}</p>
+          <p v-if="collapsed" class="why">{{ summary }}</p>
+          <p v-else-if="step.t === 'offer' && windowLabel(st, step.w)" class="why">{{ windowLabel(st, step.w) }}</p>
         </div>
+        <button
+          type="button"
+          class="fold"
+          :aria-expanded="!collapsed"
+          :title="collapsed ? 'เปิดแผงตัดสินใจ' : 'พับเก็บเพื่อดูกระดาน'"
+          @click.stop="collapsed = !collapsed"
+        >
+          {{ collapsed ? 'เปิด ◂' : 'พับ ▸' }}
+        </button>
       </header>
 
       <!-- the situation, in a few lines; the board lights the same things up -->
@@ -185,7 +228,39 @@ const hasPaths = computed(() => offerChoices.value.some((c) => c.path))
           </div>
         </div>
         <p v-if="hasPaths" class="hint">เลือกปุ่ม หรือคลิกวงประบนแผนที่ — ชี้ที่ปุ่มเพื่อดูบนแผนที่</p>
-        <div v-if="offerChoices.some((c) => c.card)" class="card-row">
+        <!-- Tinkerer: the planned cards, then the hand -->
+        <div v-if="isTinkerer" class="tinker">
+          <p class="tinker-step">1. เลือกการ์ดที่วางไว้ที่จะเปลี่ยน</p>
+          <div class="card-row">
+            <button
+              v-for="p in plannedCards"
+              :key="`p${p.i}`"
+              class="card-btn planned"
+              :class="{ on: tinkerIndex === p.i, played: p.played }"
+              :disabled="p.played"
+              @click="tinkerIndex = p.i"
+            >
+              <img :src="asset(cardImage(p.card))" :alt="cardLabel(p.card)" />
+              <span>ใบที่ {{ p.i + 1 }} · {{ p.played ? 'เล่นแล้ว' : p.next ? 'ใช้เทิร์นถัดไป' : 'ยังไม่ใช้' }}</span>
+            </button>
+          </div>
+          <template v-if="tinkerIndex !== null">
+            <p class="tinker-step">2. เปลี่ยน {{ CARD_NAMES[st.killer.planned[tinkerIndex]] }} (ใบที่ {{ tinkerIndex + 1 }}) เป็น — การ์ดในมือ</p>
+            <div class="card-row">
+              <button
+                v-for="(c, i) in tinkerSwaps"
+                :key="`s${i}`"
+                class="card-btn"
+                :title="perkChoiceLabel(st, step.perk, step.owner, step.w, c)"
+                @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })"
+              >
+                <img :src="asset(cardImage(c.card!))" :alt="cardLabel(c.card!)" />
+                <span>{{ CARD_NAMES[c.card!] }}</span>
+              </button>
+            </div>
+          </template>
+        </div>
+        <div v-else-if="offerChoices.some((c) => c.card)" class="card-row">
           <button
             v-for="(c, i) in offerChoices.filter((c) => c.card)"
             :key="`card${i}`"
@@ -362,6 +437,32 @@ header {
   display: flex;
   gap: 0.7rem;
   align-items: center;
+}
+.head-text {
+  flex: 1;
+  min-width: 0;
+}
+.fold {
+  align-self: flex-start;
+  flex: none;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.85rem;
+}
+/* folded: just the header, narrower, out of the board's way; tap it to open again */
+.dock.collapsed {
+  width: 340px;
+  animation: none;
+  box-shadow: 0 0 0 1px rgb(var(--glow) / 0.5), 0 10px 30px rgb(0 0 0 / 0.6);
+}
+.dock.collapsed > :not(header) {
+  display: none;
+}
+.dock.collapsed header {
+  cursor: pointer;
+}
+.dock.collapsed .face {
+  width: 40px;
+  height: 40px;
 }
 .face {
   width: 54px;
@@ -541,6 +642,22 @@ h3 {
   width: 100%;
   padding: 0.7rem;
 }
+.tinker {
+  display: grid;
+  gap: 0.4rem;
+}
+.tinker-step {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.card-btn.planned.on {
+  border-color: var(--blood-bright);
+  box-shadow: 0 0 0 2px var(--blood-bright) inset, 0 0 14px rgb(255 40 40 / 0.4);
+}
+.card-btn.planned.played {
+  opacity: 0.4;
+}
 
 .dock-enter-active {
   transition:
@@ -567,6 +684,9 @@ h3 {
     bottom: 0.5rem;
     width: auto;
     max-height: 55vh;
+  }
+  .dock.collapsed {
+    width: auto;
   }
   .dock-enter-from,
   .dock-leave-to {
