@@ -19,6 +19,9 @@ const history = shallowRef<GameState[]>([])
  */
 export const online = shallowRef<{ room: Room; seat: number; latest: () => GameState | null } | null>(null)
 
+/** Online moves made on this device that the room hasn't confirmed yet. */
+export const pendingWrites = shallowRef(0)
+
 export const canUndo = computed(() => !online.value && history.value.length > 0)
 
 /** Whether this device may act now (always, on one shared device). */
@@ -60,12 +63,14 @@ export function dispatch(action: Action): boolean {
     // Show it at once, then commit. If someone else changed the game first, the action is
     // checked again against their state; the room's state is what everyone ends up with.
     game.value = next
+    pendingWrites.value++
     void o.room
       .updateGame((latest) => (latest && mayAct(latest, o.seat, action) ? tryApply(latest, action) : null))
       .then(
         (ok) => !ok && resync(o),
         () => resync(o),
       )
+      .finally(() => pendingWrites.value--)
     return true
   }
   const next = tryApply(cur, action)

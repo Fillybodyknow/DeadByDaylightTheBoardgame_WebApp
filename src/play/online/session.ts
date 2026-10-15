@@ -29,9 +29,12 @@ export const session = reactive({
   data: null as RoomData | null,
   error: '',
   busy: false,
+  /** Connected to the room's server; false while the connection is down and being retried. */
+  connected: true,
 })
 
 let unsubscribe: (() => void) | null = null
+let unwatchConnection: (() => void) | null = null
 
 export const isHost = computed(() => !!session.data && session.data.host === session.me)
 export const me = computed(() => session.data?.members[session.me] ?? null)
@@ -103,6 +106,9 @@ export function lastRoom(): string | null {
 
 function enter(room: Room) {
   session.room = room
+  unwatchConnection?.()
+  session.connected = true
+  unwatchConnection = room.onConnection?.((up) => (session.connected = up)) ?? null
   unsubscribe?.()
   unsubscribe = room.subscribe((data) => {
     session.data = data
@@ -176,6 +182,9 @@ export function leaveRoom() {
     })
   unsubscribe?.()
   unsubscribe = null
+  unwatchConnection?.()
+  unwatchConnection = null
+  session.connected = true
   room?.close()
   session.room = null
   session.data = null

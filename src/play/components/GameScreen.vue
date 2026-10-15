@@ -24,6 +24,7 @@ import PerkReveal from './PerkReveal.vue'
 import Planning from './Planning.vue'
 import RoundSummary from './RoundSummary.vue'
 import StatusPanel from './StatusPanel.vue'
+import SyncBadge from './SyncBadge.vue'
 
 const props = defineProps<{ st: GameState }>()
 
@@ -350,6 +351,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       <span class="phase">รอบ {{ view.round }} · {{ PHASE_TH[view.phase] }}</span>
       <span class="spacer" />
       <button v-if="over && !showOver" class="primary" @click="showOver = true">สรุปเกม</button>
+      <SyncBadge v-if="online" />
       <span v-if="online" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
       <button v-else :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶ ย้อน</button>
       <button :title="muted ? 'เปิดเสียง' : 'ปิดเสียง'" @click="muted = !muted">{{ muted ? '🔇' : '🔊' }}</button>

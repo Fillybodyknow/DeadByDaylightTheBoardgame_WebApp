@@ -31,6 +31,7 @@ import {
 } from '../online/session'
 import CharacterPicker from './CharacterPicker.vue'
 import Mini from './Mini.vue'
+import SyncBadge from './SyncBadge.vue'
 
 const data = computed(() => session.data!)
 const code = computed(() => session.room?.code ?? '')
@@ -175,6 +176,7 @@ function start() {
       </div>
       <button @click="copyLink">{{ copied ? '✓ คัดลอกแล้ว' : '🔗 คัดลอกลิงก์เชิญ' }}</button>
       <span class="spacer" />
+      <SyncBadge />
       <span class="phase-tag">{{ data.phase === 'lobby' ? 'Lobby' : 'เลือกตัวละคร' }}</span>
       <button @click="leaveRoom">ออกจากห้อง</button>
     </header>

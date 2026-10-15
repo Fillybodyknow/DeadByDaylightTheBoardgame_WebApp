@@ -2,17 +2,20 @@
 //
 // Layout:  rooms/<code>/lobby  { host, createdAt, phase, members, seats, players, picks, locked }
 //          rooms/<code>/game   { rev, json }
+//          rooms/<code>/log    { r1: json, r2: json, … }  log of finished rounds (see logArchive.ts)
 // The game is stored as a JSON string: the database drops null values and turns some arrays
 // into objects, and the engine state relies on both. Lobby and game are separate nodes so
-// seat changes and game moves never fight over one transaction.
+// seat changes and game moves never fight over one transaction. The game written on each move
+// leaves out the log of rounds already archived, so a write stays small however long the game.
 //
 // Config comes from Vite env vars (`.env.local`, never committed):
 //   VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_DATABASE_URL,
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { getDatabase, onValue, ref, runTransaction, set, type Database } from 'firebase/database'
-import type { GameState } from '../engine/types'
+import { getDatabase, onValue, ref, runTransaction, set, update, type Database } from 'firebase/database'
+import type { GameState, LogEntry } from '../engine/types'
+import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
 import type { Backend, Room, RoomData } from './transport'
 import { emptyRoom, normalizeRoom } from './transport'
 
@@ -46,16 +49,31 @@ interface GameNode {
   json: string
 }
 
-function toRoom(raw: { lobby?: Partial<Lobby>; game?: GameNode } | null): RoomData | null {
+type RawRoom = { lobby?: Partial<Lobby>; game?: GameNode; log?: Record<string, string> } | null
+
+/** Parsed archives, by their text (an archive never changes once written). */
+const parsedArchives = new Map<string, LogEntry[]>()
+function parseArchive(text: string): LogEntry[] {
+  let entries = parsedArchives.get(text)
+  if (!entries) parsedArchives.set(text, (entries = JSON.parse(text) as LogEntry[]))
+  return entries
+}
+
+/** The written game, without the archived rounds' log. */
+function coreOf(raw: RawRoom): GameState | null {
+  return raw?.game?.json ? (JSON.parse(raw.game.json) as GameState) : null
+}
+
+function toRoom(raw: RawRoom): RoomData | null {
   if (!raw?.lobby) return null
+  const core = coreOf(raw)
   return normalizeRoom({
     ...raw.lobby,
     host: raw.lobby.host ?? '',
-    game: raw.game?.json ? (JSON.parse(raw.game.json) as GameState) : null,
+    game: core ? withFullLog(core, raw.log, parseArchive) : null,
     rev: raw.game?.rev ?? 0,
   })
 }
-
 class FirebaseRoom implements Room {
   private unsubs: (() => void)[] = []
   /** Last known room, so transactions can be answered when the local cache is still empty. */
@@ -63,6 +81,13 @@ class FirebaseRoom implements Room {
   /** Resolves on the first snapshot: lobby writes wait for it (see updateRoom). */
   private loaded: Promise<void>
   private markLoaded!: () => void
+  /** Rounds archived in the room, from the last snapshot. */
+  private archived = new Set<number>()
+  /** Archives being written by this device. */
+  private archiving = new Set<number>()
+  private archiveTimer: number | null = null
+  /** Set when archives can't be written (database rules without the log node): stop trying. */
+  private archiveDenied = false
 
   readonly code: string
 
@@ -77,9 +102,15 @@ class FirebaseRoom implements Room {
 
   subscribe(cb: (d: RoomData | null) => void) {
     const off = onValue(this.path(), (snap) => {
-      this.last = toRoom(snap.val())
+      const raw = snap.val() as RawRoom
+      this.archived = archivedRounds(raw?.log)
+      this.last = toRoom(raw)
       this.markLoaded()
       cb(this.last)
+      // The writer archives finished rounds right after its move; if that got lost (it closed
+      // the page, say), whoever is still here does it a moment later from the same state.
+      const core = coreOf(raw)
+      if (core && roundsToArchive(core, this.archived).size) this.scheduleArchive(core, 1500)
     })
     this.unsubs.push(off)
     return off
@@ -87,6 +118,7 @@ class FirebaseRoom implements Room {
 
   async updateGame(fn: (cur: GameState | null) => GameState | null): Promise<boolean> {
     let aborted = false
+    let written: GameState | null = null
     const res = await runTransaction(this.path('/game'), (cur: GameNode | null) => {
       // A null first call can just mean "not cached yet": answering it is safe, because the
       // write only commits if the server really holds null; otherwise it runs again with data.
@@ -97,13 +129,41 @@ class FirebaseRoom implements Room {
         return undefined
       }
       aborted = false
-      return { rev: (cur?.rev ?? 0) + 1, json: JSON.stringify(next) }
+      written = trimLog(next, this.archived)
+      return { rev: (cur?.rev ?? 0) + 1, json: JSON.stringify(written) }
     })
-    return res.committed && !aborted
+    const ok = res.committed && !aborted
+    if (ok && written) this.scheduleArchive(written, 0)
+    return ok
   }
 
+  /** Write the archive of every finished round the room lacks, from a state holding them whole. */
+  private scheduleArchive(st: GameState, delay: number) {
+    if (this.archiveDenied) return
+    if (this.archiveTimer !== null) clearTimeout(this.archiveTimer)
+    this.archiveTimer = window.setTimeout(() => {
+      this.archiveTimer = null
+      for (const [round, entries] of roundsToArchive(st, this.archived)) {
+        if (this.archiving.has(round)) continue
+        this.archiving.add(round)
+        set(this.path(`/log/${roundKey(round)}`), JSON.stringify(entries))
+          .catch((e) => {
+            // Rules from before the log node: keep writing the whole game, as before.
+            this.archiveDenied = true
+            console.warn('online: cannot archive the log (update database.rules.json):', e)
+          })
+          .finally(() => this.archiving.delete(round))
+      }
+    }, delay)
+  }
+
+  onConnection(cb: (up: boolean) => void) {
+    const off = onValue(ref(database(), '.info/connected'), (snap) => cb(snap.val() === true))
+    this.unsubs.push(off)
+    return off
+  }
   async resetGame() {
-    await set(this.path('/game'), null)
+    await update(this.path(), { game: null, log: null })
   }
 
   async updateRoom(fn: (cur: RoomData) => RoomData | null): Promise<boolean> {
@@ -123,6 +183,7 @@ class FirebaseRoom implements Room {
   }
 
   close() {
+    if (this.archiveTimer !== null) clearTimeout(this.archiveTimer)
     this.unsubs.forEach((u) => u())
     this.unsubs = []
   }

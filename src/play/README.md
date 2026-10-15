@@ -53,10 +53,18 @@ and the host starts the game.
     (git-ignored) as `VITE_FIREBASE_DATABASE_URL`; the deploy reads it from the repo's Actions
     variables `VITE_FIREBASE_DATABASE_URL` and `VITE_FIREBASE_PROJECT_ID`. The game is stored as a JSON string, because
     the database drops nulls.
+  - Small writes (`logArchive.ts`): the log is over 90% of a late game's state, so each move
+    writes the game without the log of finished rounds (~12 KB instead of up to ~130 KB). Each
+    finished round's log is written once to `rooms/<CODE>/log/r<N>`, and every device puts the
+    full log back together. A round leaves the written state only once its archive is in the room.
   - `local.ts` is used when no URL is set. It syncs tabs of one browser (IndexedDB +
     BroadcastChannel), with one seat per tab, for testing alone.
-- **Rules:** `database.rules.json` (project root) limits access to `rooms/<CODE>` nodes. Paste it into the
-  Firebase console under Realtime Database → Rules (the default test-mode rules expire).
+- **Rules:** `database.rules.json` (project root) limits access to `rooms/<CODE>` (`lobby`, `game`,
+  `log`). Paste it into the Firebase console under Realtime Database → Rules (the default
+  test-mode rules expire). With older rules that lack `log`, games still work but write the
+  whole log on every move.
+- The top bar shows "กำลังซิงก์…" while this device's moves take long to reach the room, and
+  "การเชื่อมต่อหลุด" while it is disconnected (`SyncBadge.vue`).
 - Undo is off online. The host's ออก ends the game for everyone and returns to the room. Other
   players leave and can rejoin with the same code; the seat is kept per device.
 - `?test` in the URL exposes the game to automated multi-player tests (`window.__dbdl`).

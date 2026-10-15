@@ -3,6 +3,7 @@ import { apply, createGame, tryApply, type GameConfig } from './engine'
 import { legalActions } from './legal'
 import { actorsOf, handsToPlan, mayAct, playerOfSurvivor } from './seats'
 import type { Action, GameState, MoveCard } from './types'
+import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from '../online/logArchive'
 
 const config = (seed = 1, players: GameConfig['players'] = 5): GameConfig => ({
   board: 'macmillan',
@@ -120,4 +121,55 @@ describe('online playthroughs', () => {
     }
     expect(finished).toBeGreaterThan(18)
   }, 120_000)
+})
+
+describe('log archive (small online writes)', () => {
+  // Play a game twice in step: one keeps the whole state, the other only what an online write
+  // carries (trimmed log) plus the archives, losing some archive writes on the way.
+  function check(seed: number, players: GameConfig['players']) {
+    let full = createGame(config(seed, players))
+    let core = full
+    const archive: Record<string, string> = {}
+    const parsed = new Map<string, GameState['log']>()
+    const parse = (t: string) => parsed.get(t) ?? (parsed.set(t, JSON.parse(t)), parsed.get(t)!)
+    let rnd = seed
+    let maxCore = 0
+    for (let i = 0; i < 3000 && full.step.t !== 'gameOver'; i++) {
+      rnd = (rnd * 1103515245 + 12345) % 2147483648
+      const opts = legalActions(full)
+      const action = opts[rnd % opts.length]
+      const nextFull = tryApply(full, action)
+      const nextCore = tryApply(core, action)
+      expect(!!nextCore).toBe(!!nextFull)
+      if (!nextFull || !nextCore) continue
+      // the engine plays the same on the trimmed state: everything but the log is equal
+      expect(JSON.stringify({ ...nextCore, log: [] })).toBe(JSON.stringify({ ...nextFull, log: [] }))
+      full = nextFull
+      // the write: trimmed by what is archived; then the archives (a fifth of them get lost)
+      core = trimLog(nextCore, archivedRounds(archive))
+      for (const [round, entries] of roundsToArchive(core, archivedRounds(archive)))
+        if (rnd % 5 !== 0) archive[roundKey(round)] = JSON.stringify(entries)
+      // every device puts the same full log back together
+      expect(JSON.stringify(withFullLog(core, archive, parse).log)).toBe(JSON.stringify(full.log))
+      maxCore = Math.max(maxCore, JSON.stringify(core).length)
+    }
+    return { full, maxCore }
+  }
+
+  it('plays the same game and rebuilds the same log, even when archive writes are lost', () => {
+    for (const [seed, players] of [[3, 5], [8, 4], [21, 3], [34, 5]] as const) {
+      const { full, maxCore } = check(seed, players)
+      expect(full.step.t).toBe('gameOver')
+      // the written state stays a fraction of the full one
+      expect(maxCore).toBeLessThan(JSON.stringify(full).length / 2)
+    }
+  }, 120_000)
+
+  it('never drops a round the room has not archived', () => {
+    const st = { round: 3, log: [1, 1, 2, 3].map((round) => ({ round, text: '', who: 'game' })) } as unknown as GameState
+    expect(trimLog(st, new Set([2])).log.map((e) => e.round)).toEqual([1, 1, 3])
+    expect([...roundsToArchive(st, new Set([2])).keys()]).toEqual([1])
+    // the current round is never archived, even if listed
+    expect(trimLog(st, new Set([3])).log.length).toBe(4)
+  })
 })
