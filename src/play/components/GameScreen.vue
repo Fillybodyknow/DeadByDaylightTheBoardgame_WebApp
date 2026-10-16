@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
-import { boardOf, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { canUndo, dispatch, myTurn, online, quitGame, undo } from '../game'
@@ -118,6 +118,8 @@ const calmCrow = ref<string | null>(null)
 const aceFirst = ref<string | null>(null)
 /** A survivor's item whose target is being picked on the board. */
 const itemPick = ref<number | null>(null)
+/** Breakout: the wounded survivor picked, waiting for where to move them. */
+const breakoutTarget = ref<number | null>(null)
 /** A fork's icon was clicked: its moves, waiting for the room to go to. */
 const forkMoves = shallowRef<BoardAction[] | null>(null)
 /** Oppression: generators picked on the board, waiting for confirm. */
@@ -150,7 +152,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom }
 
 watch(
   () => view.value.step,
@@ -162,6 +164,7 @@ watch(
     palletMode.value = null
     calmCrow.value = null
     aceFirst.value = null
+    breakoutTarget.value = null
     itemPick.value = null
     forkMoves.value = null
     multiPick.value = []
@@ -175,6 +178,13 @@ const powerMode = computed(() => isPowerMode(view.value, modes))
 
 /** While a perk or power is being decided, the board points at who and where. */
 const boardFocus = computed(() => {
+  // Breakout: the friend being moved, and every path they could take
+  if (breakoutTarget.value !== null) {
+    const st = view.value
+    const s = breakoutTarget.value
+    const moves = anyMoves(st, s)
+    return { survivors: [s], killer: false, rooms: [st.survivors[s].room], paths: moves.map((m) => m.path.id), dests: moves.map((m) => m.to) }
+  }
   // A fork's icon was clicked: dim everything but the rooms it can lead to, so the two or three
   // choices stand out (the icon itself is one spot for all of them).
   const fork = forkMoves.value
@@ -255,6 +265,8 @@ const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: 'Calm Spirit: คลิกห้องที่จะส่ง Crow ไป', cancel: () => (calmCrow.value = null) }
   if (aceFirst.value) return { text: 'Ace in the Hole: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
+  if (breakoutTarget.value !== null)
+    return { text: `Breakout: ย้าย ${view.value.survivors[breakoutTarget.value].name} — คลิกเส้นทางบนแผนที่`, cancel: () => (breakoutTarget.value = null) }
   if (trapPath.value) return { text: 'Bear Trap หมดมือ: คลิก Bear Trap บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
   if (itemPick.value !== null) return { text: 'เลือกเป้าหมายของ item บนแผนที่', cancel: () => (itemPick.value = null) }
   if (forkMoves.value)

@@ -12,8 +12,14 @@ import { fxSound } from '../fx/audio'
 import { fx, type SkillVerdict } from '../fx/bus'
 import DiceRow from './DiceRow.vue'
 
-// Waits while a perk card is showing: the perk usually explains the roll that follows.
-const current = computed(() => (fx.perks.length ? null : (fx.dice[0] ?? null)))
+// Dice and perk cards are shown in the order they happened (`id` counts up as they are queued):
+// a perk that sets a roll up comes before it (Unnerving Presence, Bond), one that answers it
+// comes after (A Nurse's Calling, Lucky Break, Off the Record).
+const current = computed(() => {
+  const dice = fx.dice[0]
+  const perk = fx.perks[0]
+  return dice && (!perk || dice.id < perk.id) ? dice : null
+})
 const phase = ref<'warn' | 'sweep' | 'landed'>('warn')
 
 const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches

@@ -2,14 +2,14 @@
 // Decisions about perks: a perk offered when its moment comes, the start-of-turn perks, and a
 // roll still waiting on Iron Will, a key or Bond's choice. Docked beside the board (not over
 // it) so the map stays readable: the board lights up who is involved and where they could go,
-// a few facts sum it up, and hovering a choice previews it on the map.
+// and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import { CARD_NAMES, ITEM_NAMES, KILLER_CARDS, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
 import { actionKey } from '../boardActions'
-import { choicePreview, decisionFocus, preview } from '../focus'
+import { choicePreview, preview } from '../focus'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { dispatch } from '../game'
@@ -239,8 +239,6 @@ watch(
 )
 onBeforeUnmount(() => (preview.value = null))
 
-const facts = computed(() => (open.value ? (decisionFocus(props.st)?.facts ?? []) : []))
-
 /** Folded away to see the board: only the header stays, saying what is waiting. */
 const collapsed = ref(false)
 
@@ -292,7 +290,8 @@ const boardCount = computed(() => {
   const s = step.value
   if (isOppression.value) return offerChoices.value.filter((c) => !c.prop2).length
   if (s.t === 'offer') return offerList.value.reduce((n, o) => n + o.choices.filter((c) => !here(perkAct(o.perk, c))).length, 0)
-  if (s.t === 'turnStart') return buttons.value.reduce((n, b) => n + b.choices.filter((c) => !here(perkAct(b.perk, c))).length, 0)
+  // Breakout's own hint says to use the board, so it isn't counted here
+  if (s.t === 'turnStart') return buttons.value.reduce((n, b) => n + (b.perk === 'breakout' ? 0 : b.choices.filter((c) => !here(perkAct(b.perk, c))).length), 0)
   if (s.t === 'phantasmChoice') return [...hagMoves.value.map((i) => ({ t: 'phantasm', teleport: true, i }) as Action), { t: 'phantasm', teleport: true } as Action].filter((a) => !here(a)).length
   return 0
 })
@@ -320,13 +319,6 @@ const boardCount = computed(() => {
         </button>
       </header>
 
-      <!-- the situation, in a few lines; the board lights the same things up -->
-      <ul v-if="facts.length" class="facts">
-        <li v-for="(f, i) in facts" :key="i">
-          <span class="icon">{{ f.icon }}</span>
-          <FaceLabel :st="st" :who="f.who" :text="f.text" />
-        </li>
-      </ul>
 
       <p v-if="boardCount" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ ({{ boardCount }} ตัวเลือก)</p>
 
@@ -434,7 +426,9 @@ const boardCount = computed(() => {
               {{ PERKS[b.perk].name }} <span class="cost">{{ cost(b.perk) }}</span>
             </h3>
             <p class="text small">{{ perkText(b.perk) }}</p>
-            <div class="choices inline">
+            <!-- Breakout is a person and then a path: both are picked on the board, one at a time -->
+            <p v-if="b.perk === 'breakout'" class="board-hint">🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง</p>
+            <div v-else class="choices inline">
               <button
                 v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))"
                 :key="i"
@@ -648,31 +642,6 @@ header {
   font-size: 0.92rem;
 }
 
-.facts {
-  list-style: none;
-  margin: 0;
-  padding: 0.55rem 0.65rem;
-  display: grid;
-  gap: 0.4rem;
-  border-radius: 8px;
-  background: rgb(var(--glow) / 0.08);
-  border: 1px solid rgb(var(--glow) / 0.3);
-  font-size: 0.9rem;
-}
-.facts li {
-  display: flex;
-  gap: 0.45rem;
-  align-items: center;
-}
-.facts .icon {
-  width: 1.3rem;
-  text-align: center;
-  flex: none;
-}
-.facts :deep(.chip) {
-  width: 24px;
-  height: 24px;
-}
 
 .perk {
   display: grid;

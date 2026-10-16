@@ -14,7 +14,13 @@ import Mini from './Mini.vue'
 
 const props = defineProps<{ st: GameState }>()
 
-const current = computed(() => fx.perks[0] ?? null)
+// In the order they happened, the same way round as DiceModal: a perk that answers a roll waits
+// for that roll's dice to be shown first.
+const current = computed(() => {
+  const perk = fx.perks[0]
+  const dice = fx.dice[0]
+  return perk && (!dice || perk.id < dice.id) ? perk : null
+})
 const killer = computed(() => current.value?.owner === 'killer')
 const isItem = computed(() => !!current.value?.item)
 

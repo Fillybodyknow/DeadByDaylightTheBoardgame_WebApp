@@ -56,6 +56,8 @@ export interface BoardModes {
   calmCrow: Ref<string | null>
   /** Ace in the Hole: the prop in Ace's room picked first. */
   aceFirst: Ref<string | null>
+  /** Breakout (Yui): the wounded survivor picked, waiting for the path to move them along. */
+  breakoutTarget: Ref<number | null>
   /** An item whose target is being picked on the board. */
   itemPick: Ref<number | null>
   /** The card picked in the panel for a power that discards one (Chainsaw, Redeemer). */
@@ -421,6 +423,33 @@ function hookSpot(st: GameState, add: (key: SpotKey, label: string, run: () => v
 function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
   for (const b of perkButtons(st)) {
     const name = PERKS[b.perk].name
+    // Breakout moves one wounded survivor: pick who first, then where, so a board full of
+    // wounded friends isn't one long list of person-and-path pairs.
+    if (b.perk === 'breakout') {
+      const who = modes.breakoutTarget.value
+      if (who === null) {
+        for (const target of new Set(b.choices.map((c) => c.target!)))
+          out.push({
+            key: `s:${target}`,
+            label: `${name}: ย้าย ${st.survivors[target].name} (แล้วเลือกเส้นทาง)`,
+            style: 'act',
+            who: target,
+            run: () => ((modes.breakoutTarget.value = target), sfx.click()),
+          })
+        continue
+      }
+      for (const c of b.choices) {
+        if (c.target !== who) continue
+        const run = () => {
+          modes.breakoutTarget.value = null
+          go({ t: 'perk', perk: 'breakout', use: true, choice: c }, sfx.drop)()
+        }
+        const p = pathDef(st, c.path!)
+        const from = st.survivors[who].room
+        out.push({ key: spotKey(st, `path:${c.path}`), label: `${name}: ${pathLabel(st, c.path!, from)}`, style: 'act', run, dest: p.a === from ? p.b : p.a })
+      }
+      continue
+    }
     if (b.perk === 'ace_in_the_hole') {
       for (const first of new Set(b.choices.map((c) => c.prop!)))
         out.push({ key: `prop:${first}`, label: `${name}: สลับ prop นี้ (แล้วเลือกอีกอันในห้องติดกัน)`, style: 'act', run: () => ((modes.aceFirst.value = first), sfx.click()) })

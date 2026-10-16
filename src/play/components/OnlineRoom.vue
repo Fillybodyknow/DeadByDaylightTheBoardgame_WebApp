@@ -265,6 +265,9 @@ function start() {
         </div>
       </section>
 
+      <!-- the killer's map, on top: the character picker below is long, and this would be lost under it -->
+      <MapPicker v-if="!amKiller" :model-value="data.board ?? 'macmillan'" readonly />
+
       <!-- survivor players pick survivors -->
       <section v-if="mySlots.length" class="card">
         <h2>เลือก Survivor {{ mySlots.length > 1 ? `(คุณคุม ${mySlots.length} ตัว — แตะช่องด้านบนเพื่อสลับ)` : '' }}</h2>
@@ -294,8 +297,8 @@ function start() {
         />
       </section>
 
-      <!-- the killer picks the board; everyone else sees it -->
-      <MapPicker :model-value="data.board ?? 'macmillan'" :readonly="!amKiller" @update:model-value="setBoard" />
+      <!-- the killer picks the board (the survivors' copy of it is above) -->
+      <MapPicker v-if="amKiller" :model-value="data.board ?? 'macmillan'" @update:model-value="setBoard" />
 
       <section v-if="mySeat" class="card actions">
         <button class="lockbtn" :class="{ primary: !locked }" :disabled="session.busy || !myPicksComplete" @click="toggleLock">

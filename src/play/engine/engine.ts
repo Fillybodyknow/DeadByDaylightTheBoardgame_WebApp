@@ -1835,9 +1835,9 @@ export function perkReady(st: GameState, o: PerkOwner, perk: PerkId): boolean {
 }
 
 /**
- * Whether a perk that reaches "a survivor in your space or a connected space" finds this one: in
- * a locker they are in no space at all (p.12). Perks worded without a space (Thanatophobia,
- * Lucky Break) still apply to them.
+ * Whether a perk reaches this survivor: in a locker they are off the board for interactions,
+ * perks and killer powers (p.12), so no perk finds them there — not even one worded without a
+ * space (Thanatophobia, Lucky Break). The killer's Search of the locker is the way to them.
  */
 function inSpace(st: GameState, s: number): boolean {
   return st.survivors[s].status === 'board'
@@ -1887,7 +1887,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return st.survivors.flatMap((sv, i) => (sv.wounded && sv.status === 'board' ? [{ target: i }] : []))
     case 'thanatophobia':
       if (w.k !== 'preRoll' || !SKILL_CHECKS.includes(w.ctx.k) || st.rollMods.danger) return []
-      return st.survivors[w.ctx.s].wounded ? NONE : []
+      return inSpace(st, w.ctx.s) && st.survivors[w.ctx.s].wounded ? NONE : []
     case 'nurses_calling':
       return [] // automatic, see makeHealthy
     // ----- The Huntress -----
@@ -2076,7 +2076,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return st.survivors.flatMap((sv, i) => (sv.status === 'board' && sv.wounded ? anyMoves(st, i).map((m) => ({ target: i, path: m.path.id })) : []))
     }
     case 'lucky_break':
-      return w.k === 'greatRoll' && me!.wounded ? NONE : []
+      return w.k === 'greatRoll' && inSpace(st, w.s) && me!.wounded ? NONE : []
     case 'any_means_necessary':
       if (w.k !== 'turnEnd' || w.s !== o || me!.wounded) return []
       return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))

@@ -259,13 +259,24 @@ describe('perks', () => {
     expect(perkChoices(st, 'bond', 1, preRoll)).toEqual([])
     expect(perkChoices(st, 'unnerving_presence', 'killer', preRoll)).toEqual([])
     expect(perkChoices(st, 'off_the_record', 1, failed)).toEqual([])
-    // Thanatophobia names no space, so it still finds a wounded survivor in there
-    expect(perkChoices(st, 'thanatophobia', 'killer', preRoll)).toEqual([{}])
+    // no perk reaches in there, not even one that names no space
+    expect(perkChoices(st, 'thanatophobia', 'killer', preRoll)).toEqual([])
     // and out of the locker every one of them reaches
     st.survivors[0].status = 'board'
     expect(perkChoices(st, 'bond', 1, preRoll)).toEqual([{}])
     expect(perkChoices(st, 'unnerving_presence', 'killer', preRoll)).toEqual([{}])
     expect(perkChoices(st, 'off_the_record', 1, failed)).toEqual([{}])
+    expect(perkChoices(st, 'thanatophobia', 'killer', preRoll)).toEqual([{}])
+  })
+
+  it('Lucky Break does not answer a great success rolled from inside a locker', () => {
+    const st = game('trapper')
+    only(st)
+    Object.assign(st.survivors[2], { perks: ['lucky_break'], bp: 6, wounded: true, status: 'board' })
+    st.survivors[0].status = 'locker'
+    expect(perkChoices(st, 'lucky_break', 2, { k: 'greatRoll', s: 0 })).toEqual([])
+    st.survivors[0].status = 'board'
+    expect(perkChoices(st, 'lucky_break', 2, { k: 'greatRoll', s: 0 })).toEqual([{}])
   })
 
   it('Huntress Lullaby stops a card move but keeps the interaction', () => {

@@ -335,10 +335,14 @@ const rollers = computed(() => rerollers(props.st))
     <!-- start of a survivor's turn: Self-Care, Empathy, Botany Knowledge -->
     <template v-else-if="step.t === 'turnStart'">
       <p>เริ่มเทิร์น — ใช้ perk ก่อนเดินได้</p>
-      <p v-if="buttons.some((b) => b.choices.some((c) => !here(perkAct(b.perk, c))))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
+      <p v-if="buttons.some((b) => b.perk !== 'breakout' && b.choices.some((c) => !here(perkAct(b.perk, c))))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
       <div v-for="b in buttons" :key="b.perk" class="perk-group">
         <span class="perk-name">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
-        <button v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+        <!-- Breakout: a person and then a path, both picked on the board (a pair per button would be a wall of them) -->
+        <span v-if="b.perk === 'breakout'" class="muted small">🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง</span>
+        <template v-else>
+          <button v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+        </template>
       </div>
       <button class="primary" @click="act({ t: 'continue' })">เปิดการ์ด แล้วเดิน</button>
     </template>

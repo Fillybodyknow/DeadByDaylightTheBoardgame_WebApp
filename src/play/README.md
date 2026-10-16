@@ -91,7 +91,8 @@ and the host starts the game.
 - Boards: **MacMillan Estate** (11 rooms, 22 paths), **Autohaven Wreckers** (10 rooms, 19 path
   icons, two of them forks), **Ormond** (10 rooms, 22 paths), **Crotus Prenn Asylum** (10 rooms,
   18 path icons, one fork) — each with 4 breakable walls and all 44 props. Offline the board is
-  picked before the trial; online the killer picks it. Forsaken Boneyard and Withered Isle are
+  picked before the trial; online the killer picks it and everyone else sees his choice on a card
+  above their character picker (which is long enough to hide anything under it). Forsaken Boneyard and Withered Isle are
   not in yet.
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
@@ -172,10 +173,10 @@ Perks:
 
 - Unnerving Presence, Thanatophobia and Bond change single-die skill checks (repair, exit gate,
   cleanse, heal, locker search), not the carry roll or danger-die rolls.
-- A survivor in a locker is in no space (p.12), so a perk that reaches "a survivor in your space
-  or a connected space" skips them, even for the roll of the locker being searched: Unnerving
-  Presence, Bond and Off the Record. Perks worded without a space still find them (Thanatophobia,
-  Lucky Break).
+- A survivor in a locker is off the board for perks (p.12), so **no** perk reaches them, even for
+  the roll of the locker being searched: Unnerving Presence, Thanatophobia, Bond, Off the Record
+  and Lucky Break all skip them, whether or not the card names a space. Searching the locker is
+  the killer's way to them.
 - Bond with a danger die: two danger dice, keep one. When two dice are rolled and one kept, the
   killer gains 1 ▲ if either failed (p.18).
 - Iron Will works on any survivor roll in range, danger dice included (a bear trap, a hatchet),
