@@ -6,7 +6,7 @@ import { PERKS, PRINTED_PERKS, type PerkId } from './perks'
 import type { Action, GameState, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
-const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam']
+const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin']
 const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit']
 
 function game(killer = 'trapper', seed = 1): GameState {
@@ -49,7 +49,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(72)
+    expect(Object.keys(PERKS)).toHaveLength(75)
   })
 })
 
@@ -1075,5 +1075,54 @@ describe('Adam Francis', () => {
     const healed = apply(g, { t: 'perk', perk: 'deliverance', use: true, choice: { target: 1 } })
     expect(healed.survivors[1].wounded).toBe(false)
     expect(healed.survivors[0].wounded).toBe(true)
+  })
+})
+
+describe('Yun-Jin Lee', () => {
+  /** Yun-Jin as survivor 0 with only these perks; the killer about to interact in `room`. */
+  function yunjin(...perks: PerkId[]) {
+    let st = createGame({ board: 'macmillan', survivors: ['yunjin', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    only(st, ...perks)
+    killerInteracting(st)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true }))
+    return st
+  }
+
+  it('Smash Hit: the killer damaging a generator pays her 1 ▲', () => {
+    const st = yunjin('smash_hit')
+    const gen = placeProp(st, 'generator', st.killer.room)
+    gen.progress = 1
+    st.survivors[0].bp = 2 // room to gain (6 is her most)
+    const bp = st.survivors[0].bp
+    const offered = apply(st, { t: 'interact', i: { k: 'damage', prop: gen.id } })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'smash_hit' })
+    const paid = apply(offered, { t: 'perk', perk: 'smash_hit', use: true, choice: {} })
+    expect(paid.survivors[0].bp).toBe(bp + 1)
+  })
+
+  it('Fast Track: after the turn someone else is wounded, she repairs a generator in her room', () => {
+    const st = yunjin('fast_track', 'self_preservation')
+    const room = st.killer.room
+    st.survivors[1].room = room
+    const gen = placeProp(st, 'generator', 'shack')
+    const locker = placeProp(st, 'locker', 'shack')
+    let g = apply(st, { t: 'interact', i: { k: 'attack', target: 1 } })
+    // nothing until the killer's turn ends; then both her perks are offered together
+    for (let n = 0; n < 10 && !(g.step.t === 'offer' && ['fast_track', 'self_preservation'].includes(g.step.perk)); n++) {
+      const opts = legalActions(g)
+      g = apply(g, opts.find((a) => a.t === 'endTurn' || (a.t === 'perk' && !a.use)) ?? opts[0])
+    }
+    expect(g.step).toMatchObject({ t: 'offer', w: { k: 'killerTurnEnd' } })
+    expect(perkChoices(g, 'fast_track', 0, (g.step as Extract<GameState['step'], { t: 'offer' }>).w)).toEqual([{ prop: gen.id }])
+    expect(perkChoices(g, 'self_preservation', 0, (g.step as Extract<GameState['step'], { t: 'offer' }>).w)).toEqual([{ prop: locker.id }])
+    const rolled = apply(g, { t: 'perk', perk: 'fast_track', use: true, choice: { prop: gen.id } })
+    expect(rolled.log.some((e) => e.ev?.k === 'roll' && e.ev.s === 0 && e.ev.ctx === 'repair')).toBe(true)
+  })
+
+  it('Fast Track: not when only she was hurt', () => {
+    const st = yunjin('fast_track')
+    st.turnHurt = [0]
+    expect(perkChoices(st, 'fast_track', 0, { k: 'killerTurnEnd', turn: 0 })).toEqual([])
   })
 })

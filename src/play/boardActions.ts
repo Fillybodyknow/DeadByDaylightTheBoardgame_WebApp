@@ -71,6 +71,8 @@ export interface BoardModes {
   undyingOn: Ref<boolean>
   undyingCard: Ref<MoveCard | null>
   undyingRoom: Ref<string | null>
+  /** Diversion (Adam): the killer was clicked — his paths are the targets now. */
+  diversion: Ref<boolean>
 }
 
 type Run = (() => void) & { action?: Action }
@@ -281,6 +283,17 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       break
 
     case 'survivorInteract': {
+      // Diversion, after clicking the killer: only his paths, each with the room it sends him to
+      // (a fork asks which room next, as any move does)
+      if (modes.diversion.value) {
+        for (const i of survivorInteractions(st, s.s)) {
+          if (i.k !== 'diversion') continue
+          add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select))
+          const p = pathDef(st, i.path)
+          out[out.length - 1].dest = p.a === st.killer.room ? p.b : p.a
+        }
+        break
+      }
       if (s.canInteract) {
         const pallets = new Set<string>()
         const crows = new Set<string>()
@@ -294,10 +307,10 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             crows.add(i.prop)
             add(spotOf(i), 'Calm Spirit: ย้าย Crow (แล้วเลือกห้อง)', () => ((modes.calmCrow.value = i.prop), sfx.click()))
           } else if (i.k === 'diversion') {
-            // Diversion: the killer's path, and the room it sends him to (a fork asks which)
-            add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select))
-            const p = pathDef(st, i.path)
-            out[out.length - 1].dest = p.a === st.killer.room ? p.b : p.a
+            // Diversion: the killer first, then his paths (in its own mode, above). Once, however
+            // many paths; with Power Struggle on him too, a click asks which.
+            if (!out.some((a) => a.key === 'killer' && a.label.startsWith('Diversion')))
+              add('killer', `Diversion: ส่ง ${st.killer.name} (แล้วเลือกเส้นทาง)`, () => ((modes.diversion.value = true), sfx.click()))
           } else add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
         }
       }

@@ -12,6 +12,7 @@ import { asset } from '../../i18n'
 import type { MoveCard } from '../engine/types'
 import { CARD_NAMES } from '../engine/engine'
 import { CARD_TH, cardImage, cardLabel } from '../labels'
+import { openHands } from '../hands'
 
 export interface HandCard {
   card: MoveCard
@@ -30,7 +31,11 @@ export interface HandCard {
  * `prompt`: a perk, power or passive is waiting for a card from here — the hand lights up and
  * says which one, so the choice isn't missed in the corner of the screen.
  */
-const props = defineProps<{ cards: HandCard[]; label: string; prompt?: string }>()
+/**
+ * `passive`: only to look at (online, your own hand while nothing asks for a card) — the cards
+ * can't be picked, and it doesn't count as a hand out.
+ */
+const props = defineProps<{ cards: HandCard[]; label: string; prompt?: string; passive?: boolean }>()
 /** `pick`: the card, and its place in `cards` (The Blight's hand holds two of each). */
 const emit = defineEmits<{ pick: [card: MoveCard, index: number]; hover: [card: MoveCard | null] }>()
 
@@ -48,6 +53,8 @@ const fan = computed(() => {
 // While a hand is out, the side panel stops above it (GameScreen). Counted on the body, as one
 // hand can mount before the previous one unmounts.
 function hands(delta: number) {
+  if (props.passive) return
+  openHands.value = Math.max(0, openHands.value + delta)
   const b = document.body
   const n = Math.max(0, Number(b.dataset.hands ?? 0) + delta)
   b.dataset.hands = String(n)
@@ -61,7 +68,7 @@ onBeforeUnmount(() => hands(-1))
   <Teleport to="body">
     <!-- The hand rests sunk, names showing, and rises while the pointer is on it — also when a
          perk asks for a card (it glows, and its prompt sits just above the names). -->
-    <div class="hand" :class="{ ask: !!prompt }" role="group" :aria-label="label">
+    <div class="hand" :class="{ ask: !!prompt, passive }" role="group" :aria-label="label">
       <p v-if="prompt" class="prompt">⚡ {{ prompt }}</p>
       <div class="fan">
         <button
@@ -77,7 +84,8 @@ onBeforeUnmount(() => hands(-1))
           @mouseleave="emit('hover', null)"
           @focus="emit('hover', c.card)"
           @blur="emit('hover', null)"
-          @click="emit('pick', c.card, i)"
+          :aria-disabled="passive || undefined"
+          @click="!passive && emit('pick', c.card, i)"
         >
           <span class="face">
             <img :src="asset(cardImage(c.card))" :alt="cardLabel(c.card)" draggable="false" />
@@ -184,6 +192,22 @@ onBeforeUnmount(() => hands(-1))
   height: 252px;
 }
 /* The button: the card's place, a bit taller than the card so the risen card is still on it. */
+/* your own hand, only to look at: no pointer cue to pick, a little dimmer */
+.hand.passive .slot {
+  cursor: default;
+}
+.hand.passive .face {
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.7)) saturate(0.8);
+}
+/* on a tablet a hand to pick from stays up; your own, only to look at, rests sunk (a tap raises it) */
+@media (hover: none) {
+  .hand.passive:not(:has(.face:hover)) .face {
+    --lift: 132px;
+  }
+  .hand.passive:not(:has(.face:hover)) + .tray {
+    height: 120px;
+  }
+}
 .slot {
   position: relative;
   flex: none;

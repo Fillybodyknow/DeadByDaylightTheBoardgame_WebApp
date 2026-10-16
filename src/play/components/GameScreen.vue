@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
-import { anyMoves, boardOf, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, survivorInteractions, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
 import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
+import { openHands } from '../hands'
+import CardHand, { type HandCard } from './CardHand.vue'
 import { canUndo, controls, dispatch, myTurn, online, quitGame, undo } from '../game'
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
@@ -141,6 +143,8 @@ const aceFirst = ref<string | null>(null)
 const itemPick = ref<number | null>(null)
 /** Breakout: the wounded survivor picked, waiting for where to move them. */
 const breakoutTarget = ref<number | null>(null)
+/** Diversion: the killer was clicked, his paths are the targets. */
+const diversion = ref(false)
 /** A fork's icon was clicked: its moves, waiting for the room to go to. */
 const forkMoves = shallowRef<BoardAction[] | null>(null)
 /** Oppression: generators picked on the board, waiting for confirm. */
@@ -173,7 +177,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion }
 
 watch(
   () => view.value.step,
@@ -186,6 +190,7 @@ watch(
     calmCrow.value = null
     aceFirst.value = null
     breakoutTarget.value = null
+    diversion.value = false
     itemPick.value = null
     forkMoves.value = null
     multiPick.value = []
@@ -205,6 +210,17 @@ const boardFocus = computed(() => {
     const s = breakoutTarget.value
     const moves = anyMoves(st, s)
     return { survivors: [s], killer: false, rooms: [st.survivors[s].room], paths: moves.map((m) => m.path.id), dests: moves.map((m) => m.to) }
+  }
+  // Diversion: the killer, and the paths he can be sent along
+  if (diversion.value) {
+    const st = view.value
+    const s = st.step
+    const paths = s.t === 'survivorInteract' ? survivorInteractions(st, s.s).flatMap((i) => (i.k === 'diversion' ? [i.path] : [])) : []
+    const dests = paths.map((id) => {
+      const p = boardOf(st).paths.find((x) => x.id === id)!
+      return p.a === st.killer.room ? p.b : p.a
+    })
+    return { survivors: [], killer: true, rooms: [st.killer.room], paths, dests }
   }
   // A fork's icon was clicked: dim everything but the rooms it can lead to, so the two or three
   // choices stand out (the icon itself is one spot for all of them).
@@ -326,6 +342,8 @@ const modeBar = computed(() => {
       text: `ทางแยก: คลิกห้องที่จะไปบนแผนที่ — ${forkMoves.value.map((a) => roomName(view.value, a.dest!)).join(' · ')}`,
       cancel: () => (forkMoves.value = null),
     }
+  // after the fork: picking its room comes first, and its way out goes back to the paths
+  if (diversion.value) return { text: `Diversion: คลิกเส้นทางที่จะส่ง ${view.value.killer.name} ไป (ทางแยกจะให้เลือกห้องต่อ)`, cancel: () => (diversion.value = false) }
   // Undying: card → path → (room, at a fork) → prop; each step says what to do and goes back one
   const kind = stepKind(view.value, modes)
   if (kind) {
@@ -498,6 +516,22 @@ watch(turnSignature, (now, before) => {
 // banner, makes the side panel glow, and — with the tab in the background — blinks the tab title
 // and sends a system notification. While it stays this player's turn a gold pill at the top and a
 // gold glow round the screen say so, and every 20 s without a move it all rings again.
+
+/**
+ * Online, this player's own movement cards, always at hand to look at (sunk, rising on hover)
+ * while nothing asks for one; a hand to pick from takes its place when something does. The
+ * killer's (The Blight holds two of each) are grouped with a count.
+ */
+const ownHand = computed<HandCard[]>(() => {
+  const o = online.value
+  const st = view.value
+  if (!o?.seat || st.phase === 'setup' || st.phase === 'over') return []
+  const cards = o.seat === KILLER_PLAYER ? st.killer.hand : (st.survivorHands[st.handPlayers.indexOf(o.seat)] ?? [])
+  return [...new Set(cards)].map((card) => {
+    const n = cards.filter((c) => c === card).length
+    return { card, picked: false, ...(n > 1 ? { count: n } : {}) }
+  })
+})
 
 /** Online, the game waits on this device now. */
 const yourTurn = computed(() => !!online.value?.seat && myTurn.value && props.st.phase !== 'over')
@@ -831,6 +865,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     </main>
 
     <!-- terror radius: the screen edge pulses with the heartbeat -->
+    <!-- online: your own hand, to look at, while no hand to pick from is out -->
+    <CardHand v-if="ownHand.length && openHands === 0" :cards="ownHand" label="มือของคุณ" passive />
     <!-- online: the others are waiting on this device — a lasting pill, and a gold edge -->
     <div v-if="yourTurn" class="your-turn-edge" aria-hidden="true" />
     <div v-if="yourTurn" class="your-turn" role="status" aria-live="polite">

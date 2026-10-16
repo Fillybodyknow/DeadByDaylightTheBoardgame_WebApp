@@ -105,7 +105,9 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   several survivors switches between them with tabs. The hand floats in the bottom-right corner,
   sunk so only the card names show (the side panel stops above them), and rises while the pointer is on a card (or when
   a perk asks for one; on a tablet it stays up). It has no label of its own. Each card's button stays still and only the card face inside it moves, so the card
-  can't bounce under the pointer.
+  can't bounce under the pointer. Online, while nothing asks for a card, the player's own hand
+  rests there anyway, only to look at (`passive`; `openHands` in `hands.ts` says when a hand to
+  pick from is out and takes its place).
 - **Your own face-down cards can be peeked at:** click one on the player tiles to see your cards
   big in the middle of the screen (the killer sees all his planned cards); a click anywhere
   turns them face down again. Online only the owner can; on one device anyone can, as at a real

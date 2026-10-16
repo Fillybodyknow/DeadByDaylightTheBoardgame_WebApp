@@ -71,6 +71,9 @@ export type PerkId =
   | 'for_the_people'
   | 'off_the_record'
   | 'power_struggle'
+  | 'fast_track'
+  | 'smash_hit'
+  | 'self_preservation'
   | 'diversion'
   | 'autodidact'
   | 'deliverance'
@@ -169,6 +172,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   diversion: def('diversion', 'Diversion', 2, 'survivor', 'adam', 0, 'เป็น Interaction กับฆาตกรในห้องเดียวกัน'),
   autodidact: def('autodidact', 'Autodidact', 2, 'survivor', 'adam', 1, 'ปุ่มตอนคนในห้อง/ห้องติดกันทอยได้สำเร็จ'),
   deliverance: def('deliverance', 'Deliverance', 1, 'survivor', 'adam', 2, 'ถามหลังคุณช่วยคนลงจาก Hook หรือถูกช่วยลง'),
+  fast_track: def('fast_track', 'Fast Track', 1, 'survivor', 'yunjin', 0, 'ถามตอนจบเทิร์นที่คนอื่นบาดเจ็บ / ถูกแขวน'),
+  smash_hit: def('smash_hit', 'Smash Hit', 0, 'survivor', 'yunjin', 1, 'ถามเมื่อฆาตกรทุบ Pallet / กำแพง หรือทำลาย Generator'),
+  self_preservation: def('self_preservation', 'Self-Preservation', 1, 'survivor', 'yunjin', 2, 'ถามตอนจบเทิร์นที่คนอื่นบาดเจ็บ / ถูกแขวน'),
   power_struggle: def('power_struggle', 'Power Struggle', 2, 'survivor', 'elodie', 0, 'เป็น Interaction กับฆาตกรในห้องเดียวกัน'),
   appraisal: def('appraisal', 'Appraisal', 2, 'survivor', 'elodie', 1, 'ถามเมื่อผู้รอดชีวิตคนอื่นทิ้ง item'),
   deception: def('deception', 'Deception', 0, 'survivor', 'elodie', 2, 'ถามก่อนเดินในเทิร์นตัวเอง'),

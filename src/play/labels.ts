@@ -303,6 +303,14 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `ลูกที่ ${c.index! + 1} → สำเร็จอย่างยิ่ง`
     case 'deliverance':
       return `${name(c.target!)} หายบาดเจ็บ`
+    case 'fast_track': {
+      const g = prop(st, c.prop!)
+      return `ซ่อม Generator ที่ ${roomName(st, g.room!)} (${g.progress}/${PROGRESS_MAX})`
+    }
+    case 'self_preservation':
+      return `ซ่อนใน Locker ที่ ${roomName(st, prop(st, c.prop!).room!)}`
+    case 'smash_hit':
+      return '+1 ▲'
     case 'rancor':
       return `ลาก ${name(c.target!)} ไปด้วย`
     case 'haunted_ground': {

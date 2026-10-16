@@ -135,9 +135,14 @@ const moves = computed(() => {
   return []
 })
 
+const hasDiversion = computed(() => {
+  const s = step.value
+  return s.t === 'survivorInteract' && s.canInteract && survivorInteractions(props.st, s.s).some((i) => i.k === 'diversion')
+})
+
 const sInteractions = computed(() => {
   const s = step.value
-  return s.t === 'survivorInteract' && s.canInteract ? survivorInteractions(props.st, s.s).filter((i) => i.k !== 'calmSpirit') : []
+  return s.t === 'survivorInteract' && s.canInteract ? survivorInteractions(props.st, s.s).filter((i) => i.k !== 'calmSpirit' && i.k !== 'diversion') : []
 })
 
 /** Calm Spirit: one entry per crow, each with the rooms it can be sent to. */
@@ -439,12 +444,14 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <!-- survivor interact -->
     <template v-else-if="step.t === 'survivorInteract'">
       <p v-if="!step.canInteract" class="warn">เคลื่อนที่ไม่สำเร็จ — เทิร์นนี้ Interact ไม่ได้</p>
-      <p v-else-if="sInteractions.length">
+      <p v-else-if="sInteractions.length || hasDiversion">
         Interact 1 อย่าง ที่ {{ roomName(st, st.survivors[step.s].room) }}<br /><span class="muted small">คลิกของหรือตัวละครที่เรืองแสงบนแผนที่ได้เลย</span>
       </p>
       <p v-else class="muted">ไม่มีอะไรให้ Interact ในห้องนี้</p>
       <div class="buttons col">
         <button v-for="(i, n) in sInteractions" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="survivorInteractionLabel(st, step.s, i)" /></button>
+        <!-- Diversion is played on the board: the killer, then the path -->
+        <p v-if="hasDiversion" class="board-hint">🎯 Diversion: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
         <details v-for="c in calmSpirit" :key="c.prop" class="calm">
           <summary>Calm Spirit: ย้าย Crow ไปห้องอื่น (ฟรี)</summary>
           <div class="buttons">

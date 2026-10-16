@@ -102,7 +102,7 @@ and the host starts the game.
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
   The Twins, The Blight, The Spirit** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
 - Mode **Adept**: each character plays the 3 perks printed on their board (66 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
@@ -288,6 +288,12 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   one — struggling free from a carry too (one great success frees them). Not on a Phantasm roll.
 - Deliverance: after Adam takes someone off a hook, or someone takes him off one; placing the
   Entity on an empty hook isn't a rescue. Adam picks which of the two wounded is healed.
+- Fast Track / Self-Preservation (Yun-Jin): "the turn" is any turn, a survivor's or one of the
+  killer's; at its end, if another survivor was wounded (by anything, a perk of their own too) or
+  hung on a hook during it, she may repair a generator / hide in a locker in her room — an
+  interaction out of her own turn. Both may be offered at the same moment; each once a round.
+- Smash Hit: any pallet the killer breaks (Enduring's too), any wall he moves through (Diversion's
+  too), any generator he damages (with progress or not).
 - Undying: the killer's interaction for the turn, with a prop in a room joined to his by a path
   of the discarded card's colour (either direction). It is an ordinary interaction over there, so
   damaging a generator with it still sets off Overcharge, Gearhead, Oppression, Dragon's Grip and

@@ -934,6 +934,7 @@ function runTask(st: GameState, task: Task) {
     case 'survivorTurn': {
       const sv = st.survivors[task.s]
       st.activeSurvivor = task.s
+      st.turnHurt = []
       sv.plannedRevealed = true
       sv.acted = true
       st.canInteract = true
@@ -1054,6 +1055,7 @@ function runTask(st: GameState, task: Task) {
       const k = st.killer
       // Zanshin Tactics comes at the start of the turn, before the card is revealed.
       if (!task.begun) {
+        st.turnHurt = []
         st.queue.unshift({ k: 'trigger', w: { k: 'killerTurnBegin', turn: task.turn }, done: [] }, { ...task, begun: true })
         return
       }
@@ -1471,6 +1473,7 @@ function hang(st: GameState, s: number, hook: Prop) {
   sv.status = 'hooked'
   sv.room = hook.room!
   hook.occupant = s
+  hurt(st, s)
   log(st, `${sv.name} ถูกแขวนบน Hook`, 'killer', { ev: { k: 'hook', s, prop: hook.id } })
   if (perkReady(st, 'killer', 'bloodhound')) {
     payPerk(st, 'killer', 'bloodhound', `${sv.name} −1 ▲, +1 ▲`)
@@ -1742,6 +1745,7 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
       } else {
         sv.wounded = true
         sv.woundedThisRound = true
+        hurt(st, s)
         log(st, `${sv.name} ติด Bear Trap — บาดเจ็บ`, 'killer', { ev: { k: 'trapSprung', s, path: ctx.path } })
         emit(st, { k: 'wound', s, by: 'trap' }, 'killer')
       }
@@ -2203,6 +2207,18 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     }
     case 'spirit_fury':
       return w.k === 'killerBreak' && w.what === 'pallet' ? NONE : []
+    // ----- Yun-Jin -----
+    case 'smash_hit':
+      return w.k === 'killerBreak' ? NONE : []
+    case 'fast_track':
+    case 'self_preservation': {
+      // at the end of a turn (a survivor's or the killer's) in which someone else was wounded or
+      // hung: an interaction with a generator / locker in her room, out of her own turn
+      if (w.k !== 'turnEnd' && w.k !== 'killerTurnEnd') return []
+      if (!(st.turnHurt ?? []).some((t) => t !== o)) return []
+      const want = perk === 'fast_track' ? 'repair' : 'hide'
+      return allSurvivorInteractions(st, o as number).flatMap((i) => (i.k === want ? [{ prop: i.prop }] : []))
+    }
     // ----- Élodie -----
     case 'power_struggle':
     case 'diversion':
@@ -2589,6 +2605,16 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       ;[a2.room, b.room] = [b.room, a2.room]
       return
     }
+    case 'smash_hit':
+      payPerk(st, o, perk, '+1 ▲')
+      gainSurvivor(st, o as number, 1)
+      return
+    case 'fast_track':
+      payPerk(st, o, perk, 'ซ่อม Generator')
+      return survivorInteract(st, o as number, { k: 'repair', prop: c.prop! })
+    case 'self_preservation':
+      payPerk(st, o, perk, 'ซ่อนใน Locker')
+      return survivorInteract(st, o as number, { k: 'hide', prop: c.prop! })
     case 'spirit_fury':
       payPerk(st, o, perk, '+2 ▲')
       gainKiller(st, 2)
@@ -2750,10 +2776,16 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
 }
 
 /** Yui and Zarina wound themselves for a perk (it counts as wounded this round, p.15). */
+/** Someone was wounded or hung this turn: Fast Track and Self-Preservation answer at its end. */
+function hurt(st: GameState, s: number) {
+  st.turnHurt = [...new Set([...(st.turnHurt ?? []), s])]
+}
+
 function selfWound(st: GameState, s: number) {
   const sv = st.survivors[s]
   sv.wounded = true
   sv.woundedThisRound = true
+  hurt(st, s)
   log(st, `${sv.name} ยอมบาดเจ็บ`, s, { ev: { k: 'wound', s, by: 'perk' } })
 }
 
@@ -3056,5 +3088,6 @@ function wound(st: GameState, s: number, by: 'attack' | 'trap' | 'power' | 'perk
   if (sv.wounded) return
   sv.wounded = true
   sv.woundedThisRound = true
+  hurt(st, s)
   log(st, text, 'killer', { ev: { k: 'wound', s, by } })
 }

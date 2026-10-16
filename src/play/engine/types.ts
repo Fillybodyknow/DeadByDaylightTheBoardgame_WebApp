@@ -543,6 +543,8 @@ export interface GameState {
   rollMods: { danger: boolean; keep: boolean; retribution?: boolean }
   /** Stridor: this survivor's planned card is played face up. */
   stridor: number | null
+  /** Survivors wounded or hung during the turn being played (Fast Track, Self-Preservation). */
+  turnHurt?: number[]
   /** Rooms with one of The Hag's Phantasm Traps (7 tokens, one per room). */
   phantasm: string[]
   /** The Third Seal: survivors' cards of this kind don't move them this round. */

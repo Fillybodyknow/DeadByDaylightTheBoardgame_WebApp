@@ -98,6 +98,17 @@ function miniRect(box: number[], i: number, killer = false): Rect {
   return { x: x + w * (killer ? 0.78 : 0.03 + i * (MINI + 0.02)), y: y + h * 0.2, w: w * (killer ? MINI * 1.25 : MINI) }
 }
 
+/**
+ * A survivor being carried: slung over the killer's shoulder — touching the top-left of his mini,
+ * smaller, so the two read as one piece and move together while his face stays in sight.
+ */
+function carryRect(box: number[]): Rect {
+  const k = miniRect(box, 0, true)
+  // smaller than him and mostly off to his upper left: only the shoulder is covered
+  const w = k.w * 0.62
+  return { x: k.x - w * 0.62, y: k.y - w * board.value.aspect * 0.62, w }
+}
+
 const rectStyle = (r: Rect) => ({ left: pct(r.x), top: pct(r.y), width: pct(r.w) })
 
 /** Centre of a rect as board fractions (a square: its height is w × aspect of the height). */
@@ -126,7 +137,9 @@ const rects = computed(() => {
   const tiles = new Map<string, Rect>()
   for (const r of rooms.value) {
     r.props.forEach((p, i) => tiles.set(p.id, tileRect(r.box, i, r.props.length)))
-    r.survivors.forEach((s, i) => minis.set(`s${s}`, miniRect(r.box, i)))
+    // the survivors standing take the slots in turn; one being carried rides on the killer
+    let slot = 0
+    for (const s of r.survivors) minis.set(`s${s}`, props.st.survivors[s].status === 'carried' ? carryRect(r.box) : miniRect(r.box, slot++))
     if (r.killer) minis.set('k', miniRect(r.box, 0, true))
     if (r.victor) minis.set('v', victorRect(r.box, r.killer))
   }
@@ -502,7 +515,7 @@ function guard(e: MouseEvent) {
       </component>
       <component
         :is="canAct(`s:${s}`) || roomTarget(r.id) ? 'button' : 'div'"
-        v-for="(s, i) in r.survivors"
+        v-for="s in r.survivors"
         :key="`s-${s}`"
         :data-mini="`s${s}`"
         :data-madness="st.survivors[s].madness || undefined"
@@ -515,8 +528,8 @@ function guard(e: MouseEvent) {
           focus: isFocused(s),
           hot: isHot(s),
         }"
-        :style="rectStyle(miniRect(r.box, i))"
-        :title="interactTargets[`s:${s}`] ?? st.survivors[s].name"
+        :style="rectStyle(rects.minis.get(`s${s}`)!)"
+        :title="st.survivors[s].status === 'carried' ? `${st.survivors[s].name} — ถูก${st.killer.name}แบก` : (interactTargets[`s:${s}`] ?? st.survivors[s].name)"
         @click="clickPiece(`s:${s}`, r.id)"
         @contextmenu.prevent="emit('inspect', { k: 'survivor', s })"
         @pointerdown="pressStart($event, { k: 'survivor', s })"
@@ -533,7 +546,7 @@ function guard(e: MouseEvent) {
         v-if="r.killer"
         data-mini="k"
         class="mini killer"
-        :class="{ act: canAct('killer'), focus: focus?.killer }"
+        :class="{ act: canAct('killer'), focus: focus?.killer, carrying: r.survivors.some((s) => st.survivors[s].status === 'carried') }"
         :style="rectStyle(miniRect(r.box, 0, true))"
         :title="interactTargets.killer ?? st.killer.name"
         @click="clickPiece('killer', r.id)"
@@ -894,8 +907,37 @@ button.tile.picked::after {
     filter: drop-shadow(0 0 10px rgb(255 214 140 / 0.9)) brightness(1.12);
   }
 }
+/* Carried: slung over the killer's shoulder, head down, kicking to get free. 'rotate' (not
+   transform) so the walk along a path, which moves the mini with a transform, carries it along. */
 .mini.survivor.carried {
-  transform: translate(25%, -25%) rotate(-25deg);
+  z-index: 6;
+  rotate: -72deg;
+  filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.95)) saturate(0.85);
+  animation: struggle 1.1s ease-in-out infinite;
+}
+@keyframes struggle {
+  0%,
+  100% {
+    rotate: -72deg;
+  }
+  20% {
+    rotate: -60deg;
+  }
+  35% {
+    rotate: -80deg;
+  }
+  50% {
+    rotate: -66deg;
+  }
+}
+/* the killer bears the weight: leaning into the carry */
+.mini.killer.carrying {
+  rotate: 8deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mini.survivor.carried {
+    animation: none;
+  }
 }
 .mini.killer {
   box-shadow:
