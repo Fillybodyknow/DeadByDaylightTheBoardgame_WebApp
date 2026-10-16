@@ -29,19 +29,50 @@ function handCards(st: GameState, hand: number): (MoveCard | null)[] {
 describe('online planning (planHand)', () => {
   it('waits for every hand, then plans all survivors at once (5 players)', () => {
     let st = toPlanning(5)
-    expect(actorsOf(st)).toEqual([2, 3, 4, 5])
+    // everyone plans at the same time: the four survivor players and the killer
+    expect(actorsOf(st)).toEqual([1, 2, 3, 4, 5])
     for (const hand of [2, 0, 3]) {
       st = apply(st, { t: 'planHand', hand, cards: handCards(st, hand) })
       expect(st.step.t).toBe('planSurvivors')
       expect(st.survivors.every((sv) => sv.planned === null)).toBe(true) // still face down, not placed
     }
     expect(handsToPlan(st)).toEqual([1])
-    expect(actorsOf(st)).toEqual([3])
+    expect(actorsOf(st)).toEqual([1, 3])
     st = apply(st, { t: 'planHand', hand: 1, cards: handCards(st, 1) })
     expect(st.step.t).toBe('planKiller')
     expect(st.survivors.every((sv) => sv.planned !== null)).toBe(true)
     expect(st.planDraft).toBeUndefined()
     expect(actorsOf(st)).toEqual([1])
+  })
+
+  it('lets the killer plan while the survivors do; the last one in starts the round', () => {
+    let st = toPlanning(5)
+    const [a, b] = st.killer.hand
+    st = apply(st, { t: 'planKiller', cards: [a, b] })
+    // held, not played: the killer is done, the survivors are still being waited on
+    expect(st.step.t).toBe('planSurvivors')
+    expect(st.killerDraft).toEqual([a, b])
+    expect(st.killer.planned).toEqual([])
+    expect(actorsOf(st)).toEqual([2, 3, 4, 5])
+    expect(mayAct(st, 1, { t: 'planKiller', cards: [a, b] })).toBe(false) // only once
+    for (const hand of [0, 1, 2]) st = apply(st, { t: 'planHand', hand, cards: handCards(st, hand) })
+    expect(st.step.t).toBe('planSurvivors')
+    st = apply(st, { t: 'planHand', hand: 3, cards: handCards(st, 3) })
+    // the last hand starts the round straight away, with the killer's cards in place
+    expect(st.killer.planned).toEqual([a, b])
+    expect(st.killerDraft).toBeUndefined()
+    expect(st.phase).toBe('survivors')
+    expect(st.step.t).not.toBe('planKiller')
+  })
+
+  it('only the killer may send the killer plan, and only with cards in hand', () => {
+    const st = toPlanning(5)
+    const [a, b] = st.killer.hand
+    expect(mayAct(st, 1, { t: 'planKiller', cards: [a, b] })).toBe(true)
+    expect(mayAct(st, 2, { t: 'planKiller', cards: [a, b] })).toBe(false)
+    expect(tryApply(st, { t: 'planKiller', cards: [a] as unknown as MoveCard[] })).toBeNull()
+    const none = st.killer.hand.includes('wait') ? [] : (['wait', 'wait'] as MoveCard[])
+    if (none.length) expect(tryApply(st, { t: 'planKiller', cards: none })).toBeNull()
   })
 
   it('makes a two-survivor hand pick two different cards (p.19)', () => {
@@ -50,7 +81,7 @@ describe('online planning (planHand)', () => {
     expect(tryApply(st, { t: 'planHand', hand: 0, cards: [a, a, null, null] })).toBeNull()
     const ok = tryApply(st, { t: 'planHand', hand: 0, cards: handCards(st, 0) })
     expect(ok?.step.t).toBe('planSurvivors')
-    expect(actorsOf(ok!)).toEqual([3])
+    expect(actorsOf(ok!)).toEqual([1, 3]) // the other hand, and the killer still planning
   })
 
   it('skips hooked survivors', () => {
@@ -98,6 +129,14 @@ function playOnline(seed: number, players: GameConfig['players']): GameState {
     const actors = actorsOf(st)
     expect(actors.length, `nobody may act at step ${st.step.t}`).toBeGreaterThan(0)
     if (st.step.t === 'planSurvivors') {
+      // half the time the killer gets his plan in first, as he may online
+      if (!st.killerDraft && rand(2) === 0) {
+        const [l, r] = st.killer.hand
+        const killer = tryApply(st, { t: 'planKiller', cards: [l, r] })
+        expect(killer, 'planKiller during planning rejected').not.toBeNull()
+        st = killer!
+        continue
+      }
       const hand = handsToPlan(st)[0]
       const next = tryApply(st, { t: 'planHand', hand, cards: handCards(st, hand) })
       expect(next, 'planHand rejected').not.toBeNull()

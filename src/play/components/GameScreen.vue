@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, sfx, startHeartbeat, stopHeartbeat } from '../../sound'
-import { boardOf, isGreat, PROGRESS_MAX, succeeded, touchingPaths } from '../engine/engine'
+import { boardOf, CARD_NAMES, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { canUndo, dispatch, myTurn, online, quitGame, undo } from '../game'
-import { actorsOf } from '../engine/seats'
+import { KILLER_PLAYER, actorsOf } from '../engine/seats'
 import { closeOnlineGame, isHost, leaveRoom, session } from '../online/session'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { boardActionKeys, boardActions, boardTargets, powerMode as isPowerMode, type BoardAction, type BoardModes } from '../boardActions'
+import { boardActionKeys, boardActions, boardTargets, powerMode as isPowerMode, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
 import ActionPanel from './ActionPanel.vue'
 import BannerHost from './BannerHost.vue'
@@ -98,8 +98,12 @@ watch(
 
 /** The killer chose "use power": the power's targets are now on the board. */
 const powerOn = ref(false)
-/** Undying (The Blight): choosing which prop in a connected room to reach. */
+/** Undying (The Blight): using it, a step at a time — the card, the path, then the prop. */
 const undyingOn = ref(false)
+const undyingCard = ref<MoveCard | null>(null)
+const undyingRoom = ref<string | null>(null)
+watch(undyingOn, () => ((undyingCard.value = null), (undyingRoom.value = null)))
+watch(undyingCard, () => (undyingRoom.value = null))
 /** Bear trap placement when the supply is empty: the path picked, waiting for which trap to move. */
 const trapPath = ref<string | null>(null)
 /** The Hillbilly picked the card to discard for the chainsaw (in the panel). */
@@ -122,14 +126,31 @@ const oppressing = computed(() => {
   const s = view.value.step
   return s.t === 'offer' && s.perk === 'oppression' && myTurn.value
 })
+/** The generators picked, in the engine's own order, as the choice to send. */
+const oppressionChoice = computed(() => {
+  const s = view.value.step
+  if (s.t !== 'offer' || !multiPick.value.length) return null
+  const want = [...multiPick.value].sort().join()
+  // The engine lists each pair one way round only, so match on the set, not the order clicked.
+  return perkChoices(view.value, 'oppression', s.owner, s.w).find((c) => [c.prop, c.prop2].filter(Boolean).sort().join() === want) ?? null
+})
+/** The picked generators in words: "Main Garage 3→2 · Barn 2→1". */
+const oppressionPicks = computed(() =>
+  multiPick.value
+    .map((id) => view.value.props.find((p) => p.id === id)!)
+    .map((p) => `${roomName(view.value, p.room!)} ${p.progress}→${p.progress - 1}`)
+    .join(' · '),
+)
 function confirmOppression() {
-  const [prop, prop2] = multiPick.value
-  if (!prop) return
-  if (dispatch({ t: 'perk', perk: 'oppression', use: true, choice: prop2 ? { prop, prop2 } : { prop } })) sfx.select()
-  multiPick.value = []
+  const choice = oppressionChoice.value
+  if (!choice) return
+  if (dispatch({ t: 'perk', perk: 'oppression', use: true, choice })) {
+    sfx.select()
+    multiPick.value = []
+  }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick, powerCard, forkMoves, multiPick, undyingOn }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom }
 
 watch(
   () => view.value.step,
@@ -144,6 +165,8 @@ watch(
     itemPick.value = null
     forkMoves.value = null
     multiPick.value = []
+    undyingCard.value = null
+    undyingRoom.value = null
   },
 )
 
@@ -152,12 +175,24 @@ const powerMode = computed(() => isPowerMode(view.value, modes))
 
 /** While a perk or power is being decided, the board points at who and where. */
 const boardFocus = computed(() => {
-  // Undying: the killer's room and the rooms it reaches, along the paths of the cards in hand
+  // A fork's icon was clicked: dim everything but the rooms it can lead to, so the two or three
+  // choices stand out (the icon itself is one spot for all of them).
+  const fork = forkMoves.value
+  if (fork) {
+    const st = view.value
+    const s = st.step
+    const from = s.t === 'survivorMove' || s.t === 'anyMove' ? st.survivors[s.s].room : st.killer.room
+    return { survivors: [], killer: false, rooms: [from], paths: [fork[0].key.slice(5)], dests: fork.flatMap((a) => (a.dest ? [a.dest] : [])) }
+  }
+  // Undying: the killer's room, and what the step is about — the rooms the card reaches, or the
+  // one room its prop is being picked in.
   if (undyingOn.value) {
     const st = view.value
-    const reach = actions.value.flatMap((a) => (a.key.startsWith('prop:') ? [st.props.find((p) => p.id === a.key.slice(5))?.room ?? ''] : []))
-    const paths = touchingPaths(st, st.killer.room).filter((p) => reach.includes(p.a === st.killer.room ? p.b : p.a) && st.killer.hand.includes(p.kind))
-    return { survivors: [], killer: true, rooms: [st.killer.room], paths: paths.map((p) => p.id), dests: [...new Set(reach)] }
+    const base = { survivors: [], killer: true, rooms: [st.killer.room] }
+    if (undyingRoom.value) return { ...base, rooms: [st.killer.room, undyingRoom.value], paths: [], dests: [undyingRoom.value] }
+    const cards = undyingCard.value ? [undyingCard.value] : undyingCards(st)
+    const reach = cards.flatMap((c) => undyingPaths(st, c))
+    return { ...base, paths: reach.flatMap((r) => r.paths), dests: reach.map((r) => r.to) }
   }
   return decisionFocus(view.value, powerMode.value)?.focus ?? null
 })
@@ -168,6 +203,16 @@ const actions = computed(() => boardActions(view.value, modes))
 const targets = computed(() => (myTurn.value ? boardTargets(actions.value) : boardTargets([])))
 /** What the board already offers: the side panels leave these out and point at the board. */
 const onBoard = computed(() => (myTurn.value ? boardActionKeys(actions.value) : new Set<string>()))
+
+/** Online planning: what this device has already sent, while the others finish. */
+const myPlanDone = computed(() => {
+  const st = view.value
+  const o = online.value
+  if (!o?.seat || st.step.t !== 'planSurvivors') return null
+  if (o.seat === KILLER_PLAYER) return st.killerDraft ? `คุณวางการ์ดแล้ว: ${st.killerDraft.map((c) => CARD_NAMES[c]).join(' → ')}` : null
+  const mine = st.survivors.flatMap((sv, i) => (st.handPlayers[sv.hand] === o.seat && st.planDraft?.[i] ? [`${sv.name} — ${CARD_NAMES[st.planDraft![i]!]}`] : []))
+  return mine.length ? `คุณวางการ์ดแล้ว: ${mine.join(' · ')}` : null
+})
 
 /** Online: who the game is waiting on, for the side panel. */
 const waitingOn = computed(() => {
@@ -212,8 +257,18 @@ const modeBar = computed(() => {
   if (aceFirst.value) return { text: 'Ace in the Hole: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
   if (trapPath.value) return { text: 'Bear Trap หมดมือ: คลิก Bear Trap บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
   if (itemPick.value !== null) return { text: 'เลือกเป้าหมายของ item บนแผนที่', cancel: () => (itemPick.value = null) }
-  if (forkMoves.value) return { text: 'ทางแยก: คลิกห้องที่จะไปบนแผนที่', cancel: () => (forkMoves.value = null) }
-  if (undyingOn.value) return { text: 'Undying: คลิก prop ในห้องที่เชื่อมกันบนแผนที่ (ทิ้งการ์ดสีเดียวกับเส้นทาง)', cancel: () => (undyingOn.value = false) }
+  if (forkMoves.value)
+    return {
+      text: `ทางแยก: คลิกห้องที่จะไปบนแผนที่ — ${forkMoves.value.map((a) => roomName(view.value, a.dest!)).join(' · ')}`,
+      cancel: () => (forkMoves.value = null),
+    }
+  // Undying: card → path → (room, at a fork) → prop; each step says what to do and goes back one
+  if (undyingOn.value) {
+    if (!undyingCard.value) return { text: 'Undying: เลือกการ์ดเคลื่อนที่ที่จะทิ้ง จากไพ่บนมือด้านล่าง', cancel: () => (undyingOn.value = false) }
+    const card = CARD_NAMES[undyingCard.value]
+    if (!undyingRoom.value) return { text: `Undying (ทิ้ง ${card}): คลิกเส้นทางสีนั้นบนแผนที่`, cancel: () => (undyingCard.value = null) }
+    return { text: `Undying ที่ ${roomName(view.value, undyingRoom.value)}: คลิก prop ในห้องนั้น`, cancel: () => (undyingRoom.value = null) }
+  }
   return null
 })
 
@@ -479,7 +534,7 @@ function leave() {
   if (over.value || confirm('ออกจากเกมนี้? (เกมจะหายไป)')) quitGame()
 }
 
-const planning = computed(() => view.value.step.t === 'planSurvivors' || view.value.step.t === 'planKiller')
+const planning = computed(() => view.value.step.t === 'planSurvivors' || view.value.step.t === 'planKiller' || view.value.step.t === 'planStridor')
 </script>
 
 <template>
@@ -501,18 +556,23 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 
     <main class="layout">
       <div class="board-col" :style="{ '--aspect': String(boardOf(view).aspect) }">
-        <div v-if="modeBar" class="reveal-bar card">
-          <span>{{ modeBar.text }}</span>
-          <button @click="modeBar.cancel()">ยกเลิก</button>
-        </div>
-        <div v-if="oppressing" class="reveal-bar card">
-          <span>Oppression: คลิก Generator บนแผนที่ 1–2 เครื่อง แต่ละเครื่อง −1 ({{ multiPick.length }}/2)</span>
-          <button class="primary" :disabled="!multiPick.length" @click="confirmOppression">ยืนยัน</button>
-        </div>
-        <div v-if="revealing" class="reveal-bar card">
-          <span>{{ view.survivors[revealing.s].name }}: คลิกไทล์คว่ำที่จะเปิด ({{ revealing.props.length }}/3)</span>
-          <button class="primary" :disabled="!revealing.props.length" @click="confirmReveal">เปิด</button>
-          <button @click="revealing = null">ยกเลิก</button>
+        <!-- floating at the foot of the screen: showing a bar must not move or resize the board -->
+        <div class="board-bars">
+          <div v-if="modeBar" class="reveal-bar card">
+            <span>{{ modeBar.text }}</span>
+            <button @click="modeBar.cancel()">ยกเลิก</button>
+          </div>
+          <div v-if="oppressing" class="reveal-bar card">
+            <span v-if="!multiPick.length">Oppression: คลิก Generator ที่กระพริบบนแผนที่ 1–2 เครื่อง (แต่ละเครื่อง −1)</span>
+            <span v-else>Oppression ({{ multiPick.length }}/2): <b>{{ oppressionPicks }}</b> — คลิกซ้ำเพื่อเอาออก</span>
+            <button class="primary" :disabled="!oppressionChoice" @click="confirmOppression">ยืนยัน −1</button>
+            <button @click="multiPick = []">ล้าง</button>
+          </div>
+          <div v-if="revealing" class="reveal-bar card">
+            <span>{{ view.survivors[revealing.s].name }}: คลิกไทล์คว่ำที่จะเปิด ({{ revealing.props.length }}/3)</span>
+            <button class="primary" :disabled="!revealing.props.length" @click="confirmReveal">เปิด</button>
+            <button @click="revealing = null">ยกเลิก</button>
+          </div>
         </div>
         <!-- the player tiles beside the map, on its left -->
         <div class="stage">
@@ -538,6 +598,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       <aside class="side">
         <Planning v-if="planning && myTurn" :st="view" />
         <section v-else-if="waitingOn && !over" class="card waiting">
+          <p v-if="myPlanDone" class="done-note">✓ {{ myPlanDone }}</p>
           <p class="muted small">กำลังรอ</p>
           <strong v-for="w in waitingOn" :key="w">{{ w }}</strong>
           <span class="dots" aria-hidden="true"><i /><i /><i /></span>
@@ -547,7 +608,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           :st="view"
           :power-on="powerOn"
           :undying-on="undyingOn"
+          :undying-card="undyingCard"
+          :undying-room="undyingRoom"
           @undying-on="undyingOn = $event"
+          @undying-card="undyingCard = $event"
+          @undying-room="undyingRoom = $event"
           :trap-path="trapPath"
           :power-card="powerCard"
           :on-board="onBoard"
@@ -744,12 +809,41 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     max-height: calc(100vh - 1rem - 220px);
   }
 }
+/* The mode bars float at the foot of the screen instead of sitting above the map, so the board
+   keeps its size and place while a mode comes and goes. Below the map on most screens, over its
+   bottom edge on the tallest ones — never over the rooms a mode is asking about. */
+.board-bars {
+  position: fixed;
+  /* above the hand of cards (z 15), so the way out of a mode is never buried */
+  z-index: 16;
+  bottom: 0.6rem;
+  left: 50%;
+  translate: -50%;
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  /* only the bars themselves take clicks; the map underneath stays reachable */
+  pointer-events: none;
+}
+.board-bars > * {
+  pointer-events: auto;
+}
+/* on one column the hand of cards floats centred at the foot: the bars go above it */
+@media (max-width: 980px) {
+  :global(body.hand-open) .board-bars {
+    bottom: 15rem;
+  }
+}
 .reveal-bar {
   display: flex;
   gap: 0.6rem;
   align-items: center;
   flex-wrap: wrap;
-  padding: 0.6rem 0.8rem;
+  padding: 0.45rem 0.7rem;
+  background: rgb(10 11 14 / 0.92);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.7);
 }
 .room-tag {
   font-family: var(--font-display);
@@ -764,6 +858,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 }
 .waiting p {
   margin: 0;
+}
+/* what this device already sent, so a player knows their own part is in */
+.done-note {
+  color: var(--ok);
+  font-size: 0.82rem;
 }
 .dots {
   display: flex;

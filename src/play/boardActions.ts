@@ -22,6 +22,7 @@ import {
   roomName,
   survivorInteractions,
   survivorMoves,
+  touchingPaths,
 } from './engine/engine'
 import { PERKS } from './engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkOwner, SurvivorInteraction } from './engine/types'
@@ -63,8 +64,10 @@ export interface BoardModes {
   forkMoves: Ref<BoardAction[] | null>
   /** Oppression: the generators picked so far on the board (up to 2), before confirming. */
   multiPick: Ref<string[]>
-  /** Undying (The Blight): only its targets, in the connected rooms, are on the board. */
+  /** Undying (The Blight): using it, one step at a time — card, then path, then the prop. */
   undyingOn: Ref<boolean>
+  undyingCard: Ref<MoveCard | null>
+  undyingRoom: Ref<string | null>
 }
 
 type Run = (() => void) & { action?: Action }
@@ -107,6 +110,34 @@ function spotOf(i: SurvivorInteraction | KillerInteraction): SpotKey {
   if (i.k === 'undying') return spotOf(i.i)
   if (i.k === 'removeVictor') return 'victor'
   return 'killer'
+}
+
+type Undying = Extract<KillerInteraction, { k: 'undying' }>
+
+/** The cards Undying can be spent on right now (each reaches at least one prop). */
+export function undyingCards(st: GameState): MoveCard[] {
+  return [...new Set(killerInteractions(st).flatMap((i) => (i.k === 'undying' ? [i.card] : [])))]
+}
+
+/** What Undying can do for one card. */
+export function undyingOptions(st: GameState, card: MoveCard): Undying[] {
+  return killerInteractions(st).filter((i): i is Undying => i.k === 'undying' && i.card === card)
+}
+
+/** The room an Undying target stands in. */
+export function undyingRoomOf(st: GameState, i: Undying): string {
+  return st.props.find((p) => p.id === (i.i as { prop: string }).prop)!.room!
+}
+
+/** The rooms that card reaches, each with the paths of its colour leading there (a fork can share one icon). */
+export function undyingPaths(st: GameState, card: MoveCard): { to: string; paths: string[] }[] {
+  const rooms = new Set(undyingOptions(st, card).map((i) => undyingRoomOf(st, i)))
+  const out = new Map<string, string[]>()
+  for (const p of touchingPaths(st, st.killer.room)) {
+    const to = p.a === st.killer.room ? p.b : p.a
+    if (p.kind === card && rooms.has(to)) out.set(to, [...(out.get(to) ?? []), p.id])
+  }
+  return [...out].map(([to, paths]) => ({ to, paths }))
 }
 
 export function powerMode(st: GameState, modes: BoardModes): boolean {
@@ -286,17 +317,34 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
 
     case 'killerInteract': {
       if (!s.canInteract) break
-      // Undying: the props it reaches in the connected rooms, nothing else
+      // Undying, step by step: the card comes from the hand, then a path of its colour, then the
+      // prop in the room it reaches (a fork asks which room in between, as any move does).
       if (modes.undyingOn.value) {
-        for (const i of killerInteractions(st)) if (i.k === 'undying') add(spotOf(i), killerInteractionLabel(st, i), go({ t: 'interact', i }, sfx.select))
+        const card = modes.undyingCard.value
+        if (!card) break
+        const all = undyingOptions(st, card)
+        const room = modes.undyingRoom.value
+        if (room === null) {
+          for (const { to, paths } of undyingPaths(st, card))
+            for (const path of paths) {
+              add(`path:${path}`, `Undying: ไป ${roomName(st, to)}`, () => ((modes.undyingRoom.value = to), sfx.click()))
+              out[out.length - 1].dest = to
+            }
+          break
+        }
+        for (const i of all) if (undyingRoomOf(st, i) === room) add(spotOf(i), killerInteractionLabel(st, i), go({ t: 'interact', i }, sfx.select))
         break
       }
       if (!powerMode(st, modes)) {
-        for (const i of killerInteractions(st)) {
+        const all = killerInteractions(st)
+        for (const i of all) {
           if (isPower(i) || i.k === 'undying') continue
           add(spotOf(i), killerInteractionLabel(st, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
         }
-        if (killerInteractions(st).some(isPower)) add('killer', `ใช้พลัง: ${powerName(st)}`, () => ((modes.powerOn.value = true), sfx.click()))
+        // The killer's own mini: the power and Undying both live there, so clicking it asks which.
+        if (all.some(isPower)) add('killer', `ใช้พลัง: ${powerName(st)}`, () => ((modes.powerOn.value = true), sfx.click()))
+        if (all.some((i) => i.k === 'undying'))
+          add('killer', `ใช้ Perk: Undying (${PERKS.undying.cost} ▲)`, () => ((modes.undyingOn.value = true), sfx.click()))
         break
       }
       for (const i of killerInteractions(st).filter(isPower)) {

@@ -434,7 +434,10 @@ function guard(e: MouseEvent) {
       :title="roomTargets?.[r.id]"
       :aria-label="roomTargets?.[r.id]"
       @click="roomTarget(r.id) && emit('room', r.id)"
-    />
+    >
+      <!-- a room to click is named on it: with several (a fork's rooms) the choice reads at a glance -->
+      <span v-if="roomTarget(r.id)" class="pick-tag">{{ r.name }}</span>
+    </component>
 
     <template v-if="litRooms">
       <div
@@ -498,6 +501,8 @@ function guard(e: MouseEvent) {
         @pointerleave="pressEnd"
       >
         <img :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name" draggable="false" />
+        <!-- Madness is a badge, not a ring: the ring says healthy (white) or wounded (red) -->
+        <span v-if="st.survivors[s].madness" class="madness-tag" title="Madness: ทอย Danger Die แทน Skill Check">🌀</span>
       </component>
       <component
         :is="canAct('killer') || roomTarget(r.id) ? 'button' : 'div'"
@@ -614,20 +619,59 @@ function guard(e: MouseEvent) {
   border-radius: 3px;
   pointer-events: none;
 }
-/* a room to click: a power or perk aimed at it */
+/* a room to click: a power or perk aimed at it, or one end of a fork's path */
 button.room-hit.pick {
   pointer-events: auto;
   cursor: pointer;
-  border: 3px solid #ff8a3d;
-  background: rgb(255 138 61 / 0.1);
+  /* above the focus dimming, so the ring and the name stay readable */
+  z-index: 1;
+  border: 4px solid #ff8a3d;
+  background: rgb(255 138 61 / 0.18);
   box-shadow:
-    0 0 0 2px rgb(0 0 0 / 0.6),
-    0 0 26px 4px rgb(255 120 40 / 0.6);
-  animation: pulse 1.4s ease-in-out infinite;
+    0 0 0 2px rgb(0 0 0 / 0.65),
+    0 0 30px 6px rgb(255 120 40 / 0.65),
+    inset 0 0 3cqw rgb(255 138 61 / 0.35);
+  /* the glow breathes, not the whole ring: the room's name stays fully readable */
+  animation: room-pick 1.6s ease-in-out infinite;
+}
+@keyframes room-pick {
+  50% {
+    box-shadow:
+      0 0 0 2px rgb(0 0 0 / 0.65),
+      0 0 14px 2px rgb(255 120 40 / 0.35),
+      inset 0 0 3cqw rgb(255 138 61 / 0.15);
+  }
 }
 button.room-hit.pick:hover:not(:disabled) {
-  background: rgb(255 138 61 / 0.25);
+  background: rgb(255 138 61 / 0.32);
   border-color: #fff;
+  animation: none;
+}
+/* the room's name on the ring, so a choice between rooms reads without hovering */
+.pick-tag {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  translate: -50% -55%;
+  max-width: 112%;
+  padding: 0.1em 0.5em;
+  border-radius: 2px;
+  background: #ff8a3d;
+  color: #140a03;
+  font-family: var(--font-display);
+  font-size: 1.5cqw;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.85);
+  pointer-events: none;
+}
+button.room-hit.pick:hover:not(:disabled) .pick-tag {
+  background: #fff;
 }
 .room-hit.target {
   border: 3px solid #ffd27a;
@@ -672,10 +716,30 @@ button.tile {
 .tile.target.down > img:first-child {
   filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.8));
 }
-.tile.picked {
+/* Picked, waiting for a confirm (Map's tiles, Oppression's generators): green, and it beats the
+   orange "you may click this" ring, which these tiles still carry. */
+.tile.picked,
+button.tile.picked {
   box-shadow:
     0 0 0 3px var(--ok),
-    0 0 18px 4px rgb(79 179 106 / 0.8);
+    0 0 20px 5px rgb(79 179 106 / 0.85);
+  animation: none;
+}
+button.tile.picked::after {
+  content: '✓';
+  position: absolute;
+  right: -18%;
+  top: -18%;
+  width: 1.4em;
+  height: 1.4em;
+  border-radius: 50%;
+  background: var(--ok);
+  color: #06140a;
+  font-size: 1.1cqw;
+  font-weight: 800;
+  line-height: 1.4em;
+  text-align: center;
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.8);
 }
 .tile.flip {
   z-index: 4;
@@ -891,10 +955,26 @@ button.tile.act {
     opacity: 0.75;
   }
 }
-/* Madness: a crackling purple-green ring */
+/* Madness: a green glow and the badge below — never a ring, which would hide the health ring. */
 .mini.survivor[data-madness] {
-  outline: 3px dotted #9cff6b;
-  outline-offset: 2px;
+  filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.9)) drop-shadow(0 0 7px rgb(156 255 107 / 0.9));
+}
+/* above the mini rather than beside it: minis stand side by side, so the room's top is free */
+.madness-tag {
+  position: absolute;
+  right: -6%;
+  top: -24%;
+  width: 1.45em;
+  height: 1.45em;
+  border-radius: 50%;
+  background: #0b1708;
+  font-size: 1.25cqw;
+  line-height: 1.45em;
+  text-align: center;
+  box-shadow:
+    0 0 0 2px #9cff6b,
+    0 1px 6px rgb(0 0 0 / 0.85);
+  pointer-events: none;
 }
 
 /* ---------- decision focus ---------- */
@@ -1149,6 +1229,7 @@ button.tile.act {
 }
 @media (prefers-reduced-motion: reduce) {
   .room-hit.target,
+  button.room-hit.pick,
   .tile.target,
   .tile.act,
   .mini.act,

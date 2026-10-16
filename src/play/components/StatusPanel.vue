@@ -7,6 +7,7 @@ import { asset } from '../../i18n'
 import { ITEM_NAMES, KILLER_BP, SURVIVOR_BP, itemUses, roomName, turnOrder, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse } from '../engine/types'
 import { itemsHidden, online } from '../game'
+import { KILLER_PLAYER } from '../engine/seats'
 import type { InspectTarget } from '../inspect'
 import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, survivorMini } from '../labels'
 import Mini from './Mini.vue'
@@ -91,6 +92,23 @@ function canPeek(owner: number | 'killer'): boolean {
 function peek(owner: number | 'killer' | null) {
   peeking.value = owner
 }
+
+// ---------- online: your own ▲ and item, at the top of the column ----------
+// Everyone's tile is small, and online you only ever spend your own ▲ and item. They get a block
+// of their own above the tiles, in the column beside the map, so nothing covers the board.
+
+/** The characters this device plays (empty offline and for a spectator). */
+const mine = computed<(number | 'killer')[]>(() => {
+  const o = online.value
+  if (!o?.seat) return []
+  if (o.seat === KILLER_PLAYER) return ['killer']
+  return props.st.survivors.flatMap((_, i) => (playerOf(props.st, i) === o.seat ? [i] : []))
+})
+
+const mineBp = (o: number | 'killer') => (o === 'killer' ? props.st.killer.bp : props.st.survivors[o].bp)
+const mineMax = (o: number | 'killer') => (o === 'killer' ? KILLER_BP.max : SURVIVOR_BP.max)
+const mineMini = (o: number | 'killer') => (o === 'killer' ? killerMini(props.st) : survivorMini(props.st, o))
+const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.name : props.st.survivors[o].name)
 </script>
 
 <template>
@@ -118,13 +136,41 @@ function peek(owner: number | 'killer' | null) {
       <span class="muted small">กด ▴ เพื่อดูสถานะผู้เล่น</span>
     </div>
 
-    <div v-else class="tiles">
+    <!-- online: your own ▲ and item card, big enough to read without opening anything -->
+    <div v-if="!collapsed && mine.length" class="mine">
+      <p class="mine-title">ของคุณ</p>
+      <div v-for="o in mine" :key="String(o)" class="mine-row">
+        <button
+          type="button"
+          class="mine-who"
+          :title="`${mineName(o)} — ดูรายละเอียดตัวละคร`"
+          @click="emit('inspect', o === 'killer' ? { k: 'killer' } : { k: 'survivor', s: o })"
+        >
+          <Mini
+            class="mine-mini"
+            :class="[o === 'killer' ? 'aura-killer' : 'aura-survivor', { wounded: o !== 'killer' && st.survivors[o].wounded }]"
+            :src="asset(mineMini(o))"
+            :alt="mineName(o)"
+          />
+          <span class="mine-bp"><b>{{ mineBp(o) }}</b>/{{ mineMax(o) }} ▲</span>
+        </button>
+        <template v-if="o !== 'killer'">
+          <button v-if="st.survivors[o].item" class="mine-item" :class="{ usable: itemUses(st, o).length > 0 }" :title="`${ITEM_NAMES[st.survivors[o].item!]} — คลิกเพื่อใช้`" @click="openItem = openItem === o ? null : o">
+            <img :src="asset(itemImage(st.survivors[o].item!))" :alt="ITEM_NAMES[st.survivors[o].item!]" />
+            <span>{{ ITEM_NAMES[st.survivors[o].item!] }}</span>
+          </button>
+          <span v-else class="mine-noitem">ไม่มี item</span>
+        </template>
+      </div>
+    </div>
+
+    <div v-if="!collapsed" class="tiles">
     <!-- killer -->
     <div class="tile killer" role="button" tabindex="0" :title="`${st.killer.name} — ดูรายละเอียดตัวละคร`" @click="emit('inspect', { k: 'killer' })" @keydown.enter="emit('inspect', { k: 'killer' })">
       <div class="head">
         <Mini class="mini aura-killer" :src="asset(killerMini(st))" :alt="st.killer.name" />
         <div class="names">
-          <span class="ptag" title="ผู้เล่น 1">P1</span>
+          <span class="ptag" :class="{ me: mine.includes('killer') }" :title="`ผู้เล่น 1${mine.includes('killer') ? ' (คุณ)' : ''}`">{{ mine.includes('killer') ? 'คุณ' : 'P1' }}</span>
         </div>
       </div>
       <div class="line small">
@@ -180,7 +226,7 @@ function peek(owner: number | 'killer' | null) {
           <img v-if="st.firstPlayer === s" class="first" :src="asset(components.firstPlayer.image)" alt="First player" title="First Player" />
         </div>
         <div class="names">
-          <span class="ptag" :title="`ผู้เล่น ${playerOf(st, s)}`">P{{ playerOf(st, s) }}</span>
+          <span class="ptag" :class="{ me: mine.includes(s) }" :title="`ผู้เล่น ${playerOf(st, s)}${mine.includes(s) ? ' (คุณ)' : ''}`">{{ mine.includes(s) ? 'คุณ' : `P${playerOf(st, s)}` }}</span>
           <span v-if="STATUS_TH[st.survivors[s].status]" class="warn small">{{ STATUS_TH[st.survivors[s].status] }}</span>
         </div>
       </div>
@@ -281,6 +327,15 @@ function peek(owner: number | 'killer' | null) {
 .players.collapsed {
   width: 40px;
 }
+/* The column is as tall as the map at most; with your own block on top of a full table of tiles
+   it can run past the foot of a short screen, and then it scrolls on its own. */
+@media (min-width: 981px) {
+  .players {
+    max-height: calc(100vh - 4.5rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
 /* the fold handle, on top of the column */
 .fold {
   flex: none;
@@ -330,6 +385,92 @@ function peek(owner: number | 'killer' | null) {
 }
 .strip .small {
   display: none;
+}
+/* Online: your own ▲ and item, on top of the column. Everything else about you is in your tile
+   below; this is only what you spend, in a size you can read from across the table. */
+.mine {
+  flex: none;
+  padding: 0.3rem 0.35rem 0.4rem;
+  border: 1px solid rgb(255 214 140 / 0.5);
+  border-radius: var(--radius);
+  background: rgb(255 214 140 / 0.07);
+}
+.mine-title {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--warn);
+  text-transform: uppercase;
+}
+.mine-row + .mine-row {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+.mine-who {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.mine-mini {
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+.mine-mini.wounded {
+  box-shadow: 0 0 0 2px var(--blood-bright);
+}
+.mine-bp {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mine-bp b {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: #ffe9b0;
+}
+/* the item card, big enough to tell apart, with its name under it */
+.mine-item {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.2rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.35);
+  cursor: pointer;
+  text-align: center;
+}
+.mine-item.usable {
+  border-color: var(--ok);
+  box-shadow: 0 0 10px rgb(79 179 106 / 0.35);
+}
+.mine-item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 0.72;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.mine-item span {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.64rem;
+  line-height: 1.25;
+  color: #e9e2d2;
+}
+.mine-noitem {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.68rem;
+  color: var(--muted);
 }
 .tiles {
   display: flex;
@@ -423,6 +564,12 @@ function peek(owner: number | 'killer' | null) {
   font-size: 0.68rem;
   line-height: 1.35;
   color: var(--muted);
+}
+/* online: which of these tiles is yours */
+.ptag.me {
+  border-color: rgb(255 214 140 / 0.7);
+  background: rgb(255 214 140 / 0.12);
+  color: #ffe9b0;
 }
 .tile .line {
   grid-column: 2;
@@ -735,6 +882,10 @@ button.item img {
     flex: 1;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+  /* the row is short: your own block keeps a column of its own beside the tiles */
+  .mine {
+    width: 104px;
   }
 }
 </style>

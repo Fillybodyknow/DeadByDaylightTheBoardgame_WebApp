@@ -31,12 +31,16 @@ export function legalActions(st: GameState): Action[] {
     case 'revealProp':
       for (const p of propsIn(st, step.room)) if (!p.revealed) out.push({ t: 'reveal', prop: p.id })
       break
+    case 'planStridor':
+      for (const c of new Set(st.survivorHands[st.survivors[step.s].hand])) out.push({ t: 'planStridor', card: c })
+      break
     case 'planSurvivors':
+      // The online-only actions of this step are left out, as `planHand` is: the killer may also
+      // send `planKiller` here (he plans at the same time), and each player sends their own hand.
       for (const cards of survivorPlans(st)) out.push({ t: 'planSurvivors', cards })
       break
     case 'planKiller':
-      // by position in the hand, so The Blight's two copies of a card can both be planned
-      st.killer.hand.forEach((l, i) => st.killer.hand.forEach((r, j) => i !== j && out.push({ t: 'planKiller', cards: [l, r] })))
+      out.push(...killerPlans(st))
       break
     case 'survivorMove':
       for (const m of survivorMoves(st, step.s, step.card)) out.push({ t: 'move', path: m.path.id })
@@ -133,13 +137,21 @@ function faceDown(st: GameState): string[] {
   return boards[st.board].rooms.flatMap((r) => propsIn(st, r.id).filter((p) => !p.revealed).map((p) => p.id))
 }
 
+/** The killer's two cards, by place in the hand (The Blight holds two copies of each). */
+function killerPlans(st: GameState): Action[] {
+  const out: Action[] = []
+  st.killer.hand.forEach((l, i) => st.killer.hand.forEach((r, j) => i !== j && out.push({ t: 'planKiller', cards: [l, r] })))
+  return out
+}
+
 /** Every way to assign one card per survivor, sharing hands between survivors of one player. */
 function survivorPlans(st: GameState): (MoveCard | null)[][] {
   const results: (MoveCard | null)[][] = []
   const pick = (i: number, acc: (MoveCard | null)[], hands: MoveCard[][]) => {
     if (i === 4) return void results.push([...acc])
     const sv = st.survivors[i]
-    if (sv.status === 'hooked') return pick(i + 1, [...acc, null], hands)
+    // hooked, or already face up from Stridor: no card of their own here
+    if (sv.status === 'hooked' || sv.planned !== null) return pick(i + 1, [...acc, null], hands)
     for (const c of new Set(hands[sv.hand])) {
       const next = hands.map((h, j) => (j === sv.hand ? h.filter((x, k) => k !== h.indexOf(c) || x !== c) : h))
       pick(i + 1, [...acc, c], next)

@@ -8,7 +8,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { CARD_NAMES, roomName, turnOrder } from '../engine/engine'
-import { handsToPlan } from '../engine/seats'
+import { KILLER_PLAYER, handsToPlan } from '../engine/seats'
 import type { GameState, MoveCard } from '../engine/types'
 import { choicePreview, preview } from '../focus'
 import { dispatch, online } from '../game'
@@ -17,6 +17,47 @@ import CardHand, { type HandCard } from './CardHand.vue'
 import Mini from './Mini.vue'
 
 const props = defineProps<{ st: GameState }>()
+
+/**
+ * Online, planning runs for everyone at once: the killer picks his two cards while the survivors
+ * pick theirs, and the round starts once the last player confirms. On one shared device the
+ * survivors still plan first and the device then goes to the killer.
+ */
+const killerSeat = computed(() => online.value?.seat === KILLER_PLAYER)
+const planningKiller = computed(() => props.st.step.t === 'planKiller' || killerSeat.value)
+
+/** Stridor: that survivor sets their card first, face up, before anyone else plans. */
+const stridorStep = computed(() => (props.st.step.t === 'planStridor' ? props.st.step.s : null))
+/** The card Stridor has already turned face up, for everyone who plans after it. */
+const stridorCard = computed(() => {
+  const s = props.st.stridor
+  if (s === null || props.st.step.t === 'planStridor') return null
+  const sv = props.st.survivors[s]
+  return sv.plannedRevealed && sv.planned ? { name: sv.name, card: sv.planned } : null
+})
+
+const stridorPick = ref<MoveCard | null>(null)
+watch(
+  () => props.st.step,
+  () => (stridorPick.value = null),
+)
+const stridorHand = computed<HandCard[]>(() =>
+  stridorStep.value === null ? [] : [...new Set(props.st.survivorHands[props.st.survivors[stridorStep.value].hand])].map((card) => ({ card, picked: stridorPick.value === card })),
+)
+
+function pickStridor(card: MoveCard) {
+  sfx.click()
+  stridorPick.value = stridorPick.value === card ? null : card
+}
+
+function confirmStridor() {
+  if (!stridorPick.value) return
+  if (dispatch({ t: 'planStridor', card: stridorPick.value })) {
+    sfx.select()
+    stridorPick.value = null
+    preview.value = null
+  }
+}
 
 // Online every player has their own screen, so there is no curtain to pass behind.
 const curtainOpen = ref(!!online.value)
@@ -47,7 +88,9 @@ const myHand = computed(() => {
 })
 
 const planners = computed(() =>
-  turnOrder(props.st).filter((i) => props.st.survivors[i].status !== 'hooked' && (!online.value || props.st.survivors[i].hand === myHand.value)),
+  turnOrder(props.st).filter(
+    (i) => props.st.survivors[i].status !== 'hooked' && props.st.survivors[i].planned === null && (!online.value || props.st.survivors[i].hand === myHand.value),
+  ),
 )
 
 /** The survivor the hand is being played for (a tab per survivor when there are several). */
@@ -90,7 +133,8 @@ function pickSurvivorCard(card: MoveCard) {
 const survivorsLeft = computed(() => planners.value.filter((s) => !picks.value[s]).length)
 
 function confirmSurvivors() {
-  const cards = props.st.survivors.map((sv, i) => (sv.status === 'hooked' ? null : picks.value[i]))
+  // on a hook, or already face up from Stridor: no card from here
+  const cards = props.st.survivors.map((sv, i) => (sv.status === 'hooked' || sv.planned !== null ? null : picks.value[i]))
   const action = online.value && myHand.value !== null ? { t: 'planHand' as const, hand: myHand.value, cards } : { t: 'planSurvivors' as const, cards }
   if (dispatch(action)) {
     sfx.select()
@@ -167,7 +211,12 @@ function confirmKiller() {
     <div class="overlay">
       <!-- hand-off curtain -->
       <button class="curtain" @click="(curtainOpen = true), sfx.click()">
-        <template v-if="st.step.t === 'planSurvivors'">
+        <template v-if="stridorStep !== null">
+          <span class="eyebrow">รอบ {{ st.round }} · Stridor</span>
+          <strong>ส่งเครื่องให้ {{ st.survivors[stridorStep].name }}</strong>
+          <span class="muted">ต้องเปิดการ์ดหงายก่อนใคร — แตะเพื่อเริ่ม</span>
+        </template>
+        <template v-else-if="st.step.t === 'planSurvivors'">
           <span class="eyebrow">รอบ {{ st.round }} · วางแผน</span>
           <strong>ส่งเครื่องให้ฝ่ายผู้รอดชีวิต</strong>
           <span class="muted">ฆาตกรห้ามดูจอ — แตะเพื่อเริ่ม</span>
@@ -181,10 +230,24 @@ function confirmKiller() {
     </div>
   </Teleport>
 
+  <!-- Stridor: this survivor commits first, face up (the card: "before you or any other Survivor") -->
+  <section v-else-if="stridorStep !== null" class="card panel">
+    <h2>Stridor: {{ st.survivors[stridorStep].name }} ต้องเปิดการ์ดก่อน</h2>
+    <p class="muted">
+      ฆาตกรใช้ Stridor กับ {{ st.survivors[stridorStep].name }} — เลือกการ์ด 1 ใบแล้ว<b>หงายหน้า</b>ให้ทุกคนเห็น ก่อนที่ผู้รอดชีวิตคนอื่นและฆาตกรจะวางแผน
+    </p>
+    <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทางบนแผนที่ · คลิกเพื่อเลือก</p>
+    <button class="primary" :disabled="!stridorPick" @click="confirmStridor">
+      {{ stridorPick ? `ยืนยัน: ${CARD_NAMES[stridorPick]} (หงายหน้า)` : 'เลือกการ์ดก่อน' }}
+    </button>
+    <CardHand :cards="stridorHand" :label="`มือของ ${st.survivors[stridorStep].name}`" @pick="pickStridor" @hover="hover($event, stridorStep)" />
+  </section>
+
   <!-- survivors -->
-  <section v-else-if="st.step.t === 'planSurvivors'" class="card panel">
+  <section v-else-if="!planningKiller" class="card panel">
     <h2>วางแผน: เลือกการ์ดเคลื่อนที่คนละ 1 ใบ</h2>
     <p class="muted">คุยกันได้ แต่ต้องพูดให้ฆาตกรได้ยิน (หน้า 8) — การ์ดจะคว่ำไว้จนถึงเทิร์นของแต่ละคน</p>
+    <p v-if="stridorCard" class="stridor-note">👁 Stridor: {{ stridorCard.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[stridorCard.card] }}</b></p>
 
     <!-- whose card is being picked: a tab per survivor -->
     <div class="tabs" role="tablist">
@@ -226,6 +289,8 @@ function confirmKiller() {
   <section v-else class="card panel">
     <h2>{{ st.killer.name }}: เลือกการ์ด 2 ใบ</h2>
     <p class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
+    <p v-if="st.step.t === 'planSurvivors'" class="muted small">วางแผนพร้อมกับผู้รอดชีวิต — การ์ดของพวกเขาคว่ำอยู่ รอบจะเริ่มเมื่อทุกคนยืนยันครบ</p>
+    <p v-if="stridorCard" class="stridor-note">👁 Stridor: {{ stridorCard.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[stridorCard.card] }}</b></p>
     <div class="slots">
       <button v-for="i in [0, 1]" :key="i" type="button" class="slot" :class="{ filled: killerPicks[i] }" :disabled="!killerPicks[i]" :title="killerPicks[i] ? 'คลิกเพื่อเอาใบนี้ออก' : ''" @click="clearSlot(i)">
         <span class="muted small">{{ i === 0 ? 'เทิร์น 1 (ซ้าย)' : 'เทิร์น 2 (ขวา)' }}</span>
@@ -237,7 +302,9 @@ function confirmKiller() {
     </div>
     <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดู · คลิกเพื่อเลือก (ใบแรก = ซ้าย)</p>
     <p class="muted small">คลิกการ์ดในช่องเพื่อเอาใบนั้นออก</p>
-    <button class="primary" :disabled="!killerReady" @click="confirmKiller">ยืนยัน — เริ่มรอบ</button>
+    <button class="primary" :disabled="!killerReady" @click="confirmKiller">
+      {{ st.step.t === 'planSurvivors' ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน — เริ่มรอบ' }}
+    </button>
 
     <CardHand
       :cards="killerHand"
@@ -299,6 +366,14 @@ function confirmKiller() {
   border: 1px dashed var(--line-strong);
   border-radius: 6px;
   color: var(--muted);
+}
+/* the card Stridor turned face up: everyone plans knowing it */
+.stridor-note {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #8a5cff;
+  border-radius: 6px;
+  background: rgb(138 92 255 / 0.12);
+  color: #e0d0ff;
 }
 .tabs {
   display: grid;

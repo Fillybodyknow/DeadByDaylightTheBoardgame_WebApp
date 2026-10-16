@@ -26,7 +26,7 @@ import {
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
-import { actionKey } from '../boardActions'
+import { actionKey, undyingCards, undyingOptions, undyingPaths, undyingRoomOf } from '../boardActions'
 import { dispatch } from '../game'
 import {
   orderedChoices,
@@ -56,7 +56,16 @@ import FaceLabel from './FaceLabel.vue'
 import { choicePreview, decisionFocus, powerPreview, preview } from '../focus'
 import Mini from './Mini.vue'
 
-const props = defineProps<{ st: GameState; powerOn: boolean; undyingOn: boolean; trapPath: string | null; powerCard: MoveCard | null; onBoard: Set<string> }>()
+const props = defineProps<{
+  st: GameState
+  powerOn: boolean
+  undyingOn: boolean
+  undyingCard: MoveCard | null
+  undyingRoom: string | null
+  trapPath: string | null
+  powerCard: MoveCard | null
+  onBoard: Set<string>
+}>()
 
 // Perk and power choices the board already offers are made there; the panel points at it.
 const here = (a: Action) => !props.onBoard.has(actionKey(a))
@@ -64,7 +73,14 @@ const perkAct = (perk: PerkId, c: PerkChoice): Action => ({ t: 'perk', perk, use
 const powerAct = (i: KillerInteraction): Action => ({ t: 'interact', i })
 /** A choice of the perk on offer that isn't on the board. */
 const offerHere = (c: PerkChoice) => (props.st.step.t === 'offer' ? here(perkAct(props.st.step.perk, c)) : true)
-const emit = defineEmits<{ powerOn: [on: boolean]; undyingOn: [on: boolean]; trapPath: [path: string | null]; powerCard: [card: MoveCard | null] }>()
+const emit = defineEmits<{
+  powerOn: [on: boolean]
+  undyingOn: [on: boolean]
+  undyingCard: [card: MoveCard | null]
+  undyingRoom: [room: string | null]
+  trapPath: [path: string | null]
+  powerCard: [card: MoveCard | null]
+}>()
 
 const step = computed(() => props.st.step)
 
@@ -169,19 +185,28 @@ function hoverPower(i: KillerInteraction | null) {
 /** The Hillbilly: cards that have a chainsaw path. The Deathslinger: cards he may discard. */
 const powerCards = computed(() => [...new Set(kInteractions.value.powers.flatMap((i) => (i.k === 'chainsaw' || i.k === 'redeemer' ? [i.card] : [])))])
 
-/** Undying's targets by the card they discard. */
-const undyingGroups = computed(() => {
-  const groups = new Map<MoveCard, KillerInteraction[]>()
-  for (const i of kInteractions.value.undying) if (i.k === 'undying') groups.set(i.card, [...(groups.get(i.card) ?? []), i])
-  return [...groups].map(([card, list]) => ({ card, list }))
-})
+// ---------- Undying: discard a card, take its path, interact in the room it reaches ----------
 
-/** "Damage Generator — Room": the card is shown beside it. */
-function undyingLabel(i: KillerInteraction): string {
-  if (i.k !== 'undying') return ''
-  const p = 'prop' in i.i ? props.st.props.find((x) => x.id === (i.i as { prop: string }).prop) : null
-  return `${killerInteractionLabel(props.st, i.i)}${p?.room ? ` — ${roomName(props.st, p.room)}` : ''}`
+/** The cards in hand that reach a prop (a colour with nothing to do isn't offered). */
+const undyingHand = computed<HandCard[]>(() =>
+  undyingCards(props.st).map((card) => ({ card, picked: props.undyingCard === card, ...(props.undyingCard === card ? { badge: 'Undying' } : {}) })),
+)
+
+function pickUndyingCard(card: MoveCard) {
+  sfx.click()
+  emit('undyingCard', props.undyingCard === card ? null : card)
 }
+
+/** The rooms the picked card reaches, for the panel's buttons (the board offers the same paths). */
+const undyingRooms = computed(() => (props.undyingCard ? undyingPaths(props.st, props.undyingCard) : []))
+
+/** What Undying can do in the room picked. */
+const undyingHere = computed(() =>
+  props.undyingCard && props.undyingRoom
+    ? undyingOptions(props.st, props.undyingCard).filter((i) => undyingRoomOf(props.st, i) === props.undyingRoom)
+    : [],
+)
+
 
 /** Perk buttons in this step (start of turn, interact, a roll). */
 const buttons = computed(() => perkButtons(props.st))
@@ -448,21 +473,36 @@ const rollers = computed(() => rerollers(props.st))
     <template v-else-if="step.t === 'killerInteract'">
       <p v-if="!step.canInteract" class="warn">เทิร์นนี้ Interact ไม่ได้</p>
 
-      <!-- Undying: a prop in a connected room, for the card of that path's colour -->
+      <!-- Undying, a step at a time: the card from the hand, its path, then the prop over there -->
       <template v-else-if="undyingOn && kInteractions.undying.length">
-        <p><b>Undying</b> (1 ▲) — ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</p>
-        <p class="board-hint">🎯 คลิก prop ที่กระพริบในห้องข้าง ๆ บนแผนที่</p>
-        <div class="undying-list">
-          <div v-for="g in undyingGroups" :key="g.card" class="undying-row">
-            <img :src="asset(cardImage(g.card))" :alt="cardLabel(g.card)" />
-            <div class="buttons col">
-              <template v-for="(i, n) in g.list" :key="n">
-                <button v-if="here(powerAct(i))" @click="act({ t: 'interact', i })">{{ undyingLabel(i) }}</button>
-                <span v-else class="undying-target">🎯 {{ undyingLabel(i) }}</span>
-              </template>
-            </div>
+        <p><b>Undying</b> ({{ PERKS.undying.cost }} ▲) — ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</p>
+
+        <template v-if="!undyingCard">
+          <p class="muted small">👇 1. เลือกการ์ดที่จะทิ้ง จากไพ่บนมือด้านล่าง</p>
+          <CardHand :cards="undyingHand" :label="`Undying — มือของ ${st.killer.name}`" @pick="pickUndyingCard" />
+        </template>
+
+        <template v-else-if="!undyingRoom">
+          <p class="small">ทิ้ง <b>{{ CARD_NAMES[undyingCard] }}</b> — 2. ไปทางไหน?</p>
+          <p class="board-hint">🎯 คลิกเส้นทางสีนั้นบนแผนที่ (ทางแยกจะให้เลือกห้องต่อ)</p>
+          <div class="buttons col">
+            <button v-for="r in undyingRooms" :key="r.to" @click="emit('undyingRoom', r.to), sfx.click()">{{ roomName(st, r.to) }}</button>
+            <button @click="emit('undyingCard', null)">เปลี่ยนการ์ด</button>
           </div>
-        </div>
+        </template>
+
+        <template v-else>
+          <p class="small">3. ทำอะไรที่ <b>{{ roomName(st, undyingRoom) }}</b>?</p>
+          <p v-if="undyingHere.some((i) => !here(powerAct(i)))" class="board-hint">🎯 คลิก prop ที่กระพริบในห้องนั้นบนแผนที่</p>
+          <div class="buttons col">
+            <template v-for="(i, n) in undyingHere" :key="n">
+              <button v-if="here(powerAct(i))" @click="act({ t: 'interact', i })">{{ killerInteractionLabel(st, i.i) }}</button>
+              <span v-else class="undying-target">🎯 {{ killerInteractionLabel(st, i.i) }}</span>
+            </template>
+            <button @click="emit('undyingRoom', null)">เปลี่ยนเส้นทาง</button>
+          </div>
+        </template>
+
         <button @click="emit('undyingOn', false)">ยกเลิก ไม่ใช้ Undying</button>
       </template>
 
@@ -545,12 +585,14 @@ const rollers = computed(() => rerollers(props.st))
       <template v-else>
         <p>
           Interact 1 อย่าง หรือใช้พลังแทน (1 ครั้ง/รอบ) ที่ {{ roomName(st, st.killer.room) }}<br /><span class="muted small"
-            >คลิกของหรือผู้รอดชีวิตที่เรืองแสงบนแผนที่ — คลิกตัว {{ st.killer.name }} เพื่อใช้พลัง</span
+            >คลิกของหรือผู้รอดชีวิตที่เรืองแสงบนแผนที่ — คลิกตัว {{ st.killer.name }} เพื่อใช้พลัง{{ kInteractions.undying.length ? ' หรือ Undying' : '' }}</span
           >
         </p>
         <div class="buttons col">
           <button v-for="(i, n) in kInteractions.plain" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
-          <button v-if="kInteractions.undying.length" class="undying" @click="emit('undyingOn', true), sfx.click()">🃏 Undying (1 ▲): Interact กับ prop ในห้องข้าง ๆ</button>
+          <button v-if="kInteractions.undying.length" class="undying" @click="emit('undyingOn', true), sfx.click()">
+            🃏 Undying ({{ PERKS.undying.cost }} ▲): ทิ้งการ์ด แล้ว Interact ในห้องข้าง ๆ
+          </button>
           <button v-if="kInteractions.powers.length" class="power" @click="emit('powerOn', true), sfx.click()">⚡ ใช้พลัง: {{ powerName(st) }}</button>
           <span v-else-if="st.killer.powerUsed" class="muted small">ใช้พลังไปแล้วรอบนี้</span>
           <span v-else class="muted small">ใช้พลังไม่ได้จากห้องนี้</span>
@@ -639,24 +681,8 @@ p {
   border-color: #8a5cff;
   color: #e0d0ff;
 }
-.undying-list {
-  display: grid;
-  gap: 0.5rem;
-}
-.undying-row {
-  display: grid;
-  grid-template-columns: 44px 1fr;
-  gap: 0.5rem;
-  align-items: start;
-}
 .undying-target {
   font-size: 0.88rem;
-}
-.undying-row img {
-  width: 44px;
-  aspect-ratio: 0.72;
-  object-fit: cover;
-  border-radius: 4px;
 }
 .board-hint {
   margin: 0;

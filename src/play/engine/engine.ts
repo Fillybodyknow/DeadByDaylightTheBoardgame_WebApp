@@ -633,11 +633,33 @@ function handle(st: GameState, a: Action) {
       else startPlanning(st)
       return
     }
+    case 'planStridor': {
+      if (a.t !== 'planStridor') break
+      const sv = st.survivors[step.s]
+      const pool = st.survivorHands[sv.hand]
+      if (a.card === 'wait' || !pool.includes(a.card)) fail('card not in hand')
+      st.survivorHands = st.survivorHands.map((h, i) => (i === sv.hand ? h.filter((_, j) => j !== h.indexOf(a.card)) : h))
+      sv.planned = a.card
+      sv.plannedRevealed = true
+      sv.acted = false
+      log(st, `Stridor: ${sv.name} ต้องเปิดการ์ดก่อนใคร — ${CARD_NAMES[a.card]}`, step.s)
+      wait(st, { t: 'planSurvivors' })
+      return
+    }
     case 'planSurvivors': {
+      // Online the killer plans alongside the survivors: their cards are face down to him either
+      // way, so nobody learns anything new, and nobody waits for a turn to plan. His choice is
+      // held until the survivors are in, and whoever confirms last starts the round.
+      if (a.t === 'planKiller') {
+        if (a.cards.length !== 2 || !takeCards(st.killer.hand, a.cards)) fail('pick 2 cards from the hand')
+        st.killerDraft = a.cards
+        return wait(st, { t: 'planSurvivors' })
+      }
       if (a.t === 'planHand') {
         // collect this hand's cards; the planning ends with the last hand
         const draft = st.planDraft ?? [null, null, null, null]
-        const mine = st.survivors.map((sv, i) => (sv.hand === a.hand && sv.status !== 'hooked' ? i : -1)).filter((i) => i >= 0)
+        // a survivor already placed (Stridor's, face up) plans no second card
+        const mine = st.survivors.map((sv, i) => (sv.hand === a.hand && sv.status !== 'hooked' && sv.planned === null ? i : -1)).filter((i) => i >= 0)
         if (!mine.length) fail('no survivor of this hand plans')
         const pool = [...(st.survivorHands[a.hand] ?? [])]
         for (const i of mine) {
@@ -648,32 +670,23 @@ function handle(st: GameState, a: Action) {
           draft[i] = c
         }
         st.planDraft = draft
-        if (st.survivors.some((sv, i) => sv.status !== 'hooked' && !draft[i])) return wait(st, { t: 'planSurvivors' })
+        if (st.survivors.some((sv, i) => sv.status !== 'hooked' && sv.planned === null && !draft[i])) return wait(st, { t: 'planSurvivors' })
         delete st.planDraft
         planSurvivors(st, draft)
       } else {
         if (a.t !== 'planSurvivors') break
         planSurvivors(st, a.cards)
       }
-      // Stridor: that survivor's card is played face up.
-      if (st.stridor !== null && st.survivors[st.stridor].planned) st.survivors[st.stridor].plannedRevealed = true
+      const draft = st.killerDraft
+      delete st.killerDraft
+      // the killer planned first (online): the round starts now
+      if (draft && takeCards(st.killer.hand, draft)) return finishKillerPlan(st, draft)
       wait(st, { t: 'planKiller' })
       return
     }
     case 'planKiller': {
       if (a.t !== 'planKiller') break
-      const [l, r] = a.cards
-      // two copies of one card only with The Blight's doubled hand
-      const left = a.cards.length === 2 ? takeCards(st.killer.hand, [l, r]) : null
-      if (!left) fail('pick 2 cards from the hand')
-      st.killer.planned = [l, r]
-      st.killer.hand = left
-      log(st, 'วางแผนเสร็จ ทุกคนวางการ์ดคว่ำแล้ว', 'game')
-      const first = turnOrder(st).find((i) => st.survivors[i].planned)
-      st.queue.push({ k: 'trigger', w: { k: 'planningEnd' }, done: [] })
-      st.phase = first === undefined ? 'killer' : 'survivors'
-      st.queue.push(first === undefined ? { k: 'killerTurn', turn: 0 } : { k: 'survivorTurn', s: first })
-      return
+      return finishKillerPlan(st, a.cards)
     }
     case 'revealProp': {
       if (a.t !== 'reveal') break
@@ -950,9 +963,14 @@ function runTask(st: GameState, task: Task) {
     case 'trigger':
       runTrigger(st, task.w, task.done)
       return
-    case 'plan':
-      wait(st, { t: 'planSurvivors' })
+    case 'plan': {
+      // Stridor: the chosen survivor plays face up "before you or any other Survivor", so their
+      // card is set on its own first and everyone else plans knowing it.
+      const s = st.stridor
+      if (s !== null && st.survivors[s].planned === null && st.survivors[s].status !== 'hooked') wait(st, { t: 'planStridor', s })
+      else wait(st, { t: 'planSurvivors' })
       return
+    }
     case 'roll': {
       // Perks may have changed this skill check (danger die instead, two dice keep one).
       const mods = st.rollMods
@@ -1087,8 +1105,9 @@ function planSurvivors(st: GameState, cards: (MoveCard | null)[]) {
   const hands = st.survivorHands.map((h) => [...h])
   st.survivors.forEach((sv, i) => {
     const c = cards[i]
-    if (sv.status === 'hooked') {
-      if (c !== null) fail('hooked survivors do not plan')
+    // on a hook, or already face up from Stridor: no card to set here
+    if (sv.status === 'hooked' || sv.planned !== null) {
+      if (c !== null) fail('this survivor does not plan a card')
       return
     }
     if (!c || c === 'wait') fail(`${sv.name} needs a card`)
@@ -1098,10 +1117,26 @@ function planSurvivors(st: GameState, cards: (MoveCard | null)[]) {
   })
   st.survivorHands = hands
   st.survivors.forEach((sv, i) => {
+    if (sv.planned !== null) return // Stridor's card, already played face up
     sv.planned = cards[i]
     sv.plannedRevealed = false
     sv.acted = false
   })
+}
+
+/** The killer's two cards are set (in either planning order): the round can start. */
+function finishKillerPlan(st: GameState, cards: MoveCard[]) {
+  const [l, r] = cards
+  // two copies of one card only with The Blight's doubled hand
+  const left = cards.length === 2 ? takeCards(st.killer.hand, [l, r]) : null
+  if (!left) fail('pick 2 cards from the hand')
+  st.killer.planned = [l, r]
+  st.killer.hand = left
+  log(st, 'วางแผนเสร็จ ทุกคนวางการ์ดคว่ำแล้ว', 'game')
+  const first = turnOrder(st).find((i) => st.survivors[i].planned)
+  st.queue.push({ k: 'trigger', w: { k: 'planningEnd' }, done: [] })
+  st.phase = first === undefined ? 'killer' : 'survivors'
+  st.queue.push(first === undefined ? { k: 'killerTurn', turn: 0 } : { k: 'survivorTurn', s: first })
 }
 
 function startSurvivorMove(st: GameState, s: number, card: PathKind) {
@@ -1838,8 +1873,9 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     }
     // ----- The Nurse -----
     case 'stridor':
+      // a survivor in a locker is off the board for perks (p.12), so they can't be chosen
       if (w.k !== 'planningStart') return []
-      return st.survivors.flatMap((sv, i) => (sv.wounded && sv.status !== 'hooked' && sv.status !== 'carried' ? [{ target: i }] : []))
+      return st.survivors.flatMap((sv, i) => (sv.wounded && sv.status === 'board' ? [{ target: i }] : []))
     case 'thanatophobia':
       if (w.k !== 'preRoll' || !SKILL_CHECKS.includes(w.ctx.k) || st.rollMods.danger) return []
       return st.survivors[w.ctx.s].wounded ? NONE : []

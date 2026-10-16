@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { apply, charlotteRoom, createGame, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, victorRoom } from './engine'
+import { apply, charlotteRoom, createGame, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
+import { actorsOf } from './seats'
 import { PERKS, PRINTED_PERKS, type PerkId } from './perks'
 import type { Action, GameState, PropKind } from './types'
 
@@ -210,6 +211,39 @@ describe('perks', () => {
     expect(after.paths.p14.trap).toBe(true)
     expect(after.killer.bp).toBe(bp + 1)
     expect(after.survivors[3].bp).toBe(5)
+  })
+
+  it('Stridor: the chosen survivor plays face up on their own, before anyone else plans', () => {
+    let st = game('nurse')
+    only(st, 'stridor')
+    st.survivors[1].wounded = true
+    st.step = { t: 'idle' }
+    // the start of a planning phase: the offer comes before any card is chosen
+    st = apply({ ...st, step: { t: 'turnStart', s: 0 }, queue: [{ k: 'trigger', w: { k: 'planningStart' }, done: [] }, { k: 'plan' }] }, { t: 'continue' })
+    expect(st.step).toMatchObject({ t: 'offer', perk: 'stridor', owner: 'killer' })
+    // only wounded survivors on the board can be chosen (a locker is off the board, p.12)
+    expect(perkChoices(st, 'stridor', 'killer', { k: 'planningStart' })).toEqual([{ target: 1 }])
+    expect(perkChoices({ ...st, survivors: st.survivors.map((sv, i) => (i === 1 ? { ...sv, status: 'locker' as const } : sv)) }, 'stridor', 'killer', { k: 'planningStart' })).toEqual([])
+    st = apply(st, { t: 'perk', perk: 'stridor', use: true, choice: { target: 1 } })
+    expect(st.stridor).toBe(1)
+    expect(st.step).toEqual({ t: 'planStridor', s: 1 })
+    expect(actorsOf(st)).toEqual([3]) // 5 players: survivor 1 is player 3's
+
+    const card = st.survivorHands[st.survivors[1].hand][1]
+    st = apply(st, { t: 'planStridor', card })
+    expect(st.survivors[1].planned).toBe(card)
+    expect(st.survivors[1].plannedRevealed).toBe(true) // face up for everyone still to plan
+    expect(st.survivorHands[st.survivors[1].hand]).not.toContain(card)
+    expect(st.step).toEqual({ t: 'planSurvivors' })
+    expect(st.survivors.filter((sv) => sv.planned)).toHaveLength(1)
+
+    // the others plan without a card for that survivor; setting one again is illegal
+    expect(tryApply(st, { t: 'planSurvivors', cards: ['sneak', 'sneak', 'sneak', 'sneak'] })).toBeNull()
+    st = apply(st, { t: 'planSurvivors', cards: ['sneak', null, 'sneak', 'sneak'] })
+    expect(st.step.t).toBe('planKiller')
+    expect(st.survivors[1].planned).toBe(card)
+    expect(st.survivors[1].plannedRevealed).toBe(true)
+    expect(st.survivors.every((sv) => sv.planned)).toBe(true)
   })
 
   it('Huntress Lullaby stops a card move but keeps the interaction', () => {
@@ -770,5 +804,42 @@ describe('The Twins, The Blight, Élodie and Felix', () => {
     st.killer.hand = [n.kind]
     const choices = perkChoices(st, 'dragons_grip', 'killer', { k: 'killerBreak', what: 'damage', prop: gen.id })
     expect(choices).toEqual([{ card: n.kind }])
+  })
+
+  it("Undying damaging a generator still sets off Dragon's Grip", () => {
+    const st = game('blight')
+    only(st, 'undying', 'dragons_grip')
+    killerInteracting(st)
+    const n = neighbour(st)
+    const gen = placeProp(st, 'generator', n.room)
+    // the card Undying discards, and one of the same colour left for Dragon's Grip
+    st.killer.hand = [n.kind, n.kind]
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'far', wounded: false }))
+    // a healthy survivor in the killer's room: a path of that colour joins it to the generator's
+    Object.assign(st.survivors[1], { room: st.killer.room, bp: 0 })
+    const after = apply(st, { t: 'interact', i: { k: 'undying', card: n.kind, i: { k: 'damage', prop: gen.id } } })
+    expect(after.step).toMatchObject({ t: 'offer', perk: 'dragons_grip', w: { k: 'killerBreak', what: 'damage', prop: gen.id } })
+    // with no ▲ to pay, the survivor takes the wound
+    const hit = apply(after, { t: 'perk', perk: 'dragons_grip', use: true, choice: { card: n.kind } })
+    expect(hit.survivors[1].wounded).toBe(true)
+  })
+
+  it("Dragon's Grip after an Undying damage reaches out from the generator, not from the killer", () => {
+    const st = game('blight')
+    only(st, 'undying', 'dragons_grip')
+    killerInteracting(st)
+    // Ancient Tree —sneak→ Scrapyard (the generator) —crouch→ Foundry Ground.
+    // Shack is a crouch away from the killer's own room, so it tells the two origins apart.
+    st.killer.room = 'ancient-tree'
+    st.killer.hand = ['sneak', 'crouch']
+    const gen = placeProp(st, 'generator', 'scrapyard')
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'backlot', wounded: false, bp: 0 }))
+    st.survivors[0].room = 'foundry-ground' // a crouch path from the generator
+    st.survivors[1].room = 'shack' // a crouch path from the killer
+    st.survivors[2].room = 'scrapyard' // in the generator's own room
+    const after = apply(st, { t: 'interact', i: { k: 'undying', card: 'sneak', i: { k: 'damage', prop: gen.id } } })
+    expect(after.step).toMatchObject({ t: 'offer', perk: 'dragons_grip' })
+    const hit = apply(after, { t: 'perk', perk: 'dragons_grip', use: true, choice: { card: 'crouch' } })
+    expect(hit.survivors.map((sv) => sv.wounded)).toEqual([true, false, false, false])
   })
 })

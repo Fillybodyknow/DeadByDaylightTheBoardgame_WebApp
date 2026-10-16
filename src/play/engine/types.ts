@@ -299,6 +299,8 @@ export type Step =
   | { t: 'setupReveal'; s: number }
   /** Entering a room: pick which face-down prop (colour) to flip. */
   | { t: 'revealProp'; who: number | 'killer'; room: string }
+  /** Stridor: this survivor plays their card face up before anyone else plans. */
+  | { t: 'planStridor'; s: number }
   | { t: 'planSurvivors' }
   | { t: 'planKiller' }
   | { t: 'survivorMove'; s: number; card: PathKind }
@@ -399,6 +401,8 @@ export type Task =
 
 export type Action =
   | { t: 'setupReveal'; prop: string }
+  /** Stridor: the chosen survivor's card, played face up before the others plan. */
+  | { t: 'planStridor'; card: MoveCard }
   | { t: 'reveal'; prop: string }
   /** One card per survivor, null for a hooked survivor (p.15). */
   | { t: 'planSurvivors'; cards: (MoveCard | null)[] }
@@ -544,4 +548,9 @@ export interface GameState {
   log: LogEntry[]
   /** Online planning: cards set so far by survivor index (`planHand`), until every hand is in. */
   planDraft?: (MoveCard | null)[]
+  /**
+   * Online planning: the killer's two cards, set while the survivors are still planning. They are
+   * played as soon as the last survivor hand is in (offline the killer plans after them instead).
+   */
+  killerDraft?: MoveCard[]
 }

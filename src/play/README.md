@@ -46,8 +46,12 @@ and the host starts the game.
   state itself. `engine/seats.ts` decides who may act (`actorsOf`, `mayAct`). Writes are
   transactions, so two players acting at once can't overwrite each other: the second action is
   checked again against the new state. Nothing is hidden from a player who opens the dev tools.
-- **Planning:** each survivor player sends their own hand with `planHand`. The cards are
-  revealed once every hand is in, and then the killer plans.
+- **Planning happens for everyone at once.** Each survivor player sends their own hand with
+  `planHand`, and the killer sends his two cards with `planKiller` in the same step; they are
+  kept in `killerDraft` until the last survivor hand is in, and whoever confirms last starts the
+  round. Nobody learns anything new from it — the survivors' cards are face down to the killer
+  either way (p.8) — it only saves the wait. On one shared device the survivors still plan first
+  and the device then goes to the killer, behind the hand-off curtain.
 - **Backends** (`online/`):
   - `firebase.ts` is the Realtime Database. Its URL goes in the project root's `.env.local`
     (git-ignored) as `VITE_FIREBASE_DATABASE_URL`; the deploy reads it from the repo's Actions
@@ -169,7 +173,10 @@ Perks:
 - Adrenaline is offered at the start of cleanup, before sacrifice progression.
 - Empathy works with any survivor not on a hook ("willing" is left to the players).
 - Saboteur comes after the rescue moves. Tinkerer only swaps cards not yet played.
-- Stridor's survivor plays their card face up as soon as the survivors have planned.
+- Stridor's survivor plays their card face up on their own, in a step of its own before anyone
+  else plans ("before you or any other Survivor"): the other survivors and the killer then choose
+  knowing it. They set no second card in the planning step that follows. A survivor hiding in a
+  locker can't be chosen: a locker is off the board for perks (p.12).
 
 The Doctor, The Hag, The Wraith:
 
@@ -233,7 +240,9 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Dragon's Grip: one or two path cards (not Wait); healthy survivors in rooms joined to the
   damaged generator's room by a path of those colours pay 1 ▲ or are wounded (in turn order).
 - Undying: the killer's interaction for the turn, with a prop in a room joined to his by a path
-  of the discarded card's colour (either direction).
+  of the discarded card's colour (either direction). It is an ordinary interaction over there, so
+  damaging a generator with it still sets off Overcharge, Gearhead, Oppression, Dragon's Grip and
+  Alert.
 - Blood Favour works by itself at the start of cleanup ("sacrificed" = on a hook).
 - Power Struggle needs the killer (Charlotte) in Élodie's room, before the killer's first card.
 - Appraisal: any discard of another survivor's item (used, re-rolled, chosen away, wasted); with

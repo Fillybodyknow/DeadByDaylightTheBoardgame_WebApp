@@ -22,6 +22,7 @@ export function stepOwner(st: GameState): PerkOwner | null {
   const s = st.step
   switch (s.t) {
     case 'setupReveal':
+    case 'planStridor':
     case 'survivorMove':
     case 'survivorInteract':
     case 'bonusOffer':
@@ -59,7 +60,8 @@ export function handsToPlan(st: GameState): number[] {
   const draft = st.planDraft ?? []
   const hands = new Set<number>()
   st.survivors.forEach((sv, i) => {
-    if (sv.status !== 'hooked' && !draft[i]) hands.add(sv.hand)
+    // a survivor on a hook, or already face up from Stridor, needs no card here
+    if (sv.status !== 'hooked' && sv.planned === null && !draft[i]) hands.add(sv.hand)
   })
   return [...hands].sort()
 }
@@ -68,7 +70,10 @@ export function handsToPlan(st: GameState): number[] {
 export function actorsOf(st: GameState): number[] {
   const s = st.step
   if (s.t === 'gameOver' || s.t === 'idle') return []
-  if (s.t === 'planSurvivors') return [...new Set(handsToPlan(st).map((h) => st.handPlayers[h]))]
+  // Planning runs for everyone at once: the survivor hands still to come in, and the killer
+  // until he has set his two cards.
+  if (s.t === 'planSurvivors')
+    return [...new Set(handsToPlan(st).map((h) => st.handPlayers[h])), ...(st.killerDraft ? [] : [KILLER_PLAYER])].sort((a, b) => a - b)
   if (s.t === 'reaction') return [...new Set(s.holders.map((h) => playerOfSurvivor(st, h)))]
   const owner = stepOwner(st)
   return owner === null ? [] : [playerOfOwner(st, owner)]
@@ -80,6 +85,9 @@ export function mayAct(st: GameState, player: number, action: Action): boolean {
   if (action.t === 'useItem' || action.t === 'reroll') return playerOfSurvivor(st, action.s) === player
   if (action.t === 'react') return st.step.t === 'reaction' && actorsOf(st).includes(player) && (action.s === null || playerOfSurvivor(st, action.s) === player)
   if (action.t === 'planHand') return st.step.t === 'planSurvivors' && st.handPlayers[action.hand] === player
+  // planning runs for everyone at once, so both actions are legal in the same step: each belongs
+  // to its own side
+  if (action.t === 'planKiller') return player === KILLER_PLAYER && actorsOf(st).includes(player)
   // The whole-table planning action only makes sense on one shared device.
   if (action.t === 'planSurvivors') return false
   return actorsOf(st).includes(player)
