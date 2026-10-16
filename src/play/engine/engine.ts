@@ -818,6 +818,10 @@ function handle(st: GameState, a: Action) {
       if (a.t === 'hang') return hang(st, step.s, usableHook(st, st.killer.room) ?? fail('no free hook here'))
       if (a.t !== 'move') break
       const m = carryMoves(st).find((e) => e.path.id === a.path) ?? fail('cannot carry there')
+      // A Firecracker in the room ahead may stop him, carrying or not (house rule): asked first.
+      const holders = onBoardIn(st, m.to).filter((i) => st.survivors[i].item === 'firecracker' && st.itemLock !== i)
+      if (holders.length > 0 && !a.reacted)
+        return wait(st, { t: 'reaction', item: 'firecracker', holders, pending: { t: 'move', path: m.path.id }, carry: { s: step.s, steps: step.steps } })
       carryStep(st, step.s, step.steps, m.path.id, m.to)
       return
     }
@@ -835,6 +839,12 @@ function handle(st: GameState, a: Action) {
       emit(st, { k: 'item', s: a.s, item: used }, a.s)
       discardItem(st, a.s, used, true)
       st.canInteract = false
+      if (step.carry) {
+        // Carrying: the step is lost, he stays where he is, and carries on with what is left.
+        log(st, `${sv.name} ใช้ Firecracker — ${st.killer.name} แบกเข้าห้องไม่ได้ เสีย 1 ก้าว`, a.s)
+        st.queue.unshift({ k: 'carryArrive', s: step.carry.s, steps: step.carry.steps - 1 })
+        return
+      }
       if (step.item === 'firecracker') log(st, `${sv.name} ใช้ Firecracker — ${st.killer.name} เข้าห้องไม่ได้ และเสียการ Interact`, a.s)
       else log(st, `${sv.name} ใช้ Flashlight — กัน Interaction ของ ${st.killer.name}`, a.s)
       return
@@ -902,6 +912,7 @@ function handle(st: GameState, a: Action) {
 
 /** The step a reaction interrupted, so the pending action can be replayed. */
 function reactedStep(st: GameState, step: Extract<Step, { t: 'reaction' }>): Step {
+  if (step.carry) return { t: 'carryMove', s: step.carry.s, steps: step.carry.steps }
   const turn = st.killer.revealedCount - 1
   // The Blight's power moves with the card it drew, not the planned one.
   if (step.pending.t === 'move') return { t: 'killerMove', turn, card: st.rushCard ?? (st.killer.planned[turn] as PathKind), ...(st.rushCard ? { rush: true } : {}) }

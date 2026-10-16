@@ -664,7 +664,10 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
     <!-- reactions -->
     <template v-else-if="step.t === 'reaction'">
-      <p v-if="step.item === 'firecracker'">
+      <p v-if="step.item === 'firecracker' && step.carry">
+        {{ st.killer.name }} กำลังแบก <b>{{ st.survivors[step.carry.s].name }}</b> เข้าห้องของคุณ — ใช้ <b>Firecracker</b> กันไว้ไหม? (เขาเสีย 1 ก้าว เหลือ {{ step.carry.steps - 1 }} ก้าว{{ step.carry.steps - 1 > 0 ? '' : ' — ถ้าไม่มี Hook ตรงนั้น เพื่อนหลุด' }})
+      </p>
+      <p v-else-if="step.item === 'firecracker'">
         {{ st.killer.name }} กำลังจะเข้าห้องของคุณ — ใช้ <b>Firecracker</b> กันไว้ไหม?
       </p>
       <p v-else>{{ st.killer.name }} กำลังจะ Interact ในห้องของคุณ — ใช้ <b>Flashlight</b> กันไว้ไหม?</p>

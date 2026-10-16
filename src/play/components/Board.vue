@@ -15,7 +15,7 @@ import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { BEAR_TRAP_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
+import { BEAR_TRAP_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 
@@ -36,6 +36,8 @@ const props = defineProps<{
 const emit = defineEmits<{ path: [id: string]; prop: [id: string]; interact: [key: string]; room: [id: string]; inspect: [target: InspectTarget] }>()
 
 const roomTarget = (room: string) => !!props.roomTargets && room in props.roomTargets
+/** The word after a room's name when clicking it means staying there. */
+const stayTag = (label?: string) => (label?.includes('Wait') ? ' · WAIT' : label?.includes('อยู่ห้องเดิม') ? ' · อยู่ห้องเดิม' : '')
 
 /** A locker or hook with someone on it says who, and what has happened to them. */
 function occupantTitle(p: Prop): string | null {
@@ -444,8 +446,8 @@ function guard(e: MouseEvent) {
       @click="roomTarget(r.id) && emit('room', r.id)"
     >
       <!-- a room to click is named on it: with several (a fork's rooms) the choice reads at a glance -->
-      <!-- planning: the room a killer's Wait keeps him in says so -->
-      <span v-if="roomTarget(r.id)" class="pick-tag">{{ r.name }}{{ roomTargets?.[r.id]?.includes('Wait') ? ' · WAIT' : '' }}</span>
+      <!-- a room that means staying put says so: a killer's Wait in planning, staying after a rescue -->
+      <span v-if="roomTarget(r.id)" class="pick-tag">{{ r.name }}{{ stayTag(roomTargets?.[r.id]) }}</span>
     </component>
 
     <template v-if="litRooms">
@@ -524,7 +526,7 @@ function guard(e: MouseEvent) {
         <img :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name" draggable="false" />
         <WoundRing v-if="st.survivors[s].wounded" />
         <!-- Madness is a badge, not a ring: the ring says healthy (white) or wounded (red) -->
-        <span v-if="st.survivors[s].madness" class="madness-tag" title="Madness: ทอย Danger Die แทน Skill Check">🌀</span>
+        <img v-if="st.survivors[s].madness" class="madness-tag" :src="asset(MADNESS_IMAGE)" alt="Madness" title="Madness: ทอย Danger Die แทน Skill Check" draggable="false" />
       </component>
       <component
         :is="canAct('killer') || roomTarget(r.id) ? 'button' : 'div'"
@@ -976,17 +978,15 @@ button.tile.act {
   filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.9)) drop-shadow(0 0 7px rgb(156 255 107 / 0.9));
 }
 /* above the mini rather than beside it: minis stand side by side, so the room's top is free */
-.madness-tag {
+/* the Madness token on the mini's top-right: the Doctor's brain, ringed in his green */
+.mini .madness-tag {
   position: absolute;
-  right: -6%;
-  top: -24%;
-  width: 1.45em;
-  height: 1.45em;
-  border-radius: 50%;
-  background: #0b1708;
-  font-size: 1.25cqw;
-  line-height: 1.45em;
-  text-align: center;
+  right: -14%;
+  top: -18%;
+  width: 46%;
+  height: 46%;
+  border-radius: 6px;
+  object-fit: cover;
   box-shadow:
     0 0 0 2px #9cff6b,
     0 1px 6px rgb(0 0 0 / 0.85);

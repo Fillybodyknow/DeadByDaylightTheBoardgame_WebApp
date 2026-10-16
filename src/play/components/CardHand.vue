@@ -59,9 +59,9 @@ onBeforeUnmount(() => hands(-1))
 
 <template>
   <Teleport to="body">
-    <!-- A perk asking for a card lifts the hand at once (open); otherwise it rests sunk, names
-         showing, and rises while the pointer is on it. -->
-    <div class="hand" :class="{ ask: !!prompt, open: !!prompt }" role="group" :aria-label="label">
+    <!-- The hand rests sunk, names showing, and rises while the pointer is on it — also when a
+         perk asks for a card (it glows, and its prompt sits just above the names). -->
+    <div class="hand" :class="{ ask: !!prompt }" role="group" :aria-label="label">
       <p v-if="prompt" class="prompt">⚡ {{ prompt }}</p>
       <div class="fan">
         <button
@@ -161,6 +161,19 @@ onBeforeUnmount(() => hands(-1))
   white-space: nowrap;
   pointer-events: none;
   box-shadow: 0 0 14px rgb(138 92 255 / 0.55);
+}
+/* sunk: the prompt comes down to sit just above the card names, and goes up with the hand */
+.prompt {
+  transform: translateY(186px);
+  transition: transform 0.2s cubic-bezier(0.2, 1.2, 0.4, 1);
+}
+.hand:is(.open, :has(.face:hover), :has(.slot:focus-visible)) .prompt {
+  transform: none;
+}
+@media (hover: none) {
+  .prompt {
+    transform: none;
+  }
 }
 .hand.ask .face {
   filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.7)) drop-shadow(0 0 8px rgb(170 110 255 / 0.65));

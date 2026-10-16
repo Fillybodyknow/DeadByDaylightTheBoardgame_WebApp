@@ -226,9 +226,11 @@ const item = computed(() => {
   backdrop-filter: blur(4px);
   animation: fade 0.18s ease-out;
 }
+/* big enough to read across the table: the text a size up, the cards wider */
 .modal {
   position: relative;
-  width: min(44rem, 100%);
+  width: min(60rem, 100%);
+  font-size: 1.12rem;
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
   display: grid;
@@ -260,13 +262,14 @@ header {
 }
 h2 {
   margin: 0;
+  font-size: 1.9rem;
 }
 header p {
   margin: 0;
 }
 .face {
-  width: 72px;
-  height: 72px;
+  width: 92px;
+  height: 92px;
 }
 .prop-img {
   width: 64px;
@@ -284,7 +287,7 @@ header p {
   padding: 0.2rem 0.6rem;
   border: 1px solid var(--line-strong);
   border-radius: 99px;
-  font-size: 0.9rem;
+  font-size: 1rem;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -302,7 +305,7 @@ header p {
 }
 .perk-list {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.7rem;
 }
 .perk-list h3 {
   margin: 0;
@@ -313,10 +316,10 @@ header p {
 }
 .perk-row {
   display: grid;
-  grid-template-columns: 64px 1fr;
-  gap: 0.7rem;
+  grid-template-columns: 110px 1fr;
+  gap: 1rem;
   align-items: start;
-  padding: 0.5rem;
+  padding: 0.75rem;
   border: 1px solid #6b4ca3;
   border-radius: 8px;
   background: rgb(120 70 200 / 0.08);
@@ -327,6 +330,9 @@ header p {
 .perk-row img {
   width: 100%;
   border-radius: 4px;
+}
+.perk-head strong {
+  font-size: 1.2rem;
 }
 .perk-head {
   display: flex;
@@ -339,10 +345,10 @@ header p {
   border-radius: 4px;
   background: rgb(255 138 128 / 0.15);
   color: #ffd1cc;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
 }
 .state {
-  font-size: 0.8rem;
+  font-size: 0.92rem;
 }
 .state.good {
   color: var(--ok);
@@ -351,7 +357,7 @@ header p {
   color: #ff8a80;
 }
 .small {
-  font-size: 0.86rem;
+  font-size: 0.98rem;
   margin: 0.2rem 0 0;
 }
 .powers {
@@ -365,7 +371,7 @@ header p {
 }
 .rule {
   margin: 0;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 .item-wrap {
   display: grid;

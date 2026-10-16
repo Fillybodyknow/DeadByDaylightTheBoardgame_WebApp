@@ -331,7 +331,8 @@ export type Step =
   | { t: 'carryDice'; s: number }
   | { t: 'carryMove'; s: number; steps: number }
   /** A survivor may discard an item to stop what the killer is doing. */
-  | { t: 'reaction'; item: 'flashlight' | 'firecracker'; holders: number[]; pending: Action }
+  /** `carry`: the killer is carrying survivor `s` with `steps` left (a Firecracker costs him the step). */
+  | { t: 'reaction'; item: 'flashlight' | 'firecracker'; holders: number[]; pending: Action; carry?: { s: number; steps: number } }
   /** Use this perk now? `done` is set when the offer comes from a trigger with more to ask. */
   | {
       t: 'offer'

@@ -3,7 +3,7 @@
 // roll still waiting on Iron Will, a key or Bond's choice. Docked beside the board (not over
 // it) so the map stays readable: the board lights up who is involved and where they could go,
 // and hovering a choice previews it on the map.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
 import { CARD_NAMES, ITEM_NAMES, KILLER_CARDS, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
@@ -13,6 +13,7 @@ import { choicePreview, preview } from '../focus'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { controls, dispatch, online } from '../game'
+import { pathPick, pathPickFor } from '../pathPick'
 import { ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import DiceRow from './DiceRow.vue'
@@ -221,6 +222,21 @@ function hoverHandCard(card: MoveCard | null) {
   preview.value = choicePreview(props.st, { card }, owner === 'killer' ? props.st.killer.room : props.st.survivors[owner].room, owner)
 }
 
+// ---------- a perk's card, opened big (a click on it); a click anywhere or Esc puts it back ----------
+
+const zoomed = ref<string | null>(null)
+function zoom(e: MouseEvent) {
+  zoomed.value = (e.currentTarget as HTMLImageElement).src
+}
+// Esc closes the picture, not the decision behind it (caught before anything else hears the key).
+function onZoomKey(e: KeyboardEvent) {
+  if (e.key !== 'Escape' || !zoomed.value) return
+  e.stopImmediatePropagation()
+  zoomed.value = null
+}
+watch(zoomed, (z) => (z ? window.addEventListener('keydown', onZoomKey, true) : window.removeEventListener('keydown', onZoomKey, true)))
+onBeforeUnmount(() => window.removeEventListener('keydown', onZoomKey, true))
+
 function confirmCard() {
   const s = step.value
   const c = cardPick.value
@@ -247,6 +263,24 @@ onBeforeUnmount(() => (preview.value = null))
 
 /** Folded away to see the board: only the header stays, saying what is waiting. */
 const collapsed = ref(false)
+
+// The map: while a perk's movement card is being picked (Adrenaline, Any Means Necessary, Predator's
+// new card…), a path out of the mover's room picks the card of its colour, as the hand does.
+let ownPick = false
+watchEffect(() => {
+  const s = step.value
+  const mover = s.t === 'replaceCard' ? s.s : s.t === 'offer' && MOVE_PERKS.includes(s.perk) ? s.owner : null
+  if (open.value && !collapsed.value && mover !== null && perkHand.value.length) {
+    const room = mover === 'killer' ? props.st.killer.room : props.st.survivors[mover].room
+    pathPick.value = pathPickFor(props.st, room, perkHand.value.map((c) => c.card), pickHandCard)
+    ownPick = true
+  } else if (ownPick) {
+    pathPick.value = null
+    ownPick = false
+  }
+})
+onBeforeUnmount(() => ownPick && (pathPick.value = null))
+
 
 /** What is being decided, in a few words, for the folded panel. */
 const summary = computed(() => {
@@ -332,7 +366,7 @@ const boardCount = computed(() => {
       <template v-if="step.t === 'offer' && offerList.length > 1">
         <p class="lead">มี {{ offerList.length }} Perk ที่ใช้ได้ในจังหวะนี้ — เลือกใช้ใบไหนก่อนก็ได้ ใบที่เหลือจะถามต่อ (หน้า 16)</p>
         <div v-for="o in offerList" :key="o.perk" class="perk boxed">
-          <img v-if="perkImage(o.perk)" class="thumb small" :src="asset(perkImage(o.perk))" :alt="PERKS[o.perk].name" />
+          <img v-if="perkImage(o.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(o.perk))" :alt="PERKS[o.perk].name" />
           <div>
             <h3>
               {{ PERKS[o.perk].name }} <span class="cost">{{ cost(o.perk) }}</span>
@@ -363,7 +397,7 @@ const boardCount = computed(() => {
       <!-- a perk offered at its moment -->
       <template v-else-if="step.t === 'offer'">
         <div class="perk">
-          <img v-if="perkImage(step.perk)" class="thumb" :src="asset(perkImage(step.perk))" :alt="PERKS[step.perk].name" />
+          <img v-if="perkImage(step.perk)" class="thumb zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(step.perk))" :alt="PERKS[step.perk].name" />
           <div>
             <h2>
               ใช้ {{ PERKS[step.perk].name }}? <span class="cost">{{ cost(step.perk) }}</span>
@@ -426,7 +460,7 @@ const boardCount = computed(() => {
       <template v-else-if="step.t === 'turnStart'">
         <p class="lead">เริ่มเทิร์น — ใช้ perk ก่อนเปิดการ์ดเดินได้</p>
         <div v-for="b in buttons" :key="b.perk" class="perk boxed">
-          <img v-if="perkImage(b.perk)" class="thumb small" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
+          <img v-if="perkImage(b.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
           <div>
             <h3>
               {{ PERKS[b.perk].name }} <span class="cost">{{ cost(b.perk) }}</span>
@@ -517,7 +551,7 @@ const boardCount = computed(() => {
         </p>
         <div class="dice"><DiceRow :dice="step.dice" big /></div>
         <div v-for="b in buttons" :key="b.perk" class="perk boxed">
-          <img v-if="perkImage(b.perk)" class="thumb small" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
+          <img v-if="perkImage(b.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
           <div>
             <h3>
               <FaceLabel :st="st" :who="b.owner" :text="`${ownerLabel(st, b.owner)}: ${PERKS[b.perk].name}`" /> <span class="cost">{{ cost(b.perk) }}</span>
@@ -553,6 +587,12 @@ const boardCount = computed(() => {
       </template>
     </aside>
   </transition>
+  <Teleport to="body">
+    <div v-if="zoomed" class="perk-zoom" role="dialog" aria-modal="true" @click="zoomed = null">
+      <img :src="zoomed" alt="" />
+      <p>คลิกที่ไหนก็ได้เพื่อย่อกลับ</p>
+    </div>
+  </Teleport>
   <CardHand v-if="open && !collapsed && perkHand.length" :cards="perkHand" :label="handLabel" :prompt="handPrompt" @pick="pickHandCard" @hover="hoverHandCard" />
   <CardHand
     v-if="open && !collapsed && gripHand.length"
@@ -681,6 +721,36 @@ header {
 }
 .thumb.small {
   width: 64px;
+}
+.zoomable {
+  cursor: zoom-in;
+}
+/* a perk's card opened big, over everything */
+.perk-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  background: rgb(4 5 7 / 0.92);
+  cursor: zoom-out;
+}
+.perk-zoom img {
+  max-width: min(92vw, 520px);
+  max-height: 84vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 2px rgb(255 233 176 / 0.6),
+    0 24px 60px rgb(0 0 0 / 0.85);
+}
+.perk-zoom p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 @keyframes card-in {
   from {

@@ -25,7 +25,7 @@ import {
   touchingPaths,
 } from './engine/engine'
 import { PERKS } from './engine/perks'
-import type { Action, GameState, KillerInteraction, MoveCard, PerkOwner, SurvivorInteraction } from './engine/types'
+import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
 import { iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
@@ -249,6 +249,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       break
     case 'anyMove':
       moves(anyMoves(st, s.s), st.survivors[s.s].room)
+      // after a rescue they may stay put (house rule): their own room says so
+      add(`room:${st.survivors[s.s].room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
       break
     case 'killerMove':
       moves(killerMoves(st, s.card), st.killer.room)
@@ -310,8 +312,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       for (const c of perkChoices(st, s.perk, s.owner, s.w)) {
         const label = `${name}: ${perkChoiceLabel(st, s.perk, s.owner, s.w, c)}`
         const run = go({ t: 'perk', perk: s.perk, use: true, choice: c }, sfx.select)
-        if (c.path) add(`path:${c.path}`, label, run)
-        else if (c.prop) add(`prop:${c.prop}`, label, run)
+        if (c.path) {
+          add(`path:${c.path}`, label, run)
+          // where it leads: at a fork the room is then picked on the map, as for any move
+          out[out.length - 1].dest = perkDest(st, s.owner, c)
+        } else if (c.prop) add(`prop:${c.prop}`, label, run)
         else if (c.target !== undefined) add(`s:${c.target}`, label, run, 'act', c.target)
       }
       break
@@ -412,6 +417,17 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   return out
 }
 
+/**
+ * Where a perk's move along a path takes its mover (the survivor it targets, or its owner): the
+ * path's other end. Undefined when the mover isn't at either end (nothing to pick then).
+ */
+function perkDest(st: GameState, owner: PerkOwner, c: PerkChoice): string | undefined {
+  const mover = c.target ?? owner
+  const from = mover === 'killer' ? st.killer.room : st.survivors[mover].room
+  const p = pathDef(st, c.path!)
+  return p.a === from ? p.b : p.b === from ? p.a : undefined
+}
+
 /** The free hook in the killer's room: click it to hang the carried survivor there. */
 function hookSpot(st: GameState, add: (key: SpotKey, label: string, run: () => void) => void) {
   const hook = hookHere(st)
@@ -459,7 +475,7 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
       const label = `${name}: ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)}`
       const run = go({ t: 'perk', perk: b.perk, use: true, choice: c }, sfx.select)
       const action = run.action
-      if (c.path) out.push({ key: spotKey(st, `path:${c.path}`), label, style: 'act', run, action })
+      if (c.path) out.push({ key: spotKey(st, `path:${c.path}`), label, style: 'act', run, action, dest: perkDest(st, b.owner, c) })
       else if (c.target !== undefined) out.push({ key: `s:${c.target}`, label, style: 'act', run, who: c.target, action })
       else if (b.perk === 'self_care') out.push({ key: `s:${b.owner}`, label, style: 'act', run, who: b.owner, action })
     }

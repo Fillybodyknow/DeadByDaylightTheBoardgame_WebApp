@@ -9,10 +9,11 @@ import type { GameState, ItemUse } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
 import type { InspectTarget } from '../inspect'
-import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, PROP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
+import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, MADNESS_IMAGE, PROP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import ObjectiveHud from './ObjectiveHud.vue'
+import PerkDiamonds from './PerkDiamonds.vue'
 
 const props = defineProps<{ st: GameState; powerOn?: boolean }>()
 const emit = defineEmits<{ use: [s: number, use: ItemUse]; inspect: [target: InspectTarget]; pick: [s: number]; power: [on: boolean] }>()
@@ -193,6 +194,7 @@ function onPowerSlot() {
         </template>
         <!-- the two cards still to plan: dashed places, so the row keeps its size -->
         <span v-for="n in Math.max(0, 2 - st.killer.planned.length)" :key="`e${n}`" class="pcard empty" title="ยังไม่ได้วางการ์ด" />
+        <PerkDiamonds :st="st" owner="killer" @open="emit('inspect', { k: 'perk', perk: $event, owner: 'killer' })" />
       </div>
     </div>
 
@@ -215,9 +217,12 @@ function onPowerSlot() {
           </Mini>
           <img v-if="stateIcon(s)" class="state" :class="st.survivors[s].status" :src="asset(stateIcon(s)!)" :alt="STATUS_TH[st.survivors[s].status]" />
           <span class="order" :title="`ลำดับเทิร์นที่ ${order(s)}`">{{ order(s) }}</span>
-          <span v-if="st.survivors[s].madness" class="madness" title="Madness: ทอย Danger Die แทน Skill Check">🌀</span>
+          <!-- the first player token: a gold coin on the portrait's corner -->
+          <span v-if="st.firstPlayer === s" class="first" title="First Player — เล่นก่อนในรอบนี้">
+            <img :src="asset(components.firstPlayer.image)" alt="First Player" />
+          </span>
+          <img v-if="st.survivors[s].madness" class="madness" :src="asset(MADNESS_IMAGE)" alt="Madness" title="Madness: ทอย Danger Die แทน Skill Check" />
           <img v-if="st.survivors[s].sacrificeToken" class="token" :src="asset(components.sacrificeProgress.image)" alt="" title="ยังมี sacrifice token บนกระดาน" />
-          <img v-if="st.firstPlayer === s" class="first" :src="asset(components.firstPlayer.image)" alt="First player" title="First Player" />
         </div>
         <div class="names">
           <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}</strong>
@@ -260,6 +265,7 @@ function onPowerSlot() {
           <img :src="asset(itemImage(st.survivors[s].item!))" :alt="ITEM_NAMES[st.survivors[s].item!]" />
         </button>
         <span v-else class="item empty" title="ไม่มี item" />
+        <PerkDiamonds :st="st" :owner="s" @open="emit('inspect', { k: 'perk', perk: $event, owner: s })" />
       </div>
     </div>
     </div>
@@ -646,11 +652,26 @@ button.slot:hover .slot-crop {
   object-fit: contain;
 }
 /* wounded: the blood ring (WoundRing) is laid over the portrait */
+/* the first player token: a gold coin with the jar on it, on the portrait's lower-left corner
+   (clear of the name beside it) */
 .first {
   position: absolute;
-  right: -6px;
-  bottom: -4px;
-  width: 18px;
+  left: -12px;
+  bottom: -10px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff1b8, #f5c542 45%, #9a6a12);
+  box-shadow:
+    0 0 0 2px #2a1d05,
+    0 0 14px 2px rgb(255 205 80 / 0.75);
+}
+.first img {
+  width: 23px;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.6));
 }
 .line {
   display: flex;
@@ -661,14 +682,19 @@ button.slot:hover .slot-crop {
 .small {
   font-size: 0.76rem;
 }
-/* Madness, on the portrait's bottom-left corner */
+/* Madness, on the portrait's lower-right corner (the first player coin has the left one) */
 .madness {
   position: absolute;
-  left: -5px;
-  bottom: -4px;
-  font-size: 0.72rem;
-  line-height: 1;
-  filter: drop-shadow(0 0 2px #000);
+  right: -8px;
+  bottom: -6px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: cover;
+  box-shadow:
+    0 0 0 2px #9cff6b,
+    0 1px 4px rgb(0 0 0 / 0.85);
 }
 .victor-at {
   color: #e0a3ff;
@@ -699,9 +725,10 @@ button.slot:hover .slot-crop {
   width: 18px;
   vertical-align: middle;
 }
+/* one row: the cards, the item, and the perks at its right end */
 .cards {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.3rem;
   align-items: center;
 }

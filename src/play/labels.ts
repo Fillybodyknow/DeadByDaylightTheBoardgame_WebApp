@@ -30,6 +30,8 @@ export const PROP_IMAGE: Record<PropKind, string> = {
 export const cardImage = (c: MoveCard) => `assets/movement/${c}.webp`
 export const SURVIVOR_CARD_BACK = 'assets/movement/back-one.webp'
 export const KILLER_CARD_BACK = 'assets/movement/back-skull.webp'
+/** The Doctor's Madness token. */
+export const MADNESS_IMAGE = 'assets/killers/tokens/doctor-madness.webp'
 export const BEAR_TRAP_IMAGE = 'assets/killers/tokens/trapper-bear-trap.webp'
 /** The Twins: Victor's own mini. */
 export const VICTOR_MINI = 'assets/killers/mini/twins_victor.webp'

@@ -349,3 +349,51 @@ describe('random playthroughs', () => {
     expect(finished).toBeGreaterThan(25)
   }, 180_000)
 })
+
+describe('Firecracker while carrying (house rule)', () => {
+  /** The killer carrying Dwight with `steps` left, Meg holding a Firecracker in the next room. */
+  function carrying(steps: number) {
+    const st = planned()
+    const k = st.killer
+    const path = macmillan.paths.find((p) => p.a === k.room || p.b === k.room)!
+    const next = path.a === k.room ? path.b : path.a
+    st.props.forEach((p) => p.kind === 'hook' && (p.revealed = false))
+    st.phase = 'killer'
+    k.planned = ['sneak', 'sneak']
+    k.revealedCount = 1
+    Object.assign(st.survivors[0], { status: 'carried', room: k.room, wounded: true })
+    Object.assign(st.survivors[1], { status: 'board', room: next, item: 'firecracker' })
+    st.survivors.slice(2).forEach((sv) => (sv.room = k.room === 'shack' ? 'backlot' : 'shack'))
+    st.step = { t: 'carryMove', s: 0, steps }
+    st.queue = [{ k: 'endKillerTurn', turn: 0 }]
+    return { st, path, from: k.room, next }
+  }
+
+  it('asks the holder before he carries into her room', () => {
+    const { st, path } = carrying(3)
+    const asked = apply(st, { t: 'move', path: path.id })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'firecracker', holders: [1] })
+  })
+
+  it('used: he stays, loses the step, and carries on with what is left', () => {
+    const { st, path, from } = carrying(3)
+    const after = apply(apply(st, { t: 'move', path: path.id }), { t: 'react', s: 1 })
+    expect(after.killer.room).toBe(from)
+    expect(after.survivors[1].item).toBeNull()
+    expect(after.step).toMatchObject({ t: 'carryMove', s: 0, steps: 2 })
+  })
+
+  it('used on the last step, with no hook: the carried survivor escapes where he stands', () => {
+    const { st, path, from } = carrying(1)
+    const after = apply(apply(st, { t: 'move', path: path.id }), { t: 'react', s: 1 })
+    expect(after.survivors[0].status).toBe('board')
+    expect(after.survivors[0].room).toBe(from)
+  })
+
+  it('not used: he carries on into the room', () => {
+    const { st, path, next } = carrying(3)
+    const after = apply(apply(st, { t: 'move', path: path.id }), { t: 'react', s: null })
+    expect(after.killer.room).toBe(next)
+    expect(after.survivors[1].item).toBe('firecracker')
+  })
+})
