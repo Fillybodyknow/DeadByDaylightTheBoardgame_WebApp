@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// Movement cards held in a fan floating in the bottom-right corner. Pointing at a card draws it
-// up to look at; clicking picks it — it stays drawn up, glowing, until the choice
+// Movement cards held in a fan floating in the bottom-right corner. At rest the hand is sunk
+// with only the names showing, so the map stays in sight; pointing at a card raises the hand and
+// draws that card up to look at; clicking picks it — it stays drawn up, glowing, until the choice
 // is confirmed in the panel (or clicked again to put it back).
 //
 // Each card is a button that never moves (its rotation in the fan aside); only the card face
@@ -9,7 +10,8 @@
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { asset } from '../../i18n'
 import type { MoveCard } from '../engine/types'
-import { cardImage, cardLabel } from '../labels'
+import { CARD_NAMES } from '../engine/engine'
+import { CARD_TH, cardImage, cardLabel } from '../labels'
 
 export interface HandCard {
   card: MoveCard
@@ -38,8 +40,8 @@ const fan = computed(() => {
   return props.cards.map((_, i) => {
     const off = i - mid
     // up to 4 cards at full size; 5 (the killer's hand) smaller; 8 (The Blight's) smaller still
-    const w = props.cards.length > 6 ? 74 : props.cards.length > 4 ? 98 : 112
-    return { '--w': `${w}px`, '--rot': `${off * 5}deg`, '--arc': `${Math.abs(off) * Math.abs(off) * 3}px`, zIndex: String(i + 1) }
+    const w = props.cards.length > 6 ? 84 : props.cards.length > 4 ? 114 : 134
+    return { '--w': `${w}px`, '--rot': `${off * 3}deg`, '--arc': `${Math.abs(off) * Math.abs(off) * 2}px`, zIndex: String(i + 1) }
   })
 })
 
@@ -57,9 +59,9 @@ onBeforeUnmount(() => hands(-1))
 
 <template>
   <Teleport to="body">
-    <!-- a soft shadow under the hand, so it reads over the map -->
-    <div class="tray" :class="{ ask: !!prompt }" aria-hidden="true" />
-    <div class="hand" :class="{ ask: !!prompt }" role="group" :aria-label="label">
+    <!-- A perk asking for a card lifts the hand at once (open); otherwise it rests sunk, names
+         showing, and rises while the pointer is on it. -->
+    <div class="hand" :class="{ ask: !!prompt, open: !!prompt }" role="group" :aria-label="label">
       <p v-if="prompt" class="prompt">⚡ {{ prompt }}</p>
       <div class="fan">
         <button
@@ -79,6 +81,8 @@ onBeforeUnmount(() => hands(-1))
         >
           <span class="face">
             <img :src="asset(cardImage(c.card))" :alt="cardLabel(c.card)" draggable="false" />
+            <!-- the card's name in its colour, on the part of a resting card that shows -->
+            <span class="tag" :class="c.card"><b>{{ CARD_NAMES[c.card] }}</b><small>{{ CARD_TH[c.card] }}</small></span>
             <span v-if="c.picked && c.badge" class="badge">{{ c.badge }}</span>
             <img v-if="c.takenBy" class="taken-by" :src="asset(c.takenBy)" alt="" />
             <span v-if="c.count !== undefined" class="count" :class="{ none: !c.count }">×{{ c.count }}</span>
@@ -86,6 +90,8 @@ onBeforeUnmount(() => hands(-1))
         </button>
       </div>
     </div>
+    <!-- a soft shadow under the hand, so it reads over the map (after it: it follows its state) -->
+    <div class="tray" :class="{ ask: !!prompt }" aria-hidden="true" />
   </Teleport>
 </template>
 
@@ -100,8 +106,9 @@ onBeforeUnmount(() => hands(-1))
 }
 .tray {
   z-index: 14;
-  width: min(720px, 100vw);
-  height: 230px;
+  width: min(760px, 100vw);
+  height: 120px;
+  transition: height 0.2s ease-out;
   background: radial-gradient(ellipse 50% 70% at 50% 100%, rgb(4 5 7 / 0.92), rgb(4 5 7 / 0.6) 55%, transparent 75%);
 }
 .hand {
@@ -161,19 +168,20 @@ onBeforeUnmount(() => hands(-1))
 .fan {
   display: flex;
   justify-content: center;
-  height: 216px;
+  height: 252px;
 }
 /* The button: the card's place, a bit taller than the card so the risen card is still on it. */
 .slot {
   position: relative;
   flex: none;
-  width: var(--w, 112px);
-  height: 210px;
+  width: var(--w, 134px);
+  height: 246px;
   margin: 0 -6px;
   padding: 0;
   border: none;
   background: none;
-  pointer-events: auto;
+  /* only the card takes the pointer: the empty space above a sunk card leaves the map clickable */
+  pointer-events: none;
   cursor: pointer;
   transform-origin: 50% 140%;
   transform: translateY(var(--arc)) rotate(var(--rot));
@@ -182,9 +190,11 @@ onBeforeUnmount(() => hands(-1))
 .slot:focus-visible {
   z-index: 50 !important;
 }
-/* The card itself: resting low, sliding up inside its button. */
+/* The card itself: resting sunk, only its name showing over the screen's edge, so the map
+   stays in sight; it slides up inside its button when the hand rises. */
 .face {
-  --lift: 58px;
+  --lift: 132px;
+  pointer-events: auto;
   position: absolute;
   left: 0;
   right: 0;
@@ -211,8 +221,24 @@ onBeforeUnmount(() => hands(-1))
   transform: translateY(-14px) scale(1.12);
   filter: drop-shadow(0 14px 18px rgb(0 0 0 / 0.8)) brightness(1.08);
 }
+/* The pointer on any card (or a perk asking for one): the whole hand rises to full size. */
+.hand:is(.open, :has(.face:hover), :has(.slot:focus-visible)) .face {
+  --lift: 14px;
+}
+.hand:is(.open, :has(.face:hover), :has(.slot:focus-visible)) + .tray {
+  height: 270px;
+}
+/* no pointer to hover with (a tablet): the hand stays up */
+@media (hover: none) {
+  .face {
+    --lift: 14px;
+  }
+  .tray {
+    height: 270px;
+  }
+}
 /* picked, not confirmed: stays drawn up */
-.slot.picked .face {
+.hand .slot.picked .face {
   --lift: -6px;
   filter: drop-shadow(0 0 14px rgb(255 214 140 / 0.85)) drop-shadow(0 8px 12px rgb(0 0 0 / 0.7));
 }
@@ -228,6 +254,53 @@ onBeforeUnmount(() => hands(-1))
 }
 .slot.taken:hover .face {
   filter: grayscale(0.2) brightness(0.9) drop-shadow(0 14px 18px rgb(0 0 0 / 0.8));
+}
+/* the name tag across the top of the card, in the colour of its paths */
+.tag {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 7%;
+  display: grid;
+  justify-items: center;
+  padding: 0.12rem 0.2rem 0.15rem;
+  border-radius: 6px;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  background: var(--tag, #444);
+  color: #fff;
+  line-height: 1.05;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.6);
+  pointer-events: none;
+}
+.tag b {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tag small {
+  font-size: 0.78rem;
+  opacity: 0.92;
+}
+.tag.sneak {
+  --tag: #1f7fc4;
+}
+.tag.sprint {
+  --tag: #2e9a46;
+}
+.tag.crouch {
+  --tag: #c4262c;
+}
+.tag.vault {
+  --tag: #b8901a;
+}
+.tag.wait {
+  --tag: #55585f;
+}
+/* The Blight's small cards: the English name only */
+.slot[style*="--w: 84px"] .tag small {
+  display: none;
 }
 .badge {
   position: absolute;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // What the current player can do now. Every button dispatches one engine action; moves can
 // also be made by clicking the highlighted paths on the board.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import {
@@ -20,6 +20,7 @@ import {
   perkChoices,
   propsIn,
   rerollers,
+  rollHelpers,
   roomName,
   survivorInteractions,
   survivorMoves,
@@ -27,7 +28,8 @@ import {
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
 import { actionKey, undyingCards, undyingOptions, undyingPaths, undyingRoomOf } from '../boardActions'
-import { dispatch } from '../game'
+import { controls, dispatch, online } from '../game'
+import { pathPick, pathPickFor } from '../pathPick'
 import {
   orderedChoices,
   cardCaption,
@@ -209,7 +211,8 @@ const undyingHere = computed(() =>
 
 
 /** Perk buttons in this step (start of turn, interact, a roll). */
-const buttons = computed(() => perkButtons(props.st))
+// online, a perk button shows only on its owner's device
+const buttons = computed(() => perkButtons(props.st).filter((b) => b.owner === 'killer' || controls(props.st, b.owner)))
 
 const offerChoices = computed(() => {
   const s = step.value
@@ -263,13 +266,33 @@ function hoverBonus(card: MoveCard | null) {
   preview.value = card ? choicePreview(props.st, { card }, o === 'killer' ? props.st.killer.room : props.st.survivors[o].room, o) : null
 }
 
+// the map: a path out of the room picks the bonus card of its colour, as the hand does
+let ownPick = false
+watchEffect(() => {
+  const s = step.value
+  if (s.t === 'bonusOffer' || s.t === 'killerBonusOffer') {
+    const o = bonusOwner.value
+    pathPick.value = pathPickFor(props.st, o === 'killer' ? props.st.killer.room : props.st.survivors[o].room, bonusCards.value, pickBonus)
+    ownPick = true
+  } else if (ownPick) {
+    pathPick.value = null
+    ownPick = false
+  }
+})
+onBeforeUnmount(() => ownPick && (pathPick.value = null))
+
 function confirmBonus() {
   if (!bonusPick.value) return
   preview.value = null
   act({ t: 'bonus', card: bonusPick.value })
 }
 
-const rollers = computed(() => rerollers(props.st))
+// Online each helper (a key, Iron Will) decides on their own device; the roller waits for them.
+const rollers = computed(() => rerollers(props.st).filter((s) => controls(props.st, s)))
+const rollOthers = computed(() => (props.st.step.t === 'roll' ? rollHelpers(props.st).filter((s) => s !== (props.st.step as { ctx: { s: number } }).ctx.s) : []))
+const passers = computed(() => (online.value ? rollOthers.value.filter((s) => controls(props.st, s)) : []))
+const keyWaiting = computed(() => rollOthers.value.filter((s) => !controls(props.st, s)))
+const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, step.value.ctx.s))
 </script>
 
 <template>
@@ -466,10 +489,18 @@ const rollers = computed(() => rerollers(props.st))
             </button>
           </template>
         </template>
-        <template v-if="step.keep">
-          <button v-for="(_, i) in step.dice" :key="`k${i}`" class="primary" @click="act({ t: 'acceptRoll', die: i })">เก็บลูกที่ {{ i + 1 }}</button>
+        <!-- someone else's roll: each helper on this device passes on it here -->
+        <button v-for="s in passers" :key="`p${s}`" @click="act({ t: 'passRoll', s })">
+          <FaceLabel :st="st" :who="s" :text="`${st.survivors[s].name} ไม่ช่วย — ไม่ใช้กุญแจ / Perk`" />
+        </button>
+        <template v-if="rollMine">
+          <p v-if="keyWaiting.length" class="small">⏳ รอ {{ keyWaiting.map((s) => st.survivors[s].name).join(', ') }} ตัดสินใจว่าจะช่วย (กุญแจ / Perk) หรือไม่</p>
+          <template v-if="step.keep">
+            <button v-for="(_, i) in step.dice" :key="`k${i}`" class="primary" :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll', die: i })">เก็บลูกที่ {{ i + 1 }}</button>
+          </template>
+          <button v-else class="primary" :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll' })">ใช้ผลนี้</button>
         </template>
-        <button v-else class="primary" @click="act({ t: 'acceptRoll' })">ใช้ผลนี้</button>
+        <p v-else class="small muted">รอ {{ st.survivors[step.ctx.s].name }} รับผลทอย</p>
       </div>
     </template>
 

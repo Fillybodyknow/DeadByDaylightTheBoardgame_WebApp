@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset, lang, tr } from '../i18n'
 import type { Killer, Perk, Survivor } from '../types'
 import RichText from './RichText.vue'
@@ -27,10 +27,28 @@ const boardImage = computed(() => {
   return asset(lang.value === 'th' ? (img.boardTh ?? img.boardEn) : (img.boardEn ?? img.boardTh))
 })
 
+// ---------- a card picture opened big (a click on it); a click anywhere or Esc puts it back ----------
+// Teleported to the body: the sheet often sits in a modal inside a .card, whose backdrop-filter
+// would trap a fixed overlay.
+
+const zoomed = ref<string | null>(null)
+function zoom(e: MouseEvent) {
+  zoomed.value = (e.currentTarget as HTMLImageElement).src
+}
+// Esc closes the picture first, not the modal around the sheet (caught before it hears the key).
+function onKey(e: KeyboardEvent) {
+  if (e.key !== 'Escape' || !zoomed.value) return
+  e.stopImmediatePropagation()
+  e.preventDefault()
+  zoomed.value = null
+}
+watch(zoomed, (z) => (z ? window.addEventListener('keydown', onKey, true) : window.removeEventListener('keydown', onKey, true)))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey, true))
+
 const t = computed(() =>
   lang.value === 'th'
-    ? { board: 'ดูภาพกระดาน', text: 'ดูแบบข้อความ', power: 'พลัง', passive: 'Passive', easy: 'ง่าย', hard: 'ยาก' }
-    : { board: 'Show board image', text: 'Show text', power: 'Power', passive: 'Passive', easy: 'Easy', hard: 'Hard' },
+    ? { zoom: 'คลิกเพื่อขยาย', back: 'คลิกที่ไหนก็ได้เพื่อย่อกลับ', board: 'ดูภาพกระดาน', text: 'ดูแบบข้อความ', power: 'พลัง', passive: 'Passive', easy: 'ง่าย', hard: 'ยาก' }
+    : { zoom: 'Click to enlarge', back: 'Click anywhere to close', board: 'Show board image', text: 'Show text', power: 'Power', passive: 'Passive', easy: 'Easy', hard: 'Hard' },
 )
 </script>
 
@@ -49,14 +67,16 @@ const t = computed(() =>
       </div>
     </header>
 
-    <img v-if="showBoard" class="board" :src="boardImage" :alt="character.name" />
+    <img v-if="showBoard" class="board zoomable" :title="t.zoom" @click="zoom" :src="boardImage" :alt="character.name" />
     <template v-else>
       <template v-if="killer">
         <!-- POWER / PASSIVE panels cut from the board; transcribed text as alt / fallback. -->
         <div class="panels">
           <img
             v-if="pick(killer.power.image)"
-            class="panel-img"
+            class="panel-img zoomable"
+            :title="t.zoom"
+            @click="zoom"
             :src="asset(pick(killer.power.image))"
             :alt="`${t.power}: ${killer.power.name} — ${tr(killer.power.text)}`"
           />
@@ -67,7 +87,9 @@ const t = computed(() =>
           <template v-if="killer.passive">
             <img
               v-if="pick(killer.passiveImage)"
-              class="panel-img"
+              class="panel-img zoomable"
+            :title="t.zoom"
+            @click="zoom"
               :src="asset(pick(killer.passiveImage))"
               :alt="`${t.passive}: ${tr(killer.passive)}`"
             />
@@ -84,7 +106,9 @@ const t = computed(() =>
         <template v-for="p in shownPerks" :key="p.name">
           <img
             v-if="perkImage(p)"
-            class="perk-card"
+            class="perk-card zoomable"
+            :title="t.zoom"
+            @click="zoom"
             :class="/-1\.webp$/.test(perkImage(p)!) ? 'own' : 'shared'"
             :src="asset(perkImage(p))"
             :alt="`${p.name} (${p.cost} ▲): ${tr(p.text)}`"
@@ -98,10 +122,46 @@ const t = computed(() =>
         </template>
       </div>
     </template>
+
+    <Teleport to="body">
+      <div v-if="zoomed" class="sheet-zoom" role="dialog" aria-modal="true" @click.stop="zoomed = null">
+        <img :src="zoomed" alt="" />
+        <p class="muted small">{{ t.back }}</p>
+      </div>
+    </Teleport>
   </section>
 </template>
 
 <style scoped>
+.zoomable {
+  cursor: zoom-in;
+}
+/* the enlarged card, over everything: as big as the screen allows */
+.sheet-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  background: rgb(4 5 7 / 0.92);
+  cursor: zoom-out;
+  animation: zoom-in 0.15s ease-out;
+}
+.sheet-zoom img {
+  max-width: min(92vw, 1100px);
+  max-height: 84vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px rgb(255 233 176 / 0.6), 0 24px 60px rgb(0 0 0 / 0.85);
+}
+@keyframes zoom-in {
+  from {
+    opacity: 0;
+  }
+}
 .head {
   display: flex;
   gap: 1rem;

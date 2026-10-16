@@ -3,8 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vu
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anyMoves, boardOf, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
-import { clearFx, flash, fx, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
-import { canUndo, dispatch, myTurn, online, quitGame, undo } from '../game'
+import { clearFx, flash, fx, showAction, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
+import { CastBuilder } from '../casts'
+import { pathPick, pathPickLabel } from '../pathPick'
+import { canUndo, controls, dispatch, myTurn, online, quitGame, undo } from '../game'
+import { PERKS } from '../engine/perks'
+import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
 import { closeOnlineGame, isHost, leaveRoom, session } from '../online/session'
 import type { InspectTarget } from '../inspect'
@@ -13,6 +17,7 @@ import { boardActionKeys, boardActions, boardTargets, powerMode as isPowerMode, 
 import { BEAR_TRAP_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
 import SoundSettings from '../../components/SoundSettings.vue'
 import ActionPanel from './ActionPanel.vue'
+import ActionReveal from './ActionReveal.vue'
 import BannerHost from './BannerHost.vue'
 import Board from './Board.vue'
 import ChoiceMenu from './ChoiceMenu.vue'
@@ -48,8 +53,12 @@ watch(
       return
     }
     const fresh = st.log.slice(prev.log.length)
+    const casts = new CastBuilder(prev, st)
     for (const [n, e] of fresh.entries()) {
       const ev = e.ev
+      // a player's action (a card played, an attack, a pallet, the power): shown before the result
+      const cast = casts.of(e)
+      if (cast) showAction(cast)
       if (ev?.k === 'item') {
         const said = fresh.slice(n + 1).find((x) => x.text && x.who === ev.s)
         showPerk({ item: ev.item, owner: ev.s, detail: said?.text.replace(`${st.survivors[ev.s].name} `, '') ?? '' })
@@ -66,6 +75,8 @@ watch(
           icon: rollIcon(st, ev.ctx, ev.s, ev.target),
         })
     }
+    const leftover = casts.leftover()
+    if (leftover) showAction(leftover)
     // A roll waiting on a decision (Iron Will, a key, Bond): roll it on screen first, then ask.
     const step = st.step
     if (step.t === 'roll') {
@@ -210,7 +221,16 @@ const boardFocus = computed(() => {
 /** Everything clickable on the board now, and the shapes the board takes them in. */
 const actions = computed(() => boardActions(view.value, modes))
 // Online, only the player the game waits on gets clickable targets.
-const targets = computed(() => (myTurn.value ? boardTargets(actions.value) : boardTargets([])))
+const targets = computed(() => {
+  const t = myTurn.value ? boardTargets(actions.value) : boardTargets([])
+  // a hand of cards is out (planning, a bonus turn): its paths pick a card
+  const pp = pathPick.value
+  if (pp && myTurn.value) {
+    for (const [id, card] of Object.entries(pp.paths)) t.paths[id] ??= pathPickLabel(card)
+    for (const [id, card] of Object.entries(pp.rooms)) t.rooms[id] ??= pathPickLabel(card)
+  }
+  return t
+})
 /** What the board already offers: the side panels leave these out and point at the board. */
 const onBoard = computed(() => (myTurn.value ? boardActionKeys(actions.value) : new Set<string>()))
 
@@ -223,6 +243,19 @@ const myPlanDone = computed(() => {
   const mine = st.survivors.flatMap((sv, i) => (st.handPlayers[sv.hand] === o.seat && st.planDraft?.[i] ? [`${sv.name} — ${CARD_NAMES[st.planDraft![i]!]}`] : []))
   return mine.length ? `คุณวางการ์ดแล้ว: ${mine.join(' · ')}` : null
 })
+
+/** Take this device's confirmed plan back, to pick again (until the last plan is in). */
+function undoPlan() {
+  const st = view.value
+  const o = online.value
+  if (!o?.seat) return
+  if (o.seat === KILLER_PLAYER) dispatch({ t: 'unplanKiller' })
+  else {
+    const hand = st.handPlayers.indexOf(o.seat)
+    if (hand >= 0) dispatch({ t: 'unplanHand', hand })
+  }
+  sfx.click()
+}
 
 /** Online: who the game is waiting on, for the side panel. */
 const waitingOn = computed(() => {
@@ -255,9 +288,17 @@ function onSpot(key: string) {
   else if (found.length > 1) menu.value = { actions: found, x: pointer.x + 8, y: pointer.y + 8 }
 }
 
-const onPath = (id: string) => onSpot(`path:${id}`)
+function onPath(id: string) {
+  const pp = pathPick.value
+  if (pp?.paths[id] && !actions.value.some((a) => a.key === `path:${id}`)) return pp.pick(pp.paths[id])
+  onSpot(`path:${id}`)
+}
 const onProp = (id: string) => onSpot(`prop:${id}`)
-const onRoom = (id: string) => onSpot(`room:${id}`)
+function onRoom(id: string) {
+  const pp = pathPick.value
+  if (pp?.rooms[id] && !actions.value.some((a) => a.key === `room:${id}`)) return pp.pick(pp.rooms[id])
+  onSpot(`room:${id}`)
+}
 const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'killer' || key === 'victor' ? key : `prop:${key}`)
 
 /** The mode the board is in, for the bar above it (with a way out). */
@@ -431,6 +472,87 @@ watch(turnSignature, (now, before) => {
   }
 })
 
+// ---------- online: telling a player the game is waiting on them ----------
+// Online the others can't see a player's screen, so nobody knows they're the one being waited
+// on. When the game turns to this device it rings, shows a banner, makes the side panel glow,
+// and — with the tab in the background — blinks the tab title and sends a system notification.
+
+/** What this player is being asked, in a few words. */
+const askWhat = computed(() => {
+  const st = props.st
+  const s = st.step
+  switch (s.t) {
+    case 'planSurvivors':
+    case 'planKiller':
+      return 'วางแผน — เลือกการ์ดเคลื่อนที่'
+    case 'offer':
+      return `ใช้ Perk ${PERKS[s.perk].name} ไหม?`
+    case 'reaction':
+      return `ใช้ ${s.item === 'flashlight' ? 'Flashlight' : 'Firecracker'} ไหม?`
+    case 'roll':
+      return controls(st, s.ctx.s) ? 'ผลทอยของคุณ — ตัดสินใจ' : `${st.survivors[s.ctx.s].name} ทอยลูกเต๋า — จะช่วยไหม?`
+    default:
+      return st.phase === 'killer' ? `ตาของ ${st.killer.name}` : st.activeSurvivor !== null ? `ตาของ ${st.survivors[st.activeSurvivor].name}` : 'ถึงตาคุณ'
+  }
+})
+
+/** The side panel glows for a few seconds after the turn comes to this device. */
+const nudge = ref(false)
+let nudgeTimer: number | null = null
+let titleTimer: number | null = null
+const baseTitle = typeof document !== 'undefined' ? document.title : ''
+
+function stopTitleBlink() {
+  if (titleTimer !== null) clearInterval(titleTimer)
+  titleTimer = null
+  document.title = baseTitle
+}
+
+function notifyTurn() {
+  sfx.yourTurn()
+  navigator.vibrate?.([120, 80, 120])
+  showBanner({ title: 'ถึงตาคุณแล้ว!', sub: askWhat.value, tone: 'game' })
+  nudge.value = true
+  if (nudgeTimer !== null) clearTimeout(nudgeTimer)
+  nudgeTimer = window.setTimeout(() => (nudge.value = false), 4000)
+  if (!document.hidden) return
+  // in the background: blink the tab's title until the player comes back, and a system notice
+  stopTitleBlink()
+  let on = false
+  titleTimer = window.setInterval(() => (document.title = (on = !on) ? '🔔 ถึงตาคุณ!' : baseTitle), 900)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification('ดบดล — ถึงตาคุณแล้ว', { body: askWhat.value, icon: asset('icon.svg'), tag: 'dbdl-turn' })
+    } catch {
+      // some browsers only allow notifications from a service worker: the title still blinks
+    }
+  }
+}
+
+const onVisible = () => !document.hidden && stopTitleBlink()
+// The browser asks for the notification permission only after a tap: ask on the first one.
+const askPermission = () => {
+  if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission()
+}
+onMounted(() => {
+  document.addEventListener('visibilitychange', onVisible)
+  if (online.value) window.addEventListener('pointerdown', askPermission, { once: true })
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisible)
+  window.removeEventListener('pointerdown', askPermission)
+  stopTitleBlink()
+  if (nudgeTimer !== null) clearTimeout(nudgeTimer)
+})
+
+watch(
+  () => !!online.value?.seat && myTurn.value && props.st.phase !== 'over',
+  (mine, was) => {
+    if (mine && !was) notifyTurn()
+    if (!mine) stopTitleBlink()
+  },
+)
+
 // ---------- terror radius ----------
 
 /** 2 = the killer is in the room, 1 = in a connected room, 0 = out of range. */
@@ -541,6 +663,15 @@ const onFullscreen = () => (fullscreen.value = !!document.fullscreenElement)
 onMounted(() => document.addEventListener('fullscreenchange', onFullscreen))
 onBeforeUnmount(() => document.removeEventListener('fullscreenchange', onFullscreen))
 
+// ---------- 16:9 and wider: one column on the left instead of a bar on top ----------
+
+const RAIL = '(min-width: 981px) and (min-aspect-ratio: 16/9)'
+const railQuery = typeof matchMedia === 'function' ? matchMedia(RAIL) : null
+const rail = ref(!!railQuery?.matches)
+const onRail = (e: MediaQueryListEvent) => (rail.value = e.matches)
+onMounted(() => railQuery?.addEventListener('change', onRail))
+onBeforeUnmount(() => railQuery?.removeEventListener('change', onRail))
+
 function toggleFullscreen() {
   if (document.fullscreenElement) void document.exitFullscreen()
   else void document.documentElement.requestFullscreen().catch(() => {})
@@ -561,10 +692,17 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 
 <template>
   <div class="game">
+    <!-- On 16:9 screens there is no bar: the round goes on top of the player column and the
+         controls under it (teleported into StatusPanel's two anchors). -->
     <header class="top">
       <span class="spacer" />
-      <span class="phase">รอบ {{ view.round }}<span class="sep"> · </span><span class="phase-name">{{ PHASE_TH[view.phase] }}</span></span>
-      <button v-if="over && !showOver" class="primary" @click="showOver = true">สรุปเกม</button>
+      <Teleport to="#rail-top" :disabled="!rail" defer>
+        <div class="phase-row">
+          <span class="phase">รอบ {{ view.round }}<span class="sep"> · </span><span class="phase-name">{{ PHASE_TH[view.phase] }}</span></span>
+          <button v-if="over && !showOver" class="primary" @click="showOver = true">สรุปเกม</button>
+        </div>
+      </Teleport>
+      <Teleport to="#rail-bottom" :disabled="!rail" defer>
       <div class="controls">
         <SyncBadge v-if="online" />
         <span v-if="online" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
@@ -573,6 +711,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <SoundSettings />
         <button @click="leave">ออก</button>
       </div>
+      </Teleport>
     </header>
 
     <main class="layout">
@@ -616,10 +755,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         </div>
       </div>
 
-      <aside class="side">
+      <aside class="side" :class="{ nudge }">
         <Planning v-if="planning && myTurn" :st="view" />
         <section v-else-if="waitingOn && !over" class="card waiting">
           <p v-if="myPlanDone" class="done-note">✓ {{ myPlanDone }}</p>
+          <button v-if="myPlanDone" type="button" class="undo-plan" @click="undoPlan">↶ ยกเลิก — เลือกการ์ดใหม่</button>
           <p class="muted small">กำลังรอ</p>
           <strong v-for="w in waitingOn" :key="w">{{ w }}</strong>
           <span class="dots" aria-hidden="true"><i /><i /><i /></span>
@@ -664,6 +804,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <BannerHost :paused="summaryRound !== null || !!over || fx.dice.length > 0 || fx.perks.length > 0" />
     <ChoiceMenu v-if="menu" :st="view" :actions="menu.actions" :x="menu.x" :y="menu.y" @close="menu = null" />
     <PerkReveal :st="view" />
+    <ActionReveal :st="view" />
     <PerkPrompt :st="view" :hidden="secret || !!over || !myTurn" :on-board="onBoard" />
     <DiceModal />
     <RoundSummary v-if="summaryRound !== null && !over && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" @close="summaryRound = null" />
@@ -747,57 +888,53 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   gap: 0.4rem;
 }
 
-/* Wide screens (16:9 and wider): the board is limited by the height, so the top bar becomes a
-   slim rail on the left and the board takes the height. Narrower screens (16:10, iPad) are
-   limited by the width: they keep the bar on top. */
+/* the round and its button sit in the bar as if they weren't wrapped */
+.phase-row {
+  display: contents;
+}
+/* Wide screens (16:9 and wider): the board is limited by the height, so there is no bar on top:
+   the round heads the player column on the left and the controls close it (teleported there),
+   and the board takes the height. Narrower screens (16:10, iPad) are limited by the width: they
+   keep the bar on top. */
 @media (min-width: 981px) and (min-aspect-ratio: 16/9) {
-  .game {
-    flex-direction: row;
-  }
-  /* a narrow rail along the left edge */
   .top {
-    flex: none;
-    width: 44px;
-    height: 100vh;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 0.7rem;
-    padding: 0.5rem 0.15rem;
-    overflow-y: auto;
-    border-bottom: none;
-    border-right: 1px solid var(--line);
-  }
-  .phase {
-    order: -1;
-    text-align: center;
-    font-size: 0.66rem;
-    line-height: 1.2;
-  }
-  /* the round on one line, the phase under it */
-  .phase .sep {
     display: none;
   }
+  .phase-row {
+    display: grid;
+    justify-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0 0.25rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .phase {
+    text-align: center;
+    font-size: 0.9rem;
+  }
   .phase-name {
-    display: block;
-    font-size: 0.6rem;
+    font-size: 0.8rem;
   }
   .btn-text {
     display: none;
   }
+  /* the controls in one row under the item slot */
   .controls {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 0.35rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.3rem;
+    padding-top: 0.35rem;
+  }
+  .controls > * {
+    flex: 1 1 0;
   }
   .controls button {
-    width: 34px;
-    padding: 0.2rem 0;
-    font-size: 0.72rem;
+    min-width: 0;
+    padding: 0.3rem 0;
+    font-size: 0.8rem;
   }
   .room-tag {
-    font-size: 0.58rem;
+    flex-basis: 100%;
+    font-size: 0.66rem;
     text-align: center;
   }
   .layout {
@@ -813,6 +950,16 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     width: max(22rem, calc((100vh - 1.25rem) * var(--aspect)));
   }
 }
+/* online: the turn just came to this device — the panel pulses gold for a moment */
+.side.nudge {
+  border-radius: var(--radius);
+  animation: nudge 1s ease-in-out 4;
+}
+@keyframes nudge {
+  50% {
+    box-shadow: 0 0 0 3px #ffd56a, 0 0 28px rgb(255 200 90 / 0.7);
+  }
+}
 .side {
   display: grid;
   gap: 0.75rem;
@@ -821,15 +968,22 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
 }
-/* a hand of cards floating in the bottom-right corner (CardHand): the panel stops above it */
+/* The hand of cards rests sunk in the bottom-right corner (CardHand), its names showing: the
+   panel stops above them (a raised hand covers its foot only while the pointer is on it). With
+   no pointer to hover (a tablet) the hand stays up, and the panel stops above all of it. */
 @media (min-width: 981px) {
-  :global(body.hand-open) .side {
-    max-height: calc(100vh - 4rem - 220px);
+  :global(body.hand-open .side) {
+    max-height: calc(100vh - 4rem - 70px);
   }
 }
 @media (min-width: 981px) and (min-aspect-ratio: 16/9) {
-  :global(body.hand-open) .side {
-    max-height: calc(100vh - 1rem - 220px);
+  :global(body.hand-open .side) {
+    max-height: calc(100vh - 1rem - 70px);
+  }
+}
+@media (min-width: 981px) and (hover: none) {
+  :global(body.hand-open .side) {
+    max-height: calc(100vh - 4rem - 250px);
   }
 }
 /* The mode bars float at the foot of the screen instead of sitting above the map, so the board
@@ -855,8 +1009,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 }
 /* on one column the hand of cards floats centred at the foot: the bars go above it */
 @media (max-width: 980px) {
-  :global(body.hand-open) .board-bars {
-    bottom: 15rem;
+  :global(body.hand-open .board-bars) {
+    bottom: 16.5rem;
   }
 }
 .reveal-bar {
@@ -881,6 +1035,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 }
 .waiting p {
   margin: 0;
+}
+.undo-plan {
+  margin-bottom: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
 }
 /* what this device already sent, so a player knows their own part is in */
 .done-note {

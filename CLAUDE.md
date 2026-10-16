@@ -87,14 +87,23 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 
 - **Results never run ahead of animations.** `GameScreen` holds the view on the old state while
   dice, perk cards and board animations play. Pending rolls show their dice first.
+- **Every action shows before its result.** A player's action (a move with its card, an attack,
+  a pallet, a locker, the killer's power, a passive) gets a short card in the middle of the
+  screen first (`casts.ts` builds them from the log, `ActionReveal` shows them in the perk
+  cards' queue). Perks, items and rolls have their own reveals and are left out there.
+- **Online, the player being waited on is told** (`notifyTurn` in `GameScreen`): a chime, a
+  banner saying what is asked, the side panel glowing, and with the tab in the background a
+  blinking title and a system notification.
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
   already offers and show "เลือกบนแผนที่" instead.
 - **Movement cards are picked from the hand** (`CardHand`): point to draw a card up (the map shows
-  where it goes), click to pick (it stays up), confirm in the side panel. This covers planning,
+  where it goes), click to pick (it stays up), confirm in the side panel. In planning and on a
+  bonus turn a path out of the room on the map picks the card of its colour too (`pathPick.ts`). This covers planning,
   bonus turns, every perk that picks a card, Predator and the Redeemer guess. A player with
-  several survivors switches between them with tabs. The hand floats in the bottom-right corner
-  (the side panel stops above it), with no label of its own. Each card's button stays still and only the card face inside it moves, so the card
+  several survivors switches between them with tabs. The hand floats in the bottom-right corner,
+  sunk so only the card names show (the side panel stops above them), and rises while the pointer is on a card (or when
+  a perk asks for one; on a tablet it stays up). It has no label of its own. Each card's button stays still and only the card face inside it moves, so the card
   can't bounce under the pointer.
 - **Your own face-down cards can be peeked at:** click one on the player tiles to see your cards
   big in the middle of the screen (the killer sees all his planned cards); a click anywhere
@@ -107,8 +116,9 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   `src/play/game.ts`, a house rule); an item shows when it is used.
 - Perk decisions dock beside the board (`PerkPrompt`), never over the map. Character choices
   show the character's mini.
-- Layout: the round, phase and controls in a bar (on top; a slim rail on the left on 16:9 and
-  wider screens, where the height limits the board), the board as big as the screen allows, the
+- Layout: the round, phase and controls in a bar on top (on 16:9 and wider screens, where the
+  height limits the board, there is no bar: they are teleported into the player column, the
+  round on top and the controls under the item slot), the board as big as the screen allows, the
   players in a column on its left in the PC game's HUD style (bare rows of portrait, name and
   state, at the foot of the column; a row under the map on narrow screens) with both sides'
   goals under them (`ObjectiveHud`: sacrifices, generators left, then the exit gate) and, under

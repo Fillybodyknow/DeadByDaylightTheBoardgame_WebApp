@@ -554,8 +554,11 @@ export function itemUses(st: GameState, s: number): ItemUse[] {
 
 /** Survivors who may re-roll a die with a key (p.16; keys are "any time"). */
 export function rerollers(st: GameState): number[] {
-  if (st.step.t !== 'roll' || st.step.dice.every((d) => d.rerolled)) return []
-  return st.survivors.flatMap((sv, i) => (sv.status === 'board' && sv.item && sv.item in KEY_BP && st.itemLock !== i ? [i] : []))
+  const step = st.step
+  if (step.t !== 'roll' || step.dice.every((d) => d.rerolled)) return []
+  return st.survivors.flatMap((sv, i) =>
+    sv.status === 'board' && sv.item && sv.item in KEY_BP && st.itemLock !== i && !step.passed?.includes(i) ? [i] : [],
+  )
 }
 
 // ---------- apply ----------
@@ -619,6 +622,7 @@ function handle(st: GameState, a: Action) {
     return
   }
   if (a.t === 'reroll') return reroll(st, a.s, a.die)
+  if (a.t === 'passRoll') return passRoll(st, a.s)
   if (a.t === 'perk') return handlePerk(st, a)
   st.step = { t: 'idle' }
 
@@ -653,6 +657,20 @@ function handle(st: GameState, a: Action) {
       if (a.t === 'planKiller') {
         if (a.cards.length !== 2 || !takeCards(st.killer.hand, a.cards)) fail('pick 2 cards from the hand')
         st.killerDraft = a.cards
+        return wait(st, { t: 'planSurvivors' })
+      }
+      // Until the last one is in, a confirmed plan can be taken back and made again.
+      if (a.t === 'unplanKiller') {
+        if (!st.killerDraft) fail('no plan to take back')
+        delete st.killerDraft
+        return wait(st, { t: 'planSurvivors' })
+      }
+      if (a.t === 'unplanHand') {
+        const draft = st.planDraft ?? []
+        const mine = st.survivors.flatMap((sv, i) => (sv.hand === a.hand && draft[i] ? [i] : []))
+        if (!mine.length) fail('no plan to take back')
+        for (const i of mine) draft[i] = null
+        st.planDraft = draft
         return wait(st, { t: 'planSurvivors' })
       }
       if (a.t === 'planHand') {
@@ -1569,6 +1587,27 @@ function reroll(st: GameState, s: number, die: number) {
   }
 }
 
+/**
+ * Survivors who can still change this roll: a key to re-roll a die, or Iron Will. Online each of
+ * them answers on their own device, and the roller waits for them.
+ */
+export function rollHelpers(st: GameState): number[] {
+  if (st.step.t !== 'roll') return []
+  const perks = perkButtons(st).flatMap((b) => (b.owner === 'killer' ? [] : [b.owner]))
+  return [...new Set([...rerollers(st), ...perks])].sort((a, b) => a - b)
+}
+
+/** A survivor passes on someone else's roll; once nobody is left to decide, it settles by itself. */
+function passRoll(st: GameState, s: number) {
+  const step = st.step
+  if (step.t !== 'roll' || s === step.ctx.s || !rollHelpers(st).includes(s)) fail('nothing to pass on')
+  step.passed = [...(step.passed ?? []), s]
+  if (rollSettled(st)) {
+    st.step = { t: 'idle' }
+    resolveRoll(st, step.ctx, step.dice)
+  }
+}
+
 const ROLL_LABEL: Record<RollContext['k'], string> = {
   repair: 'ซ่อม Generator',
   openGate: 'เปิดประตู',
@@ -2200,7 +2239,7 @@ export function perkButtons(st: GameState): { perk: PerkId; owner: PerkOwner; w:
   }
   if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout'])
   if (step.t === 'survivorInteract') add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing'])
-  if (step.t === 'roll') st.survivors.forEach((_, i) => add(i, { k: 'roll' }, ['iron_will']))
+  if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will']))
   return out
 }
 

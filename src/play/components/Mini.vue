@@ -6,11 +6,13 @@ defineProps<{ src: string; alt?: string }>()
 </script>
 
 <template>
-  <span class="mini-frame"><img :src="src" :alt="alt ?? ''" draggable="false" /></span>
+  <!-- the slot: things laid over the portrait (the wound ring) -->
+  <span class="mini-frame"><img :src="src" :alt="alt ?? ''" draggable="false" /><slot /></span>
 </template>
 
 <style scoped>
 .mini-frame {
+  position: relative;
   display: inline-block;
   flex: none;
   aspect-ratio: 1;

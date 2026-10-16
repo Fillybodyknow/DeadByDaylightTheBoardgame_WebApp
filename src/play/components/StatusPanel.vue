@@ -11,6 +11,7 @@ import { KILLER_PLAYER } from '../engine/seats'
 import type { InspectTarget } from '../inspect'
 import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, PROP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
 import Mini from './Mini.vue'
+import WoundRing from './WoundRing.vue'
 import ObjectiveHud from './ObjectiveHud.vue'
 
 const props = defineProps<{ st: GameState; powerOn?: boolean }>()
@@ -103,9 +104,8 @@ function peek(owner: number | 'killer' | null) {
   peeking.value = owner
 }
 
-// ---------- online: your own ▲ and item, at the top of the column ----------
-// Everyone's tile is small, and online you only ever spend your own ▲ and item. They get a block
-// of their own above the tiles, in the column beside the map, so nothing covers the board.
+// ---------- online: the characters this device plays ----------
+// Their tiles are highlighted, so a player finds their own at a glance.
 
 /** The characters this device plays (empty offline and for a spectator). */
 const mine = computed<(number | 'killer')[]>(() => {
@@ -145,45 +145,15 @@ function onPowerSlot() {
   else emit('inspect', { k: 'killer' })
 }
 
-const mineBp = (o: number | 'killer') => (o === 'killer' ? props.st.killer.bp : props.st.survivors[o].bp)
-const mineMax = (o: number | 'killer') => (o === 'killer' ? KILLER_BP.max : SURVIVOR_BP.max)
-const mineMini = (o: number | 'killer') => (o === 'killer' ? killerMini(props.st) : survivorMini(props.st, o))
-const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.name : props.st.survivors[o].name)
 </script>
 
 <template>
   <section class="players">
-    <!-- online: your own ▲ and item card, big enough to read without opening anything -->
-    <div v-if="mine.length" class="mine">
-      <p class="mine-title">ของคุณ</p>
-      <div v-for="o in mine" :key="String(o)" class="mine-row">
-        <button
-          type="button"
-          class="mine-who"
-          :title="`${mineName(o)} — ดูรายละเอียดตัวละคร`"
-          @click="emit('inspect', o === 'killer' ? { k: 'killer' } : { k: 'survivor', s: o })"
-        >
-          <Mini
-            class="mine-mini"
-            :class="[o === 'killer' ? 'aura-killer' : 'aura-survivor', { wounded: o !== 'killer' && st.survivors[o].wounded }]"
-            :src="asset(mineMini(o))"
-            :alt="mineName(o)"
-          />
-          <span class="mine-bp"><b>{{ mineBp(o) }}</b>/{{ mineMax(o) }} ▲</span>
-        </button>
-        <template v-if="o !== 'killer'">
-          <button v-if="st.survivors[o].item" class="mine-item" :class="{ usable: itemUses(st, o).length > 0 }" :title="`${ITEM_NAMES[st.survivors[o].item!]} — คลิกเพื่อใช้`" @click="openItem = openItem === o ? null : o">
-            <img :src="asset(itemImage(st.survivors[o].item!))" :alt="ITEM_NAMES[st.survivors[o].item!]" />
-            <span>{{ ITEM_NAMES[st.survivors[o].item!] }}</span>
-          </button>
-          <span v-else class="mine-noitem">ไม่มี item</span>
-        </template>
-      </div>
-    </div>
-
+    <!-- 16:9 screens: the round and phase, teleported here from GameScreen's bar -->
+    <div id="rail-top" class="rail-slot" />
     <div class="tiles">
     <!-- killer -->
-    <div class="tile killer" role="button" tabindex="0" :title="`${st.killer.name} — ดูรายละเอียดตัวละคร`" @click="emit('inspect', { k: 'killer' })" @keydown.enter="emit('inspect', { k: 'killer' })">
+    <div class="tile killer" :class="{ me: mine.includes('killer') }" role="button" tabindex="0" :title="`${st.killer.name} — ดูรายละเอียดตัวละคร`" @click="emit('inspect', { k: 'killer' })" @keydown.enter="emit('inspect', { k: 'killer' })">
       <div class="head">
         <Mini class="mini aura-killer" :src="asset(killerMini(st))" :alt="st.killer.name" />
         <div class="names">
@@ -221,6 +191,8 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
             <span class="eye" aria-hidden="true">👁</span>
           </button>
         </template>
+        <!-- the two cards still to plan: dashed places, so the row keeps its size -->
+        <span v-for="n in Math.max(0, 2 - st.killer.planned.length)" :key="`e${n}`" class="pcard empty" title="ยังไม่ได้วางการ์ด" />
       </div>
     </div>
 
@@ -229,7 +201,7 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
       v-for="s in turnOrder(st)"
       :key="s"
       class="tile"
-      :class="{ active: st.activeSurvivor === s, hooked: st.survivors[s].status === 'hooked', wounded: st.survivors[s].wounded }"
+      :class="{ active: st.activeSurvivor === s, hooked: st.survivors[s].status === 'hooked', wounded: st.survivors[s].wounded, me: mine.includes(s) }"
       role="button"
       tabindex="0"
       :title="`${order(s)}. ${st.survivors[s].name}${st.survivors[s].wounded ? ' (บาดเจ็บ)' : ''}${STATUS_TH[st.survivors[s].status] ? ` — ${STATUS_TH[st.survivors[s].status]}` : ''} — ดูรายละเอียดตัวละคร`"
@@ -238,7 +210,9 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
     >
       <div class="head">
         <div class="mini-wrap">
-          <Mini class="mini" :class="{ wounded: st.survivors[s].wounded, away: !!stateIcon(s) }" :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name" />
+          <Mini class="mini" :class="{ wounded: st.survivors[s].wounded, away: !!stateIcon(s) }" :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name">
+            <WoundRing v-if="st.survivors[s].wounded" />
+          </Mini>
           <img v-if="stateIcon(s)" class="state" :class="st.survivors[s].status" :src="asset(stateIcon(s)!)" :alt="STATUS_TH[st.survivors[s].status]" />
           <span class="order" :title="`ลำดับเทิร์นที่ ${order(s)}`">{{ order(s) }}</span>
           <span v-if="st.survivors[s].madness" class="madness" title="Madness: ทอย Danger Die แทน Skill Check">🌀</span>
@@ -272,6 +246,8 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
             <span class="eye" aria-hidden="true">👁</span>
           </button>
         </template>
+        <!-- no card yet: a dashed place for it (none for a survivor on a hook, who plans none) -->
+        <span v-else-if="st.survivors[s].status !== 'hooked'" class="pcard empty" title="ยังไม่ได้วางการ์ด" />
         <!-- online, everyone but its holder sees the back of the item card: something is held, not what -->
         <img v-if="st.survivors[s].item && itemHidden(st, s)" class="item hidden" :src="asset('assets/items/back.webp')" alt="ถือ item อยู่" title="ถือ item อยู่ 1 ใบ" />
         <button
@@ -283,6 +259,7 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
         >
           <img :src="asset(itemImage(st.survivors[s].item!))" :alt="ITEM_NAMES[st.survivors[s].item!]" />
         </button>
+        <span v-else class="item empty" title="ไม่มี item" />
       </div>
     </div>
     </div>
@@ -319,6 +296,9 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
         <span class="slot-name">ไม่มี item</span>
       </div>
     </template>
+
+    <!-- 16:9 screens: the game's controls, teleported here from GameScreen's bar -->
+    <div id="rail-bottom" class="rail-slot" />
 
     <!-- your own face-down cards, big; a click anywhere puts them face down again -->
     <Teleport to="body">
@@ -371,7 +351,7 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
 /* a column on the left of the map (a row under it on narrow screens) */
 .players {
   flex: none;
-  width: 112px;
+  width: 190px;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -385,6 +365,12 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
     max-height: calc(100vh - 4.5rem);
     overflow-y: auto;
     scrollbar-width: thin;
+  }
+}
+/* 16:9 screens: no bar on top, the column runs the full height */
+@media (min-width: 981px) and (min-aspect-ratio: 16/9) {
+  .players {
+    max-height: calc(100vh - 1rem);
   }
 }
 /* hooked / in a locker / carried: the state's icon over a darkened portrait */
@@ -420,6 +406,12 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
   }
 }
 /* the goals: at the foot of the column, under the list */
+.rail-slot {
+  flex: none;
+}
+.rail-slot:empty {
+  display: none;
+}
 .objectives {
   flex: none;
   margin-top: 0.35rem;
@@ -511,92 +503,6 @@ button.slot:hover .slot-crop {
     animation: none;
   }
 }
-/* Online: your own ▲ and item, on top of the column. Everything else about you is in your tile
-   below; this is only what you spend, in a size you can read from across the table. */
-.mine {
-  flex: none;
-  padding: 0.3rem 0.35rem 0.4rem;
-  border: 1px solid rgb(255 214 140 / 0.5);
-  border-radius: var(--radius);
-  background: rgb(255 214 140 / 0.07);
-}
-.mine-title {
-  margin: 0 0 0.25rem;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  color: var(--warn);
-  text-transform: uppercase;
-}
-.mine-row + .mine-row {
-  margin-top: 0.45rem;
-  padding-top: 0.45rem;
-  border-top: 1px solid var(--line);
-}
-.mine-who {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0;
-  border: none;
-  background: none;
-  cursor: pointer;
-}
-.mine-mini {
-  flex: none;
-  width: 30px;
-  height: 30px;
-}
-.mine-mini.wounded {
-  box-shadow: 0 0 0 2px var(--blood-bright);
-}
-.mine-bp {
-  font-size: 0.72rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.mine-bp b {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  color: #ffe9b0;
-}
-/* the item card, big enough to tell apart, with its name under it */
-.mine-item {
-  display: block;
-  width: 100%;
-  margin-top: 0.35rem;
-  padding: 0.2rem;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: rgb(0 0 0 / 0.35);
-  cursor: pointer;
-  text-align: center;
-}
-.mine-item.usable {
-  border-color: var(--ok);
-  box-shadow: 0 0 10px rgb(79 179 106 / 0.35);
-}
-.mine-item img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 0.72;
-  object-fit: cover;
-  border-radius: 4px;
-}
-.mine-item span {
-  display: block;
-  margin-top: 0.15rem;
-  font-size: 0.64rem;
-  line-height: 1.25;
-  color: #e9e2d2;
-}
-.mine-noitem {
-  display: block;
-  margin-top: 0.3rem;
-  font-size: 0.68rem;
-  color: var(--muted);
-}
 /* The list, as in the PC game's HUD: bare rows of portrait and name, at the foot of the column
    just above the goals — no boxes, the state on the portrait. */
 .tiles {
@@ -611,7 +517,8 @@ button.slot:hover .slot-crop {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 0 0.3rem;
-  padding: 0.25rem 0.25rem 0.25rem 0.3rem;
+  /* room on the left for the wound ring and its glow, which reach past the portrait */
+  padding: 0.3rem 0.25rem 0.3rem 0.55rem;
   border-left: 2px solid transparent;
   border-radius: 0 var(--radius) var(--radius) 0;
   background: linear-gradient(90deg, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.15));
@@ -643,11 +550,21 @@ button.slot:hover .slot-crop {
 .tile.wounded.active {
   background: linear-gradient(90deg, rgb(150 12 18 / 0.5), rgb(255 214 140 / 0.12));
 }
+/* online: your own character — a gold frame round the row, whatever state it is in */
+.tile.me {
+  outline: 2px solid rgb(255 214 140 / 0.85);
+  outline-offset: -2px;
+  border-radius: var(--radius);
+  box-shadow: 0 0 14px rgb(255 214 140 / 0.35);
+}
+.tile.me:not(.wounded):not(.active) {
+  background: linear-gradient(90deg, rgb(255 214 140 / 0.18), rgb(255 214 140 / 0.03));
+}
 .name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.76rem;
+  font-size: 0.9rem;
   color: #f2efe6;
   text-transform: capitalize;
 }
@@ -691,7 +608,7 @@ button.slot:hover .slot-crop {
   padding: 0 0.3rem;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   line-height: 1.35;
   color: var(--muted);
 }
@@ -722,15 +639,13 @@ button.slot:hover .slot-crop {
   flex: none;
 }
 .mini {
-  width: 36px;
-  height: 36px;
+  width: 46px;
+  height: 46px;
   flex: none;
   border-radius: 50%;
   object-fit: contain;
 }
-.mini.wounded {
-  box-shadow: 0 0 0 2px var(--blood-bright);
-}
+/* wounded: the blood ring (WoundRing) is laid over the portrait */
 .first {
   position: absolute;
   right: -6px;
@@ -771,6 +686,7 @@ button.slot:hover .slot-crop {
 }
 .bp {
   color: #ff8a80;
+  font-size: 0.82rem;
 }
 /* the sacrifice token, on the portrait's top-right corner */
 .token {
@@ -791,10 +707,21 @@ button.slot:hover .slot-crop {
 }
 .pcard {
   display: block;
-  width: 28px;
+  width: 50px;
   aspect-ratio: 0.72;
   object-fit: cover;
   border-radius: 4px;
+}
+/* a place waiting for a card or an item: dashed, the size of what goes there */
+.pcard.empty,
+.item.empty {
+  box-sizing: border-box;
+  border: 2px dashed rgb(255 255 255 / 0.22);
+  background: rgb(0 0 0 / 0.25);
+}
+.item.empty {
+  display: block;
+  border-radius: 6px;
 }
 .pcard.done {
   opacity: 0.45;
@@ -877,8 +804,8 @@ button.slot:hover .slot-crop {
   position: relative;
   overflow: hidden;
   padding: 0;
-  width: 36px;
-  height: 36px;
+  width: 46px;
+  height: 46px;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: #1a1c20;
@@ -1008,10 +935,6 @@ button.item img {
     margin-top: 0;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  }
-  /* the row is short: your own block keeps a column of its own beside the tiles */
-  .mine {
-    width: 104px;
   }
   .objectives,
   .slot {

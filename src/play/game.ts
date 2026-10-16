@@ -30,6 +30,12 @@ export function itemHidden(st: GameState, s: number): boolean {
   return !o.seat || o.seat === KILLER_PLAYER || st.handPlayers[st.survivors[s].hand] !== o.seat
 }
 
+/** Whether this device plays survivor `s` (always, on one shared device). */
+export function controls(st: GameState, s: number): boolean {
+  const o = online.value
+  return !o || (!!o.seat && st.handPlayers[st.survivors[s].hand] === o.seat)
+}
+
 /** Online moves made on this device that the room hasn't confirmed yet. */
 export const pendingWrites = shallowRef(0)
 

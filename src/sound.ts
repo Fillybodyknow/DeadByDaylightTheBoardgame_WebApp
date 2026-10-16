@@ -179,6 +179,12 @@ export const sfx = {
     tone(659, 0.12, { type: 'triangle', gain: 0.15 })
     tone(988, 0.2, { type: 'triangle', gain: 0.12, at: 0.07 })
   },
+  /** Online: the game is waiting on you — a three-note bell that carries across the room. */
+  yourTurn() {
+    tone(784, 0.35, { type: 'triangle', gain: 0.22 })
+    tone(1047, 0.35, { type: 'triangle', gain: 0.2, at: 0.14 })
+    tone(1568, 0.6, { type: 'triangle', gain: 0.16, at: 0.28 })
+  },
   /** A reel or die face flicking past. */
   tick() {
     noise(0.025, { freq: 3500, q: 4, gain: 0.25 })

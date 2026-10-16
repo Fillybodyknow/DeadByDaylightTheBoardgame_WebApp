@@ -4,14 +4,15 @@
 // it stays drawn up until the choice is confirmed here. A player with several survivors
 // switches between them with the tabs. On one shared device the survivors pick together, then
 // the device goes to the killer behind a hand-off curtain.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
-import { CARD_NAMES, roomName, turnOrder } from '../engine/engine'
+import { CARD_NAMES, killerMoves, roomName, turnOrder } from '../engine/engine'
 import { KILLER_PLAYER, handsToPlan } from '../engine/seats'
 import type { GameState, MoveCard } from '../engine/types'
 import { choicePreview, preview } from '../focus'
 import { dispatch, online } from '../game'
+import { pathPick, pathPickFor } from '../pathPick'
 import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, cardImage, cardLabel, killerMini, playerOf, survivorMini } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import Mini from './Mini.vue'
@@ -195,6 +196,32 @@ function swapKiller() {
   killerSlots.value.reverse()
 }
 
+/**
+ * Where the killer's next card is played from: his room for the left card; for the right one, the
+ * rooms the left card can take him to (all of them when there are several — only the colour is
+ * planned, the path is picked in play). A Wait, or a card with no way out, leaves him where he is.
+ */
+const killerFrom = computed(() => {
+  const st = props.st
+  const first = killerPicks.value[0]
+  if (killerSlots.value.indexOf(null) !== 1 || !first || first === 'wait') return [st.killer.room]
+  const rooms = [...new Set(killerMoves(st, first).map((m) => m.to))]
+  return rooms.length ? rooms : [st.killer.room]
+})
+
+// ---------- the map: a path out of the room picks the card of its colour from the hand ----------
+
+watchEffect(() => {
+  const st = props.st
+  if (!curtainOpen.value) pathPick.value = null
+  else if (stridorStep.value !== null)
+    pathPick.value = pathPickFor(st, st.survivors[stridorStep.value].room, stridorHand.value.map((c) => c.card), pickStridor)
+  else if (!planningKiller.value)
+    pathPick.value = current.value === null ? null : pathPickFor(st, st.survivors[current.value].room, survivorHand.value.map((c) => c.card), pickSurvivorCard)
+  else pathPick.value = pathPickFor(st, killerFrom.value, killerHand.value.map((c) => c.card), pickKiller)
+})
+onBeforeUnmount(() => (pathPick.value = null))
+
 function confirmKiller() {
   if (!killerReady.value) return
   if (dispatch({ t: 'planKiller', cards: killerPicks.value as MoveCard[] })) {
@@ -306,7 +333,7 @@ function confirmKiller() {
       </button>
       <button type="button" class="swap" :disabled="!killerReady" title="สลับซ้าย / ขวา" @click="swapKiller">⇄ สลับ</button>
     </div>
-    <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดู · คลิกเพื่อเลือก (ใบแรก = ซ้าย)</p>
+    <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดู · คลิกเพื่อเลือก (ใบแรก = ซ้าย) — หรือคลิกเส้นทางบนแผนที่: ใบซ้ายจากห้องตอนนี้, ใบขวาจากห้องที่ใบซ้ายพาไป (คลิกที่ห้อง = Wait)</p>
     <p class="muted small">คลิกการ์ดในช่องเพื่อเอาใบนั้นออก</p>
     <button class="primary" :disabled="!killerReady" @click="confirmKiller">
       {{ st.step.t === 'planSurvivors' ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน — เริ่มรอบ' }}

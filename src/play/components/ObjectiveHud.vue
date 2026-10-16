@@ -68,11 +68,11 @@ const RING = 2 * Math.PI * 21
 </template>
 
 <style scoped>
-/* hook 3/8 over generator 4 — a plate like the PC game's, dark and edged in red */
+/* hook 3/8 · 4 generator, side by side — a plate like the PC game's, dark and edged in red */
 .hud {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+  justify-content: space-evenly;
   gap: 0.3rem;
   padding: 0.35rem 0.3rem;
   border: 1px solid var(--line);
@@ -85,10 +85,6 @@ const RING = 2 * Math.PI * 21
   align-items: center;
   gap: 0.3rem;
   cursor: help;
-}
-/* the icon first on both rows (the count comes first in the markup, as the PC game reads) */
-.survivors .count {
-  order: 1;
 }
 .icon {
   position: relative;

@@ -4,6 +4,7 @@
 // `actorsOf` says which players the game is waiting on; `mayAct` checks that a player is allowed
 // to send an action. The engine itself still decides whether the action is legal.
 
+import { rollHelpers } from './engine'
 import type { Action, GameState, PerkOwner } from './types'
 
 export const KILLER_PLAYER = 1
@@ -75,6 +76,9 @@ export function actorsOf(st: GameState): number[] {
   if (s.t === 'planSurvivors')
     return [...new Set(handsToPlan(st).map((h) => st.handPlayers[h])), ...(st.killerDraft ? [] : [KILLER_PLAYER])].sort((a, b) => a - b)
   if (s.t === 'reaction') return [...new Set(s.holders.map((h) => playerOfSurvivor(st, h)))]
+  // A roll a key or Iron Will can change: the roller, and everyone else still to decide.
+  if (s.t === 'roll')
+    return [...new Set([s.ctx.s, ...rollHelpers(st)].map((h) => playerOfSurvivor(st, h)))].sort((a, b) => a - b)
   const owner = stepOwner(st)
   return owner === null ? [] : [playerOfOwner(st, owner)]
 }
@@ -82,12 +86,16 @@ export function actorsOf(st: GameState): number[] {
 /** Whether `player` may send `action` now (legality is the engine's job). */
 export function mayAct(st: GameState, player: number, action: Action): boolean {
   // Items and re-rolls belong to their holder and can be used outside their own step.
-  if (action.t === 'useItem' || action.t === 'reroll') return playerOfSurvivor(st, action.s) === player
+  if (action.t === 'useItem' || action.t === 'reroll' || action.t === 'passRoll') return playerOfSurvivor(st, action.s) === player
+  // the roll itself is the roller's: a key holder waiting on it can't accept it for them
+  if (action.t === 'acceptRoll') return st.step.t === 'roll' && playerOfSurvivor(st, st.step.ctx.s) === player
   if (action.t === 'react') return st.step.t === 'reaction' && actorsOf(st).includes(player) && (action.s === null || playerOfSurvivor(st, action.s) === player)
   if (action.t === 'planHand') return st.step.t === 'planSurvivors' && st.handPlayers[action.hand] === player
   // planning runs for everyone at once, so both actions are legal in the same step: each belongs
   // to its own side
   if (action.t === 'planKiller') return player === KILLER_PLAYER && actorsOf(st).includes(player)
+  if (action.t === 'unplanKiller') return player === KILLER_PLAYER && st.step.t === 'planSurvivors' && !!st.killerDraft
+  if (action.t === 'unplanHand') return st.step.t === 'planSurvivors' && st.handPlayers[action.hand] === player
   // The whole-table planning action only makes sense on one shared device.
   if (action.t === 'planSurvivors') return false
   return actorsOf(st).includes(player)

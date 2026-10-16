@@ -15,6 +15,7 @@ import {
   phantasmInteractions,
   propsIn,
   rerollers,
+  rollHelpers,
   survivorInteractions,
   survivorMoves,
 } from './engine'
@@ -64,6 +65,8 @@ export function legalActions(st: GameState): Action[] {
       if (step.keep) step.dice.forEach((_, die) => out.push({ t: 'acceptRoll', die }))
       else out.push({ t: 'acceptRoll' })
       for (const s of rerollers(st)) step.dice.forEach((d, die) => !d.rerolled && out.push({ t: 'reroll', s, die }))
+      // the roller passes by accepting; anyone else who could change the roll passes on their own
+      for (const s of rollHelpers(st)) if (s !== step.ctx.s) out.push({ t: 'passRoll', s })
       break
     case 'offer':
       for (const perk of offeredPerks(step))

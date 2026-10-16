@@ -5,14 +5,14 @@
 // and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
-import { CARD_NAMES, ITEM_NAMES, KILLER_CARDS, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, roomName } from '../engine/engine'
+import { CARD_NAMES, ITEM_NAMES, KILLER_CARDS, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
 import { actionKey } from '../boardActions'
 import { choicePreview, preview } from '../focus'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
-import { dispatch } from '../game'
+import { controls, dispatch, online } from '../game'
 import { ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import DiceRow from './DiceRow.vue'
@@ -28,8 +28,13 @@ const here = (a: Action) => !props.onBoard.has(actionKey(a))
 const offerHere = (c: PerkChoice) => (props.st.step.t === 'offer' ? here(perkAct(props.st.step.perk, c)) : true)
 
 const step = computed(() => props.st.step)
-const buttons = computed(() => perkButtons(props.st))
-const keyHolders = computed(() => rerollers(props.st))
+const buttons = computed(() => perkButtons(props.st).filter((b) => b.owner === 'killer' || controls(props.st, b.owner)))
+// Online each helper (a key, Iron Will) decides on their own device; the roller waits for them.
+const keyHolders = computed(() => rerollers(props.st).filter((s) => controls(props.st, s)))
+const rollOthers = computed(() => (props.st.step.t === 'roll' ? rollHelpers(props.st).filter((s) => s !== (props.st.step as { ctx: { s: number } }).ctx.s) : []))
+const passers = computed(() => (online.value ? rollOthers.value.filter((s) => controls(props.st, s)) : []))
+const keyWaiting = computed(() => rollOthers.value.filter((s) => !controls(props.st, s)))
+const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, step.value.ctx.s))
 
 const offerChoices = computed(() => {
   const s = step.value
@@ -68,7 +73,7 @@ const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'r
   if (s.t === 'replaceCard') return 'replace'
   if (s.t === 'redeemerGuess') return 'guess'
   if (s.t === 'turnStart' && buttons.value.length) return 'turnStart'
-  if (s.t === 'roll' && (s.keep || buttons.value.length || keyHolders.value.length)) return 'roll'
+  if (s.t === 'roll' && (s.keep || buttons.value.length || keyHolders.value.length || passers.value.length || keyWaiting.value.length)) return 'roll'
   return null
 })
 
@@ -77,7 +82,8 @@ const decider = computed<PerkOwner | null>(() => {
   const s = step.value
   if (s.t === 'offer') return s.owner
   if (s.t === 'turnStart') return s.s
-  if (s.t === 'roll') return buttons.value[0]?.owner ?? s.ctx.s
+  // online, a helper's device names the helper: it's their key or perk being asked about
+  if (s.t === 'roll') return buttons.value[0]?.owner ?? (rollMine.value ? s.ctx.s : (passers.value[0] ?? s.ctx.s))
   if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess') return s.s
   if (s.t === 'phantasmChoice') return 'killer'
   return null
@@ -528,11 +534,21 @@ const boardCount = computed(() => {
               </button>
             </template>
           </template>
-          <template v-if="step.keep">
-            <p class="small">Bond: เลือกเก็บ 1 ลูก</p>
-            <button v-for="(_, i) in step.dice" :key="`k${i}`" class="primary" @click="act({ t: 'acceptRoll', die: i })">เก็บลูกที่ {{ i + 1 }}</button>
+          <!-- someone else's roll: each helper on this device passes on it here -->
+          <button v-for="s in passers" :key="`p${s}`" @click="act({ t: 'passRoll', s })">
+            <FaceLabel :st="st" :who="s" :text="`${st.survivors[s].name} ไม่ช่วย — ไม่ใช้กุญแจ / Perk`" />
+          </button>
+          <template v-if="rollMine">
+            <p v-if="keyWaiting.length" class="small waiting-key">
+              ⏳ รอ {{ keyWaiting.map((s) => st.survivors[s].name).join(', ') }} ตัดสินใจว่าจะช่วย (กุญแจ / Perk) หรือไม่
+            </p>
+            <template v-if="step.keep">
+              <p class="small">Bond: เลือกเก็บ 1 ลูก</p>
+              <button v-for="(_, i) in step.dice" :key="`k${i}`" class="primary" :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll', die: i })">เก็บลูกที่ {{ i + 1 }}</button>
+            </template>
+            <button v-else :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll' })">ไม่ใช้ — รับผลนี้</button>
           </template>
-          <button v-else @click="act({ t: 'acceptRoll' })">ไม่ใช้ — รับผลนี้</button>
+          <p v-else class="small muted">รอ {{ st.survivors[step.ctx.s].name }} รับผลทอย</p>
         </div>
       </template>
     </aside>

@@ -313,8 +313,11 @@ export type Step =
   /** Move along any path (after a rescue, p.13). */
   | { t: 'anyMove'; s: number }
   | { t: 'keepItem'; s: number; drawn: string }
-  /** `keep`: Bond rolled two dice and one must be kept. */
-  | { t: 'roll'; ctx: RollContext; dice: Die[]; keep?: boolean }
+  /**
+   * `keep`: Bond rolled two dice and one must be kept. `passed`: survivors who said they
+   * won't use their key on this roll (online, each key holder decides on their own device).
+   */
+  | { t: 'roll'; ctx: RollContext; dice: Die[]; keep?: boolean; passed?: number[] }
   /** `rush`: The Blight's power drew this card. */
   | { t: 'killerMove'; turn: number; card: PathKind; rush?: boolean }
   /**
@@ -412,6 +415,9 @@ export type Action =
    */
   | { t: 'planHand'; hand: number; cards: (MoveCard | null)[] }
   | { t: 'planKiller'; cards: MoveCard[] }
+  /** Online planning: take a hand's (or the killer's) confirmed cards back, while others still plan. */
+  | { t: 'unplanHand'; hand: number }
+  | { t: 'unplanKiller' }
   | { t: 'move'; path: string; reacted?: boolean }
   | { t: 'stop' }
   /** Hang the carried survivor on the free hook in this room. */
@@ -423,6 +429,8 @@ export type Action =
   | { t: 'keepItem'; keep: 'new' | 'old' }
   | { t: 'carryDice'; n: number }
   | { t: 'reroll'; s: number; die: number }
+  /** Survivor `s` won't use their key on this roll. */
+  | { t: 'passRoll'; s: number }
   /** `die`: the die kept, when Bond rolled two. */
   | { t: 'acceptRoll'; die?: number }
   /** Use (or decline) a perk. `quiet`: don't ask again this round. */

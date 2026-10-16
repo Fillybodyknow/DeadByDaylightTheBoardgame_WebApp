@@ -17,6 +17,7 @@ import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
 import { BEAR_TRAP_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
+import WoundRing from './WoundRing.vue'
 
 const props = defineProps<{
   st: GameState
@@ -443,7 +444,8 @@ function guard(e: MouseEvent) {
       @click="roomTarget(r.id) && emit('room', r.id)"
     >
       <!-- a room to click is named on it: with several (a fork's rooms) the choice reads at a glance -->
-      <span v-if="roomTarget(r.id)" class="pick-tag">{{ r.name }}</span>
+      <!-- planning: the room a killer's Wait keeps him in says so -->
+      <span v-if="roomTarget(r.id)" class="pick-tag">{{ r.name }}{{ roomTargets?.[r.id]?.includes('Wait') ? ' · WAIT' : '' }}</span>
     </component>
 
     <template v-if="litRooms">
@@ -492,7 +494,9 @@ function guard(e: MouseEvent) {
           :class="{ hooked: p.kind === 'hook', hiding: p.kind === 'locker', wounded: st.survivors[p.occupant].wounded }"
           :src="asset(survivorMini(st, p.occupant))"
           :alt="st.survivors[p.occupant].name"
-        />
+        >
+          <WoundRing v-if="st.survivors[p.occupant].wounded" />
+        </Mini>
       </component>
       <component
         :is="canAct(`s:${s}`) || roomTarget(r.id) ? 'button' : 'div'"
@@ -518,6 +522,7 @@ function guard(e: MouseEvent) {
         @pointerleave="pressEnd"
       >
         <img :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name" draggable="false" />
+        <WoundRing v-if="st.survivors[s].wounded" />
         <!-- Madness is a badge, not a ring: the ring says healthy (white) or wounded (red) -->
         <span v-if="st.survivors[s].madness" class="madness-tag" title="Madness: ทอย Danger Die แทน Skill Check">🌀</span>
       </component>
@@ -835,10 +840,9 @@ button.tile.picked::after {
   filter: grayscale(0.35) brightness(0.85);
 }
 /* the tile's ring says where they are, the portrait's says how they are (as on the board) */
+/* wounded: the blood ring (WoundRing) goes over the light one */
 .occupant.wounded {
-  box-shadow:
-    0 0 0 2px var(--blood-bright),
-    0 0 0 3px rgb(0 0 0 / 0.85);
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.85);
 }
 /* the tile grows on hover: the portrait rides along, so it is still readable */
 .tile:not(.down):hover .occupant {
@@ -864,10 +868,9 @@ button.tile.picked::after {
     0 0 0 2px #f2efe6,
     0 0 0 4px rgb(0 0 0 / 0.65);
 }
+/* wounded: the blood ring (WoundRing) takes the light ring's place */
 .mini.survivor.wounded {
-  box-shadow:
-    0 0 0 3px var(--blood-bright),
-    0 0 0 5px rgb(0 0 0 / 0.65);
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.75);
 }
 /* whose turn it is: gold, a little bigger, breathing */
 .mini.survivor.active {
@@ -881,9 +884,8 @@ button.tile.picked::after {
 }
 .mini.survivor.wounded.active {
   box-shadow:
-    0 0 0 3px var(--blood-bright),
-    0 0 0 5px rgb(0 0 0 / 0.7),
-    0 0 22px 6px rgb(255 200 90 / 0.9);
+    0 0 0 2px rgb(0 0 0 / 0.75),
+    0 0 26px 8px rgb(255 200 90 / 0.9);
 }
 @keyframes turn-glow {
   50% {

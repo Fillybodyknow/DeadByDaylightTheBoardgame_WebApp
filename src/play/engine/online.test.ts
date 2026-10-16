@@ -102,6 +102,34 @@ describe('online planning (planHand)', () => {
   })
 })
 
+describe('taking a plan back', () => {
+  it('lets a hand and the killer take their cards back until the last plan is in', () => {
+    let st = toPlanning(5)
+    const [a, b] = st.killer.hand
+    st = apply(st, { t: 'planKiller', cards: [a, b] })
+    st = apply(st, { t: 'planHand', hand: 0, cards: handCards(st, 0) })
+    expect(actorsOf(st)).toEqual([3, 4, 5])
+    // survivor hand 0 (player 2) changes its mind: it is waited on again
+    expect(mayAct(st, 3, { t: 'unplanHand', hand: 0 })).toBe(false)
+    expect(mayAct(st, 2, { t: 'unplanHand', hand: 0 })).toBe(true)
+    st = apply(st, { t: 'unplanHand', hand: 0 })
+    expect(actorsOf(st)).toEqual([2, 3, 4, 5])
+    expect(st.planDraft?.[0]).toBeNull()
+    // so does the killer
+    expect(mayAct(st, 1, { t: 'unplanKiller' })).toBe(true)
+    st = apply(st, { t: 'unplanKiller' })
+    expect(st.killerDraft).toBeUndefined()
+    expect(actorsOf(st)).toEqual([1, 2, 3, 4, 5])
+    // and both plan again; the last one in still starts the round
+    st = apply(st, { t: 'planKiller', cards: [b, a] })
+    for (const hand of [0, 1, 2, 3]) st = apply(st, { t: 'planHand', hand, cards: handCards(st, hand) })
+    expect(st.step.t).not.toBe('planSurvivors')
+    expect(st.killer.planned).toEqual([b, a])
+    // once the round has started there is nothing to take back
+    expect(tryApply(st, { t: 'unplanKiller' })).toBeNull()
+  })
+})
+
 describe('seats', () => {
   it('lets only the right player act', () => {
     const st = toPlanning(4)
@@ -111,6 +139,31 @@ describe('seats', () => {
     expect(mayAct(st, 1, action)).toBe(false)
     expect(mayAct(st, 2, { t: 'planSurvivors', cards: [null, null, null, null] })).toBe(false)
     expect(playerOfSurvivor(st, 1)).toBe(2) // 4 players: survivors 0 and 1 share player 2's hand
+  })
+
+  it("asks a friend's key on their own device, and the roller waits for them", () => {
+    // Meg (survivor 1) fails a repair roll; Jake (survivor 3) holds a Dull Key
+    const st = toPlanning(5)
+    const gen = st.props.find((p) => p.kind === 'generator')!
+    st.phase = 'survivors'
+    st.activeSurvivor = 1
+    st.survivors.forEach((sv) => (sv.item = null))
+    st.survivors[3].item = 'dull_key'
+    st.step = { t: 'roll', ctx: { k: 'repair', s: 1, prop: gen.id }, dice: [{ kind: 'skill', face: 0, rerolled: false }] }
+    st.queue = [{ k: 'endSurvivorTurn', s: 1 }]
+    const meg = playerOfSurvivor(st, 1)
+    const jake = playerOfSurvivor(st, 3)
+    expect(actorsOf(st)).toEqual([meg, jake].sort((a, b) => a - b))
+    // the key is Jake's to use or pass on, the roll is Meg's to accept
+    expect(mayAct(st, jake, { t: 'reroll', s: 3, die: 0 })).toBe(true)
+    expect(mayAct(st, meg, { t: 'reroll', s: 3, die: 0 })).toBe(false)
+    expect(mayAct(st, jake, { t: 'passRoll', s: 3 })).toBe(true)
+    expect(mayAct(st, jake, { t: 'acceptRoll' })).toBe(false)
+    expect(mayAct(st, meg, { t: 'acceptRoll' })).toBe(true)
+    // Jake passes: nobody else can re-roll, so the roll settles by itself
+    const after = apply(st, { t: 'passRoll', s: 3 })
+    expect(after.step.t).not.toBe('roll')
+    expect(after.survivors[3].item).toBe('dull_key')
   })
 })
 

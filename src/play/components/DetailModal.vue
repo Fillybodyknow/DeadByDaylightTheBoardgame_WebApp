@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Details of a survivor, the killer, a prop or an item: the printed card plus its state now.
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { items, killerById, survivorById } from '../../data'
 import { asset, tr } from '../../i18n'
 import { ITEM_NAMES, PROP_NAMES, SURVIVOR_BP, KILLER_BP, roomName } from '../engine/engine'
@@ -16,10 +16,19 @@ const props = defineProps<{ st: GameState; target: InspectTarget }>()
 const emit = defineEmits<{ close: [] }>()
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') emit('close')
+  if (e.key !== 'Escape') return
+  // the enlarged card goes first, then the modal
+  if (zoomed.value) zoomed.value = null
+  else emit('close')
 }
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+
+/** A card picture opened big over the modal (a click on a card); a click anywhere closes it. */
+const zoomed = ref<string | null>(null)
+function zoom(e: MouseEvent) {
+  zoomed.value = (e.currentTarget as HTMLImageElement).src
+}
 
 const STATUS_TH = { board: 'อยู่บนกระดาน', locker: 'ซ่อนใน Locker', carried: 'ถูกแบก', hooked: 'อยู่บน Hook' }
 
@@ -93,8 +102,8 @@ const item = computed(() => {
           <li :class="st.killer.powerUsed ? 'bad' : 'good'">{{ st.killer.powerUsed ? 'ใช้พลังแล้วรอบนี้' : 'ใช้พลังได้' }}</li>
         </ul>
         <div class="powers">
-          <img v-if="killer.power.image?.th" :src="asset(killer.power.image.th)" :alt="killer.power.name" />
-          <img v-if="killer.passiveImage?.th" :src="asset(killer.passiveImage.th)" alt="Passive" />
+          <img v-if="killer.power.image?.th" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(killer.power.image.th)" :alt="killer.power.name" />
+          <img v-if="killer.passiveImage?.th" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(killer.passiveImage.th)" alt="Passive" />
         </div>
         <p class="rule"><b>Power — {{ killer.power.name }}:</b> {{ tr(killer.power.text) }}</p>
         <p v-if="killer.passive" class="rule"><b>Passive:</b> {{ tr(killer.passive) }}</p>
@@ -104,7 +113,7 @@ const item = computed(() => {
       <section v-if="perkList.length" class="perk-list">
         <h3>Perks</h3>
         <div v-for="{ p, used } in perkList" :key="p" class="perk-row" :class="{ used }">
-          <img v-if="perkImage(p)" :src="asset(perkImage(p))" :alt="PERKS[p].name" />
+          <img v-if="perkImage(p)" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(p))" :alt="PERKS[p].name" />
           <div>
             <div class="perk-head">
               <strong>{{ PERKS[p].name }}</strong>
@@ -148,7 +157,7 @@ const item = computed(() => {
           <li>{{ PERKS[perk.perk].when }}</li>
         </ul>
         <div class="item-wrap">
-          <img v-if="perkImage(perk.perk)" class="item-img" :src="asset(perkImage(perk.perk))" :alt="PERKS[perk.perk].name" />
+          <img v-if="perkImage(perk.perk)" class="item-img zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(perk.perk))" :alt="PERKS[perk.perk].name" />
           <p class="rule">{{ perkText(perk.perk) }}</p>
         </div>
       </template>
@@ -162,15 +171,50 @@ const item = computed(() => {
           </div>
         </header>
         <div class="item-wrap">
-          <img class="item-img" :src="asset(itemImage(item.id))" :alt="ITEM_NAMES[item.id]" />
+          <img class="item-img zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(itemImage(item.id))" :alt="ITEM_NAMES[item.id]" />
           <p class="rule">{{ item.text.th.replaceAll('{BP}', '▲') }}</p>
         </div>
       </template>
+    </div>
+
+    <!-- a card, big enough to read; a click anywhere puts it back -->
+    <div v-if="zoomed" class="zoom" role="dialog" aria-modal="true" @click="zoomed = null">
+      <img :src="zoomed" alt="" />
+      <p class="muted small">คลิกที่ไหนก็ได้เพื่อย่อกลับ</p>
     </div>
   </div>
 </template>
 
 <style scoped>
+.zoomable {
+  cursor: zoom-in;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.zoomable:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 0 2px #ffe9b0;
+}
+/* the enlarged card, over the modal: as big as the screen allows */
+.zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  background: rgb(4 5 7 / 0.9);
+  cursor: zoom-out;
+  animation: fade 0.15s ease-out;
+}
+.zoom img {
+  max-width: min(92vw, 1100px);
+  max-height: 84vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px rgb(255 233 176 / 0.6), 0 24px 60px rgb(0 0 0 / 0.85);
+}
 .backdrop {
   position: fixed;
   inset: 0;

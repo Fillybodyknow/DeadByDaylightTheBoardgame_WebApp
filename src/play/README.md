@@ -57,7 +57,8 @@ and the host starts the game.
 - **Planning happens for everyone at once.** Each survivor player sends their own hand with
   `planHand`, and the killer sends his two cards with `planKiller` in the same step; they are
   kept in `killerDraft` until the last survivor hand is in, and whoever confirms last starts the
-  round. Nobody learns anything new from it — the survivors' cards are face down to the killer
+  round. Until then a confirmed plan can be taken back and made again (`unplanHand`,
+  `unplanKiller`; the "ยกเลิก — เลือกการ์ดใหม่" button in the waiting panel). Nobody learns anything new from it — the survivors' cards are face down to the killer
   either way (p.8) — it only saves the wait. On one shared device the survivors still plan first
   and the device then goes to the killer, behind the hand-off curtain.
 - **Backends** (`online/`):
@@ -80,6 +81,9 @@ and the host starts the game.
   test-mode rules expire). **The rules must be updated before this version is used**: without
   `moves`, no move can be written and a game can't be played. Without `log`, games still work but
   every checkpoint carries the whole log.
+- **A roll others can change** (a friend's key, a friend's Iron Will) waits on everyone who could:
+  each of them gets the roll on their own device, to help or pass (`passRoll`), and the roller
+  accepts the result once they have all answered (`rollHelpers`; `actorsOf` lists them all).
 - The top bar shows "กำลังซิงก์…" while this device's moves take long to reach the room, and
   "การเชื่อมต่อหลุด" while it is disconnected (`SyncBadge.vue`).
 - Undo is off online. The host's ออก ends the game for everyone and returns to the room. Other

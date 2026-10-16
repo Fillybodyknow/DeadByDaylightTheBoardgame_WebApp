@@ -46,6 +46,24 @@ export interface PerkShow {
   owner: PerkOwner
   /** What it did, from the log line ("ผลัก Meg"…). */
   detail: string
+  /** Not a card at all: a player's action (ActionReveal shows these, in the same queue). */
+  action?: ActionShow
+}
+
+/** A player's action, shown briefly before the board plays it out (built in casts.ts). */
+export interface ActionShow {
+  id: number
+  owner: PerkOwner
+  /** move: a movement card; power: the killer's power; passive: a killer passive. */
+  kind: 'move' | 'action' | 'power' | 'passive'
+  /** "Meg ทิ้ง Pallet บนเส้นทาง" */
+  title: string
+  /** The rest of the log line, or where a move went. */
+  sub: string
+  /** A movement card, a prop or token, or the power card (cropped to its icon). */
+  image?: string
+  /** The survivor on the receiving end (attacked, picked up, hooked, rescued). */
+  target?: number
 }
 
 export const fx = reactive({
@@ -79,6 +97,11 @@ export function showBanner(b: Omit<Banner, 'id' | 'at'>, opts: { replace?: boole
   // Keep the queue short: a burst of turn changes should not lag behind play.
   if (fx.banners.length >= 3) fx.banners.splice(1, 1)
   fx.banners.push({ ...b, id: ++id, at: Date.now() })
+}
+
+export function showAction(a: Omit<ActionShow, 'id'>) {
+  const n = ++id
+  fx.perks.push({ id: n, owner: a.owner, detail: '', action: { ...a, id: n } })
 }
 
 export function showPerk(p: Omit<PerkShow, 'id'>) {
