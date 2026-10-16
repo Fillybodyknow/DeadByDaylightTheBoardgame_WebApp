@@ -39,7 +39,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 | `src/play/focus.ts` | Board highlights and the facts listed for a decision |
 | `src/play/labels.ts` | Thai labels for actions, perk choices, windows |
 | `src/play/fx/` | Sound effects (`audio.ts`) and the animation queue (`bus.ts`) |
-| `src/play/online/` | Firebase and local (multi-tab) backends, room session |
+| `src/play/online/` | Firebase and local (multi-tab) backends, room session. The room carries **moves**, not states: each device replays them on the last checkpoint (`transport.ts`) |
 | `src/data/` | Character, item and map data (Thai + English text, image paths) |
 | `public/assets/` | Card art, maps, minis, sounds (`app/sound/game/` = game sound clips) |
 | `public/sw.js`, `src/install.ts` | PWA: service worker and install button |
@@ -131,6 +131,13 @@ local backend syncs browser tabs.
 
 - Game sounds: `src/play/fx/audio.ts`. Recorded clips in `public/assets/app/sound/game/`, with the
   synthesised sound as fallback. They follow the mute toggle in `src/sound.ts`.
+- Every sound file is **OGG (Vorbis)**, so loops have no gap (MP3 pads both ends). Chase music
+  lives in `app/sound/theme/chase/<killer>/<theme>/layer<N>.ogg`, one 26.84 s loop per layer.
+- **Chase music** (`setChase` in `src/sound.ts`, decided in `GameScreen`): the killer standing on
+  someone plays his theme — layer 2 on a healthy survivor, 3 once wounded, 4 while carried. Every
+  layer is the same loop with more on top, so a switch keeps the playback position. The ambient
+  track ducks under it, a chase plays for at least 6 s, and online only the killer and that
+  survivor's player hear it.
 - `public/sw.js` registers only in production builds. Bump `VERSION` there when the caching
   rules change. Test install and offline with `npx vite preview` (Edge's installability check
   fails in incognito, so use a persistent profile).

@@ -69,12 +69,12 @@ export function dispatch(action: Action): boolean {
     if (!mayAct(cur, o.seat, action)) return false
     const next = tryApply(cur, action)
     if (!next) return false
-    // Show it at once, then commit. If someone else changed the game first, the action is
-    // checked again against their state; the room's state is what everyone ends up with.
+    // Show it at once, then send the move. If someone else moved first, it is checked again
+    // against their state; every device replays the same moves, so all of them agree.
     game.value = next
     pendingWrites.value++
     void o.room
-      .updateGame((latest) => (latest && mayAct(latest, o.seat, action) ? tryApply(latest, action) : null))
+      .sendMove((latest) => (latest && mayAct(latest, o.seat, action) && tryApply(latest, action) ? action : null))
       .then(
         (ok) => !ok && resync(o),
         () => resync(o),

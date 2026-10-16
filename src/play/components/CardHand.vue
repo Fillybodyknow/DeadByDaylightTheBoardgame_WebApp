@@ -23,8 +23,12 @@ export interface HandCard {
   count?: number
 }
 
-/** `label`: whose hand, for screen readers (the side panel shows it on screen). */
-const props = defineProps<{ cards: HandCard[]; label: string }>()
+/**
+ * `label`: whose hand, for screen readers (the side panel shows it on screen).
+ * `prompt`: a perk, power or passive is waiting for a card from here — the hand lights up and
+ * says which one, so the choice isn't missed in the corner of the screen.
+ */
+const props = defineProps<{ cards: HandCard[]; label: string; prompt?: string }>()
 /** `pick`: the card, and its place in `cards` (The Blight's hand holds two of each). */
 const emit = defineEmits<{ pick: [card: MoveCard, index: number]; hover: [card: MoveCard | null] }>()
 
@@ -54,8 +58,9 @@ onBeforeUnmount(() => hands(-1))
 <template>
   <Teleport to="body">
     <!-- a soft shadow under the hand, so it reads over the map -->
-    <div class="tray" aria-hidden="true" />
-    <div class="hand" role="group" :aria-label="label">
+    <div class="tray" :class="{ ask: !!prompt }" aria-hidden="true" />
+    <div class="hand" :class="{ ask: !!prompt }" role="group" :aria-label="label">
+      <p v-if="prompt" class="prompt">⚡ {{ prompt }}</p>
       <div class="fan">
         <button
           v-for="(c, i) in cards"
@@ -120,6 +125,38 @@ onBeforeUnmount(() => hands(-1))
     right: 0;
     background: radial-gradient(ellipse 60% 70% at 70% 100%, rgb(4 5 7 / 0.92), rgb(4 5 7 / 0.6) 55%, transparent 75%);
   }
+}
+/* A perk, power or passive is asking for a card: the hand glows and names what wants it. */
+.tray.ask {
+  background: radial-gradient(ellipse 50% 70% at 50% 100%, rgb(60 20 90 / 0.95), rgb(20 8 34 / 0.7) 55%, transparent 75%);
+  animation: ask-glow 1.8s ease-in-out infinite;
+}
+@media (min-width: 981px) {
+  .tray.ask {
+    background: radial-gradient(ellipse 60% 70% at 70% 100%, rgb(60 20 90 / 0.95), rgb(20 8 34 / 0.7) 55%, transparent 75%);
+  }
+}
+@keyframes ask-glow {
+  50% {
+    filter: brightness(1.45);
+  }
+}
+.prompt {
+  margin: 0 0 0.3rem;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid #8a5cff;
+  border-radius: 99px;
+  background: rgb(18 10 30 / 0.92);
+  color: #e0d0ff;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 0 14px rgb(138 92 255 / 0.55);
+}
+.hand.ask .face {
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.7)) drop-shadow(0 0 8px rgb(170 110 255 / 0.65));
 }
 .fan {
   display: flex;
@@ -238,6 +275,9 @@ onBeforeUnmount(() => hands(-1))
 @media (prefers-reduced-motion: reduce) {
   .face {
     transition: none;
+  }
+  .tray.ask {
+    animation: none;
   }
 }
 </style>

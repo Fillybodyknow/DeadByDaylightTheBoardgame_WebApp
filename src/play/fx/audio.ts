@@ -36,7 +36,7 @@ function loadClips(c: AudioContext): Promise<void> {
   clipsLoaded ??= Promise.all(
     CLIPS.map(async (name) => {
       try {
-        const res = await fetch(asset(`assets/app/sound/game/${name}.mp3`))
+        const res = await fetch(asset(`assets/app/sound/game/${name}.ogg`))
         if (res.ok) buffers.set(name, await c.decodeAudioData(await res.arrayBuffer()))
       } catch {
         // missing or undecodable: the synthesised sound is used

@@ -4,11 +4,35 @@
 // localStorage between them lazily, so a read-modify-write could miss another tab's write.
 // An IndexedDB readwrite transaction is atomic across every tab.
 
+import { tryApply } from '../engine/engine'
+import type { Action, GameState } from '../engine/types'
 import type { Backend, Room, RoomData } from './transport'
-import { emptyRoom, normalizeRoom } from './transport'
+import { CHECKPOINT_EVERY, emptyRoom, normalizeRoom } from './transport'
 
 const DB = 'dbdl-rooms'
 const STORE = 'rooms'
+
+/**
+ * What a room holds on disk. Like the Firebase backend it keeps a checkpoint and the moves since,
+ * so both run the same protocol and the tests exercise the real one.
+ */
+type StoredRoom = Omit<RoomData, 'game' | 'rev'> & {
+  checkpoint?: GameState | null
+  moves?: Action[]
+  /** Moves already folded into the checkpoint, so `rev` keeps counting up. */
+  base?: number
+}
+
+/** The checkpoint with its moves replayed: what every device sees. */
+function roomOf(stored: StoredRoom): RoomData {
+  let game = stored.checkpoint ?? null
+  for (const a of stored.moves ?? []) {
+    const next = game && tryApply(game, a)
+    if (!next) break
+    game = next
+  }
+  return normalizeRoom({ ...stored, game, rev: (stored.base ?? 0) + (stored.moves ?? []).length })
+}
 
 let dbp: Promise<IDBDatabase> | null = null
 function open(): Promise<IDBDatabase> {
@@ -25,13 +49,13 @@ async function read(code: string): Promise<RoomData | null> {
   const db = await open()
   return new Promise((resolve, reject) => {
     const req = db.transaction(STORE).objectStore(STORE).get(code)
-    req.onsuccess = () => resolve(req.result ? normalizeRoom(req.result as RoomData) : null)
+    req.onsuccess = () => resolve(req.result ? roomOf(req.result as StoredRoom) : null)
     req.onerror = () => reject(req.error)
   })
 }
 
 /** Read, change and write one room in a single transaction; false if `fn` declined. */
-async function modify(code: string, fn: (cur: RoomData | null) => RoomData | null): Promise<boolean> {
+async function modify(code: string, fn: (cur: StoredRoom | null) => StoredRoom | null): Promise<boolean> {
   const db = await open()
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite')
@@ -39,7 +63,7 @@ async function modify(code: string, fn: (cur: RoomData | null) => RoomData | nul
     let wrote = false
     const req = store.get(code)
     req.onsuccess = () => {
-      const next = fn(req.result ? normalizeRoom(req.result as RoomData) : null)
+      const next = fn((req.result as StoredRoom | null) ?? null)
       if (next) {
         // a JSON copy: the state is plain data, and Vue proxies can't be stored
         store.put(JSON.parse(JSON.stringify(next)), code)
@@ -73,7 +97,7 @@ class LocalRoom implements Room {
     return () => void this.listeners.delete(cb)
   }
 
-  private async write(fn: (cur: RoomData) => RoomData | null): Promise<boolean> {
+  private async write(fn: (cur: StoredRoom) => StoredRoom | null): Promise<boolean> {
     const ok = await modify(this.code, (cur) => (cur ? fn(cur) : null))
     if (ok) {
       this.channel.postMessage('changed')
@@ -82,19 +106,38 @@ class LocalRoom implements Room {
     return ok
   }
 
-  updateGame(fn: (cur: RoomData['game']) => RoomData['game']) {
+  startGame(st: GameState) {
+    return this.write((cur) => (cur.checkpoint ? null : { ...cur, checkpoint: st, moves: [], base: 0 }))
+  }
+
+  sendMove(fn: (cur: GameState | null) => Action | null) {
+    // One IndexedDB transaction reads and writes, so the move lands on the game as it is now —
+    // the same promise the Firebase slot transaction makes.
     return this.write((cur) => {
-      const game = fn(cur.game)
-      return game ? { ...cur, game, rev: cur.rev + 1 } : null
+      const room = roomOf(cur)
+      const action = fn(room.game)
+      if (!action || !room.game) return null
+      const moves = [...(cur.moves ?? []), action]
+      // every so often the moves fold into a fresh checkpoint, as they do online
+      if (moves.length < CHECKPOINT_EVERY) return { ...cur, moves }
+      const next = tryApply(room.game, action)
+      return next ? { ...cur, checkpoint: next, moves: [], base: (cur.base ?? 0) + moves.length } : { ...cur, moves }
     })
   }
 
   async resetGame() {
-    await this.write((cur) => ({ ...cur, game: null, rev: cur.rev + 1 }))
+    await this.write((cur) => ({ ...cur, checkpoint: null, moves: [], base: 0 }))
   }
 
   updateRoom(fn: (cur: RoomData) => RoomData | null) {
-    return this.write(fn)
+    return this.write((cur) => {
+      const next = fn(roomOf(cur))
+      if (!next) return null
+      const { game, rev, ...rest } = next
+      void game
+      void rev
+      return { ...cur, ...rest }
+    })
   }
 
   close() {

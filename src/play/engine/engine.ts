@@ -1834,6 +1834,15 @@ export function perkReady(st: GameState, o: PerkOwner, perk: PerkId): boolean {
   return o === 'killer' || st.survivors[o].status === 'board'
 }
 
+/**
+ * Whether a perk that reaches "a survivor in your space or a connected space" finds this one: in
+ * a locker they are in no space at all (p.12). Perks worded without a space (Thanatophobia,
+ * Lucky Break) still apply to them.
+ */
+function inSpace(st: GameState, s: number): boolean {
+  return st.survivors[s].status === 'board'
+}
+
 /** Rooms joined to `room` by a path (either direction, p.16), not counting `room` itself. */
 function connectedRooms(st: GameState, room: string): Set<string> {
   return new Set(touchingPaths(st, room).map((p) => (p.a === room ? p.b : p.a)))
@@ -1869,7 +1878,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
         .map((e) => ({ path: e.path.id }))
     case 'unnerving_presence': {
       if (w.k !== 'preRoll' || !SKILL_CHECKS.includes(w.ctx.k) || st.rollMods.danger) return []
-      return inRange(st, k.room, st.survivors[w.ctx.s].room) ? NONE : []
+      return inSpace(st, w.ctx.s) && inRange(st, k.room, st.survivors[w.ctx.s].room) ? NONE : []
     }
     // ----- The Nurse -----
     case 'stridor':
@@ -1919,7 +1928,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     }
     case 'bond': {
       if (w.k !== 'preRoll' || !SKILL_CHECKS.includes(w.ctx.k) || w.ctx.s === o || st.rollMods.keep) return []
-      return inRange(st, me!.room, st.survivors[w.ctx.s].room) ? NONE : []
+      return inSpace(st, w.ctx.s) && inRange(st, me!.room, st.survivors[w.ctx.s].room) ? NONE : []
     }
     // ----- Meg -----
     case 'sprint_burst':
@@ -2083,7 +2092,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return [...heal, ...gens]
     }
     case 'off_the_record':
-      return w.k === 'rollFail' && w.fails > 0 && inRange(st, me!.room, st.survivors[w.s].room) ? NONE : []
+      return w.k === 'rollFail' && w.fails > 0 && inSpace(st, w.s) && inRange(st, me!.room, st.survivors[w.s].room) ? NONE : []
     // ----- The Twins -----
     case 'coup_de_grace':
       return w.k === 'killerTurnEnd' && !k.bonusUsed ? NONE : []

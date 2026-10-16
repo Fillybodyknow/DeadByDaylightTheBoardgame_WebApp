@@ -1,23 +1,31 @@
 // Firebase Realtime Database backend.
 //
 // Layout:  rooms/<code>/lobby  { host, createdAt, phase, members, seats, players, picks, locked, double?, board? }
-//          rooms/<code>/game   { rev, json }
+//          rooms/<code>/game   { rev, json }               checkpoint: the state after `rev` moves
+//          rooms/<code>/moves  { m000001: json, … }        one action each, played in key order
 //          rooms/<code>/log    { r1: json, r2: json, … }  log of finished rounds (see logArchive.ts)
-// The game is stored as a JSON string: the database drops null values and turns some arrays
-// into objects, and the engine state relies on both. Lobby and game are separate nodes so
-// seat changes and game moves never fight over one transaction. The game written on each move
-// leaves out the log of rounds already archived, so a write stays small however long the game.
+//
+// A move is written to its own numbered slot, and every device replays the moves on top of the
+// checkpoint to get the same game (see transport.ts). That keeps a move at a few hundred bytes
+// instead of the whole state. Every CHECKPOINT_EVERY moves the player who made the move writes a
+// new checkpoint and clears the moves it covers, so joining late stays cheap too.
+//
+// Game states and actions are stored as JSON strings: the database drops null values and turns
+// some arrays into objects, and both rely on neither happening. Lobby and game are separate nodes
+// so seat changes and game moves never fight over one transaction. A checkpoint leaves out the
+// log of rounds already archived, so it stays small however long the game.
 //
 // Config comes from Vite env vars (`.env.local`, never committed):
 //   VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_DATABASE_URL,
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { getDatabase, onValue, ref, runTransaction, set, update, type Database } from 'firebase/database'
-import type { GameState, LogEntry } from '../engine/types'
+import { getDatabase, onChildAdded, onValue, ref, runTransaction, set, update, type Database } from 'firebase/database'
+import { tryApply } from '../engine/engine'
+import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
 import type { Backend, Room, RoomData } from './transport'
-import { emptyRoom, normalizeRoom } from './transport'
+import { CHECKPOINT_EVERY, emptyRoom, moveKey, normalizeRoom } from './transport'
 
 const env = import.meta.env
 
@@ -50,7 +58,6 @@ interface GameNode {
   json: string
 }
 
-type RawRoom = { lobby?: Partial<Lobby>; game?: GameNode; log?: Record<string, string> } | null
 
 /** Parsed archives, by their text (an archive never changes once written). */
 const parsedArchives = new Map<string, LogEntry[]>()
@@ -60,28 +67,28 @@ function parseArchive(text: string): LogEntry[] {
   return entries
 }
 
-/** The written game, without the archived rounds' log. */
-function coreOf(raw: RawRoom): GameState | null {
-  return raw?.game?.json ? (JSON.parse(raw.game.json) as GameState) : null
-}
-
-function toRoom(raw: RawRoom): RoomData | null {
-  if (!raw?.lobby) return null
-  const core = coreOf(raw)
-  return normalizeRoom({
-    ...raw.lobby,
-    host: raw.lobby.host ?? '',
-    game: core ? withFullLog(core, raw.log, parseArchive) : null,
-    rev: raw.game?.rev ?? 0,
-  })
-}
 class FirebaseRoom implements Room {
   private unsubs: (() => void)[] = []
+  private listener: ((d: RoomData | null) => void) | null = null
   /** Last known room, so transactions can be answered when the local cache is still empty. */
   private last: RoomData | null = null
   /** Resolves on the first snapshot: lobby writes wait for it (see updateRoom). */
   private loaded: Promise<void>
   private markLoaded!: () => void
+
+  // ----- the game, as a checkpoint plus the moves played on top of it -----
+  private lobby: Partial<Lobby> | null = null
+  private haveLobby = false
+  /** The checkpoint, and how many moves it already holds. */
+  private base: GameState | null = null
+  private baseRev = 0
+  /** Moves from the room, by their number; they may arrive before the ones in front of them. */
+  private moves = new Map<number, Action>()
+  /** The checkpoint with every move so far replayed on it, and how many that is. */
+  private state: GameState | null = null
+  private applied = 0
+  private archives: Record<string, string> = {}
+
   /** Rounds archived in the room, from the last snapshot. */
   private archived = new Set<number>()
   /** Archives being written by this device. */
@@ -102,40 +109,148 @@ class FirebaseRoom implements Room {
   }
 
   subscribe(cb: (d: RoomData | null) => void) {
-    const off = onValue(this.path(), (snap) => {
-      const raw = snap.val() as RawRoom
-      this.archived = archivedRounds(raw?.log)
-      this.last = toRoom(raw)
-      this.markLoaded()
-      cb(this.last)
-      // The writer archives finished rounds right after its move; if that got lost (it closed
-      // the page, say), whoever is still here does it a moment later from the same state.
-      const core = coreOf(raw)
-      if (core && roundsToArchive(core, this.archived).size) this.scheduleArchive(core, 1500)
-    })
-    this.unsubs.push(off)
-    return off
+    this.listener = cb
+    // The lobby and the archives are small and change rarely: a value listener each.
+    this.unsubs.push(
+      onValue(this.path('/lobby'), (snap) => {
+        this.lobby = (snap.val() as Partial<Lobby> | null) ?? null
+        this.haveLobby = true
+        this.markLoaded()
+        this.emit()
+      }),
+      onValue(this.path('/log'), (snap) => {
+        this.archives = (snap.val() as Record<string, string> | null) ?? {}
+        this.archived = archivedRounds(this.archives)
+        this.emit()
+      }),
+      // The checkpoint: a whole state, so it only comes every CHECKPOINT_EVERY moves.
+      onValue(this.path('/game'), (snap) => {
+        const node = snap.val() as GameNode | null
+        if (!node?.json) {
+          this.base = null
+          this.baseRev = 0
+          this.moves.clear()
+        } else if (node.rev >= this.baseRev) {
+          this.base = JSON.parse(node.json) as GameState
+          this.baseRev = node.rev
+          for (const n of [...this.moves.keys()]) if (n <= node.rev) this.moves.delete(n)
+        }
+        this.replay()
+      }),
+      // The moves themselves: a few hundred bytes each, and only the new ones are sent.
+      onChildAdded(this.path('/moves'), (snap) => {
+        const n = Number(String(snap.key).slice(1))
+        if (!Number.isInteger(n) || n <= this.baseRev) return
+        this.moves.set(n, JSON.parse(snap.val() as string) as Action)
+        this.replay()
+      }),
+    )
+    return () => this.close()
   }
 
-  async updateGame(fn: (cur: GameState | null) => GameState | null): Promise<boolean> {
-    let aborted = false
-    let written: GameState | null = null
+  /** The checkpoint with every move in front of it applied, in order. */
+  private replay() {
+    let st = this.base
+    let n = this.baseRev
+    while (st && this.moves.has(n + 1)) {
+      const next = tryApply(st, this.moves.get(n + 1)!)
+      // A move the engine won't take means this device is out of step: keep what we have and
+      // wait for the next checkpoint, which replaces everything.
+      if (!next) {
+        console.warn(`online: move ${n + 1} does not fit the game here`)
+        break
+      }
+      st = next
+      n++
+    }
+    this.state = st
+    this.applied = n
+    this.emit()
+    // The player who made the move archives and checkpoints; if that got lost (they closed the
+    // page, say), whoever is still here does it a moment later from the same state.
+    if (st && roundsToArchive(st, this.archived).size) this.scheduleArchive(st, 1500)
+  }
+
+  private emit() {
+    if (!this.haveLobby) return
+    if (!this.lobby) {
+      this.last = null
+      this.listener?.(null)
+      return
+    }
+    this.last = normalizeRoom({
+      ...this.lobby,
+      host: this.lobby.host ?? '',
+      game: this.state ? withFullLog(this.state, this.archives, parseArchive) : null,
+      rev: this.applied,
+    })
+    this.listener?.(this.last)
+  }
+
+  async startGame(st: GameState): Promise<boolean> {
     const res = await runTransaction(this.path('/game'), (cur: GameNode | null) => {
       // A null first call can just mean "not cached yet": answering it is safe, because the
       // write only commits if the server really holds null; otherwise it runs again with data.
-      const game = cur?.json ? (JSON.parse(cur.json) as GameState) : null
-      const next = fn(game)
-      if (!next) {
-        aborted = true
-        return undefined
-      }
-      aborted = false
-      written = trimLog(next, this.archived)
-      return { rev: (cur?.rev ?? 0) + 1, json: JSON.stringify(written) }
+      if (cur?.json) return undefined
+      return { rev: 0, json: JSON.stringify(st) }
     })
-    const ok = res.committed && !aborted
-    if (ok && written) this.scheduleArchive(written, 0)
-    return ok
+    return res.committed
+  }
+
+  async sendMove(fn: (cur: GameState | null) => Action | null): Promise<boolean> {
+    // Each move takes the next numbered slot. Losing the race to it means someone else moved
+    // first: catch up with their move and ask again, as a transaction on the state used to.
+    for (let tries = 0; tries < 10; tries++) {
+      const action = fn(this.state ? withFullLog(this.state, this.archives, parseArchive) : null)
+      if (!action) return false
+      const n = this.applied + 1
+      let taken = false
+      const res = await runTransaction(this.path(`/moves/${moveKey(n)}`), (cur: string | null) => {
+        if (cur !== null) {
+          taken = true
+          return undefined
+        }
+        return JSON.stringify(action)
+      })
+      if (res.committed && !taken) {
+        await this.afterMove(n)
+        return true
+      }
+      await this.catchUp(n)
+    }
+    return false
+  }
+
+  /** Wait for the room to deliver move `n` (ours or someone else's) before trying again. */
+  private catchUp(n: number): Promise<void> {
+    if (this.applied >= n) return Promise.resolve()
+    return new Promise((resolve) => {
+      const started = Date.now()
+      const timer = window.setInterval(() => {
+        if (this.applied >= n || Date.now() - started > 3000) {
+          clearInterval(timer)
+          resolve()
+        }
+      }, 40)
+    })
+  }
+
+  /** After our own move: archive finished rounds, and write a checkpoint now and then. */
+  private async afterMove(n: number) {
+    await this.catchUp(n)
+    const st = this.state
+    if (!st) return
+    this.scheduleArchive(st, 0)
+    if (n % CHECKPOINT_EVERY !== 0) return
+    try {
+      await set(this.path('/game'), { rev: n, json: JSON.stringify(trimLog(st, this.archived)) })
+      // The checkpoint holds them now, so the moves it covers can go.
+      const done: Record<string, null> = {}
+      for (const i of this.moves.keys()) if (i <= n) done[moveKey(i)] = null
+      if (Object.keys(done).length) await update(this.path('/moves'), done)
+    } catch (e) {
+      console.warn('online: could not write the checkpoint', e)
+    }
   }
 
   /** Write the archive of every finished round the room lacks, from a state holding them whole. */
@@ -164,7 +279,7 @@ class FirebaseRoom implements Room {
     return off
   }
   async resetGame() {
-    await update(this.path(), { game: null, log: null })
+    await update(this.path(), { game: null, log: null, moves: null })
   }
 
   async updateRoom(fn: (cur: RoomData) => RoomData | null): Promise<boolean> {
@@ -175,7 +290,7 @@ class FirebaseRoom implements Room {
     const res = await runTransaction(this.path('/lobby'), (cur: Partial<Lobby> | null) => {
       const base = cur ?? (this.last ? lobbyOf(this.last) : null)
       if (!base) return undefined // the room is gone
-      const room = toRoom({ lobby: base, game: undefined })!
+      const room = normalizeRoom({ ...base, host: base.host ?? '' })
       const next = fn({ ...room, game: this.last?.game ?? null, rev: this.last?.rev ?? 0 })
       if (!next) return undefined
       return lobbyOf(next)
@@ -185,6 +300,7 @@ class FirebaseRoom implements Room {
 
   close() {
     if (this.archiveTimer !== null) clearTimeout(this.archiveTimer)
+    this.listener = null
     this.unsubs.forEach((u) => u())
     this.unsubs = []
   }

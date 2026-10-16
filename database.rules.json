@@ -17,6 +17,11 @@
             ".validate": "$round.matches(/^r[0-9]+$/) && newData.isString() && newData.val().length < 500000"
           }
         },
+        "moves": {
+          "$move": {
+            ".validate": "$move.matches(/^m[0-9]{6}$/) && newData.isString() && newData.val().length < 20000"
+          }
+        },
         "$other": {
           ".validate": false
         }

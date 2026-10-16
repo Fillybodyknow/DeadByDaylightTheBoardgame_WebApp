@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { muted, sfx, startHeartbeat, stopHeartbeat } from '../../sound'
-import { boardOf, CARD_NAMES, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths } from '../engine/engine'
+import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
+import { boardOf, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { canUndo, dispatch, myTurn, online, quitGame, undo } from '../game'
@@ -439,6 +439,33 @@ const terror = computed(() => {
 
 const terrorBpm = computed(() => (terror.value === 2 ? 118 : 76))
 
+// ---------- chase music ----------
+// The killer standing on someone: his theme plays, and builds as the chase does — layer 2 when
+// he is on a healthy survivor, 3 once they are wounded, 4 while he carries one away. Online only
+// the two sides of that chase hear it; on one shared device the whole table does.
+
+/** Online, whether this device is part of that chase (the killer, or the survivor's player). */
+function hearsChase(subjects: number[]): boolean {
+  const o = online.value
+  if (!o?.seat || o.seat === KILLER_PLAYER) return true
+  return subjects.some((s) => playerOf(view.value, s) === o.seat)
+}
+
+const chase = computed<ChaseLayer | null>(() => {
+  const st = view.value
+  if (st.phase === 'setup' || st.phase === 'over') return null
+  // Victor is the killer too, so either mini standing on someone is a chase
+  const rooms = [charlotteRoom(st), victorRoom(st)].filter((r): r is string => !!r)
+  const carried = st.survivors.flatMap((sv, i) => (sv.status === 'carried' ? [i] : []))
+  const cornered = st.survivors.flatMap((sv, i) => (sv.status === 'board' && rooms.includes(sv.room) ? [i] : []))
+  const subjects = carried.length ? carried : cornered
+  if (!subjects.length || !hearsChase(subjects)) return null
+  if (carried.length) return 4
+  return subjects.some((s) => st.survivors[s].wounded) ? 3 : 2
+})
+
+watch(chase, (layer) => setChase(layer), { immediate: true })
+
 watch(
   [terror, muted],
   ([level]) => {
@@ -450,6 +477,7 @@ watch(
 
 onBeforeUnmount(() => {
   stopHeartbeat()
+  stopChase()
   clearFx()
 })
 

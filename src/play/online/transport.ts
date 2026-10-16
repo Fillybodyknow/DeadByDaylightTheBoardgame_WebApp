@@ -2,11 +2,15 @@
 // Firebase Realtime Database (real online play) and a local one that syncs browser tabs on the
 // same computer (for development and tests, no account needed).
 //
-// Everyone trusts each other (friends, not strangers): every client runs the same engine and
-// writes the new state itself. Writes go through a transaction so two players acting at once
-// can't overwrite each other; the loser's action is re-checked against the new state.
+// Everyone trusts each other (friends, not strangers): every client runs the same engine, so the
+// room carries the *moves*, not the state. Each device replays them from the last checkpoint and
+// arrives at the same game — the engine is a pure reducer and its RNG lives in the state, so a
+// replay is exact. A move is a few hundred bytes where a state is over ten kilobytes.
+//
+// Two players acting at once can't overwrite each other: a move is written with a transaction on
+// its own numbered slot, and whoever loses the slot re-checks their action against the new state.
 
-import type { GameState } from '../engine/types'
+import type { Action, GameState } from '../engine/types'
 
 export interface SeatInfo {
   /** Client id of the device sitting here. */
@@ -50,16 +54,29 @@ export interface RoomData {
   /** Player number → picks confirmed. */
   locked: Record<string, boolean>
   game: GameState | null
-  /** Bumped on every game write. */
+  /** Moves played so far (the checkpoint's own count plus the ones replayed on top). */
   rev: number
 }
+
+/** A move's slot name: zero-padded so the database sorts them in the order they were played. */
+export function moveKey(n: number): string {
+  return `m${String(n).padStart(6, '0')}`
+}
+
+/** How often a full state is written, so joining or reloading replays only a few moves. */
+export const CHECKPOINT_EVERY = 25
 
 export interface Room {
   readonly code: string
   /** Called now with the current data and again on every change; returns an unsubscribe. */
   subscribe(cb: (data: RoomData | null) => void): () => void
-  /** Atomically replace the game: `fn` gets the latest state and returns the next, or null to abort. */
-  updateGame(fn: (cur: GameState | null) => GameState | null): Promise<boolean>
+  /** Put the first state in the room; false when a game is already there. */
+  startGame(st: GameState): Promise<boolean>
+  /**
+   * Play one move. `fn` sees the room's latest state and returns the action to send, or null to
+   * drop it (someone else got there first and it is no longer this player's to make).
+   */
+  sendMove(fn: (cur: GameState | null) => Action | null): Promise<boolean>
   /** Remove the game (the host ends it; the room stays). */
   resetGame(): Promise<void>
   /** Atomically update the rest of the room (lobby, seats, picks). */

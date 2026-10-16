@@ -162,6 +162,81 @@ describe('online playthroughs', () => {
   }, 120_000)
 })
 
+/**
+ * The move protocol: the room keeps a checkpoint and the moves after it, and every device
+ * replays them. A device that joined at the start and one that joined at the last checkpoint
+ * must end up with exactly the same game.
+ */
+describe('move protocol', () => {
+  const CHECKPOINT_EVERY = 25
+
+  function playWithMoves(seed: number, players: GameConfig['players']) {
+    let host = createGame(config(seed, players)) // the device that has been here all along
+    let checkpoint = host
+    let moves: Action[] = []
+    const archive: Record<string, string> = {}
+    let rnd = seed
+    const rand = (n: number) => {
+      rnd = (rnd * 1103515245 + 12345) >>> 0
+      return rnd % n
+    }
+    let sent = 0
+    let moveBytes = 0
+    let checkpointBytes = 0
+
+    for (let i = 0; i < 4000 && host.phase !== 'over'; i++) {
+      const actors = actorsOf(host)
+      if (!actors.length) break
+      const action: Action =
+        host.step.t === 'planSurvivors'
+          ? { t: 'planHand', hand: handsToPlan(host)[0], cards: handCards(host, handsToPlan(host)[0]) }
+          : (() => {
+              const options = legalActions(host).filter((a) => actors.some((p) => mayAct(host, p, a)))
+              return options[rand(options.length)]
+            })()
+      if (!action) break
+      const next = tryApply(host, action)
+      if (!next) break
+      host = next
+      moves = [...moves, action]
+      sent++
+      moveBytes += JSON.stringify(action).length
+      // finished rounds are archived once, as the room does
+      for (const [round, entries] of roundsToArchive(host, archivedRounds(archive))) archive[roundKey(round)] = JSON.stringify(entries)
+      if (moves.length === CHECKPOINT_EVERY) {
+        checkpoint = trimLog(host, archivedRounds(archive))
+        moves = []
+        checkpointBytes += JSON.stringify(checkpoint).length
+      }
+    }
+    // a device joining now: the checkpoint, the moves on top of it, and the archived log
+    let replayed: GameState | null = checkpoint
+    for (const a of moves) replayed = replayed && tryApply(replayed, a)
+    const joiner = replayed && withFullLog(replayed, archive)
+    return { host, joiner, sent, moveBytes, checkpointBytes }
+  }
+
+  it('a device replaying from the checkpoint lands on the same game, to the end', () => {
+    let finished = 0
+    let moveBytes = 0
+    let checkpointBytes = 0
+    let sent = 0
+    for (let seed = 1; seed <= 12; seed++) {
+      const r = playWithMoves(seed, ([5, 4, 3] as const)[seed % 3])
+      expect(r.joiner, `seed ${seed}: a move did not replay`).not.toBeNull()
+      expect(JSON.stringify(r.joiner)).toBe(JSON.stringify(r.host))
+      if (r.host.phase === 'over') finished++
+      sent += r.sent
+      moveBytes += r.moveBytes
+      checkpointBytes += r.checkpointBytes
+    }
+    expect(finished).toBeGreaterThan(8)
+    // the point of it all: a move is far smaller than the state it would have replaced
+    expect(moveBytes / sent).toBeLessThan(200)
+    expect((moveBytes + checkpointBytes) / sent).toBeLessThan(2000)
+  }, 120_000)
+})
+
 describe('log archive (small online writes)', () => {
   // Play a game twice in step: one keeps the whole state, the other only what an online write
   // carries (trimmed log) plus the archives, losing some archive writes on the way.

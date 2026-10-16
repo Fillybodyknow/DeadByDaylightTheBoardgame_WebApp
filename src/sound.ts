@@ -21,6 +21,7 @@ watch(muted, (m) => {
     // storage unavailable
   }
   if (m) stopHeartbeat()
+  syncChase()
   syncAmbient()
 })
 
@@ -30,8 +31,8 @@ let master: GainNode | null = null
 // Recorded clips in public/assets/app/sound/ replace the synthesised version of the same effect.
 // Add an entry here when a file is added; effects without a file stay synthesised.
 const SOUND_FILES: Partial<Record<keyof typeof sfx, string>> = {
-  escape: 'assets/app/sound/escape.mp3',
-  sacrifice: 'assets/app/sound/sacrifice.mp3',
+  escape: 'assets/app/sound/escape.ogg',
+  sacrifice: 'assets/app/sound/sacrifice.ogg',
 }
 const buffers = new Map<string, AudioBuffer>()
 
@@ -203,8 +204,8 @@ export function stopHeartbeat() {
 // One looping track per part of the app; switching tracks cross-fades between them.
 
 const AMBIENT_TRACKS = {
-  lobby: { src: 'assets/app/sound/theme/lobby-ambient.mp3', volume: 0.35 },
-  play: { src: 'assets/app/sound/theme/during-play-ambient.mp3', volume: 0.3 },
+  lobby: { src: 'assets/app/sound/theme/lobby-ambient.ogg', volume: 0.35 },
+  play: { src: 'assets/app/sound/theme/during-play-ambient.ogg', volume: 0.3 },
 } as const
 export type AmbientTrack = keyof typeof AMBIENT_TRACKS
 
@@ -263,7 +264,8 @@ function syncAmbient() {
     if (track !== want && !el.paused) fadeTo(el, 0, 1200, () => el.pause())
   if (!want) return
   const el = element(want)
-  const volume = AMBIENT_TRACKS[want].volume
+  // the chase music takes the foreground: the ambient track ducks under it
+  const volume = AMBIENT_TRACKS[want].volume * (chaseWanted ? DUCK : 1)
   if (el.paused)
     el.play().then(
       () => fadeTo(el, volume, 1500),
@@ -276,6 +278,104 @@ function syncAmbient() {
 export function setAmbient(track: AmbientTrack | null) {
   ambientWanted = track
   syncAmbient()
+}
+
+// ---------- chase music ----------
+// The killer's theme, in layers that build as the chase does. Every layer is the same loop with
+// more instruments on top, so switching layer keeps the playback position and the music never
+// restarts — it only thickens. The ambient track ducks underneath while it plays.
+
+/** Where one killer's theme lives; only the default one is recorded so far. */
+const CHASE_THEME = 'assets/app/sound/theme/chase/default/theme_1'
+const CHASE_VOLUME = 0.45
+/** How far the ambient track drops under the chase music. */
+const DUCK = 0.3
+/** A chase that ends at once still plays this long, so the music can't stutter on and off. */
+const CHASE_MIN_MS = 6000
+
+export type ChaseLayer = 2 | 3 | 4
+
+const chaseEls = new Map<ChaseLayer, HTMLAudioElement>()
+let chaseWanted: ChaseLayer | null = null
+let chaseStartedAt = 0
+let chaseStopTimer: number | null = null
+
+function chaseElement(layer: ChaseLayer): HTMLAudioElement {
+  let el = chaseEls.get(layer)
+  if (!el) {
+    el = new Audio(asset(`${CHASE_THEME}/layer${layer}.ogg`))
+    el.loop = true
+    el.volume = 0
+    // the layers are only fetched once a chase actually starts
+    el.preload = 'none'
+    chaseEls.set(layer, el)
+  }
+  return el
+}
+
+/** Where the loop is right now, so a new layer comes in on the same beat. */
+function chasePosition(): number {
+  for (const el of chaseEls.values()) if (!el.paused) return el.currentTime
+  return 0
+}
+
+function syncChase() {
+  const want = muted.value ? null : chaseWanted
+  for (const [layer, el] of chaseEls)
+    if (layer !== want && !el.paused) fadeTo(el, 0, want ? 700 : 2200, () => el.pause())
+  if (want !== null) {
+    const el = chaseElement(want)
+    if (el.paused) {
+      const at = chasePosition()
+      el.play().then(
+        () => {
+          // match the loop position of the layer being replaced
+          if (at && Number.isFinite(el.duration)) el.currentTime = at % (el.duration || 1)
+          fadeTo(el, CHASE_VOLUME, 900)
+        },
+        () => retryOnGesture(),
+      )
+    } else fadeTo(el, CHASE_VOLUME, 500)
+  }
+  syncAmbient()
+}
+
+/**
+ * Play the chase theme at `layer`, or fade it out with null. A chase that has only just started
+ * keeps playing for `CHASE_MIN_MS`, so one step of a turn can't flick the music on and off.
+ */
+export function setChase(layer: ChaseLayer | null) {
+  if (chaseStopTimer !== null) {
+    clearTimeout(chaseStopTimer)
+    chaseStopTimer = null
+  }
+  if (layer !== null) {
+    if (chaseWanted === null) chaseStartedAt = Date.now()
+    chaseWanted = layer
+    return syncChase()
+  }
+  if (chaseWanted === null) return
+  const left = CHASE_MIN_MS - (Date.now() - chaseStartedAt)
+  if (left > 0) {
+    chaseStopTimer = window.setTimeout(() => {
+      chaseStopTimer = null
+      chaseWanted = null
+      syncChase()
+    }, left)
+    return
+  }
+  chaseWanted = null
+  syncChase()
+}
+
+/** Stop the chase music at once (leaving the game), ignoring the minimum play time. */
+export function stopChase() {
+  if (chaseStopTimer !== null) {
+    clearTimeout(chaseStopTimer)
+    chaseStopTimer = null
+  }
+  chaseWanted = null
+  syncChase()
 }
 
 // Warm up on the first tap anywhere: create the audio context and start loading the clips.

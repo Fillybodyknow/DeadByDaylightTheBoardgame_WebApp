@@ -195,6 +195,14 @@ const handLabel = computed(() => {
   return s.t === 'offer' ? `${PERKS[s.perk].name} — เลือกการ์ดจากมือ` : ''
 })
 
+/** What is asking for a card, shown on the hand itself (it is easy to miss in the corner). */
+const handPrompt = computed(() => {
+  const s = step.value
+  if (s.t === 'replaceCard') return 'Predator — เลือกการ์ดใบใหม่'
+  if (s.t === 'redeemerGuess') return `Redeemer — ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
+  return s.t === 'offer' ? `${PERKS[s.perk].name} — เลือกการ์ด` : ''
+})
+
 function pickHandCard(card: MoveCard) {
   fxSound.flip()
   cardPick.value = cardPick.value?.card === card ? null : (handChoices.value.find((c) => c.card === card) ?? null)
@@ -535,8 +543,15 @@ const boardCount = computed(() => {
       </template>
     </aside>
   </transition>
-  <CardHand v-if="open && !collapsed && perkHand.length" :cards="perkHand" :label="handLabel" @pick="pickHandCard" @hover="hoverHandCard" />
-  <CardHand v-if="open && !collapsed && gripHand.length" :cards="gripHand" label="Dragon's Grip — เลือกการ์ดที่จะทิ้ง" @pick="pickGrip" @hover="() => {}" />
+  <CardHand v-if="open && !collapsed && perkHand.length" :cards="perkHand" :label="handLabel" :prompt="handPrompt" @pick="pickHandCard" @hover="hoverHandCard" />
+  <CardHand
+    v-if="open && !collapsed && gripHand.length"
+    :cards="gripHand"
+    label="Dragon's Grip — เลือกการ์ดที่จะทิ้ง"
+    prompt="Dragon's Grip — ทิ้งการ์ด 1–2 ใบ"
+    @pick="pickGrip"
+    @hover="() => {}"
+  />
 </template>
 
 <style scoped>

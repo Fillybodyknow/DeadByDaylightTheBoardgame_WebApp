@@ -240,7 +240,13 @@ function confirmKiller() {
     <button class="primary" :disabled="!stridorPick" @click="confirmStridor">
       {{ stridorPick ? `ยืนยัน: ${CARD_NAMES[stridorPick]} (หงายหน้า)` : 'เลือกการ์ดก่อน' }}
     </button>
-    <CardHand :cards="stridorHand" :label="`มือของ ${st.survivors[stridorStep].name}`" @pick="pickStridor" @hover="hover($event, stridorStep)" />
+    <CardHand
+      :cards="stridorHand"
+      :label="`มือของ ${st.survivors[stridorStep].name}`"
+      prompt="Stridor — เปิดการ์ดหงายก่อนใคร"
+      @pick="pickStridor"
+      @hover="hover($event, stridorStep)"
+    />
   </section>
 
   <!-- survivors -->

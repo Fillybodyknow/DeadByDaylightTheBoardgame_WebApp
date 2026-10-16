@@ -325,16 +325,14 @@ export function startOnlineGame() {
   const killer = d.picks.killer
   if (!killer || survivors.some((s) => !s)) return
   return guard(() =>
-    session.room!.updateGame((cur) =>
-      cur
-        ? null
-        : createGame({
-            board: d.board && boards[d.board] ? d.board : macmillan.id,
-            survivors: survivors.map((id) => ({ id, name: survivorById.get(id)!.name })),
-            killer: { id: killer, name: killerById.get(killer)!.name },
-            players: d.players as 3 | 4 | 5,
-            seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
-          }),
+    session.room!.startGame(
+      createGame({
+        board: d.board && boards[d.board] ? d.board : macmillan.id,
+        survivors: survivors.map((id) => ({ id, name: survivorById.get(id)!.name })),
+        killer: { id: killer, name: killerById.get(killer)!.name },
+        players: d.players as 3 | 4 | 5,
+        seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
+      }),
     ),
   )
 }

@@ -42,10 +42,18 @@ Each player plays on their own device. The host creates a room and shares its 4-
 the invite link). Everyone takes a seat (player 1 = killer, players 2.. = the survivor hands, p.19),
 and the host starts the game.
 
-- **Trust model: friends, not strangers.** Every device runs the same engine and writes the new
-  state itself. `engine/seats.ts` decides who may act (`actorsOf`, `mayAct`). Writes are
-  transactions, so two players acting at once can't overwrite each other: the second action is
-  checked again against the new state. Nothing is hidden from a player who opens the dev tools.
+- **Trust model: friends, not strangers.** Every device runs the same engine, so the room carries
+  the **moves**, not the state: each device replays them and arrives at the same game (the engine
+  is a pure reducer and its RNG lives in the state, so a replay is exact — nothing in
+  `engine/` reads the clock or `Math.random`). A move is a few hundred bytes where a state is
+  over ten kilobytes. `engine/seats.ts` decides who may act (`actorsOf`, `mayAct`). Each move is
+  written with a transaction on its own numbered slot, so two players acting at once can't
+  overwrite each other: whoever loses the slot checks their action again against the new state.
+  Nothing is hidden from a player who opens the dev tools.
+- **Checkpoints.** Every `CHECKPOINT_EVERY` (25) moves the player who made the move writes the
+  whole state to `game` and clears the moves it covers, so joining or reloading replays only a
+  few. A device whose replay refuses a move keeps what it has and waits for the next checkpoint,
+  which replaces everything.
 - **Planning happens for everyone at once.** Each survivor player sends their own hand with
   `planHand`, and the killer sends his two cards with `planKiller` in the same step; they are
   kept in `killerDraft` until the last survivor hand is in, and whoever confirms last starts the
@@ -57,16 +65,21 @@ and the host starts the game.
     (git-ignored) as `VITE_FIREBASE_DATABASE_URL`; the deploy reads it from the repo's Actions
     variables `VITE_FIREBASE_DATABASE_URL` and `VITE_FIREBASE_PROJECT_ID`. The game is stored as a JSON string, because
     the database drops nulls.
-  - Small writes (`logArchive.ts`): the log is over 90% of a late game's state, so each move
-    writes the game without the log of finished rounds (~12 KB instead of up to ~130 KB). Each
-    finished round's log is written once to `rooms/<CODE>/log/r<N>`, and every device puts the
-    full log back together. A round leaves the written state only once its archive is in the room.
+  - Small writes (`logArchive.ts`): the log is over 90% of a late game's state, so a checkpoint
+    leaves out the log of finished rounds (~13 KB instead of up to ~130 KB). Each finished
+    round's log is written once to `rooms/<CODE>/log/r<N>`, and every device puts the full log
+    back together. A round leaves a checkpoint only once its archive is in the room.
+  - Measured on whole random games: sending the state on every move cost ~40 MB a game (the free
+    plan's 10 GB is then ~250 games); sending moves with a checkpoint every 25 costs ~1.5 MB
+    (~6,700 games). `src/play/engine/online.test.ts` checks that a device replaying from a
+    checkpoint lands on exactly the host's game.
   - `local.ts` is used when no URL is set. It syncs tabs of one browser (IndexedDB +
     BroadcastChannel), with one seat per tab, for testing alone.
 - **Rules:** `database.rules.json` (project root) limits access to `rooms/<CODE>` (`lobby`, `game`,
-  `log`). Paste it into the Firebase console under Realtime Database → Rules (the default
-  test-mode rules expire). With older rules that lack `log`, games still work but write the
-  whole log on every move.
+  `moves`, `log`). Paste it into the Firebase console under Realtime Database → Rules (the default
+  test-mode rules expire). **The rules must be updated before this version is used**: without
+  `moves`, no move can be written and a game can't be played. Without `log`, games still work but
+  every checkpoint carries the whole log.
 - The top bar shows "กำลังซิงก์…" while this device's moves take long to reach the room, and
   "การเชื่อมต่อหลุด" while it is disconnected (`SyncBadge.vue`).
 - Undo is off online. The host's ออก ends the game for everyone and returns to the room. Other
@@ -159,6 +172,10 @@ Perks:
 
 - Unnerving Presence, Thanatophobia and Bond change single-die skill checks (repair, exit gate,
   cleanse, heal, locker search), not the carry roll or danger-die rolls.
+- A survivor in a locker is in no space (p.12), so a perk that reaches "a survivor in your space
+  or a connected space" skips them, even for the roll of the locker being searched: Unnerving
+  Presence, Bond and Off the Record. Perks worded without a space still find them (Thanatophobia,
+  Lucky Break).
 - Bond with a danger die: two danger dice, keep one. When two dice are rolled and one kept, the
   killer gains 1 ▲ if either failed (p.18).
 - Iron Will works on any survivor roll in range, danger dice included (a bear trap, a hatchet),

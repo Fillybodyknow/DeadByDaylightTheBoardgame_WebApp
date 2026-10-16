@@ -36,6 +36,13 @@ const emit = defineEmits<{ path: [id: string]; prop: [id: string]; interact: [ke
 
 const roomTarget = (room: string) => !!props.roomTargets && room in props.roomTargets
 
+/** A locker or hook with someone on it says who, and what has happened to them. */
+function occupantTitle(p: Prop): string | null {
+  if (p.occupant === null) return null
+  const sv = props.st.survivors[p.occupant]
+  return `${sv.name} — ${p.kind === 'hook' ? 'ถูกแขวนบน Hook' : 'ซ่อนใน Locker'}${sv.wounded ? ' · บาดเจ็บ' : ''}`
+}
+
 /** A piece with nothing of its own to do passes the click to its room, when the room is a target. */
 function clickPiece(key: string, room: string) {
   if (canAct(key)) emit('interact', key)
@@ -456,9 +463,20 @@ function guard(e: MouseEvent) {
         :key="p.id"
         class="tile"
         :data-prop="p.id"
-        :class="[p.category, { down: !p.revealed, target: propTargets.includes(p.id), act: canAct(p.id), picked: picked?.includes(p.id), flip: flipping.includes(p.id) }]"
+        :class="[
+          p.category,
+          {
+            down: !p.revealed,
+            target: propTargets.includes(p.id),
+            act: canAct(p.id),
+            picked: picked?.includes(p.id),
+            flip: flipping.includes(p.id),
+            hiding: p.occupant !== null && p.kind === 'locker',
+            hooked: p.occupant !== null && p.kind === 'hook',
+          },
+        ]"
         :style="rectStyle(tileRect(r.box, i, r.props.length))"
-        :title="p.revealed ? (interactTargets[p.id] ?? 'คลิกขวาดูรายละเอียด') : `เปิด prop สี${CATEGORY_TH[p.category]}`"
+        :title="p.revealed ? (occupantTitle(p) ?? interactTargets[p.id] ?? 'คลิกขวาดูรายละเอียด') : `เปิด prop สี${CATEGORY_TH[p.category]}`"
         @click="clickTile(p.id, r.id)"
         @contextmenu.prevent="p.revealed && emit('inspect', { k: 'prop', id: p.id })"
         @pointerdown="p.revealed && pressStart($event, { k: 'prop', id: p.id })"
@@ -475,7 +493,6 @@ function guard(e: MouseEvent) {
           :src="asset(survivorMini(st, p.occupant))"
           :alt="st.survivors[p.occupant].name"
         />
-        <span v-if="p.occupant !== null && p.kind === 'locker'" class="occupant-tag">ซ่อน</span>
       </component>
       <component
         :is="canAct(`s:${s}`) || roomTarget(r.id) ? 'button' : 'div'"
@@ -787,48 +804,45 @@ button.tile.picked::after {
   height: 80%;
   object-fit: contain;
 }
-/* someone on the tile: their mini, big and ringed, over the hook or locker */
+/*
+ * Someone on a locker or a hook: the prop stays in full view and says what happened to them —
+ * a blue ring for a locker, a red one for a hook — while their portrait tucks into the corner,
+ * small and ringed to match. (It used to cover the whole tile, so the prop was lost and the two
+ * states looked alike.)
+ */
+.tile.hiding {
+  box-shadow:
+    0 0 0 2px #7fc8ff,
+    0 0 12px 3px rgb(90 170 255 / 0.5);
+}
+.tile.hooked {
+  box-shadow:
+    0 0 0 2px var(--blood-bright),
+    0 0 14px 4px rgb(255 30 30 / 0.55);
+}
 .occupant {
-  inset: -8%;
-  width: 116%;
-  height: 116%;
+  inset: auto -14% -14% auto;
+  width: 62%;
+  height: 62%;
   border-radius: 50%;
+  z-index: 1;
   box-shadow:
     0 0 0 2px #f2efe6,
-    0 0 0 4px rgb(0 0 0 / 0.65);
+    0 0 0 3px rgb(0 0 0 / 0.85);
 }
+/* hidden: out of sight, so the portrait sits back a little */
 .occupant.hiding {
-  box-shadow:
-    0 0 0 3px #7fc8ff,
-    0 0 0 5px rgb(0 0 0 / 0.65),
-    0 0 14px 4px rgb(90 170 255 / 0.7);
+  filter: grayscale(0.35) brightness(0.85);
 }
-.occupant.hiding.wounded {
+/* the tile's ring says where they are, the portrait's says how they are (as on the board) */
+.occupant.wounded {
   box-shadow:
-    0 0 0 3px var(--blood-bright),
-    0 0 0 5px rgb(0 0 0 / 0.65),
-    0 0 14px 4px rgb(90 170 255 / 0.7);
+    0 0 0 2px var(--blood-bright),
+    0 0 0 3px rgb(0 0 0 / 0.85);
 }
-.occupant.hooked {
-  box-shadow:
-    0 0 0 3px var(--blood-bright),
-    0 0 0 5px rgb(0 0 0 / 0.65),
-    0 0 16px 5px rgb(255 30 30 / 0.85);
-}
-.occupant-tag {
-  position: absolute;
-  left: 50%;
-  bottom: -22%;
-  translate: -50% 0;
-  padding: 0.05em 0.4em;
-  border-radius: 99px;
-  background: #1b4d77;
-  color: #e6f4ff;
-  font-size: 0.95cqw;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
-  pointer-events: none;
+/* the tile grows on hover: the portrait rides along, so it is still readable */
+.tile:not(.down):hover .occupant {
+  filter: none;
 }
 
 .mini {

@@ -246,6 +246,28 @@ describe('perks', () => {
     expect(st.survivors.every((sv) => sv.planned)).toBe(true)
   })
 
+  it('a locker is no space: the roll from inside one is out of reach of perks that need one', () => {
+    const st = game('trapper')
+    only(st)
+    const room = st.survivors[0].room
+    st.survivors[0].status = 'locker' // the one being searched, and rolling
+    Object.assign(st.survivors[1], { room, perks: ['off_the_record', 'bond'], bp: 6 })
+    Object.assign(st.killer, { perks: ['unnerving_presence', 'thanatophobia'], bp: 6, room })
+    st.survivors[0].wounded = true
+    const preRoll = { k: 'preRoll', ctx: { k: 'search' as const, s: 0, prop: 'p' } } as const
+    const failed = { k: 'rollFail', s: 0, fails: 1 } as const
+    expect(perkChoices(st, 'bond', 1, preRoll)).toEqual([])
+    expect(perkChoices(st, 'unnerving_presence', 'killer', preRoll)).toEqual([])
+    expect(perkChoices(st, 'off_the_record', 1, failed)).toEqual([])
+    // Thanatophobia names no space, so it still finds a wounded survivor in there
+    expect(perkChoices(st, 'thanatophobia', 'killer', preRoll)).toEqual([{}])
+    // and out of the locker every one of them reaches
+    st.survivors[0].status = 'board'
+    expect(perkChoices(st, 'bond', 1, preRoll)).toEqual([{}])
+    expect(perkChoices(st, 'unnerving_presence', 'killer', preRoll)).toEqual([{}])
+    expect(perkChoices(st, 'off_the_record', 1, failed)).toEqual([{}])
+  })
+
   it('Huntress Lullaby stops a card move but keeps the interaction', () => {
     const st = game('huntress')
     only(st, 'huntress_lullaby')

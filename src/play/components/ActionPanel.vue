@@ -479,7 +479,7 @@ const rollers = computed(() => rerollers(props.st))
 
         <template v-if="!undyingCard">
           <p class="muted small">👇 1. เลือกการ์ดที่จะทิ้ง จากไพ่บนมือด้านล่าง</p>
-          <CardHand :cards="undyingHand" :label="`Undying — มือของ ${st.killer.name}`" @pick="pickUndyingCard" />
+          <CardHand :cards="undyingHand" :label="`Undying — มือของ ${st.killer.name}`" prompt="Undying — เลือกการ์ดที่จะทิ้ง" @pick="pickUndyingCard" />
         </template>
 
         <template v-else-if="!undyingRoom">
