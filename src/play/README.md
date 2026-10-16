@@ -100,9 +100,9 @@ and the host starts the game.
   not in yet.
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight** — with powers and passives.
+  The Twins, The Blight, The Spirit** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter**.
+  Élodie Rakoto, Felix Richter, Adam Francis**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
 - Mode **Adept**: each character plays the 3 perks printed on their board (66 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
@@ -269,6 +269,25 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   interact there or use the power again (as long as cards are left). No path: the power ends.
 - Dragon's Grip: one or two path cards (not Wait); healthy survivors in rooms joined to the
   damaged generator's room by a path of those colours pay 1 ▲ or are wounded (in turn order).
+- Yamaoka's Haunting (The Spirit): her power, used instead of interacting; the discarded card's
+  colour picks the path, and over it a healthy survivor is attacked or a prop interacted with as
+  if she stood there (Red Herring, Brutal Strength… still answer it). Nothing on the path matters
+  (she doesn't go there). A Flashlight can't stop it: it is her power, not an interaction in
+  the holder's room.
+- Rancor: when the killer enters a room — carrying someone too — one wounded survivor from the
+  room he left comes along, and reveals a prop there as on any move.
+- Haunted Ground: after a survivor reveals a prop (not during setup), swap it with a revealed
+  prop of the same colour in another room. Besides the card's exceptions, exit gates with
+  progress stay put, and a prop isn't swapped with another of its own kind (nothing would change).
+- Spirit Fury: any pallet the killer breaks, also one broken with Enduring.
+- Diversion (Adam): an interaction with the killer in his room. "Any path" means any colour; a
+  wall on it the killer breaks on the way (as on any move of his), but a path with a pallet isn't
+  offered. The killer reveals a prop where he arrives, as on any move.
+- Autodidact: one die of a success (not a great one already, nor a failure Iron Will counts as
+  a success) becomes a great success, on any roll of a survivor in Adam's room or a connected
+  one — struggling free from a carry too (one great success frees them). Not on a Phantasm roll.
+- Deliverance: after Adam takes someone off a hook, or someone takes him off one; placing the
+  Entity on an empty hook isn't a rescue. Adam picks which of the two wounded is healed.
 - Undying: the killer's interaction for the turn, with a prop in a room joined to his by a path
   of the discarded card's colour (either direction). It is an ordinary interaction over there, so
   damaging a generator with it still sets off Overcharge, Gearhead, Oppression, Dragon's Grip and

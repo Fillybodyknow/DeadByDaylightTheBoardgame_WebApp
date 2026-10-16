@@ -340,6 +340,11 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   // Yamaoka's Wrath counts this room and the connected ones.
   if (i.k === 'wrath') f.rooms.push(room, ...touchingPaths(st, room).map((p) => (p.a === room ? p.b : p.a)))
   if (i.k === 'redeemer') f.survivors.push(i.target)
+  // Yamaoka's Haunting: the room reached, and who is hit there
+  if (i.k === 'haunt') {
+    f.dests.push(i.room)
+    if (i.i.k === 'attack') f.survivors.push(i.i.target)
+  }
   if (i.k === 'power' || i.k === 'blink' || i.k === 'chainsaw') {
     f.paths.push(i.path)
     f.dests.push(end(st, i.path, room))

@@ -177,6 +177,8 @@ export type SurvivorInteraction =
   | { k: 'removeVictor' }
   /** Power Struggle (Élodie): interact with the killer to reveal their first card. */
   | { k: 'powerStruggle' }
+  /** Diversion (Adam): interact with the killer to send them along `path`. */
+  | { k: 'diversion'; path: string }
 
 export type KillerInteraction =
   | { k: 'search'; prop: string }
@@ -207,6 +209,11 @@ export type KillerInteraction =
   | { k: 'hoard'; prop: string }
   /** Undying (The Blight): discard `card` to make interaction `i` in a room connected by its path. */
   | { k: 'undying'; card: MoveCard; i: KillerInteraction }
+  /**
+   * The Spirit: discard `card` (not Wait) to make interaction `i` — an attack on a healthy survivor
+   * or a prop — in `room`, joined to hers by a path of that card's colour.
+   */
+  | { k: 'haunt'; card: MoveCard; room: string; i: KillerInteraction }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
   | { k: 'wrath' }
   /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */
@@ -224,8 +231,12 @@ export type PerkWindow =
   | { k: 'genDone' }
   | { k: 'afterCardMove'; s: number; from: string; to: string; path: string }
   | { k: 'cleanupStart' }
-  | { k: 'killerEntered'; room: string }
-  | { k: 'afterSabotage'; s: number }
+  /** `from`: where he came from (Rancor brings a wounded survivor along). Empty for a teleport. */
+  | { k: 'killerEntered'; room: string; from?: string; path?: string; carrying?: boolean }
+  /** Survivor `s` revealed `prop` (Haunted Ground). */
+  | { k: 'afterReveal'; s: number; prop: string }
+  /** `rescued`: the survivor taken off the hook, when there was one (Deliverance). */
+  | { k: 'afterSabotage'; s: number; rescued?: number }
   /** Start / end of any survivor's turn (Open-Handed, Urban Evasion, Up the Ante). */
   | { k: 'turnBegin'; s: number }
   | { k: 'turnEnd'; s: number }

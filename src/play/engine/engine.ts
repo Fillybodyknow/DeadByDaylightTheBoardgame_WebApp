@@ -454,6 +454,10 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
   if (victorRoom(st) === sv.room) out.push({ k: 'removeVictor' })
   // Power Struggle (Élodie): with the killer (Charlotte for The Twins), before their first card.
   if (charlotteRoom(st) === sv.room && st.killer.revealedCount === 0 && st.killer.planned.length && perkReady(st, s, 'power_struggle')) out.push({ k: 'powerStruggle' })
+  // Diversion (Adam): send the killer in this room along any path but one with a pallet (a wall
+  // he breaks on the way, as on any move of his).
+  if (st.killer.room === sv.room && perkReady(st, s, 'diversion'))
+    for (const p of touchingPaths(st, sv.room)) if (!palletOn(st, p.id)) out.push({ k: 'diversion', path: p.id })
   return out
 }
 
@@ -1225,6 +1229,8 @@ function revealOnEnter(st: GameState, room: string, who: number | 'killer', aske
 function revealProp(st: GameState, p: Prop, who: LogWho) {
   p.revealed = true
   log(st, `เปิด ${PROP_NAMES[p.kind]} ที่ ${roomName(st, p.room!)}`, who, { ev: { k: 'reveal', prop: p.id, kind: p.kind, room: p.room! } })
+  // Haunted Ground answers a survivor's reveal (not the setup, where perks aren't in play yet)
+  if (typeof who === 'number' && st.phase !== 'setup') trigger(st, { k: 'afterReveal', s: who, prop: p.id })
 }
 
 function survivorInteract(st: GameState, s: number, i: SurvivorInteraction) {
@@ -1235,6 +1241,13 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction) {
       st.killer.victorRoom = null
       log(st, `${sv.name} ไล่ Victor ออกจากกระดาน`, s)
       return
+    case 'diversion': {
+      const p = pathDef(st, i.path)
+      const to = p.a === st.killer.room ? p.b : p.a
+      payPerk(st, s, 'diversion', `ส่ง ${st.killer.name} ไป ${roomName(st, to)} (ฆาตกร +1 ▲)`)
+      gainKiller(st, 1)
+      return finishKillerMove(st, p, to)
+    }
     case 'powerStruggle': {
       const k = st.killer
       payPerk(st, s, 'power_struggle', `เปิดการ์ดใบแรกของ ${k.name}: ${CARD_NAMES[k.planned[0]]} — Interact ไม่ได้หลังเดินใบนี้`)
@@ -1301,7 +1314,7 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction) {
       log(st, `${sv.name} ช่วย ${r.name} ลงจาก Hook (+1 ▲)`, s, { ev: { k: 'rescue', s: hooked, by: s } })
       // The rescuer moves along any path, then the rescued survivor does (p.13).
       st.queue.unshift({ k: 'anyMove', s }, { k: 'anyMove', s: hooked })
-      trigger(st, { k: 'afterSabotage', s }, 2)
+      trigger(st, { k: 'afterSabotage', s, rescued: hooked }, 2)
       return
     }
   }
@@ -1353,7 +1366,7 @@ function killerEnter(st: GameState, path: string, to: string) {
   const from = k.room
   k.room = to
   log(st, `${actorName(st)} → ${roomName(st, to)}`, 'killer', { ev: { k: 'move', who: k.asVictor ? 'victor' : 'killer', from, to, path } })
-  st.queue.unshift({ k: 'reveal', room: to, who: 'killer' }, { k: 'trigger', w: { k: 'killerEntered', room: to }, done: [] })
+  st.queue.unshift({ k: 'reveal', room: to, who: 'killer' }, { k: 'trigger', w: { k: 'killerEntered', room: to, from, path }, done: [] })
 }
 
 function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, turn: number) {
@@ -1479,8 +1492,12 @@ function carryStep(st: GameState, s: number, steps: number, path: string, to: st
   st.survivors[s].room = to
   log(st, `${k.name} แบก ${st.survivors[s].name} → ${roomName(st, to)}`, 'killer', { ev: { k: 'move', who: 'killer', from, to, path } })
   emit(st, { k: 'move', who: s, from, to, path }, s)
-  // Reveal first: the flipped tile may be the hook (p.15).
-  st.queue.unshift({ k: 'reveal', room: to, who: 'killer' }, { k: 'carryArrive', s, steps: steps - 1 })
+  // Reveal first: the flipped tile may be the hook (p.15). Rancor may bring someone along.
+  st.queue.unshift(
+    { k: 'reveal', room: to, who: 'killer' },
+    { k: 'trigger', w: { k: 'killerEntered', room: to, from, path, carrying: true }, done: [] },
+    { k: 'carryArrive', s, steps: steps - 1 },
+  )
 }
 
 function carryArrive(st: GameState, s: number, steps: number) {
@@ -1990,7 +2007,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       if (w.k !== 'cleanupStart' || !generatorDoneThisRound(st)) return []
       return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
     case 'quick_and_quiet': {
-      if (w.k !== 'killerEntered' || me!.room !== w.room) return []
+      if (w.k !== 'killerEntered' || w.carrying || me!.room !== w.room) return []
       return propsIn(st, w.room).flatMap((p) => (p.kind === 'locker' && p.revealed && p.occupant === null ? [{ prop: p.id }] : []))
     }
     // ----- Jake -----
@@ -2170,9 +2187,42 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     }
     case 'undying':
       return [] // an interaction, see killerInteractions
+    // ----- The Spirit -----
+    case 'rancor': {
+      // a wounded survivor in the room she just left comes along (carrying someone too)
+      if (w.k !== 'killerEntered' || !w.from || w.from === w.room || k.asVictor) return []
+      return onBoardIn(st, w.from).flatMap((t) => (st.survivors[t].wounded ? [{ target: t }] : []))
+    }
+    case 'haunted_ground': {
+      if (w.k !== 'afterReveal') return []
+      const p = st.props.find((x) => x.id === w.prop)!
+      // generators (and gates) with progress, pallets on a path, occupied lockers and hooks stay
+      const swappable = (x: Prop) => !x.removed && !x.done && x.room !== null && x.revealed && x.occupant === null && !((x.kind === 'generator' || x.kind === 'exitGate') && x.progress > 0)
+      if (!swappable(p)) return []
+      return st.props.filter((x) => x.id !== p.id && x.category === p.category && x.kind !== p.kind && x.room !== p.room && swappable(x)).map((x) => ({ prop: x.id }))
+    }
+    case 'spirit_fury':
+      return w.k === 'killerBreak' && w.what === 'pallet' ? NONE : []
     // ----- Élodie -----
     case 'power_struggle':
+    case 'diversion':
       return [] // an interaction, see survivorInteractions
+    // ----- Adam -----
+    case 'autodidact': {
+      // a success (not a great one, not a failure Iron Will turned) becomes a great success, for
+      // a survivor in Adam's room or a connected one — any roll of theirs, struggling free too
+      const step = st.step
+      if (w.k !== 'roll' || step.t !== 'roll' || step.ctx.k === 'phantasm') return []
+      if (!inRange(st, me!.room, st.survivors[step.ctx.s].room)) return []
+      return step.dice.flatMap((d, index) => (!isFailure(d) && !isGreat(d) ? [{ index }] : []))
+    }
+    case 'deliverance': {
+      // after a rescue Adam made, or one that took him off the hook: one of the two is healed
+      if (w.k !== 'afterSabotage' || w.rescued === undefined) return []
+      const other = w.s === o ? w.rescued : w.rescued === o ? w.s : null
+      if (other === null) return []
+      return [o as number, other].filter((t) => st.survivors[t].wounded).map((target) => ({ target }))
+    }
     case 'appraisal':
       return w.k === 'itemDiscard' && w.s !== o && st.survivors[w.s].item !== w.item ? NONE : []
     case 'deception':
@@ -2250,7 +2300,7 @@ export function perkButtons(st: GameState): { perk: PerkId; owner: PerkOwner; w:
   }
   if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout'])
   if (step.t === 'survivorInteract') add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing'])
-  if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will']))
+  if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact']))
   return out
 }
 
@@ -2370,7 +2420,9 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, 'ทำลาย Pallet แล้วเดินต่อ')
       palletOn(st, path)!.removed = true
       log(st, 'Pallet พัง', 'killer', { ev: { k: 'palletBreak', path } })
-      return finishKillerMove(st, pathDef(st, path), to)
+      finishKillerMove(st, pathDef(st, path), to)
+      trigger(st, { k: 'killerBreak', what: 'pallet' })
+      return
     }
     case 'tinkerer': {
       payPerk(st, o, perk, `เปลี่ยนการ์ดใบที่ ${c.index! + 1}`)
@@ -2412,6 +2464,20 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, 'นับผลล้มเหลวเป็นสำเร็จ')
       const step = st.step as Extract<Step, { t: 'roll' }>
       step.dice = step.dice.map((d) => (isFailure(d) ? { ...d, asSuccess: true } : d))
+      return
+    }
+    case 'autodidact': {
+      const step = st.step as Extract<Step, { t: 'roll' }>
+      const d = step.dice[c.index!]
+      payPerk(st, o, perk, `ลูกที่ ${c.index! + 1} สำเร็จ → สำเร็จอย่างยิ่ง`)
+      step.dice[c.index!] = { ...d, face: d.kind === 'skill' ? 5 : 0 }
+      return
+    }
+    case 'deliverance': {
+      const t = st.survivors[c.target!]
+      payPerk(st, o, perk, `${t.name} หายบาดเจ็บ`)
+      t.wounded = false
+      log(st, `${t.name} หายบาดเจ็บ`, c.target!, { ev: { k: 'heal', s: c.target!, by: o as number } })
       return
     }
     case 'saboteur': {
@@ -2506,6 +2572,27 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       ;[a2.room, b.room] = [b.room, a2.room]
       return
     }
+    case 'rancor': {
+      const w2 = w as Extract<PerkWindow, { k: 'killerEntered' }>
+      const sv = st.survivors[c.target!]
+      payPerk(st, o, perk, `ลาก ${sv.name} มาด้วย`)
+      sv.room = w2.room
+      log(st, `${sv.name} ถูกลากไป ${roomName(st, w2.room)}`, c.target!, { ev: { k: 'move', who: c.target!, from: w2.from!, to: w2.room, path: w2.path ?? '' } })
+      // they entered the room: a prop there is revealed for them, as for any move
+      st.queue.unshift({ k: 'reveal', room: w2.room, who: c.target! })
+      return
+    }
+    case 'haunted_ground': {
+      const a2 = st.props.find((p) => p.id === (w as Extract<PerkWindow, { k: 'afterReveal' }>).prop)!
+      const b = st.props.find((p) => p.id === c.prop)!
+      payPerk(st, o, perk, `สลับ ${PROP_NAMES[a2.kind]} (${roomName(st, a2.room!)}) กับ ${PROP_NAMES[b.kind]} (${roomName(st, b.room!)})`)
+      ;[a2.room, b.room] = [b.room, a2.room]
+      return
+    }
+    case 'spirit_fury':
+      payPerk(st, o, perk, '+2 ▲')
+      gainKiller(st, 2)
+      return
     case 'up_the_ante':
       payPerk(st, o, perk, `${k.name} +2 ▲`)
       gainKiller(st, 2)
@@ -2657,6 +2744,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     case 'blood_favour':
     case 'undying':
     case 'power_struggle':
+    case 'diversion':
       return
   }
 }
@@ -2700,7 +2788,7 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
 // ---------- killer powers ----------
 
 export function isPower(i: KillerInteraction): boolean {
-  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush'].includes(i.k)
+  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt'].includes(i.k)
 }
 
 // ---------- The Twins ----------
@@ -2775,6 +2863,20 @@ export function powerOptions(st: GameState): KillerInteraction[] {
     case 'twins':
       // Blood Bond: Victor into Charlotte's room (not on a turn taken with Victor).
       return k.asVictor || k.victorRoom === k.room ? [] : [{ k: 'victor' }]
+    case 'spirit': {
+      // Yamaoka's Haunting: a card (not Wait), and over a path of its colour a healthy survivor to
+      // attack or a prop to interact with. Nothing on the path matters: she doesn't go there.
+      const out: KillerInteraction[] = []
+      for (const card of new Set(k.hand)) {
+        if (card === 'wait') continue
+        const rooms = new Set(touchingPaths(st, k.room).flatMap((p) => (p.kind === card ? [p.a === k.room ? p.b : p.a] : [])))
+        for (const room of rooms) {
+          for (const t of onBoardIn(st, room)) if (!st.survivors[t].wounded) out.push({ k: 'haunt', card, room, i: { k: 'attack', target: t } })
+          for (const i of propInteractions(st, room)) out.push({ k: 'haunt', card, room, i })
+        }
+      }
+      return out
+    }
     case 'blight':
       // Blighted Corruption: needs a card to discard.
       return k.hand.length ? [{ k: 'rush' }] : []
@@ -2832,6 +2934,12 @@ function usePower(st: GameState, i: KillerInteraction) {
   const k = st.killer
   k.powerUsed = true
   switch (i.k) {
+    case 'haunt': {
+      k.hand.splice(k.hand.indexOf(i.card), 1)
+      log(st, `${k.name} ใช้ Yamaoka's Haunting — ทิ้ง ${CARD_NAMES[i.card]} แล้ว Interact ที่ ${roomName(st, i.room)}`, 'killer')
+      // an ordinary interaction over there: Red Herring, Brutal Strength… still answer it
+      return killerActs(st, i.i, null)
+    }
     case 'power': {
       if (i.remove) pathState(st, i.remove).trap = false
       else k.trapsInSupply--

@@ -557,7 +557,7 @@ const boardCount = computed(() => {
               <FaceLabel :st="st" :who="b.owner" :text="`${ownerLabel(st, b.owner)}: ${PERKS[b.perk].name}`" /> <span class="cost">{{ cost(b.perk) }}</span>
             </h3>
             <p class="text small">{{ perkText(b.perk) }}</p>
-            <button class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: {} })">ใช้ — นับผลล้มเหลวเป็นสำเร็จ</button>
+            <button v-for="(c, n) in b.choices" :key="n" class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">ใช้ — {{ perkChoiceLabel(st, b.perk, b.owner, b.w, c) }}</button>
           </div>
         </div>
         <div class="choices">

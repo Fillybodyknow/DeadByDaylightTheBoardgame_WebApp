@@ -91,9 +91,10 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   a pallet, a locker, the killer's power, a passive) gets a short card in the middle of the
   screen first (`casts.ts` builds them from the log, `ActionReveal` shows them in the perk
   cards' queue). Perks, items and rolls have their own reveals and are left out there.
-- **Online, the player being waited on is told** (`notifyTurn` in `GameScreen`): a chime, a
-  banner saying what is asked, the side panel glowing, and with the tab in the background a
-  blinking title and a system notification.
+- **Online, the player being waited on is told** (`notifyTurn` in `GameScreen`): the skill-check
+  warning and a chime, a banner saying what is asked, the side panel glowing, and with the tab in
+  the background a blinking title and a system notification. While it stays their turn a gold
+  pill at the top and a gold screen edge say so, and every 20 s without a move it rings again.
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
   already offers and show "เลือกบนแผนที่" instead.

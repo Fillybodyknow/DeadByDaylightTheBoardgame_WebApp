@@ -121,6 +121,8 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
       return 'ไล่ Victor ออกจากกระดาน'
     case 'powerStruggle':
       return `Power Struggle: เปิดการ์ดใบแรกของ ${st.killer.name} (ฆาตกร +2 ▲)`
+    case 'diversion':
+      return `Diversion: ส่ง ${st.killer.name} ไปทาง ${pathLabel(st, i.path, room)} (ฆาตกร +1 ▲)`
   }
 }
 
@@ -164,6 +166,8 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Blighted Corruption: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
     case 'hoard':
       return 'Hoarder: นำ Chest ออก (+2 ▲)'
+    case 'haunt':
+      return `Yamaoka's Haunting: ทิ้ง ${CARD_NAMES[i.card]} → ${killerInteractionLabel(st, i.i)} ที่ ${roomName(st, i.room)}`
     case 'undying': {
       const p = 'prop' in i.i ? prop(st, i.i.prop) : null
       return `Undying: ทิ้ง ${CARD_NAMES[i.card]} → ${killerInteractionLabel(st, i.i)}${p?.room ? ` ที่ ${roomName(st, p.room)}` : ''}`
@@ -295,6 +299,19 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       const nm = (p: typeof a) => (p.revealed ? PROP_NAMES_TH[p.kind] : 'prop คว่ำ')
       return `สลับ ${nm(a)} ↔ ${nm(b)} (${roomName(st, b.room!)})`
     }
+    case 'autodidact':
+      return `ลูกที่ ${c.index! + 1} → สำเร็จอย่างยิ่ง`
+    case 'deliverance':
+      return `${name(c.target!)} หายบาดเจ็บ`
+    case 'rancor':
+      return `ลาก ${name(c.target!)} ไปด้วย`
+    case 'haunted_ground': {
+      const a = prop(st, (w as { prop: string }).prop)
+      const b = prop(st, c.prop!)
+      return `สลับ ${PROP_NAMES_TH[a.kind]} (${roomName(st, a.room!)}) ↔ ${PROP_NAMES_TH[b.kind]} (${roomName(st, b.room!)})`
+    }
+    case 'spirit_fury':
+      return '+2 ▲'
     case 'up_the_ante':
       return `Bonus Turn ด้วย ${CARD_NAMES[c.card!]} (ฆาตกร +2 ▲)`
     case 'balanced_landing':
@@ -425,6 +442,10 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return 'เริ่มเก็บกวาด'
     case 'killerEntered':
       return `${st.killer.name} เข้ามาใน ${roomName(st, w.room)}`
+    case 'afterReveal': {
+      const p = st.props.find((x) => x.id === w.prop)!
+      return `${st.survivors[w.s].name} เปิด ${PROP_NAMES_TH[p.kind]} ที่ ${roomName(st, p.room!)}`
+    }
     case 'afterSabotage':
       return 'หลัง Sabotage Hook'
     case 'turnBegin':

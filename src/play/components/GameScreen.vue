@@ -5,6 +5,7 @@ import { anyMoves, boardOf, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PRO
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
+import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
 import { canUndo, controls, dispatch, myTurn, online, quitGame, undo } from '../game'
 import { PERKS } from '../engine/perks'
@@ -13,7 +14,7 @@ import { KILLER_PLAYER, actorsOf } from '../engine/seats'
 import { closeOnlineGame, isHost, leaveRoom, session } from '../online/session'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { boardActionKeys, boardActions, boardTargets, powerMode as isPowerMode, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
+import { STEP_NAME, boardActionKeys, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
 import SoundSettings from '../../components/SoundSettings.vue'
 import ActionPanel from './ActionPanel.vue'
@@ -113,8 +114,17 @@ const powerOn = ref(false)
 const undyingOn = ref(false)
 const undyingCard = ref<MoveCard | null>(null)
 const undyingRoom = ref<string | null>(null)
-watch(undyingOn, () => ((undyingCard.value = null), (undyingRoom.value = null)))
-watch(undyingCard, () => (undyingRoom.value = null))
+// Undying and Yamaoka's Haunting share these steps: starting either clears them.
+watch([undyingOn, () => powerOn.value], () => ((undyingCard.value = null), (undyingRoom.value = null)))
+// A new card: the room it reaches is picked at once when there is only one (or when the card was
+// picked by clicking one of its paths, which names the room already).
+watch(undyingCard, (card) => {
+  const kind = stepKind(view.value, modes)
+  if (!card || !kind) return (undyingRoom.value = null)
+  const rooms = undyingPaths(view.value, card, kind).map((r) => r.to)
+  if (undyingRoom.value && rooms.includes(undyingRoom.value)) return
+  undyingRoom.value = rooms.length === 1 ? rooms[0] : null
+})
 /** Bear trap placement when the supply is empty: the path picked, waiting for which trap to move. */
 const trapPath = ref<string | null>(null)
 /** The Hillbilly picked the card to discard for the chainsaw (in the panel). */
@@ -207,12 +217,13 @@ const boardFocus = computed(() => {
   }
   // Undying: the killer's room, and what the step is about — the rooms the card reaches, or the
   // one room its prop is being picked in.
-  if (undyingOn.value) {
+  const kind = stepKind(view.value, modes)
+  if (kind) {
     const st = view.value
     const base = { survivors: [], killer: true, rooms: [st.killer.room] }
     if (undyingRoom.value) return { ...base, rooms: [st.killer.room, undyingRoom.value], paths: [], dests: [undyingRoom.value] }
-    const cards = undyingCard.value ? [undyingCard.value] : undyingCards(st)
-    const reach = cards.flatMap((c) => undyingPaths(st, c))
+    const cards = undyingCard.value ? [undyingCard.value] : undyingCards(st, kind)
+    const reach = cards.flatMap((c) => undyingPaths(st, c, kind))
     return { ...base, paths: reach.flatMap((r) => r.paths), dests: reach.map((r) => r.to) }
   }
   return decisionFocus(view.value, powerMode.value)?.focus ?? null
@@ -316,11 +327,20 @@ const modeBar = computed(() => {
       cancel: () => (forkMoves.value = null),
     }
   // Undying: card → path → (room, at a fork) → prop; each step says what to do and goes back one
-  if (undyingOn.value) {
-    if (!undyingCard.value) return { text: 'Undying: เลือกการ์ดเคลื่อนที่ที่จะทิ้ง จากไพ่บนมือด้านล่าง', cancel: () => (undyingOn.value = false) }
+  const kind = stepKind(view.value, modes)
+  if (kind) {
+    const name = STEP_NAME[kind]
+    const what = kind === 'haunt' ? 'ผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ prop' : 'prop'
+    const stop = () => (kind === 'haunt' ? (powerOn.value = false) : (undyingOn.value = false))
+    if (!undyingCard.value) return { text: `${name}: เลือกการ์ดที่จะทิ้ง — จากไพ่บนมือ หรือคลิกเส้นทางบนแผนที่`, cancel: stop }
     const card = CARD_NAMES[undyingCard.value]
-    if (!undyingRoom.value) return { text: `Undying (ทิ้ง ${card}): คลิกเส้นทางสีนั้นบนแผนที่`, cancel: () => (undyingCard.value = null) }
-    return { text: `Undying ที่ ${roomName(view.value, undyingRoom.value)}: คลิก prop ในห้องนั้น`, cancel: () => (undyingRoom.value = null) }
+    // one step back: a room picked straight away (only one) goes back to the card
+    const rooms = undyingPaths(view.value, undyingCard.value, kind).length
+    if (!undyingRoom.value) return { text: `${name} (ทิ้ง ${card}): คลิกห้องที่จะไปบนแผนที่`, cancel: () => (undyingCard.value = null) }
+    return {
+      text: `${name} (ทิ้ง ${card}) ที่ ${roomName(view.value, undyingRoom.value)}: คลิก${what} ในห้องนั้น`,
+      cancel: () => (rooms > 1 ? (undyingRoom.value = null) : (undyingCard.value = null)),
+    }
   }
   return null
 })
@@ -474,8 +494,24 @@ watch(turnSignature, (now, before) => {
 
 // ---------- online: telling a player the game is waiting on them ----------
 // Online the others can't see a player's screen, so nobody knows they're the one being waited
-// on. When the game turns to this device it rings, shows a banner, makes the side panel glow,
-// and — with the tab in the background — blinks the tab title and sends a system notification.
+// on. When the game turns to this device it plays the skill-check warning and a chime, shows a
+// banner, makes the side panel glow, and — with the tab in the background — blinks the tab title
+// and sends a system notification. While it stays this player's turn a gold pill at the top and a
+// gold glow round the screen say so, and every 20 s without a move it all rings again.
+
+/** Online, the game waits on this device now. */
+const yourTurn = computed(() => !!online.value?.seat && myTurn.value && props.st.phase !== 'over')
+/** Who else is waiting, for the pill ("ผู้เล่น 2, 4 รออยู่"). */
+const othersWaiting = computed(() => {
+  const n = session.data ? Object.keys(session.data.seats).length : 0
+  return Math.max(0, n - 1)
+})
+const REMIND_MS = 20000
+let remindTimer: number | null = null
+function stopRemind() {
+  if (remindTimer !== null) clearInterval(remindTimer)
+  remindTimer = null
+}
 
 /** What this player is being asked, in a few words. */
 const askWhat = computed(() => {
@@ -508,10 +544,13 @@ function stopTitleBlink() {
   document.title = baseTitle
 }
 
-function notifyTurn() {
-  sfx.yourTurn()
-  navigator.vibrate?.([120, 80, 120])
-  showBanner({ title: 'ถึงตาคุณแล้ว!', sub: askWhat.value, tone: 'game' })
+/** `again`: a reminder, the player hasn't moved yet. */
+function notifyTurn(again = false) {
+  // the skill-check warning cuts through anything; the chime after it says "you"
+  fxSound.skillWarn()
+  window.setTimeout(() => sfx.yourTurn(), 350)
+  navigator.vibrate?.(again ? [200, 100, 200, 100, 200] : [120, 80, 120])
+  if (!again) showBanner({ title: 'ถึงตาคุณแล้ว!', sub: askWhat.value, tone: 'game' })
   nudge.value = true
   if (nudgeTimer !== null) clearTimeout(nudgeTimer)
   nudgeTimer = window.setTimeout(() => (nudge.value = false), 4000)
@@ -542,15 +581,22 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisible)
   window.removeEventListener('pointerdown', askPermission)
   stopTitleBlink()
+  stopRemind()
   if (nudgeTimer !== null) clearTimeout(nudgeTimer)
 })
 
+watch(yourTurn, (mine, was) => {
+  if (mine && !was) notifyTurn()
+  if (!mine) stopTitleBlink()
+})
+// Every move restarts the wait; a turn left alone rings again.
 watch(
-  () => !!online.value?.seat && myTurn.value && props.st.phase !== 'over',
-  (mine, was) => {
-    if (mine && !was) notifyTurn()
-    if (!mine) stopTitleBlink()
+  [yourTurn, () => props.st],
+  ([mine]) => {
+    stopRemind()
+    if (mine) remindTimer = window.setInterval(() => notifyTurn(true), REMIND_MS)
   },
+  { immediate: true },
 )
 
 // ---------- terror radius ----------
@@ -785,6 +831,14 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     </main>
 
     <!-- terror radius: the screen edge pulses with the heartbeat -->
+    <!-- online: the others are waiting on this device — a lasting pill, and a gold edge -->
+    <div v-if="yourTurn" class="your-turn-edge" aria-hidden="true" />
+    <div v-if="yourTurn" class="your-turn" role="status" aria-live="polite">
+      <span class="bell" aria-hidden="true">🔔</span>
+      <b>ถึงตาคุณ</b>
+      <span>{{ askWhat }}</span>
+      <small v-if="othersWaiting">· เพื่อนกำลังรอ</small>
+    </div>
     <div v-if="terror" class="terror" :class="{ close: terror === 2 }" :style="{ '--beat': `${60 / terrorBpm}s` }" />
     <div v-if="fx.flash" :key="fx.flash.id" class="flash" :class="fx.flash.tone" @animationend="fx.flash = null" />
 
@@ -948,6 +1002,86 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   /* no top bar to leave room for: only the padding */
   .stage > .board {
     width: max(22rem, calc((100vh - 1.25rem) * var(--aspect)));
+  }
+}
+/* online: while the game waits on this device, a pill at the top and a gold glow round the
+   screen (under modals and the hand, over the map) */
+.your-turn {
+  position: fixed;
+  z-index: 18;
+  top: 0.6rem;
+  left: 50%;
+  translate: -50%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.4rem 1rem;
+  border: 2px solid #ffd56a;
+  border-radius: 99px;
+  background: rgb(30 22 4 / 0.95);
+  color: #fff3cf;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 0 22px rgb(255 200 90 / 0.65);
+  animation: your-turn 1.4s ease-in-out infinite;
+}
+.your-turn b {
+  font-family: var(--font-display);
+  color: #ffd56a;
+  letter-spacing: 0.04em;
+}
+.your-turn span:not(.bell) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.your-turn small {
+  color: #e8cf8f;
+}
+.bell {
+  display: inline-block;
+  animation: ring 1.4s ease-in-out infinite;
+  transform-origin: 50% 10%;
+}
+@keyframes your-turn {
+  50% {
+    box-shadow: 0 0 36px 6px rgb(255 200 90 / 0.9);
+  }
+}
+@keyframes ring {
+  0%,
+  60%,
+  100% {
+    rotate: 0deg;
+  }
+  10%,
+  30% {
+    rotate: 18deg;
+  }
+  20%,
+  40% {
+    rotate: -18deg;
+  }
+}
+.your-turn-edge {
+  position: fixed;
+  inset: 0;
+  z-index: 14;
+  pointer-events: none;
+  box-shadow: inset 0 0 40px 6px rgb(255 200 90 / 0.55);
+  animation: edge 1.4s ease-in-out infinite;
+}
+@keyframes edge {
+  50% {
+    box-shadow: inset 0 0 70px 14px rgb(255 200 90 / 0.8);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .your-turn,
+  .your-turn-edge,
+  .bell {
+    animation: none;
   }
 }
 /* online: the turn just came to this device — the panel pulses gold for a moment */

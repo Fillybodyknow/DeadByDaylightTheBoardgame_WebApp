@@ -27,7 +27,7 @@ import {
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
-import { actionKey, undyingCards, undyingOptions, undyingPaths, undyingRoomOf } from '../boardActions'
+import { STEP_NAME, actionKey, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import {
@@ -175,6 +175,7 @@ const POWER_HINT: Record<string, string> = {
   wraith: 'วาร์ปไปห้องที่ไม่เชื่อมกับห้องนี้',
   oni: 'รับ ▲ เท่ากับจำนวนผู้รอดชีวิตที่บาดเจ็บ และ Hex Totem ในห้องนี้กับห้องที่เชื่อมกัน',
   twins: 'วาง Victor ในห้องนี้ (ถ้าอยู่ที่อื่นจะย้ายมา) — เทิร์นต่อไปเลือกเล่นด้วย Victor ได้',
+  spirit: 'ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น — คลิกเป้าหมายบนแผนที่',
   blight: 'สุ่มทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามเส้นทางสีนั้น — เข้าห้องใหม่ได้: Interact ที่นั่น หรือพุ่งต่อ',
 }
 
@@ -187,11 +188,20 @@ function hoverPower(i: KillerInteraction | null) {
 /** The Hillbilly: cards that have a chainsaw path. The Deathslinger: cards he may discard. */
 const powerCards = computed(() => [...new Set(kInteractions.value.powers.flatMap((i) => (i.k === 'chainsaw' || i.k === 'redeemer' ? [i.card] : [])))])
 
-// ---------- Undying: discard a card, take its path, interact in the room it reaches ----------
+// ---------- Undying / Yamaoka's Haunting: discard a card, take its path, interact over there ----------
 
-/** The cards in hand that reach a prop (a colour with nothing to do isn't offered). */
+/** Which of the two is being played, a step at a time (GameScreen holds the steps). */
+const stepKind = computed<StepKind | null>(() => {
+  if (props.undyingOn && kInteractions.value.undying.length) return 'undying'
+  return powerMode.value && props.st.killer.characterId === 'spirit' ? 'haunt' : null
+})
+const stepName = computed(() => (stepKind.value ? STEP_NAME[stepKind.value] : ''))
+
+/** The cards in hand that reach something (a colour with nothing to do isn't offered). */
 const undyingHand = computed<HandCard[]>(() =>
-  undyingCards(props.st).map((card) => ({ card, picked: props.undyingCard === card, ...(props.undyingCard === card ? { badge: 'Undying' } : {}) })),
+  stepKind.value
+    ? undyingCards(props.st, stepKind.value).map((card) => ({ card, picked: props.undyingCard === card, ...(props.undyingCard === card ? { badge: stepName.value } : {}) }))
+    : [],
 )
 
 function pickUndyingCard(card: MoveCard) {
@@ -200,14 +210,20 @@ function pickUndyingCard(card: MoveCard) {
 }
 
 /** The rooms the picked card reaches, for the panel's buttons (the board offers the same paths). */
-const undyingRooms = computed(() => (props.undyingCard ? undyingPaths(props.st, props.undyingCard) : []))
+const undyingRooms = computed(() => (props.undyingCard && stepKind.value ? undyingPaths(props.st, props.undyingCard, stepKind.value) : []))
 
-/** What Undying can do in the room picked. */
+/** What can be done in the room picked. */
 const undyingHere = computed(() =>
-  props.undyingCard && props.undyingRoom
-    ? undyingOptions(props.st, props.undyingCard).filter((i) => undyingRoomOf(props.st, i) === props.undyingRoom)
+  props.undyingCard && props.undyingRoom && stepKind.value
+    ? undyingOptions(props.st, props.undyingCard, stepKind.value).filter((i) => undyingRoomOf(props.st, i) === props.undyingRoom)
     : [],
 )
+
+/** Out of the flow altogether. */
+function stopSteps() {
+  if (stepKind.value === 'haunt') emit('powerOn', false)
+  else emit('undyingOn', false)
+}
 
 
 /** Perk buttons in this step (start of turn, interact, a roll). */
@@ -477,9 +493,10 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p v-else>ผลทอย — ใช้กุญแจทอยใหม่ หรือ perk ได้</p>
       <DiceRow :dice="step.dice" big />
       <div class="buttons col">
-        <template v-for="b in buttons" :key="b.perk">
-          <button class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: {} })">
-            <FaceLabel :st="st" :who="b.owner" :text="`${st.survivors[b.owner as number].name}: ${PERKS[b.perk].name} — นับผลล้มเหลวเป็นสำเร็จ (${PERKS[b.perk].cost} ▲)`" />
+        <!-- Iron Will, Autodidact: one button per choice (Autodidact names the die) -->
+        <template v-for="b in buttons" :key="`${b.owner}-${b.perk}`">
+          <button v-for="(c, n) in b.choices" :key="n" class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">
+            <FaceLabel :st="st" :who="b.owner" :text="`${st.survivors[b.owner as number].name}: ${PERKS[b.perk].name} — ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)} (${PERKS[b.perk].cost} ▲)`" />
           </button>
         </template>
         <template v-for="s in rollers" :key="s">
@@ -508,17 +525,18 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <template v-else-if="step.t === 'killerInteract'">
       <p v-if="!step.canInteract" class="warn">เทิร์นนี้ Interact ไม่ได้</p>
 
-      <!-- Undying, a step at a time: the card from the hand, its path, then the prop over there -->
-      <template v-else-if="undyingOn && kInteractions.undying.length">
-        <p><b>Undying</b> ({{ PERKS.undying.cost }} ▲) — ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</p>
+      <!-- Undying / Yamaoka's Haunting, a step at a time: the card (hand or path), the room, the target -->
+      <template v-else-if="stepKind">
+        <p v-if="stepKind === 'undying'"><b>Undying</b> ({{ PERKS.undying.cost }} ▲) — ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</p>
+        <p v-else><b>ใช้พลัง: Yamaoka's Haunting</b> — ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น</p>
 
         <template v-if="!undyingCard">
-          <p class="muted small">👇 1. เลือกการ์ดที่จะทิ้ง จากไพ่บนมือด้านล่าง</p>
-          <CardHand :cards="undyingHand" :label="`Undying — มือของ ${st.killer.name}`" prompt="Undying — เลือกการ์ดที่จะทิ้ง" @pick="pickUndyingCard" />
+          <p class="muted small">👇 1. เลือกการ์ดที่จะทิ้ง — จากไพ่บนมือด้านล่าง หรือคลิกเส้นทางบนแผนที่</p>
+          <CardHand :cards="undyingHand" :label="`${stepName} — มือของ ${st.killer.name}`" :prompt="`${stepName} — เลือกการ์ดที่จะทิ้ง`" @pick="pickUndyingCard" />
         </template>
 
         <template v-else-if="!undyingRoom">
-          <p class="small">ทิ้ง <b>{{ CARD_NAMES[undyingCard] }}</b> — 2. ไปทางไหน?</p>
+          <p class="small">ทิ้ง <b>{{ CARD_NAMES[undyingCard] }}</b> — 2. ไปห้องไหน?</p>
           <p class="board-hint">🎯 คลิกเส้นทางสีนั้นบนแผนที่ (ทางแยกจะให้เลือกห้องต่อ)</p>
           <div class="buttons col">
             <button v-for="r in undyingRooms" :key="r.to" @click="emit('undyingRoom', r.to), sfx.click()">{{ roomName(st, r.to) }}</button>
@@ -527,18 +545,19 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </template>
 
         <template v-else>
-          <p class="small">3. ทำอะไรที่ <b>{{ roomName(st, undyingRoom) }}</b>?</p>
-          <p v-if="undyingHere.some((i) => !here(powerAct(i)))" class="board-hint">🎯 คลิก prop ที่กระพริบในห้องนั้นบนแผนที่</p>
+          <p class="small">ทิ้ง <b>{{ CARD_NAMES[undyingCard] }}</b> — 3. ทำอะไรที่ <b>{{ roomName(st, undyingRoom) }}</b>?</p>
+          <p v-if="undyingHere.some((i) => !here(powerAct(i)))" class="board-hint">🎯 คลิกเป้าหมายที่กระพริบในห้องนั้นบนแผนที่</p>
           <div class="buttons col">
             <template v-for="(i, n) in undyingHere" :key="n">
               <button v-if="here(powerAct(i))" @click="act({ t: 'interact', i })">{{ killerInteractionLabel(st, i.i) }}</button>
               <span v-else class="undying-target">🎯 {{ killerInteractionLabel(st, i.i) }}</span>
             </template>
-            <button @click="emit('undyingRoom', null)">เปลี่ยนเส้นทาง</button>
+            <button v-if="undyingRooms.length > 1" @click="emit('undyingRoom', null)">เปลี่ยนห้อง</button>
+            <button @click="emit('undyingCard', null)">เปลี่ยนการ์ด / เส้นทาง</button>
           </div>
         </template>
 
-        <button @click="emit('undyingOn', false)">ยกเลิก ไม่ใช้ Undying</button>
+        <button @click="stopSteps">{{ stepKind === 'haunt' ? 'ยกเลิก ไม่ใช้พลัง' : 'ยกเลิก ไม่ใช้ Undying' }}</button>
       </template>
 
       <!-- choosing where the power goes, after "use power" -->

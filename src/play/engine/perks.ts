@@ -39,6 +39,9 @@ export type PerkId =
   | 'blood_favour'
   | 'dragons_grip'
   | 'undying'
+  | 'rancor'
+  | 'haunted_ground'
+  | 'spirit_fury'
   // survivors
   | 'prove_thyself'
   | 'leader'
@@ -68,6 +71,9 @@ export type PerkId =
   | 'for_the_people'
   | 'off_the_record'
   | 'power_struggle'
+  | 'diversion'
+  | 'autodidact'
+  | 'deliverance'
   | 'appraisal'
   | 'deception'
   | 'desperate_measures'
@@ -157,6 +163,12 @@ export const PERKS: Record<PerkId, PerkDef> = {
   blood_favour: def('blood_favour', 'Blood Favour', 0, 'killer', 'blight', 0, 'ทำงานเองตอนเริ่มเก็บกวาด ถ้าทุกคนบาดเจ็บและไม่มีใครบน Hook'),
   dragons_grip: def('dragons_grip', "Dragon's Grip", 1, 'killer', 'blight', 1, 'ถามหลังทำลาย Generator'),
   undying: def('undying', 'Undying', 1, 'killer', 'blight', 2, 'เป็น Interaction: ทิ้งการ์ดแล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น'),
+  rancor: def('rancor', 'Rancor', 2, 'killer', 'spirit', 0, 'ถามเมื่อคุณเดินออกจากห้องที่มีผู้รอดชีวิตบาดเจ็บ'),
+  haunted_ground: def('haunted_ground', 'Haunted Ground', 1, 'killer', 'spirit', 1, 'ถามหลังผู้รอดชีวิตเปิด prop'),
+  spirit_fury: def('spirit_fury', 'Spirit Fury', 0, 'killer', 'spirit', 2, 'ถามหลังคุณทำลาย Pallet'),
+  diversion: def('diversion', 'Diversion', 2, 'survivor', 'adam', 0, 'เป็น Interaction กับฆาตกรในห้องเดียวกัน'),
+  autodidact: def('autodidact', 'Autodidact', 2, 'survivor', 'adam', 1, 'ปุ่มตอนคนในห้อง/ห้องติดกันทอยได้สำเร็จ'),
+  deliverance: def('deliverance', 'Deliverance', 1, 'survivor', 'adam', 2, 'ถามหลังคุณช่วยคนลงจาก Hook หรือถูกช่วยลง'),
   power_struggle: def('power_struggle', 'Power Struggle', 2, 'survivor', 'elodie', 0, 'เป็น Interaction กับฆาตกรในห้องเดียวกัน'),
   appraisal: def('appraisal', 'Appraisal', 2, 'survivor', 'elodie', 1, 'ถามเมื่อผู้รอดชีวิตคนอื่นทิ้ง item'),
   deception: def('deception', 'Deception', 0, 'survivor', 'elodie', 2, 'ถามก่อนเดินในเทิร์นตัวเอง'),
@@ -172,4 +184,4 @@ export const PRINTED_PERKS: Record<string, PerkId[]> = Object.values(PERKS).redu
 }, {})
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit']

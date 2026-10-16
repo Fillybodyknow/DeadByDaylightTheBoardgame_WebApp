@@ -6,6 +6,7 @@ import type { Ref } from 'vue'
 import { sfx } from '../sound'
 import {
   anyMoves,
+  CARD_NAMES,
   boardOf,
   pathDef,
   tokenOf,
@@ -109,31 +110,47 @@ function spotOf(i: SurvivorInteraction | KillerInteraction): SpotKey {
   if ('target' in i) return `s:${i.target}`
   if ('prop' in i) return `prop:${i.prop}`
   // Undying: the prop in the other room
-  if (i.k === 'undying') return spotOf(i.i)
+  if (i.k === 'undying' || i.k === 'haunt') return spotOf(i.i)
   if (i.k === 'removeVictor') return 'victor'
+  if (i.k === 'diversion') return `path:${i.path}`
   return 'killer'
 }
 
-type Undying = Extract<KillerInteraction, { k: 'undying' }>
+/**
+ * Undying (The Blight's perk) and Yamaoka's Haunting (The Spirit's power) are played the same way:
+ * discard a card, follow a path of its colour, interact over there. On screen they go a step at a
+ * time — the card (from the hand, or by clicking a path), the room (when the card reaches several),
+ * the target.
+ */
+export type StepKind = 'undying' | 'haunt'
+type Undying = Extract<KillerInteraction, { k: 'undying' | 'haunt' }>
+
+/** Which of the two is being played now, if either. */
+export function stepKind(st: GameState, modes: BoardModes): StepKind | null {
+  if (modes.undyingOn.value) return 'undying'
+  return powerMode(st, modes) && st.killer.characterId === 'spirit' ? 'haunt' : null
+}
+
+export const STEP_NAME: Record<StepKind, string> = { undying: 'Undying', haunt: "Yamaoka's Haunting" }
 
 /** The cards Undying can be spent on right now (each reaches at least one prop). */
-export function undyingCards(st: GameState): MoveCard[] {
-  return [...new Set(killerInteractions(st).flatMap((i) => (i.k === 'undying' ? [i.card] : [])))]
+export function undyingCards(st: GameState, kind: StepKind = 'undying'): MoveCard[] {
+  return [...new Set(killerInteractions(st).flatMap((i) => (i.k === kind ? [i.card] : [])))]
 }
 
 /** What Undying can do for one card. */
-export function undyingOptions(st: GameState, card: MoveCard): Undying[] {
-  return killerInteractions(st).filter((i): i is Undying => i.k === 'undying' && i.card === card)
+export function undyingOptions(st: GameState, card: MoveCard, kind: StepKind = 'undying'): Undying[] {
+  return killerInteractions(st).filter((i): i is Undying => i.k === kind && i.card === card)
 }
 
 /** The room an Undying target stands in. */
 export function undyingRoomOf(st: GameState, i: Undying): string {
-  return st.props.find((p) => p.id === (i.i as { prop: string }).prop)!.room!
+  return i.k === 'haunt' ? i.room : st.props.find((p) => p.id === (i.i as { prop: string }).prop)!.room!
 }
 
 /** The rooms that card reaches, each with the paths of its colour leading there (a fork can share one icon). */
-export function undyingPaths(st: GameState, card: MoveCard): { to: string; paths: string[] }[] {
-  const rooms = new Set(undyingOptions(st, card).map((i) => undyingRoomOf(st, i)))
+export function undyingPaths(st: GameState, card: MoveCard, kind: StepKind = 'undying'): { to: string; paths: string[] }[] {
+  const rooms = new Set(undyingOptions(st, card, kind).map((i) => undyingRoomOf(st, i)))
   const out = new Map<string, string[]>()
   for (const p of touchingPaths(st, st.killer.room)) {
     const to = p.a === st.killer.room ? p.b : p.a
@@ -276,6 +293,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             if (crows.has(i.prop)) continue
             crows.add(i.prop)
             add(spotOf(i), 'Calm Spirit: ย้าย Crow (แล้วเลือกห้อง)', () => ((modes.calmCrow.value = i.prop), sfx.click()))
+          } else if (i.k === 'diversion') {
+            // Diversion: the killer's path, and the room it sends him to (a fork asks which)
+            add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select))
+            const p = pathDef(st, i.path)
+            out[out.length - 1].dest = p.a === st.killer.room ? p.b : p.a
           } else add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
         }
       }
@@ -324,22 +346,24 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
 
     case 'killerInteract': {
       if (!s.canInteract) break
-      // Undying, step by step: the card comes from the hand, then a path of its colour, then the
-      // prop in the room it reaches (a fork asks which room in between, as any move does).
-      if (modes.undyingOn.value) {
+      // Undying / Yamaoka's Haunting, step by step: the card (from the hand, or a path of its
+      // colour on the map), the room it reaches (a fork asks which, as any move does), the target.
+      const kind = stepKind(st, modes)
+      if (kind) {
+        const name = STEP_NAME[kind]
         const card = modes.undyingCard.value
-        if (!card) break
-        const all = undyingOptions(st, card)
         const room = modes.undyingRoom.value
         if (room === null) {
-          for (const { to, paths } of undyingPaths(st, card))
-            for (const path of paths) {
-              add(`path:${path}`, `Undying: ไป ${roomName(st, to)}`, () => ((modes.undyingRoom.value = to), sfx.click()))
-              out[out.length - 1].dest = to
-            }
+          for (const c of card ? [card] : undyingCards(st, kind))
+            for (const { to, paths } of undyingPaths(st, c, kind))
+              for (const path of paths) {
+                add(`path:${path}`, `${name}: ทิ้ง ${CARD_NAMES[c]} → ${roomName(st, to)}`, () => ((modes.undyingCard.value = c), (modes.undyingRoom.value = to), sfx.click()))
+                out[out.length - 1].dest = to
+              }
           break
         }
-        for (const i of all) if (undyingRoomOf(st, i) === room) add(spotOf(i), killerInteractionLabel(st, i), go({ t: 'interact', i }, sfx.select))
+        for (const i of undyingOptions(st, card!, kind))
+          if (undyingRoomOf(st, i) === room) add(spotOf(i), killerInteractionLabel(st, i.i), go({ t: 'interact', i }, sfx.select), 'act', i.i.k === 'attack' ? i.i.target : null)
         break
       }
       if (!powerMode(st, modes)) {
