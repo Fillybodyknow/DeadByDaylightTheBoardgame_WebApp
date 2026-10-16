@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { asset } from './i18n'
 
 // Sound effects synthesised with the Web Audio API, so the app ships no audio files.
@@ -23,6 +23,48 @@ watch(muted, (m) => {
   if (m) stopHeartbeat()
   syncChase()
   syncAmbient()
+})
+
+// ---------- volume: master, music (ambient + chase) and effects, each 0–1, remembered per device ----------
+
+export interface Volumes {
+  master: number
+  music: number
+  sfx: number
+}
+
+function readVolumes(): Volumes {
+  const v: Volumes = { master: 1, music: 1, sfx: 1 }
+  try {
+    const saved = JSON.parse(localStorage.getItem('volumes') ?? '{}') as Partial<Volumes>
+    for (const k of ['master', 'music', 'sfx'] as const) {
+      const n = saved[k]
+      if (typeof n === 'number' && n >= 0 && n <= 1) v[k] = n
+    }
+  } catch {
+    // storage unavailable or unreadable: full volume
+  }
+  return v
+}
+
+export const volumes = reactive<Volumes>(readVolumes())
+
+/** How loud the effects play, all things considered (the game's own effects use it too). */
+export const sfxLevel = () => volumes.master * volumes.sfx
+const musicLevel = () => volumes.master * volumes.music
+
+/** The effects' output level: the master gain the synthesised and recorded effects go through. */
+const SFX_GAIN = 0.6
+
+watch(volumes, () => {
+  try {
+    localStorage.setItem('volumes', JSON.stringify(volumes))
+  } catch {
+    // storage unavailable: it just isn't remembered
+  }
+  if (master) master.gain.value = SFX_GAIN * sfxLevel()
+  // the music follows its slider at once (a drag must not wait on a slow fade)
+  syncChase(150)
 })
 
 let ctx: AudioContext | null = null
@@ -80,7 +122,7 @@ function audio(): { ctx: AudioContext; out: GainNode } | null {
   if (!ctx) {
     ctx = new AudioContext()
     master = ctx.createGain()
-    master.gain.value = 0.6
+    master.gain.value = SFX_GAIN * sfxLevel()
     master.connect(ctx.destination)
     void loadClips(ctx)
   }
@@ -257,7 +299,8 @@ function element(track: AmbientTrack): HTMLAudioElement {
   return el
 }
 
-function syncAmbient() {
+/** `ms`: how long a playing track takes to reach its new volume. */
+function syncAmbient(ms = 800) {
   const want = muted.value ? null : ambientWanted
   // fade out every other track
   for (const [track, el] of ambientEls)
@@ -265,13 +308,13 @@ function syncAmbient() {
   if (!want) return
   const el = element(want)
   // the chase music takes the foreground: the ambient track ducks under it
-  const volume = AMBIENT_TRACKS[want].volume * (chaseWanted ? DUCK : 1)
+  const volume = AMBIENT_TRACKS[want].volume * (chaseWanted ? DUCK : 1) * musicLevel()
   if (el.paused)
     el.play().then(
       () => fadeTo(el, volume, 1500),
       () => retryOnGesture(),
     )
-  else fadeTo(el, volume, 800)
+  else fadeTo(el, volume, ms)
 }
 
 /** Play an ambient track (cross-fading from any other), or fade everything out with null. */
@@ -319,8 +362,10 @@ function chasePosition(): number {
   return 0
 }
 
-function syncChase() {
+/** `ms`: how long the playing layer takes to reach its new volume. */
+function syncChase(ms = 500) {
   const want = muted.value ? null : chaseWanted
+  const volume = CHASE_VOLUME * musicLevel()
   for (const [layer, el] of chaseEls)
     if (layer !== want && !el.paused) fadeTo(el, 0, want ? 700 : 2200, () => el.pause())
   if (want !== null) {
@@ -331,13 +376,13 @@ function syncChase() {
         () => {
           // match the loop position of the layer being replaced
           if (at && Number.isFinite(el.duration)) el.currentTime = at % (el.duration || 1)
-          fadeTo(el, CHASE_VOLUME, 900)
+          fadeTo(el, volume, 900)
         },
         () => retryOnGesture(),
       )
-    } else fadeTo(el, CHASE_VOLUME, 500)
+    } else fadeTo(el, volume, ms)
   }
-  syncAmbient()
+  syncAmbient(ms === 500 ? 800 : ms)
 }
 
 /**

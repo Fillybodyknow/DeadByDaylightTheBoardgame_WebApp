@@ -138,6 +138,10 @@ needs its graph in `boards.ts`), the 2-player rule, then bots from the automated
   says "gain a ▲"). Teleporting still costs ▲ equal to the die.
 - After a rescue, the rescuer and the rescued survivor may each stay in the room instead of
   moving along a path (the rulebook, p.13, has them move).
+- Online, a survivor's item shows only on its holder's screen (`itemHidden` in `game.ts`): the
+  killer, a spectator and the other survivors' players see the back of the item card. An item
+  shows to everyone when it is used, and a friend's key shows when it is offered for a re-roll.
+  On one shared device everything is in sight anyway.
 
 ## Rulings
 

@@ -2,18 +2,19 @@
 // The players, in a row under the board: the killer, then the survivors in turn order — health,
 // ▲, item and planned card. Perks, power and passive are in the details (click a tile).
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { components, items } from '../../data'
+import { components, items, killerById } from '../../data'
 import { asset } from '../../i18n'
-import { ITEM_NAMES, KILLER_BP, SURVIVOR_BP, itemUses, roomName, turnOrder, victorRoom } from '../engine/engine'
+import { ITEM_NAMES, KILLER_BP, SURVIVOR_BP, isPower, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse } from '../engine/types'
-import { itemsHidden, online } from '../game'
+import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
 import type { InspectTarget } from '../inspect'
-import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, survivorMini } from '../labels'
+import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, PROP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
 import Mini from './Mini.vue'
+import ObjectiveHud from './ObjectiveHud.vue'
 
-const props = defineProps<{ st: GameState; collapsed: boolean }>()
-const emit = defineEmits<{ use: [s: number, use: ItemUse]; inspect: [target: InspectTarget]; pick: [s: number]; collapse: [collapsed: boolean] }>()
+const props = defineProps<{ st: GameState; powerOn?: boolean }>()
+const emit = defineEmits<{ use: [s: number, use: ItemUse]; inspect: [target: InspectTarget]; pick: [s: number]; power: [on: boolean] }>()
 
 /** The item's uses aim at something on the board (a generator, a survivor, a wall). */
 const boardItem = (s: number) => itemUses(props.st, s).some((u) => u.k === 'generator' || u.k === 'heal' || u.k === 'wall')
@@ -40,6 +41,15 @@ onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 const STATUS_TH = { board: '', locker: 'ใน Locker', carried: 'ถูกแบก', hooked: 'บน Hook' }
+
+/** Off the board, the state's icon goes over the portrait, as in the PC game's list. */
+function stateIcon(s: number): string | null {
+  const status = props.st.survivors[s].status
+  if (status === 'hooked') return PROP_IMAGE.hook
+  if (status === 'locker') return PROP_IMAGE.locker
+  if (status === 'carried') return killerMini(props.st)
+  return null
+}
 
 function showKillerCard(i: number): boolean {
   const k = props.st.killer
@@ -105,6 +115,36 @@ const mine = computed<(number | 'killer')[]>(() => {
   return props.st.survivors.flatMap((_, i) => (playerOf(props.st, i) === o.seat ? [i] : []))
 })
 
+// ---------- the slot under the goals: your item, or the killer's power ----------
+// As in the PC game, the item in hand sits under the HUD's corner, ready to use. It belongs to
+// whoever is playing now: online this device's character (the one whose turn it is, if it has
+// several), on one shared device the survivor taking their turn or the killer in his.
+
+const slotOwner = computed<number | 'killer' | null>(() => {
+  const st = props.st
+  if (online.value) {
+    const m = mine.value
+    if (m.includes('killer')) return 'killer'
+    return m.find((s) => s === st.activeSurvivor) ?? m[0] ?? null
+  }
+  if (st.phase === 'killer') return 'killer'
+  if (st.phase === 'survivors' && st.activeSurvivor !== null) return st.activeSurvivor
+  return null
+})
+
+/** The killer's power card, for its icon (the picture on the card's left). */
+const powerImage = computed(() => killerById.get(props.st.killer.characterId)?.power.image?.th ?? null)
+/** The power can be used now: the panel's "use power" would be offered. */
+const powerReady = computed(() => {
+  const s = props.st.step
+  return myTurn.value && s.t === 'killerInteract' && s.canInteract && killerInteractions(props.st).some(isPower)
+})
+
+function onPowerSlot() {
+  if (powerReady.value) emit('power', !props.powerOn)
+  else emit('inspect', { k: 'killer' })
+}
+
 const mineBp = (o: number | 'killer') => (o === 'killer' ? props.st.killer.bp : props.st.survivors[o].bp)
 const mineMax = (o: number | 'killer') => (o === 'killer' ? KILLER_BP.max : SURVIVOR_BP.max)
 const mineMini = (o: number | 'killer') => (o === 'killer' ? killerMini(props.st) : survivorMini(props.st, o))
@@ -112,32 +152,9 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
 </script>
 
 <template>
-  <section class="players" :class="{ collapsed }">
-    <button type="button" class="fold" :title="collapsed ? 'แสดงสถานะผู้เล่น' : 'พับสถานะผู้เล่น — ขยายแผนที่'" :aria-expanded="!collapsed" @click="emit('collapse', !collapsed)">
-      {{ collapsed ? '▴' : '▾' }}
-    </button>
-
-    <!-- folded: just the portraits, ringed by state; a click still opens the details -->
-    <div v-if="collapsed" class="strip">
-      <button type="button" class="dot killer" :title="st.killer.name" @click="emit('inspect', { k: 'killer' })">
-        <Mini class="dot-mini" :src="asset(killerMini(st))" alt="" />
-      </button>
-      <button
-        v-for="s in turnOrder(st)"
-        :key="s"
-        type="button"
-        class="dot"
-        :class="{ wounded: st.survivors[s].wounded, active: st.activeSurvivor === s, away: st.survivors[s].status !== 'board' }"
-        :title="`${st.survivors[s].name}${STATUS_TH[st.survivors[s].status] ? ` — ${STATUS_TH[st.survivors[s].status]}` : ''}`"
-        @click="emit('inspect', { k: 'survivor', s })"
-      >
-        <Mini class="dot-mini" :src="asset(survivorMini(st, s))" alt="" />
-      </button>
-      <span class="muted small">กด ▴ เพื่อดูสถานะผู้เล่น</span>
-    </div>
-
+  <section class="players">
     <!-- online: your own ▲ and item card, big enough to read without opening anything -->
-    <div v-if="!collapsed && mine.length" class="mine">
+    <div v-if="mine.length" class="mine">
       <p class="mine-title">ของคุณ</p>
       <div v-for="o in mine" :key="String(o)" class="mine-row">
         <button
@@ -164,16 +181,17 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
       </div>
     </div>
 
-    <div v-if="!collapsed" class="tiles">
+    <div class="tiles">
     <!-- killer -->
     <div class="tile killer" role="button" tabindex="0" :title="`${st.killer.name} — ดูรายละเอียดตัวละคร`" @click="emit('inspect', { k: 'killer' })" @keydown.enter="emit('inspect', { k: 'killer' })">
       <div class="head">
         <Mini class="mini aura-killer" :src="asset(killerMini(st))" :alt="st.killer.name" />
         <div class="names">
-          <span class="ptag" :class="{ me: mine.includes('killer') }" :title="`ผู้เล่น 1${mine.includes('killer') ? ' (คุณ)' : ''}`">{{ mine.includes('killer') ? 'คุณ' : 'P1' }}</span>
+          <strong class="name" :class="{ me: mine.includes('killer') }">{{ st.killer.name }}</strong>
         </div>
       </div>
       <div class="line small">
+        <span class="ptag" :class="{ me: mine.includes('killer') }" :title="`ผู้เล่น 1${mine.includes('killer') ? ' (คุณ)' : ''}`">{{ mine.includes('killer') ? 'คุณ' : 'P1' }}</span>
         <span class="bp">{{ st.killer.bp }}/{{ KILLER_BP.max }} ▲</span>
         <span v-if="st.killer.characterId === 'trapper'" class="traps"><img :src="asset(BEAR_TRAP_IMAGE)" alt="" /> ×{{ st.killer.trapsInSupply }}</span>
         <span v-if="st.killer.characterId === 'hag'" class="traps" title="Phantasm Trap ที่ยังวางได้"
@@ -214,24 +232,25 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
       :class="{ active: st.activeSurvivor === s, hooked: st.survivors[s].status === 'hooked', wounded: st.survivors[s].wounded }"
       role="button"
       tabindex="0"
-      :title="`${order(s)}. ${st.survivors[s].name}${st.survivors[s].wounded ? ' (บาดเจ็บ)' : ''} — ดูรายละเอียดตัวละคร`"
+      :title="`${order(s)}. ${st.survivors[s].name}${st.survivors[s].wounded ? ' (บาดเจ็บ)' : ''}${STATUS_TH[st.survivors[s].status] ? ` — ${STATUS_TH[st.survivors[s].status]}` : ''} — ดูรายละเอียดตัวละคร`"
       @click="emit('inspect', { k: 'survivor', s })"
       @keydown.enter="emit('inspect', { k: 'survivor', s })"
     >
       <div class="head">
         <div class="mini-wrap">
-          <Mini class="mini" :class="{ wounded: st.survivors[s].wounded }" :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name" />
+          <Mini class="mini" :class="{ wounded: st.survivors[s].wounded, away: !!stateIcon(s) }" :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name" />
+          <img v-if="stateIcon(s)" class="state" :class="st.survivors[s].status" :src="asset(stateIcon(s)!)" :alt="STATUS_TH[st.survivors[s].status]" />
           <span class="order" :title="`ลำดับเทิร์นที่ ${order(s)}`">{{ order(s) }}</span>
+          <span v-if="st.survivors[s].madness" class="madness" title="Madness: ทอย Danger Die แทน Skill Check">🌀</span>
           <img v-if="st.survivors[s].sacrificeToken" class="token" :src="asset(components.sacrificeProgress.image)" alt="" title="ยังมี sacrifice token บนกระดาน" />
           <img v-if="st.firstPlayer === s" class="first" :src="asset(components.firstPlayer.image)" alt="First player" title="First Player" />
         </div>
         <div class="names">
-          <span class="ptag" :class="{ me: mine.includes(s) }" :title="`ผู้เล่น ${playerOf(st, s)}${mine.includes(s) ? ' (คุณ)' : ''}`">{{ mine.includes(s) ? 'คุณ' : `P${playerOf(st, s)}` }}</span>
-          <span v-if="STATUS_TH[st.survivors[s].status]" class="warn small">{{ STATUS_TH[st.survivors[s].status] }}</span>
+          <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}</strong>
         </div>
       </div>
       <div class="line small">
-        <span v-if="st.survivors[s].madness" class="madness" title="Madness: ทอย Danger Die แทน Skill Check">🌀</span>
+        <span class="ptag" :class="{ me: mine.includes(s) }" :title="`ผู้เล่น ${playerOf(st, s)}${mine.includes(s) ? ' (คุณ)' : ''}`">{{ mine.includes(s) ? 'คุณ' : `P${playerOf(st, s)}` }}</span>
         <span class="bp">{{ st.survivors[s].bp }}/{{ SURVIVOR_BP.max }} ▲</span>
       </div>
       <div class="cards">
@@ -253,8 +272,8 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
             <span class="eye" aria-hidden="true">👁</span>
           </button>
         </template>
-        <!-- online, the killer sees the back of the item card: something is held, not what -->
-        <img v-if="st.survivors[s].item && itemsHidden" class="item hidden" :src="asset('assets/items/back.webp')" alt="ถือ item อยู่" title="ถือ item อยู่ 1 ใบ" />
+        <!-- online, everyone but its holder sees the back of the item card: something is held, not what -->
+        <img v-if="st.survivors[s].item && itemHidden(st, s)" class="item hidden" :src="asset('assets/items/back.webp')" alt="ถือ item อยู่" title="ถือ item อยู่ 1 ใบ" />
         <button
           v-else-if="st.survivors[s].item"
           class="item"
@@ -267,6 +286,39 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
       </div>
     </div>
     </div>
+
+    <!-- both sides' goals at the foot of the column: the bottom-left corner, as in the PC game -->
+    <ObjectiveHud class="objectives" :st="st" />
+
+    <!-- under the goals: the item of whoever plays now, or the killer's power; a click uses it -->
+    <button
+      v-if="slotOwner === 'killer' && powerImage"
+      type="button"
+      class="slot power"
+      :class="{ usable: powerReady, on: powerOn, spent: st.killer.powerUsed }"
+      :title="powerReady ? (powerOn ? `ยกเลิกการใช้พลัง ${powerName(st)}` : `ใช้พลัง: ${powerName(st)}`) : st.killer.powerUsed ? `${powerName(st)} — ใช้ไปแล้วรอบนี้` : `${powerName(st)} — ตอนนี้ใช้ไม่ได้ (คลิกดูรายละเอียด)`"
+      @click="onPowerSlot"
+    >
+      <span class="slot-icon" :style="{ backgroundImage: `url(${asset(powerImage)})` }" />
+      <span class="slot-name">{{ powerName(st) }}</span>
+    </button>
+    <template v-else-if="typeof slotOwner === 'number'">
+      <button
+        v-if="st.survivors[slotOwner].item"
+        type="button"
+        class="slot item-slot"
+        :class="{ usable: itemUses(st, slotOwner).length > 0 }"
+        :title="`${st.survivors[slotOwner].name}: ${ITEM_NAMES[st.survivors[slotOwner].item!]} — คลิกเพื่อใช้`"
+        @click="openItem = slotOwner"
+      >
+        <span class="slot-crop"><img :src="asset(itemImage(st.survivors[slotOwner].item!))" alt="" /></span>
+        <span class="slot-name">{{ ITEM_NAMES[st.survivors[slotOwner].item!] }}</span>
+      </button>
+      <div v-else class="slot empty" :title="`${st.survivors[slotOwner].name} ไม่มี item`">
+        <span class="slot-crop" />
+        <span class="slot-name">ไม่มี item</span>
+      </div>
+    </template>
 
     <!-- your own face-down cards, big; a click anywhere puts them face down again -->
     <Teleport to="body">
@@ -319,72 +371,145 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
 /* a column on the left of the map (a row under it on narrow screens) */
 .players {
   flex: none;
-  width: 96px;
+  width: 112px;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-}
-.players.collapsed {
-  width: 40px;
 }
 /* The column is as tall as the map at most; with your own block on top of a full table of tiles
    it can run past the foot of a short screen, and then it scrolls on its own. */
 @media (min-width: 981px) {
   .players {
+    /* as tall as the map, so the goals sit at its foot */
+    align-self: stretch;
     max-height: calc(100vh - 4.5rem);
     overflow-y: auto;
     scrollbar-width: thin;
   }
 }
-/* the fold handle, on top of the column */
-.fold {
-  flex: none;
-  height: 1.4rem;
-  padding: 0;
-  font-size: 0.9rem;
-  border: 1px solid var(--line);
-  background: rgb(17 19 23 / 0.92);
+/* hooked / in a locker / carried: the state's icon over a darkened portrait */
+.mini.away {
+  filter: grayscale(0.7) brightness(0.45);
 }
-.strip {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.4rem 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgb(17 19 23 / 0.92);
+.state {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 78%;
+  translate: -50% -50%;
+  pointer-events: none;
+  filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.9));
 }
-.dot {
-  padding: 0;
-  border: none;
-  background: none;
+.state.hooked {
+  animation: hooked 1.6s ease-in-out infinite;
+}
+/* carried: the killer's mini, small and ringed in red */
+.state.carried {
+  width: 64%;
   border-radius: 50%;
-  line-height: 0;
-  box-shadow:
-    0 0 0 2px #f2efe6,
-    0 0 0 3px rgb(0 0 0 / 0.6);
-}
-.dot.killer {
-  box-shadow: 0 0 0 2px #ff4a3d;
-}
-.dot.wounded {
   box-shadow: 0 0 0 2px var(--blood-bright);
 }
-.dot.active {
-  box-shadow:
-    0 0 0 2px #ffd56a,
-    0 0 10px 2px rgb(255 200 90 / 0.8);
+@keyframes hooked {
+  50% {
+    filter: drop-shadow(0 0 6px rgb(255 40 40 / 0.95));
+  }
 }
-.dot.away {
-  opacity: 0.6;
+@media (prefers-reduced-motion: reduce) {
+  .state.hooked {
+    animation: none;
+  }
 }
-.dot-mini {
-  width: 26px;
-  height: 26px;
+/* the goals: at the foot of the column, under the list */
+.objectives {
+  flex: none;
+  margin-top: 0.35rem;
 }
-.strip .small {
-  display: none;
+/* The item / power slot under the goals: a square icon in a dark frame, like the PC game's item
+   slot, with its name under it. It glows when it can be used now. */
+.slot {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.3rem 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgb(10 11 14 / 0.94), rgb(20 22 26 / 0.94));
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+button.slot {
+  cursor: pointer;
+}
+button.slot:hover .slot-icon,
+button.slot:hover .slot-crop {
+  border-color: var(--line-strong);
+}
+.slot-icon,
+.slot-crop {
+  position: relative;
+  display: block;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border: 2px solid rgb(255 255 255 / 0.18);
+  border-radius: 6px;
+  background-color: #1a1c20;
+}
+/* the power card's picture: the square on its left (each card is laid out the same) */
+.slot-icon {
+  background-size: 413% auto;
+  background-position: 3% 62%;
+  background-repeat: no-repeat;
+}
+/* the item's icon, cropped from the top of its card (as on the tiles) */
+.slot-crop img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 290%;
+  max-width: none;
+  transform: translate(-50%, -27%);
+}
+.slot-name {
+  max-width: 100%;
+  font-size: 0.64rem;
+  line-height: 1.2;
+  color: #e9e2d2;
+}
+.slot.usable .slot-icon,
+.slot.usable .slot-crop {
+  border-color: #ffe9b0;
+  box-shadow: 0 0 12px rgb(255 214 140 / 0.6);
+  animation: ready 1.8s ease-in-out infinite;
+}
+/* the power picked: its targets are on the board now */
+.slot.on .slot-icon {
+  border-color: var(--blood-bright);
+  box-shadow: 0 0 14px rgb(255 40 40 / 0.8);
+  animation: none;
+}
+.slot.spent .slot-icon {
+  filter: grayscale(1) brightness(0.5);
+}
+.slot.empty .slot-crop {
+  border-style: dashed;
+  background: rgb(0 0 0 / 0.3);
+}
+.slot.empty .slot-name {
+  color: var(--muted);
+}
+@keyframes ready {
+  50% {
+    box-shadow: 0 0 18px rgb(255 214 140 / 0.9);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slot.usable .slot-icon,
+  .slot.usable .slot-crop {
+    animation: none;
+  }
 }
 /* Online: your own ▲ and item, on top of the column. Everything else about you is in your tile
    below; this is only what you spend, in a size you can read from across the table. */
@@ -472,57 +597,62 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
   font-size: 0.68rem;
   color: var(--muted);
 }
+/* The list, as in the PC game's HUD: bare rows of portrait and name, at the foot of the column
+   just above the goals — no boxes, the state on the portrait. */
 .tiles {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.15rem;
+  margin-top: auto;
 }
-/* one compact row per player: portrait | name, then state | cards — so the board gets the height */
 .tile {
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.05rem 0.3rem;
-  padding: 0.3rem 0.35rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgb(17 19 23 / 0.92);
+  gap: 0 0.3rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.3rem;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background: linear-gradient(90deg, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.15));
   cursor: pointer;
-  transition:
-    border-color 0.15s,
-    transform 0.15s;
+  transition: background 0.15s;
 }
 .tile:hover,
 .tile:focus-visible {
-  border-color: var(--line-strong);
-  transform: translateY(-2px);
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02));
 }
+/* the killer heads the list, set apart by a red edge */
 .tile.killer {
-  border-color: var(--blood-dim);
-  background: rgb(92 11 16 / 0.22);
+  margin-bottom: 0.25rem;
+  border-left-color: var(--blood-bright);
+  background: linear-gradient(90deg, rgb(92 11 16 / 0.6), rgb(92 11 16 / 0.1));
 }
+/* whose turn it is: a gold edge and glow along the row */
 .tile.active {
-  border-color: rgb(255 214 140 / 0.7);
-  background: rgb(255 214 140 / 0.08);
-  box-shadow: 0 0 12px rgb(255 214 140 / 0.2);
+  border-left-color: #ffd56a;
+  background: linear-gradient(90deg, rgb(255 214 140 / 0.22), rgb(255 214 140 / 0.03));
 }
-.tile.hooked {
-  opacity: 0.75;
+.tile.hooked .name {
+  color: var(--muted);
 }
-/* wounded: the whole tile says so, no words needed */
+/* wounded: a red wash behind the row, as the PC game reddens the portrait */
 .tile.wounded {
-  border-color: var(--blood-bright);
-  background: rgb(120 12 18 / 0.35);
-  box-shadow:
-    inset 0 0 14px rgb(255 40 40 / 0.35),
-    0 0 10px rgb(255 30 30 / 0.35);
+  background: linear-gradient(90deg, rgb(150 12 18 / 0.5), rgb(150 12 18 / 0.05));
 }
 .tile.wounded.active {
-  border-color: #ffd56a;
-  box-shadow:
-    inset 0 0 14px rgb(255 40 40 / 0.45),
-    0 0 12px rgb(255 214 140 / 0.35);
+  background: linear-gradient(90deg, rgb(150 12 18 / 0.5), rgb(255 214 140 / 0.12));
+}
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.76rem;
+  color: #f2efe6;
+  text-transform: capitalize;
+}
+.name.me {
+  color: #ffe9b0;
 }
 /* turn order, on the portrait's corner */
 .order {
@@ -592,8 +722,8 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
   flex: none;
 }
 .mini {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex: none;
   border-radius: 50%;
   object-fit: contain;
@@ -616,9 +746,14 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
 .small {
   font-size: 0.76rem;
 }
+/* Madness, on the portrait's bottom-left corner */
 .madness {
-  color: #9cff6b;
-  font-weight: 700;
+  position: absolute;
+  left: -5px;
+  bottom: -4px;
+  font-size: 0.72rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 2px #000);
 }
 .victor-at {
   color: #e0a3ff;
@@ -656,7 +791,7 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
 }
 .pcard {
   display: block;
-  width: 34px;
+  width: 28px;
   aspect-ratio: 0.72;
   object-fit: cover;
   border-radius: 4px;
@@ -742,8 +877,8 @@ const mineName = (o: number | 'killer') => (o === 'killer' ? props.st.killer.nam
   position: relative;
   overflow: hidden;
   padding: 0;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   background: #1a1c20;
@@ -864,28 +999,24 @@ button.item img {
 }
 /* narrow screens: the map takes the width, the tiles go back to a row under it */
 @media (max-width: 980px) {
-  .players,
-  .players.collapsed {
+  .players {
     width: auto;
     flex-direction: row;
   }
-  .fold {
-    height: auto;
-    width: 1.6rem;
-  }
-  .strip {
-    flex: 1;
-    flex-direction: row;
-    padding: 0.2rem 0.4rem;
-  }
   .tiles {
     flex: 1;
+    margin-top: 0;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   }
   /* the row is short: your own block keeps a column of its own beside the tiles */
   .mine {
     width: 104px;
+  }
+  .objectives,
+  .slot {
+    margin-top: 0;
+    align-self: center;
   }
 }
 </style>

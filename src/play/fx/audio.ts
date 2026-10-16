@@ -1,17 +1,26 @@
 // Sound effects for the full game. Recorded clips (public/assets/app/sound/game/) where there
 // is one, otherwise synthesised with Web Audio like the companion's src/sound.ts (whose mute
-// toggle this follows). Kept here so the companion is untouched.
+// toggle and master / effects volume this follows). Kept here so the companion is untouched.
 
+import { watch } from 'vue'
 import { asset } from '../../i18n'
-import { muted } from '../../sound'
+import { muted, sfxLevel, volumes } from '../../sound'
 
 let ctx: AudioContext | null = null
+/** Every effect goes through this, set by the master and effects sliders (`volumes`). */
+let out: GainNode | null = null
+watch(volumes, () => {
+  if (out) out.gain.value = sfxLevel()
+})
 
 function audio(): AudioContext | null {
   if (muted.value) return null
   try {
     if (!ctx) {
       ctx = new AudioContext()
+      out = ctx.createGain()
+      out.gain.value = sfxLevel()
+      out.connect(ctx.destination)
       void loadClips(ctx)
     }
     if (ctx.state === 'suspended') void ctx.resume()
@@ -57,7 +66,7 @@ function clip(name: Clip, fallback: () => void = () => {}, gain = 0.7) {
     src.buffer = buf
     const g = a.createGain()
     g.gain.value = gain
-    src.connect(g).connect(a.destination)
+    src.connect(g).connect(out!)
     src.start()
   })
 }
@@ -83,7 +92,7 @@ function tone(freq: number, dur: number, o: ToneOpts = {}) {
   g.gain.setValueAtTime(0.0001, t)
   g.gain.exponentialRampToValueAtTime(o.gain ?? 0.2, t + 0.01)
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
-  osc.connect(g).connect(a.destination)
+  osc.connect(g).connect(out!)
   osc.start(t)
   osc.stop(t + dur + 0.05)
 }
@@ -111,7 +120,7 @@ function noise(dur: number, o: NoiseOpts = {}) {
   f.Q.value = o.q ?? 1
   const g = a.createGain()
   g.gain.value = o.gain ?? 0.3
-  src.connect(f).connect(g).connect(a.destination)
+  src.connect(f).connect(g).connect(out!)
   src.start(t)
 }
 

@@ -3,13 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter, type RouteMeta } from 'vue-router'
 import LoadingVeil from './components/LoadingVeil.vue'
 import Particles from './components/Particles.vue'
+import SoundSettings from './components/SoundSettings.vue'
 import { quoteOrTip, showLoading } from './loading'
 import { asset, lang } from './i18n'
 import { game } from './play/game'
 import { isPhone } from './play/device'
 import { session } from './play/online/session'
 import PhoneBlock from './play/views/PhoneBlock.vue'
-import { muted, setAmbient, type AmbientTrack } from './sound'
+import { setAmbient, type AmbientTrack } from './sound'
 import { useLobbyStore } from './stores/lobby'
 
 const lobby = useLobbyStore()
@@ -114,9 +115,7 @@ const scene = computed(() => {
         <span class="lbl">{{ l.label }}</span>
       </RouterLink>
     </nav>
-    <button class="icon-btn" type="button" :title="muted ? 'เปิดเสียง' : 'ปิดเสียง'" :aria-pressed="!muted" @click="muted = !muted">
-      {{ muted ? '🔇' : '🔊' }}
-    </button>
+    <SoundSettings class="icon-btn" />
     <!-- Switches card/board text between Thai and English; the UI itself is Thai. -->
     <button class="lang" type="button" title="ภาษาข้อความการ์ด" @click="lang = lang === 'th' ? 'en' : 'th'">
       <span class="lang-label">การ์ด: </span>{{ lang === 'th' ? 'TH' : 'EN' }}

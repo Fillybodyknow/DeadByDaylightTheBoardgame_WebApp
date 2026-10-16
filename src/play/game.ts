@@ -20,13 +20,15 @@ const history = shallowRef<GameState[]>([])
 export const online = shallowRef<{ room: Room; seat: number; latest: () => GameState | null } | null>(null)
 
 /**
- * Online, the survivors' items are hidden from the killer's screen (and a spectator's): they see
- * that an item is held, not which. Items show when used. One shared device can't hide anything.
+ * Online, a survivor's item shows only on the screen of the player who holds it (house rule): the
+ * killer, a spectator and the other survivors' players see that an item is held, not which.
+ * Items show when used. One shared device can't hide anything.
  */
-export const itemsHidden = computed(() => {
+export function itemHidden(st: GameState, s: number): boolean {
   const o = online.value
-  return !!o && (o.seat === KILLER_PLAYER || !o.seat)
-})
+  if (!o) return false
+  return !o.seat || o.seat === KILLER_PLAYER || st.handPlayers[st.survivors[s].hand] !== o.seat
+}
 
 /** Online moves made on this device that the room hasn't confirmed yet. */
 export const pendingWrites = shallowRef(0)

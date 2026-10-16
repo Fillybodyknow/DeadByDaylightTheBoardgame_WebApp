@@ -34,7 +34,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 | Path | What |
 |---|---|
 | `src/play/engine/` | Rules engine: `engine.ts` (pure reducer), `types.ts`, `perks.ts`, `legal.ts`, `seats.ts`, `boards.ts` (board graphs, read from the map art; `boards.test.ts` checks them), tests |
-| `src/play/components/` | Game UI: `GameScreen` (layout), `Board`, `ActionPanel`, `PerkPrompt`, `Planning`, `CardHand`, `StatusPanel` (player tiles), `TrackBar`, modals |
+| `src/play/components/` | Game UI: `GameScreen` (layout), `Board`, `ActionPanel`, `PerkPrompt`, `Planning`, `CardHand`, `StatusPanel` (player tiles), `ObjectiveHud` (both sides' goals, under the tiles), modals |
 | `src/play/boardActions.ts` | Everything clickable on the board right now |
 | `src/play/focus.ts` | Board highlights and the facts listed for a decision |
 | `src/play/labels.ts` | Thai labels for actions, perk choices, windows |
@@ -102,13 +102,17 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   table. Items open in a modal in the middle of the screen too.
 - **Secrets.** Hidden information (planned cards, Tinkerer / Zanshin swaps, the Redeemer card) gets
   a hand-off curtain in hot-seat (`secretFor` in `GameScreen`) and is never shown to other players
-  online. Online, the killer (and a spectator) sees only the back of the survivors' item cards
-  (`itemsHidden` in `src/play/game.ts`); an item shows when it is used.
+  online. Online, a survivor's item shows only to its holder; everyone else (the killer, a
+  spectator, the other survivors) sees the back of the card (`itemHidden` in
+  `src/play/game.ts`, a house rule); an item shows when it is used.
 - Perk decisions dock beside the board (`PerkPrompt`), never over the map. Character choices
   show the character's mini.
-- Layout: the tracks and controls in a bar (on top; a slim rail on the left on 16:9 and wider
-  screens, where the height limits the board), the board as big as the screen allows, one row
-  of player tiles under it (foldable to a strip of portraits, remembered per device), the side
+- Layout: the round, phase and controls in a bar (on top; a slim rail on the left on 16:9 and
+  wider screens, where the height limits the board), the board as big as the screen allows, the
+  players in a column on its left in the PC game's HUD style (bare rows of portrait, name and
+  state, at the foot of the column; a row under the map on narrow screens) with both sides'
+  goals under them (`ObjectiveHud`: sacrifices, generators left, then the exit gate) and, under
+  those, the slot of whoever plays now (their item, or the killer's power; a click uses it), the side
   panel (320 px) on the right. Player tiles don't list perks: clicking a tile opens the
   character details, with the perks and whether they were used this round. There is no game
   log on screen. Pointing at a revealed prop enlarges it.
@@ -131,6 +135,10 @@ local backend syncs browser tabs.
 
 - Game sounds: `src/play/fx/audio.ts`. Recorded clips in `public/assets/app/sound/game/`, with the
   synthesised sound as fallback. They follow the mute toggle in `src/sound.ts`.
+- Volume: `volumes` in `src/sound.ts` (master, music, sfx; 0–1, remembered per device), set from
+  the sound button's panel (`src/components/SoundSettings.vue`, in the top bar and the game's
+  rail). Music (ambient and chase) scales by master × music, every effect (both `sound.ts` and
+  `fx/audio.ts`) by master × sfx through a gain node.
 - Every sound file is **OGG (Vorbis)**, so loops have no gap (MP3 pads both ends). Chase music
   lives in `app/sound/theme/chase/<killer>/<theme>/layer<N>.ogg`, one 26.84 s loop per layer.
 - **Chase music** (`setChase` in `src/sound.ts`, decided in `GameScreen`): the killer standing on

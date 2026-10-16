@@ -11,6 +11,7 @@ import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
 import { boardActionKeys, boardActions, boardTargets, powerMode as isPowerMode, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
+import SoundSettings from '../../components/SoundSettings.vue'
 import ActionPanel from './ActionPanel.vue'
 import BannerHost from './BannerHost.vue'
 import Board from './Board.vue'
@@ -18,7 +19,6 @@ import ChoiceMenu from './ChoiceMenu.vue'
 import DetailModal from './DetailModal.vue'
 import DiceModal from './DiceModal.vue'
 import EndSummary from './EndSummary.vue'
-import TrackBar from './TrackBar.vue'
 import PerkPrompt from './PerkPrompt.vue'
 import PerkReveal from './PerkReveal.vue'
 import Planning from './Planning.vue'
@@ -497,24 +497,6 @@ onBeforeUnmount(() => {
 
 const inspecting = ref<InspectTarget | null>(null)
 
-// ---------- player tiles: folded away, the map takes the whole height (remembered per device) ----------
-
-function readFolded(): boolean {
-  try {
-    return localStorage.getItem('dbdl-players-folded') === '1'
-  } catch {
-    return false
-  }
-}
-const playersFolded = ref(readFolded())
-watch(playersFolded, (f) => {
-  try {
-    localStorage.setItem('dbdl-players-folded', f ? '1' : '0')
-  } catch {
-    // storage unavailable: it just isn't remembered
-  }
-})
-
 // ---------- secret choices (Tinkerer swaps a face-down card) ----------
 
 const secretSeen = ref(false)
@@ -580,7 +562,6 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 <template>
   <div class="game">
     <header class="top">
-      <TrackBar :st="view" />
       <span class="spacer" />
       <span class="phase">รอบ {{ view.round }}<span class="sep"> · </span><span class="phase-name">{{ PHASE_TH[view.phase] }}</span></span>
       <button v-if="over && !showOver" class="primary" @click="showOver = true">สรุปเกม</button>
@@ -589,7 +570,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <span v-if="online" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
         <button v-else :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶<span class="btn-text"> ย้อน</span></button>
         <button v-if="canFullscreen" :title="fullscreen ? 'ออกจากเต็มจอ' : 'เต็มจอ'" @click="toggleFullscreen">{{ fullscreen ? '🗗' : '⛶' }}</button>
-        <button :title="muted ? 'เปิดเสียง' : 'ปิดเสียง'" @click="muted = !muted">{{ muted ? '🔇' : '🔊' }}</button>
+        <SoundSettings />
         <button @click="leave">ออก</button>
       </div>
     </header>
@@ -616,7 +597,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         </div>
         <!-- the player tiles beside the map, on its left -->
         <div class="stage">
-          <StatusPanel :st="view" :collapsed="playersFolded" @collapse="playersFolded = $event" @use="onUse" @inspect="inspecting = $event" @pick="itemPick = $event" />
+          <StatusPanel :st="view" :power-on="powerOn" @power="powerOn = $event" @use="onUse" @inspect="inspecting = $event" @pick="itemPick = $event" />
           <Board
             :st="view"
             :path-targets="targets.paths"
@@ -727,6 +708,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
   align-items: start;
+  /* on one column a short side panel must not leave the rows spread down the screen */
+  align-content: start;
 }
 .board-col {
   position: relative;
@@ -766,7 +749,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 
 /* Wide screens (16:9 and wider): the board is limited by the height, so the top bar becomes a
    slim rail on the left and the board takes the height. Narrower screens (16:10, iPad) are
-   limited by the width: they keep the bar on top. TrackBar switches with the same query. */
+   limited by the width: they keep the bar on top. */
 @media (min-width: 981px) and (min-aspect-ratio: 16/9) {
   .game {
     flex-direction: row;
@@ -774,13 +757,13 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   /* a narrow rail along the left edge */
   .top {
     flex: none;
-    width: 64px;
+    width: 44px;
     height: 100vh;
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 0.9rem;
-    padding: 0.6rem 0.2rem;
+    gap: 0.7rem;
+    padding: 0.5rem 0.15rem;
     overflow-y: auto;
     border-bottom: none;
     border-right: 1px solid var(--line);
@@ -788,8 +771,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   .phase {
     order: -1;
     text-align: center;
-    font-size: 0.74rem;
-    line-height: 1.25;
+    font-size: 0.66rem;
+    line-height: 1.2;
   }
   /* the round on one line, the phase under it */
   .phase .sep {
@@ -797,7 +780,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   }
   .phase-name {
     display: block;
-    font-size: 0.68rem;
+    font-size: 0.6rem;
   }
   .btn-text {
     display: none;
@@ -809,12 +792,12 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     gap: 0.35rem;
   }
   .controls button {
-    width: 48px;
-    padding: 0.3rem 0;
-    font-size: 0.82rem;
+    width: 34px;
+    padding: 0.2rem 0;
+    font-size: 0.72rem;
   }
   .room-tag {
-    font-size: 0.66rem;
+    font-size: 0.58rem;
     text-align: center;
   }
   .layout {
