@@ -70,7 +70,14 @@ const shape = computed(() => {
             <span v-if="shape === 'power'" class="pic power" :style="{ backgroundImage: `url(${asset(current.image)})` }" />
             <img v-else class="pic" :class="shape" :src="asset(current.image)" alt="" />
           </template>
-          <template v-if="current.target !== undefined">
+          <!-- a whole room hit at once -->
+          <template v-if="current.targets?.length">
+            <span class="arrow" aria-hidden="true">›</span>
+            <span class="targets">
+              <Mini v-for="t in current.targets" :key="t" class="face target" :src="asset(face(t))" />
+            </span>
+          </template>
+          <template v-else-if="current.target !== undefined">
             <span class="arrow" aria-hidden="true">›</span>
             <Mini class="face target" :src="asset(face(current.target))" />
           </template>
@@ -140,6 +147,14 @@ const shape = computed(() => {
 .face {
   width: 64px;
   height: 64px;
+}
+.targets {
+  display: flex;
+  gap: 0.3rem;
+}
+.targets .face {
+  width: 52px;
+  height: 52px;
 }
 .face.target {
   box-shadow: 0 0 0 3px var(--blood-bright);

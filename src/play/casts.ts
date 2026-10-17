@@ -8,7 +8,7 @@ import { CARD_NAMES } from './engine/engine'
 import type { GameState, LogEntry, MoveCard } from './engine/types'
 import type { ActionShow } from './fx/bus'
 import { itemHidden } from './game'
-import { BEAR_TRAP_IMAGE, PROP_IMAGE, cardImage, powerName } from './labels'
+import { BEAR_TRAP_IMAGE, KNIFE_IMAGE, PROP_IMAGE, cardImage, powerName } from './labels'
 
 /** Events that already have a reveal of their own, or are the game's bookkeeping. */
 const SKIP = new Set(['perk', 'item', 'roll', 'reveal', 'repair', 'genDone', 'gatesPowered', 'gate', 'sacrifice', 'round', 'heal', 'cleanse', 'carryEscape', 'gameOver', 'bp', 'phantasmSet'])
@@ -48,6 +48,10 @@ export class CastBuilder {
   /** Movement cards in play in this batch, by who plays them: only a move made with one shows. */
   private cards = new Map<string, MoveCard>()
 
+  /** Survivors the power used in this batch wounded: named on its one card, not a card each. */
+  private powerHits: number[] = []
+  private knives = false
+
   constructor(prev: GameState, st: GameState) {
     this.st = st
     // the step this batch answered: a move with the card it asked for
@@ -55,6 +59,11 @@ export class CastBuilder {
     if (p.t === 'survivorMove') this.cards.set(String(p.s), p.card)
     if (p.t === 'killerMove') this.cards.set('killer', p.card)
     this.power = !prev.killer.powerUsed && st.killer.powerUsed
+    if (this.power)
+      for (const e of st.log.slice(prev.log.length))
+        if ((e.ev?.k === 'wound' && e.ev.by === 'power') || e.ev?.k === 'knife') if (!this.powerHits.includes(e.ev.s)) this.powerHits.push(e.ev.s)
+    // Showstopper hands out Knives: everyone given one is on its card, however many
+    this.knives = this.power && st.log.slice(prev.log.length).some((e) => e.ev?.k === 'knife')
   }
 
   /** The card for one log entry, or null. */
@@ -65,6 +74,8 @@ export class CastBuilder {
     if (!e.text || e.who === 'game') return null
     if (ev && SKIP.has(ev.k)) return null
     if (SKIP_TEXT.some((r) => r.test(e.text))) return null
+    // a wound by this batch's power is on the power's card already
+    if ((ev?.k === 'knife' || (ev?.k === 'wound' && ev.by === 'power')) && this.powerHits.includes(ev.s) && !this.power) return null
     const owner = e.who
     const key = String(owner)
     let [title, sub] = splitText(e.text)
@@ -103,6 +114,11 @@ export class CastBuilder {
     else if (ev?.k === 'damage') image = PROP_IMAGE.generator
     else if (ev?.k === 'trapSet') image = BEAR_TRAP_IMAGE
     else if (ev?.k === 'madness') kind = 'passive'
+    else if (ev?.k === 'knife') {
+      // The Trickster's passive: Knives shed in a locker
+      kind = 'passive'
+      image = KNIFE_IMAGE
+    }
     else image = pictureOf(e.text)
 
     // Online, an item found in a chest stays hidden from everyone but its finder.
@@ -115,6 +131,17 @@ export class CastBuilder {
       const name = powerName(this.st)
       if (!title.includes(name)) sub = sub ? `${name} · ${sub}` : name
       image = powerImage(this.st) ?? image
+      if (this.powerHits.length > 1 || this.knives) {
+        // the whole room at once: every portrait, and who in words
+        target = undefined
+        const who = this.knives
+          ? `ได้ Knife: ${this.powerHits.map((s) => `${this.st.survivors[s].name} (${this.st.survivors[s].knives ?? 0}/3)`).join(', ')}`
+          : `บาดเจ็บ: ${this.powerHits.map((s) => this.st.survivors[s].name).join(', ')}`
+        sub = `${sub ? `${sub} · ` : ''}${who}`
+        this.shownFor.add(key)
+        this.count++
+        return { owner, kind, title, sub, image, targets: this.powerHits }
+      }
     }
     this.shownFor.add(key)
     this.count++

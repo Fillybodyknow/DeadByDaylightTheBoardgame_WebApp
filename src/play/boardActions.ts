@@ -16,6 +16,7 @@ import {
   itemUses,
   killerInteractions,
   killerMoves,
+  offeredPerks,
   perkButtons,
   perkChoices,
   phantasmInteractions,
@@ -219,13 +220,14 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     return out
   }
 
-  if (modes.aceFirst.value && s.t === 'survivorInteract') {
-    const b = perkButtons(st).find((x) => x.perk === 'ace_in_the_hole')
+  // Ace in the Hole / Iron Maiden: the first prop picked, the second to swap it with
+  if (modes.aceFirst.value && (s.t === 'survivorInteract' || s.t === 'killerInteract')) {
+    const b = perkButtons(st).find((x) => x.perk === 'ace_in_the_hole' || x.perk === 'iron_maiden')
     for (const c of b?.choices ?? [])
       if (c.prop === modes.aceFirst.value)
-        add(`prop:${c.prop2}`, perkChoiceLabel(st, 'ace_in_the_hole', s.s, b!.w, c), () => {
+        add(`prop:${c.prop2}`, `${PERKS[b!.perk].name}: ${perkChoiceLabel(st, b!.perk, b!.owner, b!.w, c)}`, () => {
           modes.aceFirst.value = null
-          go({ t: 'perk', perk: 'ace_in_the_hole', use: true, choice: c }, sfx.select)()
+          go({ t: 'perk', perk: b!.perk, use: true, choice: c }, sfx.select)()
         })
     return out
   }
@@ -349,10 +351,15 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         }
         break
       }
-      for (const c of perkChoices(st, s.perk, s.owner, s.w)) {
-        const label = `${name}: ${perkChoiceLabel(st, s.perk, s.owner, s.w, c)}`
-        const run = go({ t: 'perk', perk: s.perk, use: true, choice: c }, sfx.select)
-        if (c.path) {
+      // several at once: the one picked in the panel (none yet: nothing on the board)
+      const perk = perksToPick(st) ? perkPicked.value : s.perk
+      if (!perk) break
+      for (const c of perkChoices(st, perk, s.owner, s.w)) {
+        const label = `${PERKS[perk].name}: ${perkChoiceLabel(st, perk, s.owner, s.w, c)}`
+        const run = go({ t: 'perk', perk, use: true, choice: c }, sfx.select)
+        // Starstruck: the survivor to pick up instead (the path there is part of the label)
+        if (perk === 'starstruck') add(`s:${c.target}`, label, run, 'act', c.target!)
+        else if (c.path) {
           add(`path:${c.path}`, label, run)
           // where it leads: at a fork the room is then picked on the map, as for any move
           out[out.length - 1].dest = perkDest(st, s.owner, c)
@@ -382,6 +389,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         }
         for (const i of undyingOptions(st, card!, kind))
           if (undyingRoomOf(st, i) === room) add(spotOf(i), killerInteractionLabel(st, i.i), go({ t: 'interact', i }, sfx.select), 'act', i.i.k === 'attack' ? i.i.target : null)
+        break
+      }
+      // Iron Maiden picked in the panel: only its lockers (then hooks)
+      if (perkPicked.value && perksToPick(st)) {
+        perkSpots(st, out, modes)
         break
       }
       if (!powerMode(st, modes)) {
@@ -419,6 +431,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             add(`room:${i.room}`, label, run)
             break
           case 'phantasm':
+          case 'frenzy':
+          case 'showstopper':
           case 'wrath':
           case 'victor':
           case 'rush':
@@ -489,8 +503,11 @@ export const perkPicked = ref<PerkId | null>(null)
  * in the interact step with any (they would mix with the ordinary interactions on the board).
  */
 export function perksToPick(st: GameState): boolean {
+  const s = st.step
+  // several perks of one owner offered at the same moment (p.16)
+  if (s.t === 'offer') return offeredPerks(s).length > 1
   const n = new Set(perkButtons(st).map((b) => b.perk)).size
-  return (st.step.t === 'turnStart' && n > 1) || (st.step.t === 'survivorInteract' && n > 0)
+  return (s.t === 'turnStart' && n > 1) || ((s.t === 'survivorInteract' || s.t === 'killerInteract') && n > 0)
 }
 
 function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
@@ -525,9 +542,10 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
       }
       continue
     }
-    if (b.perk === 'ace_in_the_hole') {
+    if (b.perk === 'ace_in_the_hole' || b.perk === 'iron_maiden') {
+      const then = b.perk === 'iron_maiden' ? 'สลับ Locker นี้ (แล้วเลือก Hook)' : 'สลับ prop นี้ (แล้วเลือกอีกอันในห้องติดกัน)'
       for (const first of new Set(b.choices.map((c) => c.prop!)))
-        out.push({ key: `prop:${first}`, label: `${name}: สลับ prop นี้ (แล้วเลือกอีกอันในห้องติดกัน)`, style: 'act', run: () => ((modes.aceFirst.value = first), sfx.click()) })
+        out.push({ key: `prop:${first}`, label: `${name}: ${then}`, style: 'act', run: () => ((modes.aceFirst.value = first), sfx.click()) })
       continue
     }
     for (const c of b.choices) {

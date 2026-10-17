@@ -100,11 +100,11 @@ and the host starts the game.
   not in yet.
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (66 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (84 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -290,10 +290,49 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   one — struggling free from a carry too (one great success frees them). Not on a Phantasm roll.
 - Deliverance: after Adam takes someone off a hook, or someone takes him off one; placing the
   Entity on an empty hook isn't a rescue. Adam picks which of the two wounded is healed.
+- Feral Frenzy (The Legion): his power, offered with a survivor on the board in his room (one hidden
+  in a locker or on a hook isn't there to wound). It isn't an attack, so Flashlights and attack
+  perks don't answer it.
+- Mad Grit: carrying someone, on entering a room with another healthy survivor on the board.
+- Discordance: a survivor entering a room (by any move) where another survivor is on the board;
+  ▲ for each survivor on the board in that room, the one entering too, and 1 if the killer is
+  there.
+- Iron Maiden: before interacting (a button in his interact step; then he still interacts), an
+  empty revealed locker and an empty revealed hook in another room swap places, anywhere.
+- The Trickster's Knives: a survivor's ▲ maximum is 6 − 2 per Knife; ▲ above it are lost the
+  moment the Knife comes (and stay lost when the Knives go). The third Knife wounds (nothing more
+  if already wounded); a fourth is a sacrifice progress for him instead. With three, no heal of
+  any kind is offered. "Interacts with a locker" is hiding in one, by any means (Quick & Quiet,
+  Self-Preservation too): the Knives go as they hide.
+- Showstopper: everyone on the board (not in a locker, hooked or carried) in his room and the
+  connected ones, whatever stands on the path between.
+- No Way Out: asked before any interaction with a generator or an exit gate (Fast Track's too)
+  by a survivor with fewer ▲ than him; the interaction is lost.
+- Crowd Control: a survivor on the board who sets a card this planning. The survivors pay the 2 ▲
+  between them (1 + 1 or 2 from one). Online every player puts in their own survivors' ▲ (or
+  nothing), each screen showing the tally. Nothing goes through by itself: the chosen survivor's
+  player confirms, paying at 2 ▲ or refusing once everyone has said and it is short; until then
+  anyone may change what they put in. Refused (or not 2 ▲ among them), the killer picks from that
+  survivor's hand and the card is set face up, as Stridor's is.
+- Starstruck: when he would pick someone up, he moves along a path from his room (not through a
+  pallet; a wall breaks, as on his other moves) and picks up another survivor on the board there,
+  wounded or not, wounded this round or not. The move reveals the room and sets off what an
+  entry does, but not Head On (it isn't his turn's move). Someone who hides as he comes in
+  (Quick & Quiet) is not picked up.
 - Fast Track / Self-Preservation (Yun-Jin): "the turn" is any turn, a survivor's or one of the
   killer's; at its end, if another survivor was wounded (by anything, a perk of their own too) or
   hung on a hook during it, she may repair a generator / hide in a locker in her room — an
   interaction out of her own turn. Both may be offered at the same moment; each once a round.
+- Poised (Jane): a great success on a skill check (repair, gate, totem, heal) during a survivor's
+  turn, by any survivor on the board with a card in hand. Jane pays; the roller then picks the card
+  (or lets the turn go). The bonus turn comes after the interaction that rolled, before the
+  turn's end-of-turn perks, and the interrupted turn carries on after it.
+- Solidarity: the ordinary heal (a skill check), on a wounded survivor on the board in a room
+  connected to Jane's, in place of her interaction for the turn (a perk card in her
+  interact step, picked first, then the survivor).
+- Head On: when the killer enters Jane's room during his turn (not carrying: he has interacted
+  already), an empty revealed locker there is removed and he cannot interact (power included)
+  for the rest of that turn. Jane must be on the board (in a locker, perks don't reach her).
 - Smash Hit: any pallet the killer breaks (Enduring's too), any wall he moves through (Diversion's
   too), any generator he damages (with progress or not).
 - Undying: the killer's interaction for the turn, with a prop in a room joined to his by a path

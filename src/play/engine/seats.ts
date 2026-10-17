@@ -4,7 +4,7 @@
 // `actorsOf` says which players the game is waiting on; `mayAct` checks that a player is allowed
 // to send an action. The engine itself still decides whether the action is legal.
 
-import { rollHelpers } from './engine'
+import { crowdPledges, pledgedPay, rollHelpers } from './engine'
 import type { Action, GameState, PerkOwner } from './types'
 
 export const KILLER_PLAYER = 1
@@ -33,6 +33,7 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'sparkChoice':
     case 'replaceCard':
     case 'redeemerGuess':
+    case 'crowdPay':
       return s.s
     case 'revealProp':
       return s.who
@@ -49,6 +50,7 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'pickSurvivor':
     case 'phantasmChoice':
     case 'twinChoice':
+    case 'crowdPick':
       return 'killer'
     default:
       return null
@@ -79,6 +81,9 @@ export function actorsOf(st: GameState): number[] {
   // A roll a key or Iron Will can change: the roller, and everyone else still to decide.
   if (s.t === 'roll')
     return [...new Set([s.ctx.s, ...rollHelpers(st)].map((h) => playerOfSurvivor(st, h)))].sort((a, b) => a - b)
+  // Crowd Control: every survivor's player, until the chosen survivor's player confirms — each
+  // may still change what they put in
+  if (s.t === 'crowdPay') return [...new Set(st.survivors.map((_, i) => playerOfSurvivor(st, i)))].sort((a, b) => a - b)
   const owner = stepOwner(st)
   return owner === null ? [] : [playerOfOwner(st, owner)]
 }
@@ -96,6 +101,18 @@ export function mayAct(st: GameState, player: number, action: Action): boolean {
   if (action.t === 'planKiller') return player === KILLER_PLAYER && actorsOf(st).includes(player)
   if (action.t === 'unplanKiller') return player === KILLER_PLAYER && st.step.t === 'planSurvivors' && !!st.killerDraft
   if (action.t === 'unplanHand') return st.step.t === 'planSurvivors' && st.handPlayers[action.hand] === player
+  // Crowd Control: a survivor's ▲ are put in by their own player; the payment is what was put in
+  if (action.t === 'crowdPledge') return st.step.t === 'crowdPay' && playerOfSurvivor(st, action.s) === player
+  if (action.t === 'crowdPay') {
+    const s = st.step
+    // the confirm is the chosen survivor's: it's their card the killer would set
+    if (s.t !== 'crowdPay' || playerOfSurvivor(st, s.s) !== player) return false
+    const pledge = s.pledge ?? crowdPledges(st)
+    const pay = pledgedPay(pledge)
+    // refusing: only once everyone has said and it came short of 2
+    if (!action.pay.length) return pay.length < 2 && pledge.every((p) => p !== null)
+    return pay.length === 2 && JSON.stringify(pay) === JSON.stringify(action.pay)
+  }
   // The whole-table planning action only makes sense on one shared device.
   if (action.t === 'planSurvivors') return false
   return actorsOf(st).includes(player)

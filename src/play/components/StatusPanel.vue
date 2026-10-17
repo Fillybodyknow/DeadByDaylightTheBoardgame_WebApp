@@ -4,12 +4,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components, items, killerById } from '../../data'
 import { asset } from '../../i18n'
-import { ITEM_NAMES, KILLER_BP, SURVIVOR_BP, isPower, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
+import { ITEM_NAMES, KILLER_BP, isPower, survivorMax, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
 import type { InspectTarget } from '../inspect'
-import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, MADNESS_IMAGE, PROP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
+import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import ObjectiveHud from './ObjectiveHud.vue'
@@ -230,7 +230,11 @@ function onPowerSlot() {
       </div>
       <div class="line small">
         <span class="ptag" :class="{ me: mine.includes(s) }" :title="`ผู้เล่น ${playerOf(st, s)}${mine.includes(s) ? ' (คุณ)' : ''}`">{{ mine.includes(s) ? 'คุณ' : `P${playerOf(st, s)}` }}</span>
-        <span class="bp">{{ st.survivors[s].bp }}/{{ SURVIVOR_BP.max }} ▲</span>
+        <span class="bp">{{ st.survivors[s].bp }}/{{ survivorMax(st, s) }} ▲</span>
+        <!-- The Trickster's Knives: one token each, the ▲ maximum 2 lower for every one -->
+        <span v-if="st.survivors[s].knives" class="knives" :class="{ full: st.survivors[s].knives === 3 }" :title="`Knife ${st.survivors[s].knives}/3 — ▲ สูงสุดลดลง ${2 * st.survivors[s].knives!}${st.survivors[s].knives === 3 ? ' · หายบาดเจ็บไม่ได้' : ''} · เข้า Locker เพื่อทิ้ง`">
+          <img :src="asset(KNIFE_IMAGE)" alt="Knife" /><b>{{ st.survivors[s].knives }}/3</b>
+        </span>
       </div>
       <div class="cards">
         <template v-if="st.survivors[s].planned">
@@ -714,6 +718,26 @@ button.slot:hover .slot-crop {
   color: #ff8a80;
   font-size: 0.82rem;
 }
+.knives {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.74rem;
+  color: #e8b77f;
+}
+.knives.full b {
+  color: var(--blood-bright);
+}
+.knives img {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px #c98a4b;
+}
+/* three: wounded for good until a locker */
+.knives.full img {
+  box-shadow: 0 0 0 1px var(--blood-bright), 0 0 6px var(--blood-bright);
+}
 /* the sacrifice token, on the portrait's top-right corner */
 .token {
   position: absolute;
@@ -738,6 +762,13 @@ button.slot:hover .slot-crop {
   aspect-ratio: 0.72;
   object-fit: cover;
   border-radius: 4px;
+}
+/* the killer's cards share the deck's back: a red frame says whose they are */
+.tile.killer .pcard {
+  box-shadow: 0 0 0 2px var(--blood-bright);
+}
+.tile.killer .pcard.empty {
+  box-shadow: none;
 }
 /* a place waiting for a card or an item: dashed, the size of what goes there */
 .pcard.empty,

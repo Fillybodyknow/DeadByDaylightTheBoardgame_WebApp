@@ -3,7 +3,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { items, killerById, survivorById } from '../../data'
 import { asset, tr } from '../../i18n'
-import { ITEM_NAMES, PROP_NAMES, SURVIVOR_BP, KILLER_BP, roomName } from '../engine/engine'
+import { ITEM_NAMES, PROP_NAMES, KILLER_BP, roomName, survivorMax } from '../engine/engine'
 import type { GameState, PerkOwner } from '../engine/types'
 import { CATEGORY_TH, PROP_RULES, type InspectTarget } from '../inspect'
 import { PERKS } from '../engine/perks'
@@ -80,7 +80,8 @@ const item = computed(() => {
         <ul class="facts">
           <li :class="survivor.sv.wounded ? 'bad' : 'good'">{{ survivor.sv.wounded ? 'บาดเจ็บ' : 'ไม่บาดเจ็บ' }}</li>
           <li>{{ STATUS_TH[survivor.sv.status] }} · {{ roomName(st, survivor.sv.room) }}</li>
-          <li>{{ survivor.sv.bp }}/{{ SURVIVOR_BP.max }} ▲</li>
+          <li>{{ survivor.sv.bp }}/{{ survivorMax(st, survivor.s) }} ▲</li>
+          <li v-if="survivor.sv.knives" :class="{ bad: survivor.sv.knives === 3 }">Knife {{ survivor.sv.knives }}/3 — ▲ สูงสุด −{{ 2 * survivor.sv.knives }}{{ survivor.sv.knives === 3 ? ' · หายบาดเจ็บไม่ได้' : '' }} (เข้า Locker เพื่อทิ้ง)</li>
           <li>{{ survivor.sv.item ? (itemHidden(st, survivor.s) ? 'ถือ item อยู่ (ไม่เปิดเผย)' : `ถือ ${ITEM_NAMES[survivor.sv.item]}`) : 'ไม่มี item' }}</li>
           <li>{{ survivor.sv.sacrificeToken ? 'ยังไม่เคยถูกแขวน' : 'เคยถูกแขวนแล้ว' }}</li>
         </ul>

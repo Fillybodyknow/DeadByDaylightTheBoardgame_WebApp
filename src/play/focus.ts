@@ -2,7 +2,7 @@
 // to decide with: who is involved, where they are, where they would go, how far the killer is.
 
 import { ref } from 'vue'
-import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, killerInteractions, killerMoves, isPower, pathDef, perkChoices, propsIn, roomName, survivorMoves, touchingPaths } from './engine/engine'
+import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, killerInteractions, killerMoves, isPower, pathDef, perkChoices, propsIn, roomName, showstopperTargets, survivorMoves, touchingPaths } from './engine/engine'
 import { PERKS } from './engine/perks'
 import type { GameState, KillerInteraction, PerkChoice, PerkOwner, RollContext } from './engine/types'
 
@@ -240,6 +240,7 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
         facts.push({ who: w.s, icon: '🔍', text: `${st.survivors[w.s].name} เข้า ${roomName(st, w.room)} — ไม่ใช้ = เปิด prop ในห้องนี้` })
         for (const c of choices) if (c.prop) f.dests.push(st.props.find((p) => p.id === c.prop)!.room!)
         break
+      case 'genInteract':
       case 'afterHang':
       case 'afterPalletLocker':
       case 'entered':
@@ -337,6 +338,16 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   if (i.k === 'hatchet') f.survivors.push(i.target)
   if (i.k === 'spark' || i.k === 'bell') f.dests.push(i.room)
   if (i.k === 'phantasm') f.rooms.push(room)
+  // Showstopper: his room, the connected ones, and who gets a Knife
+  if (i.k === 'showstopper') {
+    f.rooms.push(room, ...touchingPaths(st, room).map((p) => (p.a === room ? p.b : p.a)))
+    f.survivors.push(...showstopperTargets(st))
+  }
+  // Feral Frenzy: the room, and everyone in it
+  if (i.k === 'frenzy') {
+    f.rooms.push(room)
+    st.survivors.forEach((sv, s) => sv.status === 'board' && sv.room === room && f.survivors.push(s))
+  }
   // Yamaoka's Wrath counts this room and the connected ones.
   if (i.k === 'wrath') f.rooms.push(room, ...touchingPaths(st, room).map((p) => (p.a === room ? p.b : p.a)))
   if (i.k === 'redeemer') f.survivors.push(i.target)

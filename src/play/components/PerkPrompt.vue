@@ -5,7 +5,7 @@
 // and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
-import { CARD_NAMES, KILLER_CARDS, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
+import { CARD_NAMES, KILLER_CARDS, crowdPayments, crowdPledges, pledgedPay, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
 import { actionKey, perkPicked, perksToPick } from '../boardActions'
@@ -14,7 +14,7 @@ import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
-import { ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
+import { KILLER_CARD_BACK, ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
@@ -53,10 +53,18 @@ function choosePerk(perk: PerkId) {
   perkPicked.value = perkPicked.value === perk ? null : perk
 }
 
+/** The perk being decided: the one offered, or with several at once the one picked (null: none yet). */
+const activePerk = computed<PerkId | null>(() => {
+  const s = step.value
+  if (s.t !== 'offer') return null
+  return offeredPerks(s).length > 1 ? perkPicked.value : s.perk
+})
+
 const offerChoices = computed(() => {
   const s = step.value
-  if (s.t !== 'offer') return []
-  return orderedChoices(props.st, s.perk, s.w, perkChoices(props.st, s.perk, s.owner, s.w))
+  const perk = activePerk.value
+  if (s.t !== 'offer' || !perk) return []
+  return orderedChoices(props.st, perk, s.w, perkChoices(props.st, perk, s.owner, s.w))
 })
 
 // ---------- Tinkerer, Zanshin Tactics: pick the planned card, then what to put in its place ----------
@@ -74,8 +82,16 @@ const plannedCards = computed(() => {
   return k.planned.map((card, i) => ({ card, i, played: i < k.revealedCount, next: i === k.revealedCount }))
 })
 /** Lightborn: which planned card to turn face up, picked on the card itself. */
-const isLightborn = computed(() => step.value.t === 'offer' && step.value.perk === 'lightborn')
+// Lightborn (the killer) and Open-Handed (a survivor) both turn one of the killer's planned cards
+// face up: the cards are laid out to click. The survivor sees only their backs, unless already shown.
+const isLightborn = computed(() => step.value.t === 'offer' && (activePerk.value === 'lightborn' || activePerk.value === 'open_handed'))
 const lightbornChoice = (i: number) => (isLightborn.value ? offerChoices.value.find((c) => c.index === i) : undefined)
+const openHanded = computed(() => activePerk.value === 'open_handed')
+/** A planned card's face is in sight: always for the killer, for a survivor once it is revealed. */
+const faceUp = (i: number) => {
+  const k = props.st.killer
+  return !openHanded.value || i < k.revealedCount || k.shown.includes(i) || k.plannedShown
+}
 
 const tinkerSwaps = computed(() => offerChoices.value.filter((c) => c.index === tinkerIndex.value))
 
@@ -86,9 +102,10 @@ const offerList = computed(() => {
 })
 
 /** What is being decided now, if anything worth the panel. */
-const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | 'guess' | null>(() => {
+const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | 'guess' | 'crowd' | null>(() => {
   const s = step.value
   if (s.t === 'offer') return 'offer'
+  if (s.t === 'crowdPay' || s.t === 'crowdPick') return 'crowd'
   if (s.t === 'sparkChoice') return 'spark'
   if (s.t === 'phantasmChoice') return 'phantasm'
   if (s.t === 'replaceCard') return 'replace'
@@ -105,10 +122,42 @@ const decider = computed<PerkOwner | null>(() => {
   if (s.t === 'turnStart') return s.s
   // online, a helper's device names the helper: it's their key or perk being asked about
   if (s.t === 'roll') return buttons.value[0]?.owner ?? (rollMine.value ? s.ctx.s : (passers.value[0] ?? s.ctx.s))
-  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess') return s.s
-  if (s.t === 'phantasmChoice') return 'killer'
+  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess' || s.t === 'crowdPay') return s.s
+  if (s.t === 'phantasmChoice' || s.t === 'crowdPick') return 'killer'
   return null
 })
+
+/**
+ * Crowd Control: the survivors pay its 2 ▲ between them — a click on a survivor puts in 1 ▲ of
+ * theirs (twice for both), then confirm.
+ */
+const payPick = ref<number[]>([])
+watch(
+  () => JSON.stringify(step.value),
+  () => (payPick.value = []),
+)
+const canPay = computed(() => crowdPayments(props.st).length > 1)
+function addPay(s: number) {
+  const n = payPick.value.filter((x) => x === s).length
+  if (payPick.value.length >= 2 || props.st.survivors[s].bp <= n) return
+  fxSound.flip()
+  payPick.value = [...payPick.value, s].sort((a, b) => a - b)
+}
+const paid = (s: number) => payPick.value.filter((x) => x === s).length
+
+/** Online, each player puts in their own survivors' ▲; the tally shows on every survivor's screen. */
+const pledges = computed(() => {
+  const s = step.value
+  return s.t === 'crowdPay' ? (s.pledge ?? crowdPledges(props.st)) : []
+})
+const pledgeTotal = computed(() => pledges.value.reduce<number>((t, p) => t + (p ?? 0), 0))
+const pledgesIn = computed(() => pledges.value.every((p) => p !== null))
+function pledgeLabel(s: number): string {
+  const p = pledges.value[s]
+  if (p === null) return 'ยังไม่ตัดสินใจ'
+  if (p === 0) return props.st.survivors[s].bp ? 'ไม่ลง' : 'ไม่มี ▲'
+  return `ลง ${p} ▲`
+}
 
 const hagMoves = computed(() => {
   const s = step.value
@@ -121,7 +170,7 @@ function hoverHag(i: KillerInteraction | null, room: string) {
 
 const handCards = computed(() => {
   const s = step.value
-  return s.t === 'replaceCard' ? [...new Set(props.st.survivorHands[props.st.survivors[s.s].hand])] : []
+  return s.t === 'replaceCard' || s.t === 'crowdPick' ? [...new Set(props.st.survivorHands[props.st.survivors[s.s].hand])] : []
 })
 
 const killerSide = computed(() => decider.value === 'killer')
@@ -199,11 +248,11 @@ const MOVE_PERKS: PerkId[] = ['adrenaline', 'saboteur', 'up_the_ante', 'any_mean
 /** The cards to choose from: an offer's card choices (Tinkerer / Zanshin: for the planned card picked), or Predator's new card. */
 const handChoices = computed<PerkChoice[]>(() => {
   const s = step.value
-  if (s.t === 'replaceCard') return handCards.value.map((card) => ({ card }))
+  if (s.t === 'replaceCard' || s.t === 'crowdPick') return handCards.value.map((card) => ({ card }))
   if (s.t === 'redeemerGuess') return KILLER_CARDS.map((card) => ({ card }))
-  if (s.t !== 'offer' || offerList.value.length > 1) return []
+  if (s.t !== 'offer' || !activePerk.value) return []
   // Dragon's Grip discards one or two cards: its choices stay buttons
-  if (s.perk === 'dragons_grip') return []
+  if (activePerk.value === 'dragons_grip') return []
   return isTinkerer.value ? tinkerSwaps.value : offerChoices.value.filter((c) => c.card)
 })
 
@@ -211,23 +260,25 @@ const perkHand = computed<HandCard[]>(() => {
   const s = step.value
   return handChoices.value.map((c) => {
     const picked = cardPick.value?.card === c.card
-    return { card: c.card!, picked, ...(picked && s.t === 'offer' ? { badge: cardCaption(s.perk, c) } : {}) }
+    return { card: c.card!, picked, ...(picked && s.t === 'offer' && activePerk.value ? { badge: cardCaption(activePerk.value, c) } : {}) }
   })
 })
 
 const handLabel = computed(() => {
   const s = step.value
   if (s.t === 'replaceCard') return `Predator — มือของ ${props.st.survivors[s.s].name}`
+  if (s.t === 'crowdPick') return `Crowd Control — มือของ ${props.st.survivors[s.s].name}`
   if (s.t === 'redeemerGuess') return `ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
-  return s.t === 'offer' ? `${PERKS[s.perk].name} — เลือกการ์ดจากมือ` : ''
+  return s.t === 'offer' && activePerk.value ? `${PERKS[activePerk.value].name} — เลือกการ์ดจากมือ` : ''
 })
 
 /** What is asking for a card, shown on the hand itself (it is easy to miss in the corner). */
 const handPrompt = computed(() => {
   const s = step.value
   if (s.t === 'replaceCard') return 'Predator — เลือกการ์ดใบใหม่'
+  if (s.t === 'crowdPick') return `Crowd Control — เลือกการ์ดให้ ${props.st.survivors[s.s].name}`
   if (s.t === 'redeemerGuess') return `Redeemer — ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
-  return s.t === 'offer' ? `${PERKS[s.perk].name} — เลือกการ์ด` : ''
+  return s.t === 'offer' && activePerk.value ? `${PERKS[activePerk.value].name} — เลือกการ์ด` : ''
 })
 
 function pickHandCard(card: MoveCard) {
@@ -237,8 +288,9 @@ function pickHandCard(card: MoveCard) {
 
 function hoverHandCard(card: MoveCard | null) {
   const s = step.value
-  const owner = s.t === 'replaceCard' ? s.s : s.t === 'offer' && MOVE_PERKS.includes(s.perk) ? s.owner : null
-  if (!card || owner === null) return (preview.value = null)
+  const owner = s.t === 'replaceCard' || s.t === 'crowdPick' ? s.s : s.t === 'offer' && activePerk.value && MOVE_PERKS.includes(activePerk.value) ? s.owner : null
+  // Shadowborn's card is played third, from where the first two lead: the map can't say yet
+  if (!card || owner === null || activePerk.value === 'shadowborn') return (preview.value = null)
   preview.value = choicePreview(props.st, { card }, owner === 'killer' ? props.st.killer.room : props.st.survivors[owner].room, owner)
 }
 
@@ -262,8 +314,9 @@ function confirmCard() {
   const c = cardPick.value
   if (!c) return
   if (s.t === 'replaceCard') act({ t: 'replace', card: c.card! })
+  else if (s.t === 'crowdPick') act({ t: 'crowdPick', card: c.card! })
   else if (s.t === 'redeemerGuess') act({ t: 'guess', card: c.card! })
-  else if (s.t === 'offer') act({ t: 'perk', perk: s.perk, use: true, choice: c })
+  else if (s.t === 'offer' && activePerk.value) act({ t: 'perk', perk: activePerk.value, use: true, choice: c })
 }
 
 // Wait for perk cards, dice and board animations to finish before asking.
@@ -297,7 +350,9 @@ onBeforeUnmount(() => wideQuery?.removeEventListener('change', onWide))
 let ownPick = false
 watchEffect(() => {
   const s = step.value
-  const mover = s.t === 'replaceCard' ? s.s : s.t === 'offer' && MOVE_PERKS.includes(s.perk) ? s.owner : null
+  // (not Shadowborn: its card is played third, from wherever the first two lead)
+  const perk = activePerk.value
+  const mover = s.t === 'replaceCard' ? s.s : s.t === 'offer' && perk && perk !== 'shadowborn' && MOVE_PERKS.includes(perk) ? s.owner : null
   if (open.value && !collapsed.value && mover !== null && perkHand.value.length) {
     const room = mover === 'killer' ? props.st.killer.room : props.st.survivors[mover].room
     pathPick.value = pathPickFor(props.st, room, perkHand.value.map((c) => c.card), pickHandCard)
@@ -396,17 +451,30 @@ const boardCount = computed(() => {
 
       <!-- several perks of one owner at the same moment: pick which to use first (p.16) -->
       <template v-if="step.t === 'offer' && offerList.length > 1">
-        <p class="lead">มี {{ offerList.length }} Perk ที่ใช้ได้ในจังหวะนี้ — เลือกใช้ใบไหนก่อนก็ได้ ใบที่เหลือจะถามต่อ (หน้า 16)</p>
-        <div v-for="o in offerList" :key="o.perk" class="perk boxed">
+        <p class="lead">มี {{ offerList.length }} Perk ที่ใช้ได้ในจังหวะนี้ — ใช้ใบไหนก่อนก็ได้ ใบที่เหลือจะถามต่อ (หน้า 16)</p>
+        <p class="small">{{ perkPicked ? 'เลือกของ Perk นี้ — คลิก Perk อีกครั้งเพื่อเปลี่ยน' : '👆 เลือก Perk ที่จะใช้ก่อน' }}</p>
+        <div
+          v-for="o in offerList"
+          :key="o.perk"
+          class="perk boxed pickable"
+          :class="{ picked: perkPicked === o.perk, dim: perkPicked && perkPicked !== o.perk }"
+          role="button"
+          tabindex="0"
+          @click="choosePerk(o.perk)"
+          @keydown.enter="choosePerk(o.perk)"
+        >
           <img v-if="perkImage(o.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(o.perk))" :alt="PERKS[o.perk].name" />
           <div>
             <h3>
               {{ PERKS[o.perk].name }} <span class="cost">{{ cost(o.perk) }}</span>
             </h3>
             <p class="text small">{{ perkText(o.perk) }}</p>
-            <div class="choices inline">
+            <!-- picked: a card from the hand below, or a survivor on the board (or a button here) -->
+            <p v-if="perkPicked === o.perk && o.choices.some((c) => c.card)" class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง แล้วกดยืนยัน</p>
+            <p v-if="perkPicked === o.perk && o.choices.some((c) => !c.card && !here(perkAct(o.perk, c)))" class="board-hint">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</p>
+            <div v-if="perkPicked === o.perk" class="choices inline" @click.stop>
               <button
-                v-for="(c, i) in o.choices.filter((c) => here(perkAct(o.perk, c)))"
+                v-for="(c, i) in o.choices.filter((c) => !c.card && here(perkAct(o.perk, c)))"
                 :key="i"
                 class="primary"
                 @mouseenter="hover(step.owner, c, o.perk)"
@@ -421,6 +489,9 @@ const boardCount = computed(() => {
           </div>
         </div>
         <div class="choices">
+          <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
+            {{ cardPick && activePerk ? `ยืนยัน: ${PERKS[activePerk].name} — ${perkChoiceLabel(st, activePerk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน' }}
+          </button>
           <button @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้ทั้งหมด</button>
           <button class="quiet" @click="act({ t: 'perk', perk: step.perk, use: false, quiet: true })">ไม่ใช้ และไม่ต้องถามอีกในรอบนี้</button>
         </div>
@@ -457,19 +528,19 @@ const boardCount = computed(() => {
             <p class="tinker-step">2. เปลี่ยน {{ CARD_NAMES[st.killer.planned[tinkerIndex]] }} (ใบที่ {{ tinkerIndex + 1 }}) เป็น — เลือกจากไพ่บนมือด้านล่าง</p>
           </template>
         </div>
-        <!-- Lightborn: the two planned cards side by side — click the one to turn face up -->
+        <!-- Lightborn / Open-Handed: the planned cards side by side — click the one to turn face up -->
         <div v-else-if="isLightborn" class="tinker">
-          <p class="tinker-step">คลิกการ์ดที่จะเปิดหงาย (+1 ▲)</p>
+          <p class="tinker-step">{{ openHanded ? 'คลิกการ์ดของฆาตกรที่จะเปิดหงาย' : 'คลิกการ์ดที่จะเปิดหงาย (+1 ▲)' }}</p>
           <div class="card-row">
             <button
-              v-for="p in plannedCards.slice(0, 2)"
+              v-for="p in openHanded ? plannedCards : plannedCards.slice(0, 2)"
               :key="`l${p.i}`"
               class="card-btn planned lightborn"
               :disabled="!lightbornChoice(p.i)"
-              @click="act({ t: 'perk', perk: 'lightborn', use: true, choice: lightbornChoice(p.i)! })"
+              @click="act({ t: 'perk', perk: activePerk!, use: true, choice: lightbornChoice(p.i)! })"
             >
-              <img :src="asset(cardImage(p.card))" :alt="cardLabel(p.card)" />
-              <span>ใบที่ {{ p.i + 1 }} ({{ p.i === 0 ? 'ซ้าย' : 'ขวา' }}) · {{ lightbornChoice(p.i) ? CARD_NAMES[p.card] : 'เปิดแล้ว' }}</span>
+              <img :src="asset(faceUp(p.i) ? cardImage(p.card) : KILLER_CARD_BACK)" :alt="faceUp(p.i) ? cardLabel(p.card) : 'คว่ำ'" />
+              <span>ใบที่ {{ p.i + 1 }} ({{ p.i === 0 ? 'ซ้าย' : p.i === 1 ? 'ขวา' : 'โบนัส' }}) · {{ !lightbornChoice(p.i) ? (p.played ? 'เล่นแล้ว' : 'เปิดแล้ว') : faceUp(p.i) ? CARD_NAMES[p.card] : 'คว่ำอยู่' }}</span>
             </button>
           </div>
         </div>
@@ -592,6 +663,80 @@ const boardCount = computed(() => {
         <p class="lead">Predator ทิ้งการ์ดของ {{ st.survivors[step.s].name }} — เลือกการ์ดใบใหม่ (คว่ำไว้)</p>
         <p class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง — ชี้เพื่อดูเส้นทาง</p>
         <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: วาง ${CARD_NAMES[cardPick.card!]} (คว่ำ)` : 'เลือกการ์ดจากมือก่อน' }}</button>
+      </template>
+
+      <!-- Crowd Control: the survivors buy it off together, or the killer sets the card -->
+      <template v-else-if="step.t === 'crowdPay'">
+        <p class="lead">
+          <b>Crowd Control!</b> {{ st.killer.name }} เลือก <b>{{ st.survivors[step.s].name }}</b>
+        </p>
+        <p class="text small">ผู้รอดชีวิตรวมกันจ่าย 2 ▲ (ใครจ่ายก็ได้) — ถ้าไม่จ่าย {{ st.killer.name }} จะเลือกการ์ดเคลื่อนที่ที่ {{ st.survivors[step.s].name }} ต้องวางรอบนี้ (เปิดหน้า)</p>
+        <!-- online: each player puts in their own ▲; at 2, anyone confirms -->
+        <template v-if="online">
+          <div class="pledges">
+            <div v-for="(sv, s) in st.survivors" :key="s" class="pledge" :class="{ on: (pledges[s] ?? 0) > 0, waiting: pledges[s] === null }">
+              <Mini class="face" :src="asset(survivorMini(st, s))" :alt="sv.name" />
+              <span class="pledge-who">{{ sv.name }} <span class="muted">({{ sv.bp }} ▲)</span></span>
+              <span v-if="!controls(st, s) || !sv.bp" class="pledge-state">{{ pledgeLabel(s) }}</span>
+              <span v-else class="pledge-btns">
+                <button
+                  v-for="n in [0, 1, 2]"
+                  :key="n"
+                  type="button"
+                  :class="{ picked: pledges[s] === n }"
+                  :disabled="n > sv.bp || pledgeTotal - (pledges[s] ?? 0) + n > 2"
+                  @click="act({ t: 'crowdPledge', s, n })"
+                >
+                  {{ n ? `ลง ${n} ▲` : 'ไม่ลง' }}
+                </button>
+              </span>
+            </div>
+          </div>
+          <p class="pledge-total" :class="{ full: pledgeTotal === 2 }">รวม {{ pledgeTotal }}/2 ▲</p>
+          <div class="choices">
+            <!-- nothing goes through by itself: the chosen survivor's player confirms, paying or refusing -->
+            <button v-if="!controls(st, step.s)" class="primary" disabled>
+              {{ pledgeTotal === 2 ? `ครบ 2 ▲ — รอ ${st.survivors[step.s].name} ยืนยัน` : pledgesIn ? `รอ ${st.survivors[step.s].name} ยืนยันไม่จ่าย` : `รอทุกคนตัดสินใจ (รวม ${pledgeTotal}/2 ▲)` }}
+            </button>
+            <button v-else-if="pledgeTotal === 2" class="primary crowd-pay" @click="act({ t: 'crowdPay', pay: pledgedPay(pledges) })">ยืนยัน: จ่าย 2 ▲</button>
+            <button v-else-if="pledgesIn" class="primary crowd-refuse" @click="act({ t: 'crowdPay', pay: [] })">ยืนยัน: ไม่จ่าย — ให้ {{ st.killer.name }} เลือกการ์ด</button>
+            <button v-else class="primary" disabled>รอทุกคนตัดสินใจ (อีก {{ 2 - pledgeTotal }} ▲ ถึงจะจ่ายได้)</button>
+          </div>
+          <p class="small muted">{{ st.survivors[step.s].name }} เป็นคนกดยืนยัน — ก่อนนั้นทุกคนเปลี่ยนที่ตัวเองลงได้</p>
+        </template>
+        <template v-else-if="canPay">
+          <p class="small">คลิกผู้รอดชีวิตเพื่อใส่ 1 ▲ ของเขา (คลิกซ้ำ = 2 ▲) — รวมให้ครบ 2 ▲</p>
+          <div class="payers">
+            <button
+              v-for="(sv, s) in st.survivors"
+              :key="s"
+              type="button"
+              class="payer"
+              :class="{ on: paid(s) > 0 }"
+              :disabled="sv.bp <= paid(s) || payPick.length >= 2"
+              @click="addPay(s)"
+            >
+              <Mini class="face" :src="asset(survivorMini(st, s))" :alt="sv.name" />
+              <span class="payer-name">{{ sv.name }}</span>
+              <span class="payer-bp">{{ sv.bp - paid(s) }} ▲<b v-if="paid(s)"> −{{ paid(s) }}</b></span>
+            </button>
+          </div>
+          <div class="choices">
+            <button class="primary crowd-pay" :disabled="payPick.length < 2" @click="act({ t: 'crowdPay', pay: payPick })">
+              {{ payPick.length < 2 ? `เลือกอีก ${2 - payPick.length} ▲` : 'ยืนยัน: จ่าย 2 ▲' }}
+            </button>
+            <button v-if="payPick.length" @click="payPick = []">ล้างที่เลือก</button>
+          </div>
+        </template>
+        <div v-if="!online" class="choices">
+          <button class="crowd-refuse" @click="act({ t: 'crowdPay', pay: [] })">ไม่จ่าย — ให้ {{ st.killer.name }} เลือกการ์ด</button>
+        </div>
+      </template>
+      <template v-else-if="step.t === 'crowdPick'">
+        <p class="lead"><b>Crowd Control</b> — เลือกการ์ดที่ {{ st.survivors[step.s].name }} ต้องวางรอบนี้</p>
+        <p class="text small">การ์ดจะวางแบบเปิดหน้า ผู้รอดชีวิตคนนี้ไม่ต้องวางแผนเอง</p>
+        <p class="hand-hint">👇 เลือกจากมือของ {{ st.survivors[step.s].name }} ด้านล่าง — ชี้เพื่อดูเส้นทาง</p>
+        <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: ให้วาง ${CARD_NAMES[cardPick.card!]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
       </template>
 
       <!-- The Deathslinger's Redeemer: guess the card he discarded face down -->
@@ -881,6 +1026,88 @@ h3 {
 .choices {
   display: grid;
   gap: 0.4rem;
+}
+/* Crowd Control online: one row per survivor, what they put in */
+.pledges {
+  display: grid;
+  gap: 0.3rem;
+}
+.pledge {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.04);
+}
+.pledge .face {
+  width: 34px;
+  height: 34px;
+}
+.pledge.on {
+  box-shadow: inset 0 0 0 1px var(--blood-bright);
+}
+.pledge.waiting .pledge-state {
+  color: var(--muted, #999);
+  font-style: italic;
+}
+.pledge-who {
+  font-size: 0.85rem;
+}
+.pledge-state {
+  font-size: 0.8rem;
+  color: #ff8a80;
+}
+.pledge-btns {
+  display: flex;
+  gap: 0.2rem;
+}
+.pledge-btns button {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.76rem;
+}
+.pledge-btns button.picked {
+  background: var(--blood);
+  color: #fff;
+}
+.pledge-total {
+  margin: 0.3rem 0;
+  text-align: center;
+  font-weight: 700;
+}
+.pledge-total.full {
+  color: #ff8a80;
+}
+/* Crowd Control: the survivors putting in a ▲ each */
+.payers {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+}
+.payer {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 0.4rem 0.2rem;
+  border-radius: 10px;
+}
+.payer .face {
+  width: 44px;
+  height: 44px;
+}
+.payer.on {
+  box-shadow: 0 0 0 2px var(--blood-bright), 0 0 12px rgb(255 60 60 / 0.5);
+}
+.payer-name {
+  font-size: 0.78rem;
+}
+.payer-bp {
+  font-size: 0.78rem;
+  color: #ff8a80;
+}
+.payer-bp b {
+  color: #fff;
 }
 .choices.inline {
   display: flex;

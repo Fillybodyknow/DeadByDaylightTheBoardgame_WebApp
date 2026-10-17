@@ -36,3 +36,24 @@ describe('action cards', () => {
     expect(b.of(move('killer'))?.image).toContain('vault')
   })
 })
+
+describe('a power that wounds a whole room', () => {
+  it('shows one card naming everyone hit, however many', () => {
+    let prev = createGame({ board: 'macmillan', survivors: ['dwight', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'legion', name: 'legion' }, players: 5, seed: 1 })
+    while (prev.step.t === 'setupReveal') prev = apply(prev, legalActions(prev)[0])
+    const room = prev.killer.room
+    prev.survivors.forEach((sv) => Object.assign(sv, { room, status: 'board', wounded: false }))
+    prev.phase = 'killer'
+    prev.killer.planned = ['wait', 'wait']
+    prev.killer.revealedCount = 1
+    prev.step = { t: 'killerInteract', turn: 0, canInteract: true }
+    prev.queue = [{ k: 'endKillerTurn', turn: 0 }]
+    const st = apply(prev, { t: 'interact', i: { k: 'frenzy' } })
+    const b = new CastBuilder(prev, st)
+    // the power's card, then the next turn's (the scene runs on): one card for the whole room
+    const casts = st.log.slice(prev.log.length).map((e) => b.of(e)).filter((c) => c && c.kind !== 'move')
+    expect(casts).toHaveLength(1)
+    expect(casts[0]!.kind).toBe('power')
+    expect(casts[0]!.targets).toEqual([0, 1, 2, 3])
+  })
+})

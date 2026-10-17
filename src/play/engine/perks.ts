@@ -40,8 +40,14 @@ export type PerkId =
   | 'dragons_grip'
   | 'undying'
   | 'rancor'
+  | 'mad_grit'
+  | 'discordance'
+  | 'iron_maiden'
   | 'haunted_ground'
   | 'spirit_fury'
+  | 'no_way_out'
+  | 'crowd_control'
+  | 'starstruck'
   // survivors
   | 'prove_thyself'
   | 'leader'
@@ -82,6 +88,9 @@ export type PerkId =
   | 'desperate_measures'
   | 'visionary'
   | 'built_to_last'
+  | 'poised'
+  | 'solidarity'
+  | 'head_on'
 
 export interface PerkDef {
   id: PerkId
@@ -166,6 +175,12 @@ export const PERKS: Record<PerkId, PerkDef> = {
   blood_favour: def('blood_favour', 'Blood Favour', 0, 'killer', 'blight', 0, 'ทำงานเองตอนเริ่มเก็บกวาด ถ้าทุกคนบาดเจ็บและไม่มีใครบน Hook'),
   dragons_grip: def('dragons_grip', "Dragon's Grip", 1, 'killer', 'blight', 1, 'ถามหลังทำลาย Generator'),
   undying: def('undying', 'Undying', 1, 'killer', 'blight', 2, 'เป็น Interaction: ทิ้งการ์ดแล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น'),
+  mad_grit: def('mad_grit', 'Mad Grit', 0, 'killer', 'legion', 0, 'ถามเมื่อแบกผู้รอดชีวิตเข้าห้องที่มีผู้รอดชีวิตอีกคน'),
+  discordance: def('discordance', 'Discordance', 0, 'killer', 'legion', 1, 'ถามเมื่อผู้รอดชีวิตเข้าห้องที่มีผู้รอดชีวิตอีกคน'),
+  iron_maiden: def('iron_maiden', 'Iron Maiden', 2, 'killer', 'legion', 2, 'ปุ่มก่อน Interact: สลับ Locker ว่างกับ Hook ว่าง'),
+  no_way_out: def('no_way_out', 'No Way Out', 1, 'killer', 'trickster', 0, 'ถามเมื่อผู้รอดชีวิตที่มี ▲ น้อยกว่าคุณจะ Interact กับ Generator / Exit Gate'),
+  crowd_control: def('crowd_control', 'Crowd Control', 1, 'killer', 'trickster', 1, 'ถามตอนเริ่มเฟสวางแผน'),
+  starstruck: def('starstruck', 'Starstruck', 2, 'killer', 'trickster', 2, 'ถามเมื่อคุณจะอุ้มผู้รอดชีวิต'),
   rancor: def('rancor', 'Rancor', 2, 'killer', 'spirit', 0, 'ถามเมื่อคุณเดินออกจากห้องที่มีผู้รอดชีวิตบาดเจ็บ'),
   haunted_ground: def('haunted_ground', 'Haunted Ground', 1, 'killer', 'spirit', 1, 'ถามหลังผู้รอดชีวิตเปิด prop'),
   spirit_fury: def('spirit_fury', 'Spirit Fury', 0, 'killer', 'spirit', 2, 'ถามหลังคุณทำลาย Pallet'),
@@ -181,6 +196,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   desperate_measures: def('desperate_measures', 'Desperate Measures', 1, 'survivor', 'felix', 0, 'ถามหลัง Interact ครั้งแรกในเทิร์นตัวเอง'),
   visionary: def('visionary', 'Visionary', 0, 'survivor', 'felix', 1, 'ถามเมื่อจะเปิด prop ตอนเข้าห้อง'),
   built_to_last: def('built_to_last', 'Built to Last', 2, 'survivor', 'felix', 2, 'ถามเมื่อจะทิ้ง item หลังใช้'),
+  poised: def('poised', 'Poised', 1, 'survivor', 'jane', 0, 'ถามเมื่อผู้รอดชีวิตทอย Skill Check ได้สำเร็จอย่างยิ่งในเทิร์นผู้รอดชีวิต'),
+  solidarity: def('solidarity', 'Solidarity', 1, 'survivor', 'jane', 1, 'ปุ่มแทนการ Interact: รักษาผู้รอดชีวิตในห้องที่เชื่อมกัน'),
+  head_on: def('head_on', 'Head On', 1, 'survivor', 'jane', 2, 'ถามเมื่อฆาตกรเข้าห้องของคุณในเทิร์นฆาตกร'),
 }
 
 /** Printed perks by character (Adept mode). Characters not listed play without perks for now. */
@@ -190,4 +208,4 @@ export const PRINTED_PERKS: Record<string, PerkId[]> = Object.values(PERKS).redu
 }, {})
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster']

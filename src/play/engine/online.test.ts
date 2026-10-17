@@ -340,3 +340,58 @@ describe('log archive (small online writes)', () => {
     expect(trimLog(st, new Set([3])).log.length).toBe(4)
   })
 })
+
+describe('Crowd Control online: each player puts in their own ▲', () => {
+  /** The Trickster has just picked survivor 1 (player 3): the survivors' answer is due. */
+  function asked(players: GameConfig['players'] = 5): GameState {
+    let st = createGame({ ...config(1, players), killer: { id: 'trickster', name: 'trickster' } })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    expect(st.step).toMatchObject({ t: 'offer', perk: 'crowd_control' })
+    return apply(st, { t: 'perk', perk: 'crowd_control', use: true, choice: { target: 1 } })
+  }
+
+  it("only a survivor's own player puts in their ▲, and 2 ▲ wait for a confirm", () => {
+    let st = asked()
+    expect(actorsOf(st)).toEqual([2, 3, 4, 5])
+    expect(mayAct(st, 3, { t: 'crowdPledge', s: 0, n: 1 })).toBe(false) // survivor 0 is player 2's
+    // nobody can spend ▲ that weren't put in
+    expect(mayAct(st, 3, { t: 'crowdPay', pay: [0, 2] })).toBe(false)
+    st = apply(st, { t: 'crowdPledge', s: 0, n: 1 })
+    expect(actorsOf(st)).toEqual([2, 3, 4, 5]) // player 2 has said, and may still change it
+    st = apply(st, { t: 'crowdPledge', s: 2, n: 1 })
+    expect(st.step).toMatchObject({ t: 'crowdPay', pledge: [1, null, 1, null] })
+    expect(st.survivors[0].bp).toBe(2) // not paid yet
+    expect(actorsOf(st)).toEqual([2, 3, 4, 5]) // each may still change theirs
+    // only the chosen survivor's player (Meg's: player 3) confirms
+    expect(mayAct(st, 5, { t: 'crowdPay', pay: [0, 2] })).toBe(false)
+    expect(mayAct(st, 3, { t: 'crowdPay', pay: [0, 2] })).toBe(true)
+    expect(mayAct(st, 3, { t: 'crowdPay', pay: [0, 0] })).toBe(false)
+    st = apply(st, { t: 'crowdPay', pay: [0, 2] })
+    expect([st.survivors[0].bp, st.survivors[2].bp]).toEqual([1, 1])
+    expect(st.step.t).toBe('planSurvivors')
+  })
+
+  it('refused only on a confirm, once everyone has said and it is short of 2', () => {
+    let st = asked()
+    for (const s of [0, 1, 2]) st = apply(st, { t: 'crowdPledge', s, n: 0 })
+    expect(mayAct(st, 3, { t: 'crowdPay', pay: [] })).toBe(false) // Jake hasn't said
+    st = apply(st, { t: 'crowdPledge', s: 3, n: 1 })
+    // everyone has said: nothing happens until someone confirms
+    expect(st.step.t).toBe('crowdPay')
+    expect(mayAct(st, 3, { t: 'crowdPay', pay: [] })).toBe(true)
+    expect(mayAct(st, 2, { t: 'crowdPay', pay: [] })).toBe(false)
+    st = apply(st, { t: 'crowdPay', pay: [] })
+    expect(st.step).toEqual({ t: 'crowdPick', s: 1 })
+  })
+
+  it('with 3 players, one player saying for both their survivors still gets to confirm', () => {
+    let st = asked(3)
+    const mine = [0, 1, 2, 3].filter((s) => playerOfSurvivor(st, s) === playerOfSurvivor(st, 0))
+    expect(mine).toHaveLength(2)
+    for (const s of mine) st = apply(st, { t: 'crowdPledge', s, n: 0 })
+    expect(st.step.t).toBe('crowdPay')
+    expect(actorsOf(st)).toContain(playerOfSurvivor(st, 0))
+    for (const s of [0, 1, 2, 3].filter((s) => !mine.includes(s))) st = apply(st, { t: 'crowdPledge', s, n: 0 })
+    expect(st.step.t).toBe('crowdPay') // all said no: still waits for the confirm
+  })
+})

@@ -333,9 +333,15 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: 'Calm Spirit: คลิกห้องที่จะส่ง Crow ไป', cancel: () => (calmCrow.value = null) }
-  if (aceFirst.value) return { text: 'Ace in the Hole: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
-  if (perkPicked.value && view.value.step.t === 'survivorInteract')
-    return { text: `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`, cancel: () => (perkPicked.value = null) }
+  if (aceFirst.value)
+    return view.value.step.t === 'killerInteract'
+      ? { text: 'Iron Maiden: คลิก Hook ที่จะสลับกับ Locker นี้', cancel: () => (aceFirst.value = null) }
+      : { text: 'Ace in the Hole: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
+  if (perkPicked.value && (view.value.step.t === 'survivorInteract' || view.value.step.t === 'killerInteract'))
+    return {
+      text: perkPicked.value === 'iron_maiden' ? 'Iron Maiden: คลิก Locker ว่างที่กระพริบบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`,
+      cancel: () => (perkPicked.value = null),
+    }
   if (breakoutTarget.value !== null)
     return { text: `Breakout: ย้าย ${view.value.survivors[breakoutTarget.value].name} — คลิกเส้นทางบนแผนที่`, cancel: () => (breakoutTarget.value = null) }
   if (trapPath.value) return { text: 'Bear Trap หมดมือ: คลิก Bear Trap บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
@@ -564,6 +570,10 @@ const askWhat = computed(() => {
       return `ใช้ ${s.item === 'flashlight' ? 'Flashlight' : 'Firecracker'} ไหม?`
     case 'roll':
       return controls(st, s.ctx.s) ? 'ผลทอยของคุณ — ตัดสินใจ' : `${st.survivors[s.ctx.s].name} ทอยลูกเต๋า — จะช่วยไหม?`
+    case 'crowdPay':
+      return `Crowd Control: ${st.survivors[s.s].name} — ลง ▲ ช่วยจ่ายไหม?`
+    case 'crowdPick':
+      return `Crowd Control: เลือกการ์ดให้ ${st.survivors[s.s].name}`
     default:
       return st.phase === 'killer' ? `ตาของ ${st.killer.name}` : st.activeSurvivor !== null ? `ตาของ ${st.survivors[st.activeSurvivor].name}` : 'ถึงตาคุณ'
   }

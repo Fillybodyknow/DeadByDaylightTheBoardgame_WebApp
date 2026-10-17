@@ -181,6 +181,8 @@ const POWER_HINT: Record<string, string> = {
   oni: 'รับ ▲ เท่ากับจำนวนผู้รอดชีวิตที่บาดเจ็บ และ Hex Totem ในห้องนี้กับห้องที่เชื่อมกัน',
   twins: 'วาง Victor ในห้องนี้ (ถ้าอยู่ที่อื่นจะย้ายมา) — เทิร์นต่อไปเลือกเล่นด้วย Victor ได้',
   spirit: 'ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น — คลิกเป้าหมายบนแผนที่',
+  legion: 'ผู้รอดชีวิตทุกคนในห้องนี้บาดเจ็บ — ถ้ามีคนบาดเจ็บอยู่แล้วอย่างน้อย 1 คน ได้ +1 ▲',
+  trickster: 'ผู้รอดชีวิตในห้องนี้และห้องที่เชื่อมกันได้ Knife คนละ 1 เล่ม — เล่มที่ 3 บาดเจ็บ, เกิน 3 = Sacrifice +1',
   blight: 'สุ่มทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามเส้นทางสีนั้น — เข้าห้องใหม่ได้: Interact ที่นั่น หรือพุ่งต่อ',
 }
 
@@ -223,6 +225,9 @@ const undyingHere = computed(() =>
     ? undyingOptions(props.st, props.undyingCard, stepKind.value).filter((i) => undyingRoomOf(props.st, i) === props.undyingRoom)
     : [],
 )
+
+/** Perks that swap two props: picked one prop at a time on the board, never listed as pairs. */
+const SWAPS: PerkId[] = ['ace_in_the_hole', 'iron_maiden']
 
 /** An interact-step perk, picked before its targets show on the board. */
 function pickInteractPerk(perk: PerkId) {
@@ -468,13 +473,20 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </div>
       <!-- a perk is picked first (its targets then show on the board), again to put it back -->
       <div v-for="b in buttons" :key="b.perk" class="perk-group" :class="{ picked: perkPicked === b.perk }">
-        <button type="button" class="perk-name" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
-          {{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span>
-          <span class="muted small">{{ perkPicked === b.perk ? '— เลือกเป้าหมาย (คลิกอีกครั้งเพื่อยกเลิก)' : '— คลิกเพื่อใช้' }}</span>
+        <!-- the perk's card: picture, name, cost and text — a click picks it -->
+        <button type="button" class="perk-name perk-card" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
+          <img v-if="perkImage(b.perk)" :src="asset(perkImage(b.perk))" alt="" />
+          <span class="perk-card-body">
+            <span class="perk-card-title">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
+            <span class="perk-card-text">{{ perkText(b.perk) }}</span>
+            <span class="perk-card-hint">{{ perkPicked === b.perk ? '🎯 เลือกเป้าหมาย — คลิกอีกครั้งเพื่อยกเลิก' : '👆 คลิกเพื่อใช้' }}</span>
+          </span>
         </button>
         <template v-if="perkPicked === b.perk">
-          <button v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
-          <span v-if="b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
+          <!-- a swap (Ace in the Hole, Iron Maiden) is two props, one click each on the board -->
+          <span v-if="SWAPS.includes(b.perk)" class="muted small">🎯 {{ b.perk === 'iron_maiden' ? 'คลิก Locker ว่างบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย' }}</span>
+          <button v-for="(c, i) in SWAPS.includes(b.perk) ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+          <span v-if="!SWAPS.includes(b.perk) && b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
         </template>
       </div>
       <button class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
@@ -653,13 +665,31 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           >
         </p>
         <div class="buttons col">
-          <button v-for="(i, n) in kInteractions.plain" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
+          <button v-for="(i, n) in perkPicked ? [] : kInteractions.plain" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
           <button v-if="kInteractions.undying.length" class="undying" @click="emit('undyingOn', true), sfx.click()">
             🃏 Undying ({{ PERKS.undying.cost }} ▲): ทิ้งการ์ด แล้ว Interact ในห้องข้าง ๆ
           </button>
           <button v-if="kInteractions.powers.length" class="power" @click="emit('powerOn', true), sfx.click()">⚡ ใช้พลัง: {{ powerName(st) }}</button>
           <span v-else-if="st.killer.powerUsed" class="muted small">ใช้พลังไปแล้วรอบนี้</span>
           <span v-else class="muted small">ใช้พลังไม่ได้จากห้องนี้</span>
+        </div>
+        <!-- a perk is picked first (its targets then show on the board), again to put it back -->
+        <div v-for="b in buttons" :key="b.perk" class="perk-group" :class="{ picked: perkPicked === b.perk }">
+          <!-- the perk's card: picture, name, cost and text — a click picks it -->
+          <button type="button" class="perk-name perk-card" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
+            <img v-if="perkImage(b.perk)" :src="asset(perkImage(b.perk))" alt="" />
+            <span class="perk-card-body">
+              <span class="perk-card-title">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
+              <span class="perk-card-text">{{ perkText(b.perk) }}</span>
+              <span class="perk-card-hint">{{ perkPicked === b.perk ? '🎯 เลือกเป้าหมาย — คลิกอีกครั้งเพื่อยกเลิก' : '👆 คลิกเพื่อใช้' }}</span>
+            </span>
+          </button>
+          <template v-if="perkPicked === b.perk">
+            <!-- a swap (Ace in the Hole, Iron Maiden) is two props, one click each on the board -->
+            <span v-if="SWAPS.includes(b.perk)" class="muted small">🎯 {{ b.perk === 'iron_maiden' ? 'คลิก Locker ว่างบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย' }}</span>
+            <button v-for="(c, i) in SWAPS.includes(b.perk) ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+            <span v-if="!SWAPS.includes(b.perk) && b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
+          </template>
         </div>
       </template>
       <button v-if="!powerMode" class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
@@ -879,6 +909,40 @@ p {
   font-size: 0.85rem;
   color: #d8c2ff;
   border-color: rgb(155 107 214 / 0.6);
+}
+/* the perk as its card: picture on the left, name, cost, text and what a click does */
+.perk-card {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.45rem;
+  font-family: inherit;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.perk-card img {
+  width: 64px;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px rgb(155 107 214 / 0.7);
+}
+.perk-card-body {
+  display: grid;
+  gap: 0.2rem;
+}
+.perk-card-title {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: #e8dbff;
+}
+.perk-card-text {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+.perk-card-hint {
+  font-size: 0.76rem;
+  color: #d8c2ff;
 }
 /* the perk picked: its targets are on the board */
 .perk-group.picked {

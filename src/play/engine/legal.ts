@@ -3,6 +3,8 @@
 import {
   anyMoves,
   carryMoves,
+  crowdPayments,
+  crowdPledges,
   itemUses,
   killerInteractions,
   killerMoves,
@@ -92,6 +94,20 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'replaceCard':
       for (const card of new Set(st.survivorHands[st.survivors[step.s].hand])) out.push({ t: 'replace', card })
+      break
+    case 'crowdPay':
+      for (const pay of crowdPayments(st)) out.push({ t: 'crowdPay', pay })
+      {
+        // online: each survivor still to say puts in what they can
+        const pledge = step.pledge ?? crowdPledges(st)
+        const total = pledge.reduce<number>((t, p) => t + (p ?? 0), 0)
+        pledge.forEach((p, s) => {
+          if (p === null) for (let n = 0; n <= Math.min(2, st.survivors[s].bp, 2 - total); n++) out.push({ t: 'crowdPledge', s, n })
+        })
+      }
+      break
+    case 'crowdPick':
+      for (const card of new Set(st.survivorHands[st.survivors[step.s].hand])) out.push({ t: 'crowdPick', card })
       break
     case 'redeemerGuess':
       for (const card of KILLER_CARDS) out.push({ t: 'guess', card })

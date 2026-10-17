@@ -1,7 +1,7 @@
 // Thai labels for actions, steps and pieces.
 
 import { killerById, survivorById } from '../data'
-import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, boardOf, pathDef, roomName, tokenOf, wrathGain } from './engine/engine'
+import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import type { GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
 import type { Perk } from '../types'
@@ -28,10 +28,17 @@ export const PROP_IMAGE: Record<PropKind, string> = {
 }
 
 export const cardImage = (c: MoveCard) => `assets/movement/${c}.webp`
-export const SURVIVOR_CARD_BACK = 'assets/movement/back-one.webp'
-export const KILLER_CARD_BACK = 'assets/movement/back-skull.webp'
+/**
+ * A survivor's face-down movement card: the deck's own back. (The numbered backs, back-one to
+ * back-five, mark one player's hand at the table; a single one for every survivor misled.)
+ */
+export const SURVIVOR_CARD_BACK = 'assets/movement/back_movement_card.webp'
+/** The killer's face-down movement cards: the same deck back as the survivors' (a red frame tells them apart). */
+export const KILLER_CARD_BACK = 'assets/movement/back_movement_card.webp'
 /** The Doctor's Madness token. */
 export const MADNESS_IMAGE = 'assets/killers/tokens/doctor-madness.webp'
+/** The Trickster's Knife token (resized to 256 px, as Madness). */
+export const KNIFE_IMAGE = 'assets/killers/tokens/trickster-knife.webp'
 export const BEAR_TRAP_IMAGE = 'assets/killers/tokens/trapper-bear-trap.webp'
 /** The Twins: Victor's own mini. */
 export const VICTOR_MINI = 'assets/killers/mini/twins_victor.webp'
@@ -166,6 +173,14 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Blighted Corruption: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
     case 'hoard':
       return 'Hoarder: นำ Chest ออก (+2 ▲)'
+    case 'showstopper': {
+      const who = showstopperTargets(st).map((s) => st.survivors[s])
+      return `Showstopper: Knife ให้ ${who.map((sv) => `${sv.name} (${sv.knives ?? 0}→${Math.min(3, (sv.knives ?? 0) + 1)})`).join(', ')}`
+    }
+    case 'frenzy': {
+      const here = st.survivors.filter((sv) => sv.status === 'board' && sv.room === st.killer.room)
+      return `Feral Frenzy: ${here.map((sv) => sv.name).join(', ')} บาดเจ็บ${here.some((sv) => sv.wounded) ? ' (+1 ▲)' : ''}`
+    }
     case 'haunt':
       return `Yamaoka's Haunting: ทิ้ง ${CARD_NAMES[i.card]} → ${killerInteractionLabel(st, i.i)} ที่ ${roomName(st, i.room)}`
     case 'undying': {
@@ -311,6 +326,15 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `ซ่อนใน Locker ที่ ${roomName(st, prop(st, c.prop!).room!)}`
     case 'smash_hit':
       return '+1 ▲'
+    case 'mad_grit':
+      return `ทำให้ ${name(c.target!)} บาดเจ็บ`
+    case 'discordance':
+      return 'รับ ▲ ตามจำนวนคนในห้อง'
+    case 'iron_maiden': {
+      const l = prop(st, c.prop!)
+      const h = prop(st, c.prop2!)
+      return `สลับ Locker (${roomName(st, l.room!)}) ↔ Hook (${roomName(st, h.room!)})`
+    }
     case 'rancor':
       return `ลาก ${name(c.target!)} ไปด้วย`
     case 'haunted_ground': {
@@ -384,6 +408,18 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       const p = prop(st, c.prop!)
       return `เปิด prop สี${PROP_CATEGORY_TH[p.category]} ที่ ${roomName(st, p.room!)} แทน`
     }
+    case 'no_way_out':
+      return `ห้าม ${name((w as { s: number }).s)} Interact`
+    case 'crowd_control':
+      return `เลือก ${name(c.target!)} (ผู้รอดชีวิตจ่าย 2 ▲ หรือคุณเลือกการ์ดให้)`
+    case 'starstruck':
+      return `ไป ${roomName(st, (() => { const p = pathDef(st, c.path!); return p.a === st.killer.room ? p.b : p.a })())} แล้วอุ้ม ${name(c.target!)} แทน`
+    case 'solidarity':
+      return `รักษา ${name(c.target!)} ที่ ${roomName(st, st.survivors[c.target!].room)}`
+    case 'poised':
+      return `ให้ ${name(c.target!)} เล่น Bonus Turn`
+    case 'head_on':
+      return `นำ Locker ออก — ${st.killer.name} Interact ไม่ได้เทิร์นนี้`
     case 'built_to_last':
       return `เก็บ ${ITEM_NAMES[(w as { item: string }).item]} ไว้`
     default:
@@ -450,6 +486,12 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return 'เริ่มเก็บกวาด'
     case 'killerEntered':
       return `${st.killer.name} เข้ามาใน ${roomName(st, w.room)}`
+    case 'killerInteract':
+      return 'ก่อน Interact'
+    case 'genInteract': {
+      const p = prop(st, w.prop)
+      return `${st.survivors[w.s].name} (${st.survivors[w.s].bp} ▲) กำลังจะ Interact กับ ${PROP_NAMES_TH[p.kind]}`
+    }
     case 'afterReveal': {
       const p = st.props.find((x) => x.id === w.prop)!
       return `${st.survivors[w.s].name} เปิด ${PROP_NAMES_TH[p.kind]} ที่ ${roomName(st, p.room!)}`

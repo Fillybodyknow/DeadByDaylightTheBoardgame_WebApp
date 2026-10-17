@@ -15,7 +15,7 @@ import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { BEAR_TRAP_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
+import { BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 
@@ -540,6 +540,10 @@ function guard(e: MouseEvent) {
         <WoundRing v-if="st.survivors[s].wounded" />
         <!-- Madness is a badge, not a ring: the ring says healthy (white) or wounded (red) -->
         <img v-if="st.survivors[s].madness" class="madness-tag" :src="asset(MADNESS_IMAGE)" alt="Madness" title="Madness: ทอย Danger Die แทน Skill Check" draggable="false" />
+        <!-- The Trickster's Knives: the token and how many, on the top-left -->
+        <span v-if="st.survivors[s].knives" class="knife-tag" :class="{ full: st.survivors[s].knives === 3 }" :title="`Knife ${st.survivors[s].knives}/3`">
+          <img :src="asset(KNIFE_IMAGE)" alt="Knife" draggable="false" /><b>{{ st.survivors[s].knives }}</b>
+        </span>
       </component>
       <component
         :is="canAct('killer') || roomTarget(r.id) ? 'button' : 'div'"
@@ -1033,6 +1037,44 @@ button.tile.act {
     0 0 0 2px #9cff6b,
     0 1px 6px rgb(0 0 0 / 0.85);
   pointer-events: none;
+}
+
+/* the Knife token on the mini's top-left (Madness has the right), with the count on it */
+.mini .knife-tag {
+  position: absolute;
+  left: -14%;
+  top: -18%;
+  width: 46%;
+  height: 46%;
+  pointer-events: none;
+}
+.mini .knife-tag img {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow:
+    0 0 0 2px #c98a4b,
+    0 1px 6px rgb(0 0 0 / 0.85);
+}
+.mini .knife-tag.full img {
+  box-shadow:
+    0 0 0 2px var(--blood-bright),
+    0 0 8px var(--blood-bright);
+}
+.mini .knife-tag b {
+  position: absolute;
+  right: -18%;
+  bottom: -18%;
+  min-width: 1.15em;
+  padding: 0 0.15em;
+  border-radius: 99px;
+  background: #111;
+  color: #fff;
+  font-size: 0.7em;
+  line-height: 1.15em;
+  text-align: center;
+  box-shadow: 0 0 0 1px #c98a4b;
 }
 
 /* ---------- decision focus ---------- */

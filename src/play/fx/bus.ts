@@ -64,6 +64,8 @@ export interface ActionShow {
   image?: string
   /** The survivor on the receiving end (attacked, picked up, hooked, rescued). */
   target?: number
+  /** Everyone hit at once (a power that wounds a whole room): their portraits, in a row. */
+  targets?: number[]
 }
 
 export const fx = reactive({

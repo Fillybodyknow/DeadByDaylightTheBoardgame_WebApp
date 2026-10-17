@@ -96,6 +96,8 @@ export interface SurvivorState {
   madness: boolean
   /** Printed perks (Adept mode); empty for characters without implemented perks. */
   perks: PerkId[]
+  /** The Trickster's Knives (0–3); missing in games saved before him. */
+  knives?: number
 }
 
 export interface KillerState {
@@ -214,6 +216,10 @@ export type KillerInteraction =
    * or a prop — in `room`, joined to hers by a path of that card's colour.
    */
   | { k: 'haunt'; card: MoveCard; room: string; i: KillerInteraction }
+  /** The Legion: every survivor in the room is wounded; ▲ if one was already. */
+  | { k: 'frenzy' }
+  /** The Trickster: a Knife for every survivor in his room and the connected ones. */
+  | { k: 'showstopper' }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
   | { k: 'wrath' }
   /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */
@@ -260,7 +266,7 @@ export type PerkWindow =
   /** Start of one of the killer's turns, before the card is revealed (Zanshin Tactics). */
   | { k: 'killerTurnBegin'; turn: number }
   /** The killer is about to attack or pick up `target` (Red Herring). */
-  | { k: 'preKillerInteract'; target: number }
+  | { k: 'preKillerInteract'; target: number; pickUp?: boolean }
   /** A survivor was hung on a hook — "sacrificed" (Blood Echo, Dead Man's Switch). */
   | { k: 'afterHang'; s: number }
   /** A survivor dropped a pallet or hid in a locker (Nemesis). */
@@ -269,11 +275,15 @@ export type PerkWindow =
   | { k: 'entered'; s: number }
   /** A roll had `fails` failures; the killer gains them unless Off the Record takes one. */
   | { k: 'rollFail'; s: number; fails: number }
-  /** A survivor rolled a great success (Lucky Break). */
-  | { k: 'greatRoll'; s: number }
+  /** A survivor rolled a great success (Lucky Break); `ctx`: what the roll was for (Poised). */
+  | { k: 'greatRoll'; s: number; ctx?: RollContext['k'] }
   /** Buttons rather than questions: start of a survivor's turn, their interact step, a roll. */
   | { k: 'turnStart'; s: number }
   | { k: 'interact'; s: number }
+  /** The killer's interact step, before interacting (Iron Maiden). */
+  | { k: 'killerInteract' }
+  /** Survivor `s` is about to interact with generator / exit gate `prop` (No Way Out). */
+  | { k: 'genInteract'; s: number; prop: string }
   | { k: 'roll' }
 
 /** What a perk was used on; only the fields that perk needs are set. */
@@ -372,6 +382,14 @@ export type Step =
   | { t: 'pickSurvivor'; why: 'chainsaw'; options: number[] }
   /** The Deathslinger's Redeemer: survivor `s` guesses the card he discarded face down. */
   | { t: 'redeemerGuess'; s: number }
+  /** Crowd Control: the survivors may pay 2 ▲ between them, or the killer sets `s`'s card. */
+  /**
+   * `pledge` (online): what each survivor's player puts in from their own ▲ — null while they
+   * haven't said. Someone then confirms: paying at 2 ▲, refusing once everyone has said and it
+   * isn't 2.
+   */
+  | { t: 'crowdPay'; s: number; pledge?: (number | null)[] }
+  | { t: 'crowdPick'; s: number }
   | { t: 'gameOver'; winner: 'survivors' | 'killer' }
 
 /** Queued work that runs once the current step has its input. */
@@ -413,6 +431,11 @@ export type Task =
   | { k: 'itemUse'; s: number; use: ItemUse }
   /** The Hag teleported: interact once the room is revealed. */
   | { k: 'phantasmHit'; i: KillerInteraction | null }
+  /** Poised: survivor `s` takes a bonus turn, then the turn goes back to `back`. */
+  | { k: 'poisedTurn'; s: number }
+  | { k: 'activeBack'; s: number | null }
+  /** A survivor's interaction, after No Way Out had its chance to stop it. */
+  | { k: 'survivorDo'; s: number; i: SurvivorInteraction }
 
 export type Action =
   | { t: 'setupReveal'; prop: string }
@@ -438,6 +461,11 @@ export type Action =
   | { t: 'endTurn' }
   | { t: 'bonus'; card: MoveCard }
   | { t: 'declineBonus' }
+  /** Crowd Control: who pays (each entry 1 ▲, a survivor twice for 2); empty to refuse. */
+  | { t: 'crowdPay'; pay: number[] }
+  /** Crowd Control online: survivor `s` puts in `n` of their own ▲ (0: nothing). */
+  | { t: 'crowdPledge'; s: number; n: number }
+  | { t: 'crowdPick'; card: MoveCard }
   | { t: 'keepItem'; keep: 'new' | 'old' }
   | { t: 'carryDice'; n: number }
   | { t: 'reroll'; s: number; die: number }
@@ -485,6 +513,8 @@ export type GameEvent =
   | { k: 'roll'; s: number; ctx: RollContext['k']; prop?: string; target?: number }
   /** `perk`: a perk wounded them (Blood Echo), or they wounded themselves (Yui, Zarina). */
   | { k: 'wound'; s: number; by: 'attack' | 'trap' | 'power' | 'perk' }
+  /** The Trickster's Knife: `n` is how many they hold now (4: a sacrifice progress instead). */
+  | { k: 'knife'; s: number; n: number }
   | { k: 'perk'; who: PerkOwner; perk: PerkId }
   | { k: 'heal'; s: number; by: number }
   | { k: 'pickUp'; s: number }
