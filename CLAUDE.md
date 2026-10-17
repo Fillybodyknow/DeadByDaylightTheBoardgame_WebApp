@@ -117,7 +117,9 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   online. Online, a survivor's item shows only to its holder; everyone else (the killer, a
   spectator, the other survivors) sees the back of the card (`itemHidden` in
   `src/play/game.ts`, a house rule); an item shows when it is used.
-- Perk decisions dock beside the board (`PerkPrompt`), never over the map. Character choices
+- Perk decisions (`PerkPrompt`) are part of the side panel on wide screens: teleported into
+  `#side-dock`, they take the panel's place while open and fold with it (narrow screens: a sheet
+  along the bottom). Character choices
   show the character's mini.
 - Layout: the round, phase and controls in a bar on top (on 16:9 and wider screens, where the
   height limits the board, there is no bar: they are teleported into the player column, the
@@ -126,7 +128,10 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   state, at the foot of the column; a row under the map on narrow screens) with both sides'
   goals under them (`ObjectiveHud`: sacrifices, generators left, then the exit gate) and, under
   those, the slot of whoever plays now (their item, or the killer's power; a click uses it), the side
-  panel (320 px) on the right. Player tiles don't list perks: clicking a tile opens the
+  panel (320 px) on the right. The side panel folds into one tab on the right edge (always in the same place)
+  (the panel's fold is remembered per device, and the board takes its width); the panel's tab
+  glows when a new decision comes. On screens narrower than 16:9 (a tablet) the map takes the
+  whole row and the panel floats over its right edge. Player tiles don't list perks: clicking a tile opens the
   character details, with the perks and whether they were used this round. There is no game
   log on screen. Pointing at a revealed prop enlarges it.
 - Fixed overlays inside a `.card` must `<Teleport to="body">`: `.card` has `backdrop-filter`,

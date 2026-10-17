@@ -4,7 +4,12 @@ import { asset } from '../../i18n'
 import { isFailure, isGreat } from '../engine/engine'
 import type { Die } from '../engine/types'
 
-defineProps<{ dice: Die[]; big?: boolean }>()
+/**
+ * `pickable`: dice that can be clicked now (Bond's die to keep, a die to re-roll with a key), with
+ * `pickHint` as their tooltip.
+ */
+defineProps<{ dice: Die[]; big?: boolean; pickable?: boolean[]; pickHint?: string }>()
+const emit = defineEmits<{ pick: [index: number] }>()
 
 const image = (d: Die) => (d.kind === 'skill' ? skillFaceImage(d.face) : components.dangerDieFaces[d.face])
 const label = (d: Die) => (d.asSuccess ? 'ล้มเหลว → สำเร็จ (Iron Will)' : isFailure(d) ? 'ล้มเหลว' : isGreat(d) ? 'สำเร็จยอดเยี่ยม' : 'สำเร็จ')
@@ -12,9 +17,18 @@ const label = (d: Die) => (d.asSuccess ? 'ล้มเหลว → สำเร
 
 <template>
   <span class="dice" :class="{ big }">
-    <span v-for="(d, i) in dice" :key="i" class="die" :class="{ fail: isFailure(d) && !d.asSuccess, great: isGreat(d), rerolled: d.rerolled, willed: d.asSuccess }" :title="label(d)">
+    <component
+      :is="pickable?.[i] ? 'button' : 'span'"
+      v-for="(d, i) in dice"
+      :key="i"
+      :type="pickable?.[i] ? 'button' : undefined"
+      class="die"
+      :class="{ fail: isFailure(d) && !d.asSuccess, great: isGreat(d), rerolled: d.rerolled, willed: d.asSuccess, pick: pickable?.[i] }"
+      :title="pickable?.[i] && pickHint ? `${label(d)} — ${pickHint}` : label(d)"
+      @click="pickable?.[i] && emit('pick', i)"
+    >
       <img :src="asset(image(d))" :alt="label(d)" />
-    </span>
+    </component>
   </span>
 </template>
 
@@ -36,6 +50,27 @@ const label = (d: Die) => (d.asSuccess ? 'ล้มเหลว → สำเร
   height: 52px;
   border-radius: 7px;
   animation: land 0.35s ease-out;
+}
+/* a die to click: it pulses, and lifts under the pointer */
+button.die {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  outline: 2px solid #ffe9b0;
+  outline-offset: 2px;
+  animation: pick 1.2s ease-in-out infinite;
+  transition: transform 0.12s;
+}
+button.die:hover,
+button.die:focus-visible {
+  transform: translateY(-4px) scale(1.08);
+  animation: none;
+}
+@keyframes pick {
+  50% {
+    outline-color: rgb(255 233 176 / 0.3);
+  }
 }
 .die img {
   width: 100%;

@@ -140,6 +140,8 @@ needs its graph in `boards.ts`), the 2-player rule, then bots from the automated
   (the rulebook, p.18, hangs at once). Ending the carry on a free hook still hangs.
 - The Hag's Phantasm Trap: when she doesn't teleport, she gains ▲ equal to the die (the card
   says "gain a ▲"). Teleporting still costs ▲ equal to the die.
+- A survivor being carried may use their own key to re-roll a die of their roll to struggle
+  free (the key says "at any time"). No other item, and no key on anyone else's roll, while carried.
 - A Firecracker also stops the killer while he carries someone: he can't enter that room and
   loses the step (it counts as one step taken). With no steps left and no free hook where he
   stands, the carried survivor escapes there (p.15). (The card says "at any time"; the rulebook

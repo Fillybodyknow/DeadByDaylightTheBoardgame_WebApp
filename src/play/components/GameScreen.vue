@@ -16,7 +16,7 @@ import { KILLER_PLAYER, actorsOf } from '../engine/seats'
 import { closeOnlineGame, isHost, leaveRoom, session } from '../online/session'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { STEP_NAME, boardActionKeys, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
+import { STEP_NAME, boardActionKeys, perkPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
 import SoundSettings from '../../components/SoundSettings.vue'
 import ActionPanel from './ActionPanel.vue'
@@ -191,6 +191,7 @@ watch(
     aceFirst.value = null
     breakoutTarget.value = null
     diversion.value = false
+    perkPicked.value = null
     itemPick.value = null
     forkMoves.value = null
     multiPick.value = []
@@ -333,6 +334,8 @@ const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: 'Calm Spirit: คลิกห้องที่จะส่ง Crow ไป', cancel: () => (calmCrow.value = null) }
   if (aceFirst.value) return { text: 'Ace in the Hole: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
+  if (perkPicked.value && view.value.step.t === 'survivorInteract')
+    return { text: `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`, cancel: () => (perkPicked.value = null) }
   if (breakoutTarget.value !== null)
     return { text: `Breakout: ย้าย ${view.value.survivors[breakoutTarget.value].name} — คลิกเส้นทางบนแผนที่`, cancel: () => (breakoutTarget.value = null) }
   if (trapPath.value) return { text: 'Bear Trap หมดมือ: คลิก Bear Trap บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
@@ -699,13 +702,48 @@ onBeforeUnmount(() => {
 
 const inspecting = ref<InspectTarget | null>(null)
 
+// ---------- the side panel, folded to a tab on the right edge (remembered per device) ----------
+// Folded, the board takes its width (on a tablet the map then fills the screen). Choices on the
+// board still work; the tab glows when a new decision comes, so a choice made only in the panel
+// isn't missed.
+
+function readSideFolded(): boolean {
+  try {
+    return localStorage.getItem('dbdl-side-folded') === '1'
+  } catch {
+    return false
+  }
+}
+const sideFolded = ref(readSideFolded())
+watch(sideFolded, (f) => {
+  try {
+    localStorage.setItem('dbdl-side-folded', f ? '1' : '0')
+  } catch {
+    // storage unavailable: it just isn't remembered
+  }
+})
+/** A new step while folded: the tab pulses for a while. */
+const sideNews = ref(false)
+let sideNewsTimer: number | null = null
+watch(
+  () => view.value.step,
+  () => {
+    if (!sideFolded.value || !myTurn.value) return
+    sideNews.value = true
+    if (sideNewsTimer !== null) clearTimeout(sideNewsTimer)
+    sideNewsTimer = window.setTimeout(() => (sideNews.value = false), 6000)
+  },
+)
+watch(sideFolded, (f) => !f && (sideNews.value = false))
+
 // ---------- secret choices (Tinkerer swaps a face-down card) ----------
 
 const secretSeen = ref(false)
 /** Who must hold the device alone: the killer swapping a hidden card, survivors picking one. */
 const secretFor = computed<'killer' | 'survivors' | null>(() => {
   const s = view.value.step
-  if (s.t === 'offer' && (s.perk === 'tinkerer' || s.perk === 'zanshin_tactics')) return 'killer'
+  // Lightborn shows both planned cards to pick one: only one of them is turned face up
+  if (s.t === 'offer' && (s.perk === 'tinkerer' || s.perk === 'zanshin_tactics' || s.perk === 'lightborn')) return 'killer'
   // Redeemer: the card discarded face down is picked first.
   if (s.t === 'killerInteract' && powerMode.value && view.value.killer.characterId === 'deathslinger') return 'killer'
   if (s.t === 'replaceCard') return 'survivors'
@@ -714,6 +752,7 @@ const secretFor = computed<'killer' | 'survivors' | null>(() => {
 /** What the killer is about to do alone, for the curtain. */
 const secretWhat = computed(() => {
   const s = view.value.step
+  if (s.t === 'offer' && s.perk === 'lightborn') return 'เลือกการ์ดที่วางไว้ใบที่จะเปิดหงาย (Lightborn)'
   if (s.t === 'offer') return `เลือกเปลี่ยนการ์ดที่คว่ำไว้ (${s.perk === 'tinkerer' ? 'Tinkerer' : 'Zanshin Tactics'})`
   return 'เลือกการ์ดที่จะทิ้งแบบคว่ำ (Redeemer)'
 })
@@ -794,7 +833,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       </Teleport>
     </header>
 
-    <main class="layout">
+    <main class="layout" :class="{ 'side-folded': sideFolded }">
       <div class="board-col" :style="{ '--aspect': String(boardOf(view).aspect) }">
         <!-- floating at the foot of the screen: showing a bar must not move or resize the board -->
         <div class="board-bars">
@@ -835,7 +874,9 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         </div>
       </div>
 
-      <aside class="side" :class="{ nudge }">
+      <aside v-show="!sideFolded" class="side" :class="{ nudge }">
+        <!-- a perk decision (PerkPrompt), teleported here: while it is open it is the panel -->
+        <div id="side-dock" />
         <Planning v-if="planning && myTurn" :st="view" />
         <section v-else-if="waitingOn && !over" class="card waiting">
           <p v-if="myPlanDone" class="done-note">✓ {{ myPlanDone }}</p>
@@ -865,6 +906,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     </main>
 
     <!-- terror radius: the screen edge pulses with the heartbeat -->
+    <!-- one tab on the right edge, always in the same place: folds the side panel and opens it again -->
+    <button type="button" class="side-tab" :class="{ news: sideFolded && (sideNews || nudge), open: !sideFolded }" :title="sideFolded ? 'เปิดแผงควบคุม' : 'พับแผงควบคุม — ขยายแผนที่'" @click="sideFolded = !sideFolded">
+      <span aria-hidden="true">{{ sideFolded ? '◂' : '▸' }}</span>
+      <span class="side-tab-text">{{ sideFolded ? 'เปิดแผงควบคุม' : 'พับแผงควบคุม' }}</span>
+    </button>
     <!-- online: your own hand, to look at, while no hand to pick from is out -->
     <CardHand v-if="ownHand.length && openHands === 0" :cards="ownHand" label="มือของคุณ" passive />
     <!-- online: the others are waiting on this device — a lasting pill, and a gold edge -->
@@ -1120,6 +1166,55 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     animation: none;
   }
 }
+/* one panel: while a perk decision is open in it (#side-dock), the rest steps aside */
+.side:has(#side-dock .dock) > :not(#side-dock) {
+  display: none;
+}
+#side-dock:empty {
+  display: none;
+}
+/* folded: the board takes the panel's column */
+.layout.side-folded {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* the tab has the right edge to itself: the layout and the floating panels keep clear of it */
+@media (min-width: 981px) {
+  .layout {
+    padding-right: 2.5rem;
+  }
+}
+@media (max-width: 980px) {
+  .side-tab {
+    display: none;
+  }
+}
+.side-tab {
+  position: fixed;
+  z-index: 17;
+  right: 0;
+  top: 50%;
+  translate: 0 -50%;
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 0.8rem 0.35rem;
+  border: 1px solid var(--line-strong);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  background: rgb(14 15 19 / 0.95);
+  box-shadow: -4px 0 18px rgb(0 0 0 / 0.6);
+}
+.side-tab-text {
+  writing-mode: vertical-rl;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+}
+/* a new decision came while folded */
+.side-tab.news {
+  border-color: #ffd56a;
+  color: #ffe9b0;
+  animation: nudge 1s ease-in-out infinite;
+}
 /* online: the turn just came to this device — the panel pulses gold for a moment */
 .side.nudge {
   border-radius: var(--radius);
@@ -1137,6 +1232,65 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   top: 4rem;
   max-height: calc(100vh - 5rem);
   overflow-y: auto;
+}
+/* Screens narrower than 16:9 (a tablet): the map is limited by the width, so it takes the whole
+   row and the side panel floats over its right edge (fold it to a tab to see that edge). */
+@media (min-width: 981px) and (max-aspect-ratio: 1777/1000) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .side {
+    position: fixed;
+    z-index: 12;
+    top: 3.4rem;
+    right: 2.5rem;
+    width: 320px;
+    max-height: calc(100vh - 4.2rem);
+  }
+  /* see-through, so the map shows under it; solid again while the pointer is on it, to read */
+  .side > :deep(.card) {
+    background: rgb(12 13 17 / 0.42);
+    backdrop-filter: none;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.35);
+    text-shadow: 0 1px 3px rgb(0 0 0 / 0.95), 0 0 8px rgb(0 0 0 / 0.8);
+    transition: background 0.2s;
+  }
+  .side:hover > :deep(.card) {
+    background: rgb(12 13 17 / 0.9);
+  }
+  /* only the panel's own background is see-through: what is on it stays solid — the words on a
+     dark backing, dimmed things (an empty slot, a button not ready) dark rather than faded */
+  .side :deep(.card) :is(p, h2, h3, li, .hint, .board-hint, .stridor-note, .done-note) {
+    background: rgb(12 13 17 / 0.88);
+    border-radius: 6px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .side :deep(.card) :is(p, h2, h3) {
+    padding-inline: 0.35rem;
+  }
+  .side :deep(button:disabled) {
+    opacity: 1;
+    filter: none;
+    color: var(--muted);
+    background: #121317;
+  }
+  .side :deep(img.empty) {
+    opacity: 1;
+    filter: grayscale(1) brightness(0.3);
+  }
+  /* planning's survivor tabs carry a see-through tint of their own: solid here */
+  .side :deep(.tab) {
+    background: rgb(16 17 21 / 0.92);
+  }
+  .side :deep(.tab.on) {
+    background: rgb(52 44 26 / 0.95);
+  }
+}
+@media (min-width: 981px) and (max-aspect-ratio: 1777/1000) {
+  :global(body.hand-open .layout .side) {
+    max-height: calc(100vh - 3.4rem - 80px);
+  }
 }
 /* The hand of cards rests sunk in the bottom-right corner (CardHand), its names showing: the
    panel stops above them (a raised hand covers its foot only while the pointer is on it). With

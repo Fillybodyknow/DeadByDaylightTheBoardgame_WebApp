@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { macmillan } from './boards'
-import { apply, createGame, isFailure, killerInteractions, propsIn, survivorMoves, type GameConfig } from './engine'
+import { apply, createGame, isFailure, killerInteractions, propsIn, survivorMoves, tryApply, type GameConfig } from './engine'
 import { legalActions } from './legal'
 import type { GameState, Prop, PropKind } from './types'
 
@@ -395,5 +395,24 @@ describe('Firecracker while carrying (house rule)', () => {
     const after = apply(apply(st, { t: 'move', path: path.id }), { t: 'react', s: null })
     expect(after.killer.room).toBe(next)
     expect(after.survivors[1].item).toBe('firecracker')
+  })
+})
+
+describe('a key while carried (house rule)', () => {
+  it('the carried survivor re-rolls their own struggle with their key', () => {
+    const st = planned()
+    const k = st.killer
+    st.phase = 'killer'
+    Object.assign(st.survivors[0], { status: 'carried', room: k.room, wounded: true, item: 'broken_key' })
+    st.survivors.slice(1).forEach((sv) => (sv.item = null))
+    st.step = { t: 'roll', ctx: { k: 'carry', s: 0 }, dice: [{ kind: 'skill', face: 1, rerolled: false }] }
+    st.queue = [{ k: 'endKillerTurn', turn: 0 }]
+    const after = apply(st, { t: 'reroll', s: 0, die: 0 })
+    expect(after.survivors[0].item).toBeNull()
+    // not on someone else's roll while carried
+    const other = planned()
+    Object.assign(other.survivors[0], { status: 'carried', room: other.killer.room, item: 'broken_key' })
+    other.step = { t: 'roll', ctx: { k: 'repair', s: 1, prop: other.props.find((p) => p.kind === 'generator')!.id }, dice: [{ kind: 'skill', face: 0, rerolled: false }] }
+    expect(tryApply(other, { t: 'reroll', s: 0, die: 0 })).toBeNull()
   })
 })

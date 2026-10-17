@@ -27,7 +27,7 @@ import {
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
-import { STEP_NAME, actionKey, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
+import { STEP_NAME, actionKey, perkPicked, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import {
@@ -53,7 +53,7 @@ import {
   windowLabel,
 } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
-import DiceRow from './DiceRow.vue'
+import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
 import { choicePreview, decisionFocus, powerPreview, preview } from '../focus'
 import Mini from './Mini.vue'
@@ -223,6 +223,12 @@ const undyingHere = computed(() =>
     ? undyingOptions(props.st, props.undyingCard, stepKind.value).filter((i) => undyingRoomOf(props.st, i) === props.undyingRoom)
     : [],
 )
+
+/** An interact-step perk, picked before its targets show on the board. */
+function pickInteractPerk(perk: PerkId) {
+  sfx.click()
+  perkPicked.value = perkPicked.value === perk ? null : perk
+}
 
 /** Out of the flow altogether. */
 function stopSteps() {
@@ -449,7 +455,8 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </p>
       <p v-else class="muted">ไม่มีอะไรให้ Interact ในห้องนี้</p>
       <div class="buttons col">
-        <button v-for="(i, n) in sInteractions" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="survivorInteractionLabel(st, step.s, i)" /></button>
+        <!-- a perk picked: its targets only, the ordinary interactions wait -->
+        <button v-for="(i, n) in perkPicked ? [] : sInteractions" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="survivorInteractionLabel(st, step.s, i)" /></button>
         <!-- Diversion is played on the board: the killer, then the path -->
         <p v-if="hasDiversion" class="board-hint">🎯 Diversion: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
         <details v-for="c in calmSpirit" :key="c.prop" class="calm">
@@ -459,10 +466,16 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           </div>
         </details>
       </div>
-      <div v-for="b in buttons" :key="b.perk" class="perk-group">
-        <span class="perk-name">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
-        <button v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
-        <span v-if="b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 หรือคลิกบนแผนที่</span>
+      <!-- a perk is picked first (its targets then show on the board), again to put it back -->
+      <div v-for="b in buttons" :key="b.perk" class="perk-group" :class="{ picked: perkPicked === b.perk }">
+        <button type="button" class="perk-name" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
+          {{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span>
+          <span class="muted small">{{ perkPicked === b.perk ? '— เลือกเป้าหมาย (คลิกอีกครั้งเพื่อยกเลิก)' : '— คลิกเพื่อใช้' }}</span>
+        </button>
+        <template v-if="perkPicked === b.perk">
+          <button v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+          <span v-if="b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
+        </template>
       </div>
       <button class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
     </template>
@@ -496,9 +509,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
     <!-- dice with a possible key re-roll -->
     <template v-else-if="step.t === 'roll'">
-      <p v-if="step.keep">Bond: ทอย 2 ลูก — เลือกเก็บ 1 ลูก</p>
+      <p v-if="step.keep">Bond: ทอย 2 ลูก — คลิกลูกที่จะเก็บ 1 ลูก</p>
       <p v-else>ผลทอย — ใช้กุญแจทอยใหม่ หรือ perk ได้</p>
-      <DiceRow :dice="step.dice" big />
+      <RollDice :st="st" :key-holders="rollers" :can-keep="rollMine && !keyWaiting.length" @act="act" />
       <div class="buttons col">
         <!-- Iron Will, Autodidact: one button per choice (Autodidact names the die) -->
         <template v-for="b in buttons" :key="`${b.owner}-${b.perk}`">
@@ -506,23 +519,13 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             <FaceLabel :st="st" :who="b.owner" :text="`${st.survivors[b.owner as number].name}: ${PERKS[b.perk].name} — ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)} (${PERKS[b.perk].cost} ▲)`" />
           </button>
         </template>
-        <template v-for="s in rollers" :key="s">
-          <template v-for="(d, i) in step.dice" :key="i">
-            <button v-if="!d.rerolled" @click="act({ t: 'reroll', s, die: i })">
-              <FaceLabel :st="st" :who="s" :text="`${st.survivors[s].name} ทิ้ง ${ITEM_NAMES[st.survivors[s].item!]} ทอยลูกที่ ${i + 1} ใหม่`" />
-            </button>
-          </template>
-        </template>
         <!-- someone else's roll: each helper on this device passes on it here -->
         <button v-for="s in passers" :key="`p${s}`" @click="act({ t: 'passRoll', s })">
           <FaceLabel :st="st" :who="s" :text="`${st.survivors[s].name} ไม่ช่วย — ไม่ใช้กุญแจ / Perk`" />
         </button>
         <template v-if="rollMine">
           <p v-if="keyWaiting.length" class="small">⏳ รอ {{ keyWaiting.map((s) => st.survivors[s].name).join(', ') }} ตัดสินใจว่าจะช่วย (กุญแจ / Perk) หรือไม่</p>
-          <template v-if="step.keep">
-            <button v-for="(_, i) in step.dice" :key="`k${i}`" class="primary" :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll', die: i })">เก็บลูกที่ {{ i + 1 }}</button>
-          </template>
-          <button v-else class="primary" :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll' })">ใช้ผลนี้</button>
+          <button v-if="!step.keep" class="primary" :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll' })">ใช้ผลนี้</button>
         </template>
         <p v-else class="small muted">รอ {{ st.survivors[step.ctx.s].name }} รับผลทอย</p>
       </div>
@@ -871,9 +874,20 @@ p {
 }
 .perk-name {
   width: 100%;
+  text-align: left;
   font-family: var(--font-display);
   font-size: 0.85rem;
   color: #d8c2ff;
+  border-color: rgb(155 107 214 / 0.6);
+}
+/* the perk picked: its targets are on the board */
+.perk-group.picked {
+  border-left-color: #ffe9b0;
+  background: rgb(255 214 140 / 0.1);
+}
+.perk-group.picked .perk-name {
+  border-color: #ffe9b0;
+  box-shadow: 0 0 10px rgb(255 214 140 / 0.4);
 }
 .calm summary {
   cursor: pointer;

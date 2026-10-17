@@ -560,8 +560,10 @@ export function itemUses(st: GameState, s: number): ItemUse[] {
 export function rerollers(st: GameState): number[] {
   const step = st.step
   if (step.t !== 'roll' || step.dice.every((d) => d.rerolled)) return []
+  // on the board — or the survivor being carried, on their own roll to struggle free (house rule)
+  const ownCarry = (i: number) => step.ctx.k === 'carry' && step.ctx.s === i && st.survivors[i].status === 'carried'
   return st.survivors.flatMap((sv, i) =>
-    sv.status === 'board' && sv.item && sv.item in KEY_BP && st.itemLock !== i && !step.passed?.includes(i) ? [i] : [],
+    (sv.status === 'board' || ownCarry(i)) && sv.item && sv.item in KEY_BP && st.itemLock !== i && !step.passed?.includes(i) ? [i] : [],
   )
 }
 

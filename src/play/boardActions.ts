@@ -2,7 +2,7 @@
 // interacting with props and survivors, picking rooms for powers and perks, item targets. Each
 // action names the spot it lives on; when one spot has several, the board asks which.
 
-import type { Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { sfx } from '../sound'
 import {
   anyMoves,
@@ -25,7 +25,7 @@ import {
   survivorMoves,
   touchingPaths,
 } from './engine/engine'
-import { PERKS } from './engine/perks'
+import { PERKS, type PerkId } from './engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
 import { iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
@@ -283,6 +283,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       break
 
     case 'survivorInteract': {
+      // a perk picked in the panel: only its targets
+      if (perkPicked.value && perksToPick(st)) {
+        perkSpots(st, out, modes)
+        break
+      }
       // Diversion, after clicking the killer: only his paths, each with the room it sends him to
       // (a fork asks which room next, as any move does)
       if (modes.diversion.value) {
@@ -473,8 +478,25 @@ function hookSpot(st: GameState, add: (key: SpotKey, label: string, run: () => v
 }
 
 /** Perks used by clicking: Prove Thyself, Botany Knowledge, Empathy, Self-Care, Ace in the Hole, Balanced Landing. */
+/**
+ * Several perks to use at the start of a turn: the perk is picked in the panel first (PerkPrompt),
+ * and only its targets are on the board. Null: none picked yet.
+ */
+export const perkPicked = ref<PerkId | null>(null)
+
+/**
+ * A perk has to be picked before its targets show: at the start of a turn with more than one, and
+ * in the interact step with any (they would mix with the ordinary interactions on the board).
+ */
+export function perksToPick(st: GameState): boolean {
+  const n = new Set(perkButtons(st).map((b) => b.perk)).size
+  return (st.step.t === 'turnStart' && n > 1) || (st.step.t === 'survivorInteract' && n > 0)
+}
+
 function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
+  const pick = perksToPick(st)
   for (const b of perkButtons(st)) {
+    if (pick && perkPicked.value !== b.perk) continue
     const name = PERKS[b.perk].name
     // Breakout moves one wounded survivor: pick who first, then where, so a board full of
     // wounded friends isn't one long list of person-and-path pairs.

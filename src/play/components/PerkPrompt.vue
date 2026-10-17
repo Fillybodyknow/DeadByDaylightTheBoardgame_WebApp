@@ -3,12 +3,12 @@
 // roll still waiting on Iron Will, a key or Bond's choice. Docked beside the board (not over
 // it) so the map stays readable: the board lights up who is involved and where they could go,
 // and hovering a choice previews it on the map.
-import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
-import { CARD_NAMES, ITEM_NAMES, KILLER_CARDS, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
+import { CARD_NAMES, KILLER_CARDS, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
-import { actionKey } from '../boardActions'
+import { actionKey, perkPicked, perksToPick } from '../boardActions'
 import { choicePreview, preview } from '../focus'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
@@ -16,7 +16,7 @@ import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import { ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
-import DiceRow from './DiceRow.vue'
+import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
 import Mini from './Mini.vue'
 
@@ -36,6 +36,22 @@ const rollOthers = computed(() => (props.st.step.t === 'roll' ? rollHelpers(prop
 const passers = computed(() => (online.value ? rollOthers.value.filter((s) => controls(props.st, s)) : []))
 const keyWaiting = computed(() => rollOthers.value.filter((s) => !controls(props.st, s)))
 const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, step.value.ctx.s))
+
+// ---------- several perks at the start of a turn: the perk first, then what to do with it ----------
+
+const pickPerk = computed(() => perksToPick(props.st))
+watch(
+  () => JSON.stringify(step.value),
+  () => (perkPicked.value = null),
+)
+onBeforeUnmount(() => (perkPicked.value = null))
+/** This perk's choices are out (on the board, and as buttons here). */
+const perkOpen = (perk: PerkId) => !pickPerk.value || perkPicked.value === perk
+function choosePerk(perk: PerkId) {
+  if (!pickPerk.value) return
+  fxSound.flip()
+  perkPicked.value = perkPicked.value === perk ? null : perk
+}
 
 const offerChoices = computed(() => {
   const s = step.value
@@ -57,6 +73,10 @@ const plannedCards = computed(() => {
   const k = props.st.killer
   return k.planned.map((card, i) => ({ card, i, played: i < k.revealedCount, next: i === k.revealedCount }))
 })
+/** Lightborn: which planned card to turn face up, picked on the card itself. */
+const isLightborn = computed(() => step.value.t === 'offer' && step.value.perk === 'lightborn')
+const lightbornChoice = (i: number) => (isLightborn.value ? offerChoices.value.find((c) => c.index === i) : undefined)
+
 const tinkerSwaps = computed(() => offerChoices.value.filter((c) => c.index === tinkerIndex.value))
 
 /** Several perks of one owner at the same moment: each with its choices, used in any order (p.16). */
@@ -264,6 +284,14 @@ onBeforeUnmount(() => (preview.value = null))
 /** Folded away to see the board: only the header stays, saying what is waiting. */
 const collapsed = ref(false)
 
+/** Wide screens: the decision lives in the side panel (and folds with it). */
+const WIDE = '(min-width: 981px)'
+const wideQuery = typeof matchMedia === 'function' ? matchMedia(WIDE) : null
+const wide = ref(!!wideQuery?.matches)
+const onWide = (e: MediaQueryListEvent) => ((wide.value = e.matches), e.matches && (collapsed.value = false))
+onMounted(() => wideQuery?.addEventListener('change', onWide))
+onBeforeUnmount(() => wideQuery?.removeEventListener('change', onWide))
+
 // The map: while a perk's movement card is being picked (Adrenaline, Any Means Necessary, Predator's
 // new card…), a path out of the mover's room picks the card of its colour, as the hand does.
 let ownPick = false
@@ -338,6 +366,8 @@ const boardCount = computed(() => {
 </script>
 
 <template>
+  <!-- wide screens: inside the side panel, in its place (GameScreen's #side-dock) -->
+  <Teleport to="#side-dock" :disabled="!wide" defer>
   <transition name="dock">
     <aside v-if="open" class="dock" :class="{ killer: killerSide, collapsed }" role="dialog" aria-live="assertive">
       <header @click="collapsed && (collapsed = false)">
@@ -348,14 +378,16 @@ const boardCount = computed(() => {
           <p v-if="collapsed" class="why">{{ summary }}</p>
           <p v-else-if="step.t === 'offer' && windowLabel(st, step.w)" class="why">{{ windowLabel(st, step.w) }}</p>
         </div>
+        <!-- narrow screens only: on wide ones the side panel's tab folds it, with the panel -->
         <button
+          v-if="!wide"
           type="button"
           class="fold"
           :aria-expanded="!collapsed"
-          :title="collapsed ? 'เปิดแผงตัดสินใจ' : 'พับเก็บเพื่อดูกระดาน'"
+          :title="collapsed ? `เปิดแผงตัดสินใจ — ${summary}` : 'พับไปด้านขวา เพื่อดูกระดาน'"
           @click.stop="collapsed = !collapsed"
         >
-          {{ collapsed ? 'เปิด ◂' : 'พับ ▸' }}
+          {{ collapsed ? '◂ ตัดสินใจ' : 'พับ ▸' }}
         </button>
       </header>
 
@@ -425,6 +457,22 @@ const boardCount = computed(() => {
             <p class="tinker-step">2. เปลี่ยน {{ CARD_NAMES[st.killer.planned[tinkerIndex]] }} (ใบที่ {{ tinkerIndex + 1 }}) เป็น — เลือกจากไพ่บนมือด้านล่าง</p>
           </template>
         </div>
+        <!-- Lightborn: the two planned cards side by side — click the one to turn face up -->
+        <div v-else-if="isLightborn" class="tinker">
+          <p class="tinker-step">คลิกการ์ดที่จะเปิดหงาย (+1 ▲)</p>
+          <div class="card-row">
+            <button
+              v-for="p in plannedCards.slice(0, 2)"
+              :key="`l${p.i}`"
+              class="card-btn planned lightborn"
+              :disabled="!lightbornChoice(p.i)"
+              @click="act({ t: 'perk', perk: 'lightborn', use: true, choice: lightbornChoice(p.i)! })"
+            >
+              <img :src="asset(cardImage(p.card))" :alt="cardLabel(p.card)" />
+              <span>ใบที่ {{ p.i + 1 }} ({{ p.i === 0 ? 'ซ้าย' : 'ขวา' }}) · {{ lightbornChoice(p.i) ? CARD_NAMES[p.card] : 'เปิดแล้ว' }}</span>
+            </button>
+          </div>
+        </div>
         <template v-else-if="isGrip">
           <p class="hand-hint">👇 เลือกการ์ด 1–2 ใบจากไพ่บนมือด้านล่าง — แผนที่จะไฮไลต์ผู้รอดชีวิตที่โดน</p>
           <p v-if="gripPick.length" class="small">
@@ -440,7 +488,7 @@ const boardCount = computed(() => {
             {{ cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน' }}
           </button>
           <button
-            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression)"
+            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression && !isLightborn)"
             :key="i"
             class="primary"
             @mouseenter="hover(step.owner, c)"
@@ -459,7 +507,17 @@ const boardCount = computed(() => {
       <!-- start of a survivor's turn -->
       <template v-else-if="step.t === 'turnStart'">
         <p class="lead">เริ่มเทิร์น — ใช้ perk ก่อนเปิดการ์ดเดินได้</p>
-        <div v-for="b in buttons" :key="b.perk" class="perk boxed">
+        <p v-if="pickPerk" class="small">{{ perkPicked ? 'เลือกเป้าหมายของ Perk นี้ — คลิก Perk อีกครั้งเพื่อเปลี่ยน' : '👆 เลือก Perk ที่จะใช้ก่อน' }}</p>
+        <div
+          v-for="b in buttons"
+          :key="b.perk"
+          class="perk boxed"
+          :class="{ pickable: pickPerk, picked: pickPerk && perkPicked === b.perk, dim: pickPerk && perkPicked && perkPicked !== b.perk }"
+          :role="pickPerk ? 'button' : undefined"
+          :tabindex="pickPerk ? 0 : undefined"
+          @click="choosePerk(b.perk)"
+          @keydown.enter="choosePerk(b.perk)"
+        >
           <img v-if="perkImage(b.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
           <div>
             <h3>
@@ -467,8 +525,9 @@ const boardCount = computed(() => {
             </h3>
             <p class="text small">{{ perkText(b.perk) }}</p>
             <!-- Breakout is a person and then a path: both are picked on the board, one at a time -->
+            <template v-if="perkOpen(b.perk)">
             <p v-if="b.perk === 'breakout'" class="board-hint">🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง</p>
-            <div v-else class="choices inline">
+            <div v-else class="choices inline" @click.stop>
               <button
                 v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))"
                 :key="i"
@@ -479,6 +538,7 @@ const boardCount = computed(() => {
                 <FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" />
               </button>
             </div>
+            </template>
           </div>
         </div>
         <button class="primary wide" @click="act({ t: 'continue' })">ไม่ใช้ perk — เปิดการ์ดแล้วเดิน</button>
@@ -549,7 +609,7 @@ const boardCount = computed(() => {
         <p class="lead">
           <FaceLabel :st="st" :who="step.ctx.s" :text="`${st.survivors[step.ctx.s].name} ทอย ${ROLL_TITLE[step.ctx.k]}`" />
         </p>
-        <div class="dice"><DiceRow :dice="step.dice" big /></div>
+        <RollDice :st="st" :key-holders="keyHolders" :can-keep="rollMine && !keyWaiting.length" @act="act" />
         <div v-for="b in buttons" :key="b.perk" class="perk boxed">
           <img v-if="perkImage(b.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
           <div>
@@ -561,13 +621,6 @@ const boardCount = computed(() => {
           </div>
         </div>
         <div class="choices">
-          <template v-for="s in keyHolders" :key="s">
-            <template v-for="(d, i) in step.dice" :key="i">
-              <button v-if="!d.rerolled" @click="act({ t: 'reroll', s, die: i })">
-                <FaceLabel :st="st" :who="s" :text="`${st.survivors[s].name} ทิ้ง ${ITEM_NAMES[st.survivors[s].item!]} ทอยลูกที่ ${i + 1} ใหม่`" />
-              </button>
-            </template>
-          </template>
           <!-- someone else's roll: each helper on this device passes on it here -->
           <button v-for="s in passers" :key="`p${s}`" @click="act({ t: 'passRoll', s })">
             <FaceLabel :st="st" :who="s" :text="`${st.survivors[s].name} ไม่ช่วย — ไม่ใช้กุญแจ / Perk`" />
@@ -576,10 +629,7 @@ const boardCount = computed(() => {
             <p v-if="keyWaiting.length" class="small waiting-key">
               ⏳ รอ {{ keyWaiting.map((s) => st.survivors[s].name).join(', ') }} ตัดสินใจว่าจะช่วย (กุญแจ / Perk) หรือไม่
             </p>
-            <template v-if="step.keep">
-              <p class="small">Bond: เลือกเก็บ 1 ลูก</p>
-              <button v-for="(_, i) in step.dice" :key="`k${i}`" class="primary" :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll', die: i })">เก็บลูกที่ {{ i + 1 }}</button>
-            </template>
+            <p v-if="step.keep" class="small">Bond: คลิกลูกเต๋าที่จะเก็บ 1 ลูก</p>
             <button v-else :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll' })">ไม่ใช้ — รับผลนี้</button>
           </template>
           <p v-else class="small muted">รอ {{ st.survivors[step.ctx.s].name }} รับผลทอย</p>
@@ -587,6 +637,7 @@ const boardCount = computed(() => {
       </template>
     </aside>
   </transition>
+  </Teleport>
   <Teleport to="body">
     <div v-if="zoomed" class="perk-zoom" role="dialog" aria-modal="true" @click="zoomed = null">
       <img :src="zoomed" alt="" />
@@ -704,6 +755,25 @@ header {
   grid-template-columns: 76px 1fr;
   gap: 0.7rem;
   align-items: start;
+}
+/* several perks at once: each box is picked first */
+.perk.boxed.pickable {
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    opacity 0.15s,
+    transform 0.15s;
+}
+.perk.boxed.pickable:hover {
+  border-color: rgb(var(--glow) / 0.9);
+  transform: translateX(-2px);
+}
+.perk.boxed.picked {
+  border-color: #ffe9b0;
+  box-shadow: 0 0 14px rgb(255 214 140 / 0.45);
+}
+.perk.boxed.dim {
+  opacity: 0.5;
 }
 .perk.boxed {
   padding: 0.6rem;
@@ -877,6 +947,16 @@ h3 {
   border-color: var(--blood-bright);
   box-shadow: 0 0 0 2px var(--blood-bright) inset, 0 0 14px rgb(255 40 40 / 0.4);
 }
+.card-btn.lightborn {
+  width: 112px;
+  font-size: 0.8rem;
+}
+/* Lightborn: a card to pick lifts under the pointer */
+.card-btn.lightborn:not(:disabled):hover {
+  transform: translateY(-4px);
+  border-color: var(--blood-bright);
+  box-shadow: 0 0 14px rgb(255 40 40 / 0.45);
+}
 .card-btn.planned.played {
   opacity: 0.4;
 }
@@ -897,6 +977,63 @@ h3 {
   opacity: 0;
 }
 
+/* Wide screens: inside the side panel, in its place — no longer floating. */
+@media (min-width: 981px) {
+  .dock {
+    position: static;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .dock.collapsed {
+    right: 0;
+    width: auto;
+    padding: 0.5rem 0.35rem;
+    border-right: none;
+    border-radius: 10px 0 0 10px;
+  }
+  .dock.collapsed header {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .dock.collapsed .head-text {
+    display: none;
+  }
+  .dock.collapsed .fold {
+    align-self: center;
+    padding: 0.4rem 0.2rem;
+    writing-mode: vertical-rl;
+  }
+}
+/* Screens narrower than 16:9 (a tablet), where it floats over the map: its own background is
+   see-through, what is on it stays solid (as the side panel, GameScreen); solid again under the
+   pointer, to read. */
+@media (min-width: 981px) and (max-aspect-ratio: 1777/1000) {
+  .dock {
+    background: rgb(12 13 17 / 0.42);
+    text-shadow: 0 1px 3px rgb(0 0 0 / 0.95);
+    transition: background 0.2s;
+  }
+  .dock:hover {
+    background: rgb(14 15 19 / 0.97);
+  }
+  .dock :is(header, .lead, .board-hint, .hand-hint, .small, h3, .text) {
+    background-color: rgb(12 13 17 / 0.88);
+    border-radius: 6px;
+  }
+  .dock header {
+    padding: 0.3rem;
+  }
+  .dock .perk.boxed {
+    background: rgb(20 18 26 / 0.92);
+  }
+  .dock :deep(button:disabled) {
+    opacity: 1;
+    filter: none;
+    color: var(--muted);
+    background: #121317;
+  }
+}
 /* Narrow screens: a sheet along the bottom, the board above stays visible. */
 @media (max-width: 980px) {
   .dock {
