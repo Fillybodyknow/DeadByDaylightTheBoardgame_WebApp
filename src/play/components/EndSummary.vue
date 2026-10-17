@@ -7,7 +7,8 @@ import { killerMini, playerOf, survivorMini } from '../labels'
 import { gameStats, timeline } from '../stats'
 import Mini from './Mini.vue'
 
-const props = defineProps<{ st: GameState; winner: 'survivors' | 'killer' }>()
+/** `online`: "play again" takes the room back to its lobby rather than to a new game here. */
+const props = defineProps<{ st: GameState; winner: 'survivors' | 'killer'; online?: boolean }>()
 const emit = defineEmits<{ close: []; again: [] }>()
 
 const stats = computed(() => gameStats(props.st))
@@ -100,7 +101,7 @@ const mvp = computed(() => {
       </section>
 
       <div class="actions">
-        <button class="primary" @click="emit('again')">เล่นใหม่</button>
+        <button class="primary" @click="emit('again')">{{ online ? 'กลับ Lobby' : 'เล่นใหม่' }}</button>
         <button @click="emit('close')">ดูกระดาน</button>
       </div>
     </div>

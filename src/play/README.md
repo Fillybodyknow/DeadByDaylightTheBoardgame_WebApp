@@ -307,7 +307,8 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Showstopper: everyone on the board (not in a locker, hooked or carried) in his room and the
   connected ones, whatever stands on the path between.
 - No Way Out: asked before any interaction with a generator or an exit gate (Fast Track's too)
-  by a survivor with fewer ▲ than him; the interaction is lost.
+  by a survivor with fewer ▲ than him; the interaction is lost. "Fewer" is checked as the moment
+  comes, before he pays: 3 ▲ against 2 may use it (and he is left with 2).
 - Crowd Control: a survivor on the board who sets a card this planning. The survivors pay the 2 ▲
   between them (1 + 1 or 2 from one). Online every player puts in their own survivors' ▲ (or
   nothing), each screen showing the tally. Nothing goes through by itself: the chosen survivor's

@@ -816,6 +816,13 @@ function leave() {
   if (over.value || confirm('ออกจากเกมนี้? (เกมจะหายไป)')) quitGame()
 }
 
+/** The summary's "play again": online, the whole room goes back to its lobby (the game is over,
+ * so anyone may), sides kept, to pick again; on one device, a new game. */
+function playAgain() {
+  if (online.value) void closeOnlineGame()
+  else quitGame()
+}
+
 const planning = computed(() => view.value.step.t === 'planSurvivors' || view.value.step.t === 'planKiller' || view.value.step.t === 'planStridor')
 </script>
 
@@ -955,7 +962,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <DiceModal />
     <RoundSummary v-if="summaryRound !== null && !over && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" @close="summaryRound = null" />
     <DetailModal v-if="inspecting" :st="view" :target="inspecting" @close="inspecting = null" />
-    <EndSummary v-if="over && showOver" :st="view" :winner="over" @close="showOver = false" @again="quitGame" />
+    <EndSummary v-if="over && showOver" :st="view" :winner="over" :online="!!online" @close="showOver = false" @again="playAgain" />
   </div>
 </template>
 
