@@ -14,7 +14,7 @@ import { game, online, receive, restoreLocal } from '../game'
 import { firebaseBackend, firebaseConfigured } from './firebase'
 import { localBackend } from './local'
 import { settingsOf, playableKillers, playableSurvivors, type RoomSettings } from './settings'
-import { clientId, newRoomCode, type Backend, type Room, type RoomData, type Side } from './transport'
+import { clientId, newRoomCode, type Backend, type Room, type RoomData, type RoomListing, type Side } from './transport'
 
 /** Firebase when configured (.env.local), otherwise the same-browser test backend. */
 export const backend: Backend = firebaseConfigured ? firebaseBackend : localBackend
@@ -32,6 +32,8 @@ export const session = reactive({
   busy: false,
   /** Connected to the room's server; false while the connection is down and being retried. */
   connected: true,
+  /** A room that asked for its password (the code), for the board to ask the player. */
+  needPassword: null as string | null,
 })
 
 let unsubscribe: (() => void) | null = null
@@ -116,6 +118,7 @@ function enter(room: Room) {
   unsubscribe = room.subscribe((data) => {
     session.data = data
     if (!data) return leaveRoom()
+    if (data.host === session.me) publish(room.code, data)
     // Mirror the room's game. A device without a seat watches (seat 0 may not act).
     online.value = data.game ? { room, seat: mySeat.value ?? 0, latest: () => toRaw(session.data)?.game ?? null } : null
     if (data.game) receive(data.game)
@@ -152,10 +155,23 @@ function join(name: string) {
   })
 }
 
-export function createRoom(name: string) {
+/** A room's password, hashed with its code (the room holds the hash, never the password). */
+export async function hashPassword(code: string, password: string): Promise<string> {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`dbdl:${code}:${password}`))
+  return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Create a room: `roomName` names it on the board, `password` (optional) is asked of anyone
+ * joining who isn't in it already.
+ */
+export function createRoom(name: string, roomName = '', password = '') {
   return guard(async () => {
     const code = newRoomCode()
     const room = await backend.create(code, session.me)
+    const pw = password.trim()
+    const hash = pw ? await hashPassword(code, pw) : ''
+    await room.updateRoom((cur) => ({ ...cur, name: roomName.trim() || randomRoomName(), ...(hash ? { passwordHash: hash } : {}) }))
     remember(code, name)
     enter(room)
     await join(name)
@@ -163,10 +179,20 @@ export function createRoom(name: string) {
   })
 }
 
-export function joinRoom(code: string, name: string) {
+export function joinRoom(code: string, name: string, password = '') {
   return guard(async () => {
     const room = await backend.join(code.trim().toUpperCase())
     if (!room) throw new Error(`ไม่พบห้อง ${code.toUpperCase()}`)
+    // a password, unless this device is in the room already (coming back)
+    const lock = await backend.lockOf(room.code, session.me)
+    if (lock.hash && !lock.member) {
+      if (!password || (await hashPassword(room.code, password.trim())) !== lock.hash) {
+        room.close()
+        session.needPassword = room.code
+        throw new Error(password ? 'รหัสผ่านไม่ถูกต้อง' : 'ห้องนี้ต้องใช้รหัสผ่าน')
+      }
+    }
+    session.needPassword = null
     remember(room.code, name)
     enter(room)
     await join(name)
@@ -176,6 +202,9 @@ export function joinRoom(code: string, name: string) {
 
 export function leaveRoom() {
   const room = session.room
+  // the last one out of a lobby takes the room off the board
+  const d = session.data
+  if (room && d && d.phase === 'lobby' && !d.game && Object.keys(d.members).every((id) => id === session.me)) void backend.unlistRoom(room.code)
   // In the lobby, leaving frees the place; once seated, the member stays so they can come back.
   if (room && session.data?.phase === 'lobby' && !session.data.game)
     void room.updateRoom((cur) => {
@@ -193,6 +222,38 @@ export function leaveRoom() {
   session.data = null
   remember(null)
   restoreLocal()
+}
+
+// ---------- the room board ----------
+
+let published = ''
+/** The host's device keeps the room's listing current (only when something on it changed). */
+function publish(code: string, d: RoomData) {
+  const listing: Omit<RoomListing, 'updatedAt'> = {
+    code,
+    name: d.name || `ห้อง ${code}`,
+    host: d.members[d.host]?.name ?? '',
+    members: Object.keys(d.members).length,
+    phase: d.game ? 'game' : d.phase,
+    locked: !!d.passwordHash,
+  }
+  const key = JSON.stringify(listing)
+  if (key === published) return
+  published = key
+  void backend.publishRoom({ ...listing, updatedAt: Date.now() }).catch(() => {
+    // the board is a convenience: a room still works by its code
+  })
+}
+
+/** Rooms left untouched this long are taken for abandoned (the local backend has no disconnect). */
+export const BOARD_STALE_MS = 6 * 60 * 60 * 1000
+
+const NAME_START = ['คืนหลอนที่', 'หนีตายจาก', 'ปาร์ตี้ที่', 'ล่าท้าผีที่', 'เอาตัวรอดใน', 'หมอกดำเหนือ', 'เสียงกรีดร้องจาก', 'ทริปสยองที่']
+const NAME_END = ['MacMillan', 'Autohaven', 'Coldwind', 'Crotus Prenn', 'Haddonfield', 'Ormond', 'Red Forest', 'Backwater', 'Yamaoka', 'Silent Hill', 'Grave of Glenvale']
+/** A room name to start from (the creator may type their own). */
+export function randomRoomName(): string {
+  const pick = <T>(l: T[]) => l[Math.floor(Math.random() * l.length)]
+  return `${pick(NAME_START)} ${pick(NAME_END)}`
 }
 
 // ---------- lobby ----------

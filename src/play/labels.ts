@@ -215,6 +215,9 @@ export const ROLL_TITLE: Record<RollContext['k'], string> = {
   selfCare: 'Self-Care',
   phantasm: 'Phantasm Trap',
   overwhelm: 'Overwhelming Presence',
+  noMither: 'No Mither',
+  breakdown: 'Breakdown',
+  deadHard: 'Dead Hard',
 }
 
 /** The survivor an interaction is about (heal, attack, pick up, hatchet, a rescue), if any. */
@@ -430,6 +433,20 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       const p = prop(st, c.prop!)
       return `เปิด prop สี${PROP_CATEGORY_TH[p.category]} ที่ ${roomName(st, p.room!)} แทน`
     }
+    case 'breakdown':
+      return `ทอย Danger Die — สำเร็จ: ${st.killer.name} เสีย Sacrifice Progress 1 แต้ม`
+    case 'aftercare': {
+      const p = prop(st, c.prop!)
+      return `วาง Entity บน Hook ที่ ${roomName(st, p.room!)}`
+    }
+    case 'distortion':
+      return `เดินต่อทาง ${pathLabel(st, c.path!, from(o))}`
+    case 'no_mither':
+      return `ทอย Danger Die — สำเร็จ: ${name((w as { target: number }).target)} ไม่บาดเจ็บ, ฆาตกร +1 ▲`
+    case 'dead_hard':
+      return `ทอย Danger Die — สำเร็จ: ${name((w as { s: number }).s)} หนีไปตามเส้นทางแทนถูกแขวน`
+    case 'wgl_forever':
+      return `${st.killer.name} ออกจากห้องไม่ได้ (ยัง Interact ได้)`
     case 'coulrophobia': {
       const { s } = w as Extract<PerkWindow, { k: 'preEnter' }>
       return `ห้าม ${name(s)} เข้าห้อง (Interact ไม่ได้เทิร์นนี้)`
@@ -582,6 +599,12 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return `${st.survivors[w.s].name} เข้า ${roomName(st, st.survivors[w.s].room)}`
     case 'rollFail':
       return `${st.survivors[w.s].name} ทอยล้มเหลว (${st.killer.name} จะได้ +${w.fails} ▲)`
+    case 'healed':
+      return `${st.survivors[w.s].name} หายบาดเจ็บ`
+    case 'preHang':
+      return `${st.survivors[w.s].name} กำลังจะถูกแขวนบน Hook`
+    case 'preLeave':
+      return `${st.killer.name} กำลังจะออกจาก ${roomName(st, st.killer.room)}`
     case 'preEnter':
       return `${st.survivors[w.s].name} กำลังจะเดินเข้า ${roomName(st, w.to)} (ห้องของคุณ)`
     case 'carryRoll':

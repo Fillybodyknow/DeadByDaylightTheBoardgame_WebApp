@@ -187,6 +187,7 @@ function start() {
   <div class="room">
     <header class="card head">
       <div>
+        <p v-if="data.name" class="room-title">{{ data.passwordHash ? '🔒 ' : '' }}{{ data.name }}</p>
         <p class="muted small">รหัสห้อง</p>
         <strong class="code">{{ code }}</strong>
       </div>
@@ -384,6 +385,11 @@ function start() {
   max-width: 1100px;
   margin: 0 auto;
   padding: 1rem;
+}
+.room-title {
+  margin: 0 0 0.2rem;
+  font-weight: 700;
+  font-size: 1.05rem;
 }
 .head {
   display: flex;

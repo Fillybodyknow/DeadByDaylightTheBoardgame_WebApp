@@ -61,6 +61,15 @@ and the host starts the game.
   `unplanKiller`; the "ยกเลิก — เลือกการ์ดใหม่" button in the waiting panel). Nobody learns anything new from it — the survivors' cards are face down to the killer
   either way (p.8) — it only saves the wait. On one shared device the survivors still plan first
   and the device then goes to the killer, behind the hand-off curtain.
+- **The room board** (`#/online`): open rooms are listed under `roomIndex/<code>` (name, host,
+  members, phase, locked), apart from the rooms, which are still only read with their code. The
+  host's device keeps the listing current, and Firebase takes it off when that device
+  disconnects (`onDisconnect`); the last one out of a lobby takes it off too, and listings quiet
+  for 6 hours aren't shown. A room is created with a name (a random one on offer, 🎲) and an
+  optional password: the room keeps only its SHA-256 hash with the code, and a device already in
+  the room comes back without it. Friends, not strangers: the check is on the joining device.
+  **The database rules must be updated** (`roomIndex`) for the board to show rooms; without
+  them rooms still work by code.
 - **Room settings** (`online/settings.ts`, the lobby's ⚙ card): the host sets them before
   seating everyone, everyone sees them (with chips for what differs from the defaults), and a
   change makes everyone say ready again. Stored in the lobby node as a partial object, so older
@@ -120,9 +129,9 @@ and the host starts the game.
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
   The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (93 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (99 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -371,6 +380,24 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   killer's; at its end, if another survivor was wounded (by anything, a perk of their own too) or
   hung on a hook during it, she may repair a generator / hide in a locker in her room — an
   interaction out of her own turn. Both may be offered at the same moment; each once a round.
+- Breakdown (Jeff): after a rescue Jeff made, or one that took him off the hook (asked after both
+  rescue moves). A success takes 1 sacrifice progress from the track; not asked with none on it.
+- Aftercare: after anyone becomes healthy by any means (a heal, a perk, Deliverance); the Entity
+  goes onto an empty revealed hook anywhere, picked on the map (it moves there if it was out).
+- Distortion: after Jeff moves into the killer's room on his own turn (a bonus turn too) by any
+  move — a card, a perk (Sprint Burst, Breakout…), the rescue move; once a round, so it doesn't
+  answer its own move — along any path but the one he came by, before interacting.
+- No Mither (David): asked when the killer is about to attack a healthy survivor in David's room
+  (David himself too; Yamaoka's Haunting reaches into his room too). David rolls the danger die;
+  on a success the attack doesn't land and the killer gains 1 ▲ (his interaction is spent).
+- Dead Hard: asked when another survivor in David's room is about to be hung (any hanging,
+  picked up or carried there). On a success they come off the killer's shoulder in his room and
+  must move along any path (no staying put: the board offers no "stay").
+- We're Gonna Live Forever: asked before any move of the killer out of David's room: a card
+  move (the Blight's rush, Victor's too), carrying (the step is lost, as with a Firecracker),
+  the Antidote's move, a moving power (chainsaw, blink, Wailing Bell: not used, he may still
+  interact), a Phantasm Trap teleport (nothing paid) and a perk's move (Starstruck, Diversion,
+  Beast of Prey, Agitation). Asked before a Firecracker. He stays and still interacts there.
 - Windows of Opportunity (Kate): her interaction for the turn (a perk card in her interact step,
   picked first), with a survival or altruism prop in a connected room: rummage a chest, chase
   a crow, drop a pallet (on a free path of that room), or hide in an empty locker — then she

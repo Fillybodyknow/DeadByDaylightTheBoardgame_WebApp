@@ -6,7 +6,7 @@
 
 import { tryApply } from '../engine/engine'
 import type { Action, GameState } from '../engine/types'
-import type { Backend, Room, RoomData } from './transport'
+import type { Backend, Room, RoomData, RoomListing } from './transport'
 import { CHECKPOINT_EVERY, emptyRoom, normalizeRoom } from './transport'
 
 const DB = 'dbdl-rooms'
@@ -146,8 +146,50 @@ class LocalRoom implements Room {
   }
 }
 
+// ---------- the room board: one record of listings, beside the rooms ----------
+
+const INDEX = '__room-board__'
+const indexChannel = () => new BroadcastChannel(`${DB}-board`)
+
+async function readBoard(): Promise<RoomListing[]> {
+  const db = await open()
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE).objectStore(STORE).get(INDEX)
+    req.onsuccess = () => resolve(Object.values((req.result as Record<string, RoomListing> | undefined) ?? {}))
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function writeBoard(fn: (cur: Record<string, RoomListing>) => Record<string, RoomListing>) {
+  await modify(INDEX, (cur) => fn((cur as unknown as Record<string, RoomListing>) ?? {}) as unknown as StoredRoom)
+  const ch = indexChannel()
+  ch.postMessage('changed')
+  ch.close()
+}
+
 export const localBackend: Backend = {
   name: 'local',
+  listRooms(cb) {
+    const ch = indexChannel()
+    const send = () => void readBoard().then(cb)
+    ch.onmessage = send
+    send()
+    return () => ch.close()
+  },
+  async publishRoom(listing) {
+    await writeBoard((cur) => ({ ...cur, [listing.code]: listing }))
+  },
+  async lockOf(code, member) {
+    const d = await read(code)
+    return { ...(d?.passwordHash ? { hash: d.passwordHash } : {}), member: !!d?.members[member] }
+  },
+  async unlistRoom(code) {
+    await writeBoard((cur) => {
+      const next = { ...cur }
+      delete next[code]
+      return next
+    })
+  },
   async create(code, host) {
     await modify(code, () => emptyRoom(host))
     return new LocalRoom(code)

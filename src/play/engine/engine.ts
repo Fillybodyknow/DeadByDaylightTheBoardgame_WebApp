@@ -763,6 +763,7 @@ function handle(st: GameState, a: Action) {
       if (a.t === 'stop') return log(st, `${actorName(st)} อยู่ห้องเดิม`, 'killer')
       if (a.t !== 'move') break
       const m = antidoteKillerMoves(st).find((e) => e.path.id === a.path) ?? fail('cannot move there')
+      if (askLeave(st, m.to, step, a)) return
       // a Firecracker in the room ahead may stop him, as on his card moves
       const holders = onBoardIn(st, m.to).filter((i) => st.survivors[i].item === 'firecracker' && st.itemLock !== i)
       if (holders.length > 0 && !a.reacted) return wait(st, { t: 'reaction', item: 'firecracker', holders, pending: { t: 'move', path: m.path.id }, antidote: true })
@@ -773,6 +774,7 @@ function handle(st: GameState, a: Action) {
       // House rule: after a rescue, staying in the room is allowed (see src/play/README.md).
       // (The Afterpiece Antidote's move is a "may": staying is the other answer.)
       if (a.t === 'stop') {
+        if (step.why === 'deadHard') fail('Dead Hard moves them')
         log(st, `${st.survivors[step.s].name} อยู่ห้องเดิม`, step.s)
         return
       }
@@ -863,6 +865,7 @@ function handle(st: GameState, a: Action) {
     case 'killerMove': {
       if (a.t !== 'move') break
       const m = killerMoves(st, step.card).find((e) => e.path.id === a.path) ?? fail('cannot move there')
+      if (askLeave(st, m.to, step, a)) return
       killerMove(st, a, m.path, m.to)
       return
     }
@@ -880,6 +883,8 @@ function handle(st: GameState, a: Action) {
       const i = a.i as KillerInteraction
       const legal = killerInteractions(st, step).filter((o) => !step.powerOnly || isPower(o))
       if (!legal.some((o) => same(o, i))) fail('not a legal interaction')
+      const to = powerDest(st, i)
+      if (to && askLeave(st, to, step, a, [{ k: 'resume', step }])) return
       killerInteract(st, i, a.reacted === true, step.turn)
       return
     }
@@ -915,6 +920,7 @@ function handle(st: GameState, a: Action) {
       if (a.t === 'hang') return hang(st, step.s, usableHook(st, st.killer.room) ?? fail('no free hook here'))
       if (a.t !== 'move') break
       const m = carryMoves(st).find((e) => e.path.id === a.path) ?? fail('cannot carry there')
+      if (askLeave(st, m.to, step, a, [{ k: 'carryArrive', s: step.s, steps: step.steps - 1 }])) return
       // A Firecracker in the room ahead may stop him, carrying or not (house rule): asked first.
       const holders = onBoardIn(st, m.to).filter((i) => st.survivors[i].item === 'firecracker' && st.itemLock !== i)
       if (holders.length > 0 && !a.reacted)
@@ -980,6 +986,7 @@ function handle(st: GameState, a: Action) {
       if (k.bp < step.face) fail('not enough ▲ to teleport')
       const i = a.i ?? null
       if (i && !phantasmInteractions(st, step.room).some((o) => same(o, i))) fail('not a legal interaction there')
+      if (askLeave(st, step.room, step, a)) return
       k.bp -= step.face
       log(st, `${k.name} จ่าย ${step.face} ▲ วาร์ปไป Phantasm Trap`, 'killer')
       killerEnter(st, '', step.room)
@@ -1138,6 +1145,18 @@ function runTask(st: GameState, task: Task) {
       return
     case 'survivorDo':
       return survivorInteract(st, task.s, task.i, true)
+    case 'hangDo': {
+      // still on his shoulder (Dead Hard didn't take them off)
+      if (st.survivors[task.s].status !== 'carried') return
+      return hang(st, task.s, st.props.find((p) => p.id === task.hook)!, true)
+    }
+    case 'leave':
+      return void st.queue.unshift(task.go)
+    case 'replay':
+      st.step = task.step
+      return handle(st, task.action)
+    case 'killerMoved':
+      return killerMovedBy(st, pathDef(st, task.path), task.to, true)
     case 'killerGo':
       return finishKillerMove(st, pathDef(st, task.path), task.to)
     case 'purgeTake': {
@@ -1356,7 +1375,7 @@ function moveSurvivor(st: GameState, s: number, path: PathDef, to: string) {
   // The Clown's Afterpiece Antidote: they may move on along any path, before interacting.
   if (st.afterpiece?.antidote === to && sv.status === 'board') st.queue.splice(after++, 0, { k: 'anyMove', s, why: 'antidote' })
   // For the People, once the room is revealed.
-  if (sv.status === 'board') trigger(st, { k: 'entered', s }, after)
+  if (sv.status === 'board') trigger(st, { k: 'entered', s, path: path.id }, after)
   if (pathState(st, path.id).trap) {
     log(st, `${sv.name} เดินผ่าน Bear Trap — ทอย Danger Die`, s)
     startRoll(st, { k: 'trap', s, path: path.id }, 1, 'danger')
@@ -1483,6 +1502,18 @@ function placeEntity(st: GameState, place: EntityPlace) {
 
 // ---------- killer ----------
 
+/**
+ * We're Gonna Live Forever: before any move of the killer out of David's room, the move is held
+ * and the perk asked; with no use, `a` is answered again in `step` (marked `left`). `stop`: what
+ * follows when the perk keeps him there. True when it asked (the caller stops there).
+ */
+function askLeave(st: GameState, to: string, step: Step, a: Action, stop: Task[] = []): boolean {
+  if (('left' in a && a.left) || ('reacted' in a && a.reacted) || to === st.killer.room) return false
+  if (!perkCandidates(st, { k: 'preLeave', to }, []).length) return false
+  st.queue.unshift({ k: 'trigger', w: { k: 'preLeave', to }, done: [] }, { k: 'leave', go: { k: 'replay', step, action: { ...a, left: true } as Action }, stop })
+  return true
+}
+
 function killerMove(st: GameState, a: Extract<Action, { t: 'move' }>, path: PathDef, to: string) {
   if (palletOn(st, path.id)) {
     // Enduring may break it and keep going.
@@ -1498,13 +1529,32 @@ function killerMove(st: GameState, a: Extract<Action, { t: 'move' }>, path: Path
   finishKillerMove(st, path, to)
 }
 
+/** Where a power that moves the killer takes him (chainsaw, blink, Wailing Bell); else undefined. */
+function powerDest(st: GameState, i: KillerInteraction): string | undefined {
+  const room = st.killer.room
+  if (i.k === 'chainsaw') return exits(st, room, i.card as PathKind).find((e) => e.path.id === i.path)?.to
+  if (i.k === 'blink') {
+    const p = pathDef(st, i.path)
+    return p.a === room ? p.b : p.a
+  }
+  if (i.k === 'bell') return i.room
+  return undefined
+}
+
 /** Survivors in `room` who can throw a Firecracker to keep the killer out. */
 function fireHolders(st: GameState, room: string): number[] {
   return onBoardIn(st, room).filter((i) => st.survivors[i].item === 'firecracker' && st.itemLock !== i)
 }
 
-/** The killer moved by a perk (Starstruck, Diversion): a Firecracker in the room may stop it. */
-function killerMovedBy(st: GameState, path: PathDef, to: string) {
+/**
+ * The killer moved by a perk (Starstruck, Diversion, Beast of Prey, Agitation): We're Gonna Live
+ * Forever and a Firecracker in the room may stop it. `asked`: the former was asked already.
+ */
+function killerMovedBy(st: GameState, path: PathDef, to: string, asked = false) {
+  if (!asked && to !== st.killer.room && perkCandidates(st, { k: 'preLeave', to }, []).length) {
+    st.queue.unshift({ k: 'trigger', w: { k: 'preLeave', to }, done: [] }, { k: 'leave', go: { k: 'killerMoved', path: path.id, to } })
+    return
+  }
   const holders = fireHolders(st, to)
   if (holders.length) return wait(st, { t: 'reaction', item: 'firecracker', holders, pending: { t: 'move', path: path.id }, then: [{ k: 'killerGo', path: path.id, to }] })
   finishKillerMove(st, path, to)
@@ -1648,7 +1698,12 @@ export function hookHere(st: GameState): Prop | undefined {
   return usableHook(st, st.killer.room)
 }
 
-function hang(st: GameState, s: number, hook: Prop) {
+/** `asked`: Dead Hard has had its chance at this hanging. */
+function hang(st: GameState, s: number, hook: Prop, asked = false) {
+  if (!asked && perkCandidates(st, { k: 'preHang', s }, []).length) {
+    st.queue.unshift({ k: 'trigger', w: { k: 'preHang', s }, done: [] }, { k: 'hangDo', s, hook: hook.id })
+    return
+  }
   const sv = st.survivors[s]
   sv.status = 'hooked'
   sv.room = hook.room!
@@ -1832,6 +1887,9 @@ const ROLL_LABEL: Record<RollContext['k'], string> = {
   selfCare: 'Self-Care',
   phantasm: 'Phantasm Trap',
   overwhelm: 'Overwhelming Presence',
+  noMither: 'No Mither',
+  breakdown: 'Breakdown',
+  deadHard: 'Dead Hard',
 }
 
 function resolveRoll(st: GameState, ctx: RollContext, dice: Die[], failBp?: number) {
@@ -1915,6 +1973,32 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
     case 'hatchet':
       if (!ok) wound(st, s, 'power', `${sv.name} โดน Hatchet — บาดเจ็บ`)
       return
+    case 'noMither': {
+      if (!ok) return
+      // the attack doesn't land; the killer gains a ▲ for it
+      const at = st.queue.findIndex((t) => t.k === 'killerDo' && t.i.k === 'attack' && t.i.target === ctx.target)
+      if (at >= 0) st.queue.splice(at, 1)
+      log(st, `${st.survivors[ctx.target].name} ยังไม่บาดเจ็บ (No Mither) — ${st.killer.name} +1 ▲`, s)
+      gainKiller(st, 1)
+      return
+    }
+    case 'breakdown':
+      if (!ok || st.sacrifice <= 0) return
+      st.sacrifice--
+      log(st, `Breakdown สำเร็จ — ${st.killer.name} เสีย Sacrifice Progress (${st.sacrifice}/${SACRIFICE_TO_WIN})`, s, { ev: { k: 'sacrifice', total: st.sacrifice } })
+      return
+    case 'deadHard': {
+      if (!ok) return
+      // off the killer's shoulder and away along a path, instead of onto the hook
+      const at = st.queue.findIndex((t) => t.k === 'hangDo' && t.s === ctx.target)
+      if (at >= 0) st.queue.splice(at, 1)
+      const t = st.survivors[ctx.target]
+      t.status = 'board'
+      t.room = st.killer.room
+      log(st, `${t.name} หลุดจากการแบก (Dead Hard) — เดินไปตามเส้นทางใดก็ได้`, ctx.target, { ev: { k: 'carryEscape', s: ctx.target } })
+      st.queue.unshift({ k: 'anyMove', s: ctx.target, why: 'deadHard' })
+      return
+    }
     case 'trap': {
       if (ok) return
       pathState(st, ctx.path).trap = false
@@ -2511,6 +2595,35 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
           }
       return out
     }
+    // ----- Jeff -----
+    case 'breakdown':
+      // a rescue Jeff made, or one that took him off the hook; a sacrifice progress to take
+      if (w.k !== 'afterSabotage' || w.rescued === undefined || st.sacrifice <= 0) return []
+      return w.s === o || w.rescued === o ? NONE : []
+    case 'aftercare':
+      // anyone healthy again: the Entity onto an empty hook anywhere
+      if (w.k !== 'healed') return []
+      return st.props.flatMap((p) => (p.kind === 'hook' && p.revealed && p.room && !p.removed && p.occupant === null && !entityOn(st, { prop: p.id }) ? [{ prop: p.id }] : []))
+    case 'distortion':
+      // any move of his on his turn into the killer's room: again, along another path
+      if (w.k !== 'entered' || w.s !== o || st.activeSurvivor !== o || me!.room !== charlotteRoom(st)) return []
+      return anyMoves(st, o as number)
+        .filter((m) => m.path.id !== w.path)
+        .map((m) => ({ path: m.path.id }))
+    // ----- David -----
+    case 'no_mither': {
+      // the killer about to attack a healthy survivor in David's room (himself too)
+      const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
+      if (w.k !== 'preKillerInteract' || w.pickUp || (task && task.i.k !== 'attack')) return []
+      const t = st.survivors[w.target]
+      return !t.wounded && t.room === me!.room ? NONE : []
+    }
+    case 'dead_hard':
+      // another survivor about to be hung in David's room
+      return w.k === 'preHang' && w.s !== o && st.survivors[w.s].room === me!.room ? NONE : []
+    case 'wgl_forever':
+      // the killer about to leave David's room with a card
+      return w.k === 'preLeave' && st.killer.room === me!.room ? NONE : []
     // ----- Kate -----
     case 'windows_of_opportunity':
       // her interaction for the turn, with a survival or altruism prop in a connected room
@@ -2683,11 +2796,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     case 'beast_of_prey': {
       const e = exits(st, k.room, 'any').find((x) => x.path.id === c.path)!
       payPerk(st, o, perk)
-      if (pathState(st, e.path.id).wall) {
-        pathState(st, e.path.id).wall = false
-        log(st, `${k.name} ทุบกำแพง`, 'killer', { ev: { k: 'wallBreak', path: e.path.id } })
-      }
-      return killerEnter(st, e.path.id, e.to)
+      return killerMovedBy(st, e.path, e.to)
     }
     case 'unnerving_presence':
     case 'thanatophobia':
@@ -2781,9 +2890,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     case 'deliverance': {
       const t = st.survivors[c.target!]
       payPerk(st, o, perk, `${t.name} หายบาดเจ็บ`)
-      t.wounded = false
-      log(st, `${t.name} หายบาดเจ็บ`, c.target!, { ev: { k: 'heal', s: c.target!, by: o as number } })
-      return
+      return makeHealthy(st, c.target!, `${t.name} หายบาดเจ็บ`, o as number)
     }
     case 'saboteur': {
       if (c.mode === 'bp') {
@@ -3067,6 +3174,35 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       st.itemLock = s
       return
     }
+    case 'breakdown':
+      payPerk(st, o, perk, 'ทอย Danger Die — สำเร็จ = ฆาตกรเสีย Sacrifice Progress')
+      return startRoll(st, { k: 'breakdown', s: o as number }, 1, 'danger')
+    case 'aftercare': {
+      const p = st.props.find((x) => x.id === c.prop)!
+      payPerk(st, o, perk, `วาง Entity บน Hook ที่ ${roomName(st, p.room!)}`)
+      return placeEntity(st, { prop: p.id })
+    }
+    case 'distortion': {
+      const m = anyMoves(st, o as number).find((x) => x.path.id === c.path)!
+      payPerk(st, o, perk, `เดินต่อไป ${roomName(st, m.to)}`)
+      return moveSurvivor(st, o as number, m.path, m.to)
+    }
+    case 'no_mither': {
+      const { target } = w as Extract<PerkWindow, { k: 'preKillerInteract' }>
+      payPerk(st, o, perk, `ทอย Danger Die — สำเร็จ = ${name(target)} ไม่บาดเจ็บ`)
+      return startRoll(st, { k: 'noMither', s: o as number, target }, 1, 'danger')
+    }
+    case 'dead_hard': {
+      const { s } = w as Extract<PerkWindow, { k: 'preHang' }>
+      payPerk(st, o, perk, `ทอย Danger Die — สำเร็จ = ${name(s)} หนีแทนถูกแขวน`)
+      return startRoll(st, { k: 'deadHard', s: o as number, target: s }, 1, 'danger')
+    }
+    case 'wgl_forever': {
+      payPerk(st, o, perk, `${k.name} ออกจากห้องไม่ได้ — ยัง Interact ในห้องนี้ได้`)
+      const at = st.queue.findIndex((t) => t.k === 'leave')
+      if (at >= 0) st.queue.splice(at, 1, ...((st.queue[at] as Extract<Task, { k: 'leave' }>).stop ?? []))
+      return
+    }
     case 'windows_of_opportunity': {
       const p = st.props.find((x) => x.id === c.prop)!
       const i = windowInteraction(p, c.path)
@@ -3216,6 +3352,7 @@ function makeHealthy(st: GameState, s: number, text: string, by: number) {
     payPerk(st, 'killer', 'nurses_calling', '+2 ▲')
     gainKiller(st, 2)
   }
+  trigger(st, { k: 'healed', s })
 }
 
 /** A bonus turn from a perk or a crow: the card goes through the usual card-move checks. */

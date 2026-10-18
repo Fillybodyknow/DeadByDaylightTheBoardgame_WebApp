@@ -100,6 +100,12 @@ export type PerkId =
   | 'windows_of_opportunity'
   | 'boil_over'
   | 'dance_with_me'
+  | 'no_mither'
+  | 'dead_hard'
+  | 'wgl_forever'
+  | 'breakdown'
+  | 'aftercare'
+  | 'distortion'
 
 export interface PerkDef {
   id: PerkId
@@ -216,6 +222,12 @@ export const PERKS: Record<PerkId, PerkDef> = {
   windows_of_opportunity: def('windows_of_opportunity', 'Windows of Opportunity', 1, 'survivor', 'kate', 0, 'ปุ่มแทนการ Interact: prop สีน้ำเงิน / เขียวในห้องที่เชื่อมกัน'),
   boil_over: def('boil_over', 'Boil Over', 2, 'survivor', 'kate', 1, 'ถามหลังฆาตกรเลือกจำนวนเต๋าตอนอุ้มคุณหรือคนในห้องคุณ'),
   dance_with_me: def('dance_with_me', 'Dance With Me', 0, 'survivor', 'kate', 2, 'ถามหลังเดินด้วยการ์ด ถ้าเริ่มเทิร์นใน Locker'),
+  no_mither: def('no_mither', 'No Mither', 1, 'survivor', 'david', 0, 'ถามเมื่อฆาตกรจะโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บในห้องคุณ'),
+  dead_hard: def('dead_hard', 'Dead Hard', 2, 'survivor', 'david', 1, 'ถามเมื่อผู้รอดชีวิตคนอื่นในห้องคุณจะถูกแขวน'),
+  breakdown: def('breakdown', 'Breakdown', 1, 'survivor', 'jeff', 0, 'ถามหลังคุณช่วยคนลงจาก Hook หรือถูกช่วยลง'),
+  aftercare: def('aftercare', 'Aftercare', 0, 'survivor', 'jeff', 1, 'ถามหลังผู้รอดชีวิตหายบาดเจ็บ'),
+  distortion: def('distortion', 'Distortion', 1, 'survivor', 'jeff', 2, 'ถามหลังคุณเดินเข้าห้องฆาตกรในเทิร์นตัวเอง (เดินด้วยวิธีใดก็ได้)'),
+  wgl_forever: def('wgl_forever', "We're Gonna Live Forever", 1, 'survivor', 'david', 2, 'ถามเมื่อฆาตกรจะเดินด้วยการ์ดออกจากห้องคุณ'),
   head_on: def('head_on', 'Head On', 1, 'survivor', 'jane', 2, 'ถามเมื่อฆาตกรเข้าห้องของคุณในเทิร์นฆาตกร'),
 }
 

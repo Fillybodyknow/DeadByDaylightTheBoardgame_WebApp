@@ -164,6 +164,12 @@ export type RollContext =
   /** Botany Knowledge / Self-Care (danger die). */
   | { k: 'botany'; s: number; target: number }
   | { k: 'selfCare'; s: number }
+  /** No Mither (danger die): a success keeps `target` healthy, the killer gains 1 ▲. */
+  | { k: 'noMither'; s: number; target: number }
+  /** Dead Hard (danger die): a success sends `target` along a path instead of onto the hook. */
+  | { k: 'deadHard'; s: number; target: number }
+  /** Breakdown (danger die): a success takes a sacrifice progress from the killer. */
+  | { k: 'breakdown'; s: number }
 
 export type SurvivorInteraction =
   | { k: 'rummage'; prop: string }
@@ -278,13 +284,19 @@ export type PerkWindow =
   /** A survivor dropped a pallet or hid in a locker (Nemesis). */
   | { k: 'afterPalletLocker'; s: number; prop: string }
   /** A survivor entered a room (For the People). */
-  | { k: 'entered'; s: number }
+  | { k: 'entered'; s: number; path?: string }
   /** A roll had `fails` failures; the killer gains them unless Off the Record takes one. */
   | { k: 'rollFail'; s: number; fails: number }
   /** A survivor rolled a great success (Lucky Break); `ctx`: what the roll was for (Poised). */
   | { k: 'greatRoll'; s: number; ctx?: RollContext['k'] }
   /** The killer chose `n` dice for survivor `s` to struggle free (Boil Over). */
   | { k: 'carryRoll'; s: number; n: number }
+  /** Survivor `s` is about to be hung (Dead Hard). */
+  | { k: 'preHang'; s: number }
+  /** Survivor `s` became healthy (Aftercare). */
+  | { k: 'healed'; s: number }
+  /** The killer is about to move with a card from his room along `path` (We're Gonna Live Forever). */
+  | { k: 'preLeave'; to: string }
   /** Buttons rather than questions: start of a survivor's turn, their interact step, a roll. */
   | { k: 'turnStart'; s: number }
   | { k: 'interact'; s: number }
@@ -342,8 +354,8 @@ export type Step =
   | { t: 'survivorInteract'; s: number; canInteract: boolean; exclude?: string; survivalOnly?: boolean }
   | { t: 'bonusOffer'; s: number }
   /** Move along any path (after a rescue, p.13). */
-  /** `why`: The Clown's Afterpiece Antidote (else a rescue, p.13). */
-  | { t: 'anyMove'; s: number; why?: 'antidote' }
+  /** `why`: The Clown's Afterpiece Antidote, or Dead Hard (a move they must make); else a rescue (p.13). */
+  | { t: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' }
   /** The Clown's Afterpiece Antidote: the killer walked in, and may move on along any path. */
   | { t: 'killerAnyMove' }
   | { t: 'keepItem'; s: number; drawn: string }
@@ -418,13 +430,25 @@ export type Task =
   | { k: 'survivorTurn'; s: number }
   | { k: 'survivorInteract'; s: number }
   | { k: 'endSurvivorTurn'; s: number }
-  | { k: 'anyMove'; s: number; why?: 'antidote' }
+  | { k: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' }
   /** The killer entered the room with the Afterpiece Antidote. */
   | { k: 'killerAntidote' }
   /** A survivor's card move, after Coulrophobia had its chance to stop it. */
   | { k: 'survivorGo'; s: number; path: string; to: string }
   /** The killer moved by a perk (Starstruck, Diversion), once no Firecracker stopped him. */
   | { k: 'killerGo'; path: string; to: string }
+  /** A hanging, after Dead Hard had its chance. */
+  | { k: 'hangDo'; s: number; hook: string }
+  /** The killer's card move, after We're Gonna Live Forever had its chance. */
+  /**
+   * A move of the killer out of his room, held while We're Gonna Live Forever is asked: `go` makes
+   * it, `stop` is what follows when the perk keeps him there.
+   */
+  | { k: 'leave'; go: Task; stop?: Task[] }
+  /** An action answered again once a question before it is settled (its step put back). */
+  | { k: 'replay'; step: Step; action: Action }
+  /** The killer moved by a perk (Starstruck, Diversion, Beast of Prey, Agitation). */
+  | { k: 'killerMoved'; path: string; to: string }
   /**
    * `extra`: a turn from Devour Hope at the start of cleanup (cleanup is already queued).
    * `begun`: the start-of-turn perks were asked. `chosen`: The Twins picked who takes it.
@@ -482,11 +506,12 @@ export type Action =
   /** Online planning: take a hand's (or the killer's) confirmed cards back, while others still plan. */
   | { t: 'unplanHand'; hand: number }
   | { t: 'unplanKiller' }
-  | { t: 'move'; path: string; reacted?: boolean }
+  /** `left`: We're Gonna Live Forever was asked already (a replayed move). */
+  | { t: 'move'; path: string; reacted?: boolean; left?: boolean }
   | { t: 'stop' }
   /** Hang the carried survivor on the free hook in this room. */
   | { t: 'hang' }
-  | { t: 'interact'; i: SurvivorInteraction | KillerInteraction; reacted?: boolean }
+  | { t: 'interact'; i: SurvivorInteraction | KillerInteraction; reacted?: boolean; left?: boolean }
   | { t: 'endTurn' }
   | { t: 'bonus'; card: MoveCard }
   | { t: 'declineBonus' }
@@ -512,7 +537,7 @@ export type Action =
   /** Carter's Spark: pay 1 ▲, or take Madness / the wound. */
   | { t: 'spark'; pay: boolean }
   /** Phantasm Trap: gain 1 ▲, or teleport (paying the face) and maybe interact. */
-  | { t: 'phantasm'; teleport: boolean; i?: KillerInteraction }
+  | { t: 'phantasm'; teleport: boolean; i?: KillerInteraction; left?: boolean }
   | { t: 'replace'; card: MoveCard }
   /** Redeemer: the survivor's guess at The Deathslinger's discarded card. */
   | { t: 'guess'; card: MoveCard }

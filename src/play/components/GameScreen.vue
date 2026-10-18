@@ -424,6 +424,11 @@ function rollIcon(st: GameState, ctx: RollContext['k'], s: number, target: numbe
       return { src: survivorMini(st, target ?? s), round: true }
     case 'selfCare':
       return { src: survivorMini(st, s), round: true }
+    case 'noMither':
+      return { src: survivorMini(st, target ?? s), round: true }
+    case 'deadHard':
+    case 'breakdown':
+      return { src: PROP_IMAGE.hook, round: false }
     default:
       // struggling, a hatchet, a phantasm trap, Overwhelming Presence: the killer
       return { src: killerMini(st), round: true }
@@ -474,6 +479,12 @@ function diceResult(ctx: RollContext['k'], dice: Die[]): Pick<DiceShow, 'outcome
     }
     case 'overwhelm':
       return fail ? { outcome: 'item เสียเปล่า!', tone: 'bad' } : { outcome: 'ใช้ item ได้', tone: 'great' }
+    case 'noMither':
+      return fail ? { outcome: 'ไม่สำเร็จ — โดนโจมตี', tone: 'bad' } : { outcome: 'ไม่บาดเจ็บ! ฆาตกร +1 ▲', tone: 'great' }
+    case 'breakdown':
+      return fail ? { outcome: 'ไม่สำเร็จ', tone: 'bad' } : { outcome: 'ฆาตกรเสีย Sacrifice Progress!', tone: 'great' }
+    case 'deadHard':
+      return fail ? { outcome: 'ไม่สำเร็จ — ถูกแขวน', tone: 'bad' } : { outcome: 'หลุดรอดจากตะขอ!', tone: 'great' }
   }
 }
 

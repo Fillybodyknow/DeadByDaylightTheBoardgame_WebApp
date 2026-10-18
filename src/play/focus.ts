@@ -81,6 +81,9 @@ const ROLL_WHAT: Record<RollContext['k'], (st: GameState, ctx: RollContext) => s
   selfCare: () => 'Self-Care — สำเร็จ = หายบาดเจ็บ',
   phantasm: () => 'Phantasm Trap — แต้มที่ได้ = ▲ ที่ Hag รับ หรือจ่ายเพื่อวาร์ป',
   overwhelm: () => 'Overwhelming Presence — ล้มเหลว = item เสียเปล่า',
+  noMither: (st, c) => `No Mither — สำเร็จ = ${c.k === 'noMither' ? st.survivors[c.target].name : ''} ไม่บาดเจ็บ`,
+  breakdown: () => 'Breakdown — สำเร็จ = ฆาตกรเสีย Sacrifice Progress 1 แต้ม',
+  deadHard: (st, c) => `Dead Hard — สำเร็จ = ${c.k === 'deadHard' ? st.survivors[c.target].name : ''} หนีแทนถูกแขวน`,
 }
 
 function progress(st: GameState, c: RollContext): string {
@@ -248,6 +251,8 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
       case 'greatRoll':
       case 'carryRoll':
       case 'preEnter':
+      case 'preHang':
+      case 'healed':
       case 'itemUsed':
       case 'itemDiscard':
       case 'afterSurvivorInteract':

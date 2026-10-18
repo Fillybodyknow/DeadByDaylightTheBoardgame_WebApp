@@ -2,6 +2,13 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "roomIndex": {
+      ".read": true,
+      "$code": {
+        ".write": "$code.matches(/^[A-Z2-9]{4}$/)",
+        ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 60 && newData.child('updatedAt').isNumber())"
+      }
+    },
     "rooms": {
       "$code": {
         ".read": "$code.matches(/^[A-Z2-9]{4}$/)",

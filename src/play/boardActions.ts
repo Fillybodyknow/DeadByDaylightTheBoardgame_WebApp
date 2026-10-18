@@ -285,7 +285,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     case 'anyMove':
       moves(anyMoves(st, s.s), st.survivors[s.s].room)
       // after a rescue (house rule) or the Afterpiece Antidote they may stay put: their own room says so
-      add(`room:${st.survivors[s.s].room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
+      if (s.why !== 'deadHard') add(`room:${st.survivors[s.s].room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
       break
     case 'killerMove':
       moves(killerMoves(st, s.card), st.killer.room)

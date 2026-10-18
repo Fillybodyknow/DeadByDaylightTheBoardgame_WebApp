@@ -52,6 +52,10 @@ export interface RoomData {
   board?: string
   /** The host's room settings (anything unset: its default, see settings.ts). */
   settings?: Partial<RoomSettings>
+  /** The room's name, shown on the room board and in the room. */
+  name?: string
+  /** A password to join (hashed with the code, see session.ts); unset: open to anyone. */
+  passwordHash?: string
   /** Character picks: 'killer' → killer id, survivor slot '0'..'3' → survivor id. */
   picks: Record<string, string>
   /** Player number → picks confirmed. */
@@ -89,11 +93,33 @@ export interface Room {
   close(): void
 }
 
+/** A room on the public board (rooms/<code> itself is only read with its code). */
+export interface RoomListing {
+  code: string
+  name: string
+  /** The host's name. */
+  host: string
+  /** People in the room. */
+  members: number
+  phase: 'lobby' | 'pick' | 'game'
+  /** A password is needed to join. */
+  locked: boolean
+  updatedAt: number
+}
+
 export interface Backend {
   readonly name: 'firebase' | 'local'
   create(code: string, host: string): Promise<Room>
   /** null when there is no room with this code. */
   join(code: string): Promise<Room | null>
+  /** The room board: called now and on every change; returns an unsubscribe. */
+  listRooms(cb: (rooms: RoomListing[]) => void): () => void
+  /** Put a room on the board (or update it); the host's device keeps it current. */
+  publishRoom(listing: RoomListing): Promise<void>
+  /** Take a room off the board. */
+  unlistRoom(code: string): Promise<void>
+  /** Before joining: the room's password hash (if any) and whether `member` is in it already. */
+  lockOf(code: string, member: string): Promise<{ hash?: string; member: boolean }>
 }
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no 0/O, 1/I/L

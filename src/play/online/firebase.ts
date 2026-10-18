@@ -20,11 +20,11 @@
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { getDatabase, onChildAdded, onValue, ref, runTransaction, set, update, type Database } from 'firebase/database'
+import { get, getDatabase, onChildAdded, onDisconnect, onValue, ref, remove, runTransaction, set, update, type Database } from 'firebase/database'
 import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
-import type { Backend, Room, RoomData } from './transport'
+import type { Backend, Room, RoomData, RoomListing } from './transport'
 import { CHECKPOINT_EVERY, emptyRoom, moveKey, normalizeRoom } from './transport'
 
 const env = import.meta.env
@@ -52,7 +52,21 @@ type Lobby = Omit<RoomData, 'game' | 'rev'>
 function lobbyOf(r: RoomData): Lobby {
   // `double`, `board` and `settings` are optional: the database rejects undefined, so they are
   // only written when set
-  return { host: r.host, createdAt: r.createdAt, phase: r.phase, members: r.members, seats: r.seats, players: r.players, picks: r.picks, locked: r.locked, ...(r.double ? { double: r.double } : {}), ...(r.board ? { board: r.board } : {}), ...(r.settings ? { settings: r.settings } : {}) }
+  return {
+    host: r.host,
+    createdAt: r.createdAt,
+    phase: r.phase,
+    members: r.members,
+    seats: r.seats,
+    players: r.players,
+    picks: r.picks,
+    locked: r.locked,
+    ...(r.double ? { double: r.double } : {}),
+    ...(r.board ? { board: r.board } : {}),
+    ...(r.settings ? { settings: r.settings } : {}),
+    ...(r.name ? { name: r.name } : {}),
+    ...(r.passwordHash ? { passwordHash: r.passwordHash } : {}),
+  }
 }
 interface GameNode {
   rev: number
@@ -309,6 +323,24 @@ class FirebaseRoom implements Room {
 
 export const firebaseBackend: Backend = {
   name: 'firebase',
+  // The board lives apart from the rooms (roomIndex/<code>), readable by anyone: the rooms
+  // themselves are only read with their code.
+  listRooms(cb) {
+    return onValue(ref(database(), 'roomIndex'), (snap) => cb(Object.values((snap.val() as Record<string, RoomListing> | null) ?? {})))
+  },
+  async publishRoom(listing) {
+    const node = ref(database(), `roomIndex/${listing.code}`)
+    await set(node, listing)
+    // the host's device keeps it; when it goes, the room leaves the board (the code still works)
+    await onDisconnect(node).remove()
+  },
+  async lockOf(code, member) {
+    const [hash, inRoom] = await Promise.all([get(ref(database(), `rooms/${code}/lobby/passwordHash`)), get(ref(database(), `rooms/${code}/lobby/members/${member}`))])
+    return { ...(hash.exists() ? { hash: hash.val() as string } : {}), member: inRoom.exists() }
+  },
+  async unlistRoom(code) {
+    await remove(ref(database(), `roomIndex/${code}`))
+  },
   async create(code, host) {
     const room = emptyRoom(host)
     await set(ref(database(), `rooms/${code}/lobby`), lobbyOf(room))

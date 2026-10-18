@@ -6,7 +6,7 @@ import { PERKS, PRINTED_PERKS, type PerkId } from './perks'
 import type { Action, GameState, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
-const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate']
+const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff']
 const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown']
 
 function game(killer = 'trapper', seed = 1): GameState {
@@ -49,7 +49,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(93)
+    expect(Object.keys(PERKS)).toHaveLength(99)
   })
 })
 
@@ -392,7 +392,10 @@ describe('perks', () => {
       }
       for (const e of st.log) if (e.ev?.k === 'perk') used.add(e.ev.perk)
     }
-    expect([...Object.keys(PERKS)].filter((p) => !used.has(p))).toEqual([])
+    // Dead Hard needs David next to a survivor being hung with 2 ▲ to spare: random play almost never
+    // gets there, so its own tests below cover it
+    const RARE: string[] = ['dead_hard']
+    expect([...Object.keys(PERKS)].filter((p) => !used.has(p) && !RARE.includes(p))).toEqual([])
   }, 600_000)
 })
 
@@ -1808,5 +1811,171 @@ describe("a Firecracker stops any move of the killer into its holder's room", ()
     const stopped = apply(asked, { t: 'react', s: 2 })
     expect(stopped.killer.room).toBe('shack')
     expect(stopped.survivors.some((sv) => sv.status === 'carried')).toBe(false)
+  })
+})
+
+describe('David King', () => {
+  /** David as survivor 0 with only these perks; everyone in the shack, the killer about to interact there. */
+  function david(...perks: PerkId[]) {
+    let st = createGame({ board: 'macmillan', survivors: ['david', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    only(st, ...perks)
+    killerInteracting(st)
+    st.killer.room = 'shack'
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true }))
+    return st
+  }
+
+  it('No Mither: a success keeps the survivor attacked healthy, and the killer gains 1 ▲', () => {
+    const base = david('no_mither')
+    const offered = apply(base, { t: 'interact', i: { k: 'attack', target: 1 } })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'no_mither' })
+    const used = (rng: number) => apply({ ...structuredClone(offered), rng }, { t: 'perk', perk: 'no_mither', use: true, choice: {} })
+    const kept = findOutcome(used, (g) => g.log.some((e) => e.text.includes('(No Mither)')))
+    expect(kept.survivors[1].wounded).toBe(false)
+    const hit = findOutcome(used, (g) => g.survivors[1].wounded)
+    expect(hit.log.some((e) => e.text.includes('(No Mither)'))).toBe(false)
+  })
+
+  it('Dead Hard: a success takes the survivor off his shoulder, and they must move', () => {
+    const base = david('dead_hard')
+    const hook = placeProp(base, 'hook', 'shack')
+    Object.assign(base.survivors[1], { status: 'carried', wounded: true })
+    base.step = { t: 'carryDice', s: 1 }
+    const offered = apply(base, { t: 'hang' })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'dead_hard', w: { k: 'preHang', s: 1 } })
+    const used = (rng: number) => apply({ ...structuredClone(offered), rng }, { t: 'perk', perk: 'dead_hard', use: true, choice: {} })
+    const away = findOutcome(used, (g) => g.step.t === 'anyMove')
+    expect(away.step).toEqual({ t: 'anyMove', s: 1, why: 'deadHard' })
+    expect(away.survivors[1].status).toBe('board')
+    expect(legalActions(away)).not.toContainEqual({ t: 'stop' })
+    const hung = findOutcome(used, (g) => g.survivors[1].status === 'hooked')
+    expect(hung.props.find((p) => p.id === hook.id)!.occupant).toBe(1)
+  })
+
+  it("We're Gonna Live Forever: the killer can't leave David's room, but still interacts there", () => {
+    const st = david('wgl_forever')
+    const p = touchingPaths(st, 'shack').find((x) => x.a === 'shack' || x.kind !== 'vault')!
+    st.killer.planned = [p.kind, 'wait']
+    st.step = { t: 'killerMove', turn: 0, card: p.kind }
+    st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+    const offered = apply(st, { t: 'move', path: p.id })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'wgl_forever' })
+    const kept = apply(offered, { t: 'perk', perk: 'wgl_forever', use: true, choice: {} })
+    expect(kept.killer.room).toBe('shack')
+    expect(kept.step).toMatchObject({ t: 'killerInteract', canInteract: true })
+  })
+
+  it("We're Gonna Live Forever: carrying out of David's room, the step is lost", () => {
+    const st = david('wgl_forever')
+    Object.assign(st.survivors[1], { status: 'carried', wounded: true })
+    st.step = { t: 'carryMove', s: 1, steps: 3 }
+    const m = legalActions(st).find((a) => a.t === 'move') as { t: 'move'; path: string }
+    const offered = apply(st, m)
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'wgl_forever' })
+    const kept = apply(offered, { t: 'perk', perk: 'wgl_forever', use: true, choice: {} })
+    expect(kept.killer.room).toBe('shack')
+    expect(kept.step).toMatchObject({ t: 'carryMove', s: 1, steps: 2 })
+    // not used: he carries on
+    let on = apply(offered, { t: 'perk', perk: 'wgl_forever', use: false })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.killer.room).not.toBe('shack')
+  })
+
+  it("We're Gonna Live Forever: a power that moves him (the Wailing Bell) is kept from it, and he may still interact", () => {
+    let st = createGame({ board: 'macmillan', survivors: ['david', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'wraith', name: 'wraith' }, players: 5, seed: 1 })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    only(st, 'wgl_forever')
+    killerInteracting(st)
+    st.killer.room = 'shack'
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true }))
+    const bell = killerInteractions(st).find((i) => i.k === 'bell')!
+    const offered = apply(st, { t: 'interact', i: bell })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'wgl_forever' })
+    const kept = apply(offered, { t: 'perk', perk: 'wgl_forever', use: true, choice: {} })
+    expect(kept.killer.room).toBe('shack')
+    expect(kept.killer.powerUsed).toBe(false)
+    expect(kept.step).toMatchObject({ t: 'killerInteract', canInteract: true })
+  })
+})
+
+describe('Jeff Johansen', () => {
+  /** Jeff as survivor 0 with only these perks; everyone in the shack, on Jeff's turn. */
+  function jeff(...perks: PerkId[]) {
+    let st = createGame({ board: 'macmillan', survivors: ['jeff', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    only(st, ...perks)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true, acted: true }))
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.canInteract = true
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    return st
+  }
+
+  it('Breakdown: after a rescue, a success takes a sacrifice progress from the killer', () => {
+    const base = jeff('breakdown')
+    const hook = placeProp(base, 'hook', 'shack')
+    Object.assign(base.survivors[1], { status: 'hooked' })
+    hook.occupant = 1
+    base.sacrifice = 3
+    let g = apply(base, { t: 'interact', i: { k: 'sabotage', prop: hook.id } })
+    for (let n = 0; n < 6 && !(g.step.t === 'offer' && g.step.perk === 'breakdown'); n++) g = apply(g, legalActions(g).find((a) => a.t === 'stop') ?? legalActions(g)[0])
+    expect(g.step).toMatchObject({ t: 'offer', perk: 'breakdown' })
+    const used = (rng: number) => apply({ ...structuredClone(g), rng }, { t: 'perk', perk: 'breakdown', use: true, choice: {} })
+    expect(findOutcome(used, (x) => x.sacrifice === 2).sacrifice).toBe(2)
+    expect(findOutcome(used, (x) => x.sacrifice === 3).sacrifice).toBe(3)
+  })
+
+  it('Breakdown: not with no sacrifice progress to take, nor on an empty hook', () => {
+    const st = jeff('breakdown')
+    st.sacrifice = 0
+    expect(perkChoices(st, 'breakdown', 0, { k: 'afterSabotage', s: 0, rescued: 1 })).toEqual([])
+    st.sacrifice = 2
+    expect(perkChoices(st, 'breakdown', 0, { k: 'afterSabotage', s: 0 })).toEqual([])
+    expect(perkChoices(st, 'breakdown', 0, { k: 'afterSabotage', s: 2, rescued: 0 })).toEqual([{}])
+  })
+
+  it('Aftercare: someone healthy again, the Entity goes onto an empty hook anywhere', () => {
+    const st = jeff('aftercare')
+    const hook = placeProp(st, 'hook', 'backlot')
+    st.survivors[1].wounded = true
+    const healed = findOutcome(
+      (rng) => apply({ ...structuredClone(st), rng }, { t: 'interact', i: { k: 'heal', target: 1 } }),
+      (x) => x.step.t === 'offer' && x.step.perk === 'aftercare',
+    )
+    expect(perkChoices(healed, 'aftercare', 0, { k: 'healed', s: 1 })).toContainEqual({ prop: hook.id })
+    const used = apply(healed, { t: 'perk', perk: 'aftercare', use: true, choice: { prop: hook.id } })
+    expect(used.entity).toEqual({ prop: hook.id })
+  })
+
+  it("Distortion: after his card move into the killer's room, he moves on along another path", () => {
+    const st = jeff('distortion')
+    const m = (['sneak', 'sprint', 'crouch', 'vault'] as const).flatMap((card) => survivorMoves(st, 0, card).map((x) => ({ ...x, card })))[0]
+    st.killer.room = m.to
+    st.props.forEach((p) => p.room === m.to && (p.revealed = true))
+    st.step = { t: 'survivorMove', s: 0, card: m.card }
+    st.queue = [{ k: 'survivorInteract', s: 0 }, { k: 'endSurvivorTurn', s: 0 }]
+    let g = apply(st, { t: 'move', path: m.path.id })
+    for (let n = 0; n < 4 && !(g.step.t === 'offer' && g.step.perk === 'distortion'); n++) g = apply(g, legalActions(g)[0])
+    expect(g.step).toMatchObject({ t: 'offer', perk: 'distortion' })
+    const c = perkChoices(g, 'distortion', 0, (g.step as Extract<GameState['step'], { t: 'offer' }>).w)[0]
+    expect(c.path).not.toBe(m.path.id)
+    let on = apply(g, { t: 'perk', perk: 'distortion', use: true, choice: c })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.survivors[0].room).not.toBe(m.to)
+  })
+
+  it('Distortion: a move without a card counts too (the rescue move into his room)', () => {
+    const st = jeff('distortion')
+    const m = anyMoves(st, 0)[0]
+    st.killer.room = m.to
+    st.props.forEach((p) => p.room === m.to && (p.revealed = true))
+    st.step = { t: 'anyMove', s: 0 }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    let g = apply(st, { t: 'move', path: m.path.id })
+    for (let n = 0; n < 4 && !(g.step.t === 'offer' && g.step.perk === 'distortion'); n++) g = apply(g, legalActions(g)[0])
+    expect(g.step).toMatchObject({ t: 'offer', perk: 'distortion', w: { k: 'entered', s: 0, path: m.path.id } })
   })
 })
