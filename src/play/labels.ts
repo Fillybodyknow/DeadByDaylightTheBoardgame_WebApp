@@ -37,6 +37,9 @@ export const SURVIVOR_CARD_BACK = 'assets/movement/back_movement_card.webp'
 export const KILLER_CARD_BACK = 'assets/movement/back_movement_card.webp'
 /** The Doctor's Madness token. */
 export const MADNESS_IMAGE = 'assets/killers/tokens/doctor-madness.webp'
+/** The Clown's tokens (resized to 256 px, as Madness). */
+export const TONIC_IMAGE = 'assets/killers/tokens/clown-afterpiece-tonic.webp'
+export const ANTIDOTE_IMAGE = 'assets/killers/tokens/clown-afterpiece-antidote.webp'
 /** The Plague's Vile Purge token (resized to 256 px, as Madness). */
 export const VILE_PURGE_IMAGE = 'assets/killers/tokens/plague-vile-purge.webp'
 /** The Trickster's Knife token (resized to 256 px, as Madness). */
@@ -175,6 +178,8 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Blighted Corruption: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
     case 'hoard':
       return 'Hoarder: นำ Chest ออก (+2 ▲)'
+    case 'afterpiece':
+      return `${i.which === 'tonic' ? 'Afterpiece Tonic' : 'Afterpiece Antidote'} → ${roomName(st, i.room)}${st.afterpiece?.[i.which] ? ' (ย้าย)' : ''}`
     case 'purge': {
       const rooms = [st.killer.room, i.room].filter((r) => !(st.purge ?? []).includes(r)).map((r) => roomName(st, r))
       return `Vile Purge → ${rooms.join(' + ')}`
@@ -425,6 +430,18 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       const p = prop(st, c.prop!)
       return `เปิด prop สี${PROP_CATEGORY_TH[p.category]} ที่ ${roomName(st, p.room!)} แทน`
     }
+    case 'coulrophobia': {
+      const { s } = w as Extract<PerkWindow, { k: 'preEnter' }>
+      return `ห้าม ${name(s)} เข้าห้อง (Interact ไม่ได้เทิร์นนี้)`
+    }
+    case 'bamboozle': {
+      const p = pathDef(st, c.path!)
+      return `Entity บนทาง ${roomName(st, p.a)} ↔ ${roomName(st, p.b)}`
+    }
+    case 'pop_goes_the_weasel': {
+      const p = prop(st, c.prop!)
+      return `นำ ${PROP_NAMES_TH[p.kind]} ที่ ${roomName(st, p.room!)} ออก`
+    }
     case 'dark_devotion':
     case 'infectious_fright':
       return `ย้าย ${name(c.target!)} ไปทาง ${pathLabel(st, c.path!, st.survivors[c.target!].room)}`
@@ -565,6 +582,8 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return `${st.survivors[w.s].name} เข้า ${roomName(st, st.survivors[w.s].room)}`
     case 'rollFail':
       return `${st.survivors[w.s].name} ทอยล้มเหลว (${st.killer.name} จะได้ +${w.fails} ▲)`
+    case 'preEnter':
+      return `${st.survivors[w.s].name} กำลังจะเดินเข้า ${roomName(st, w.to)} (ห้องของคุณ)`
     case 'carryRoll':
       return `${st.killer.name} ให้ ${st.survivors[w.s].name} ทอยดิ้น ${w.n} ลูก`
     case 'greatRoll':

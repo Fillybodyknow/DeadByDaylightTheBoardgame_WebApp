@@ -7,6 +7,7 @@ import { sfx } from '../../sound'
 import {
   CARD_NAMES,
   ITEM_NAMES,
+  antidoteKillerMoves,
   bonusCost,
   charlotteRoom,
   victorRoom,
@@ -31,6 +32,8 @@ import { STEP_NAME, actionKey, perkPicked, undyingCards, undyingOptions, undying
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import {
+  ANTIDOTE_IMAGE,
+  TONIC_IMAGE,
   orderedChoices,
   cardCaption,
   cardImage,
@@ -117,6 +120,7 @@ const actor = computed<number | 'killer' | null>(() => {
     case 'roll':
       return s.ctx.s
     case 'killerMove':
+    case 'killerAnyMove':
     case 'killerInteract':
     case 'killerBonusOffer':
     case 'carryDice':
@@ -135,6 +139,7 @@ const moves = computed(() => {
   if (s.t === 'survivorMove') return survivorMoves(st, s.s, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.survivors[s.s].room) }))
   if (s.t === 'anyMove') return anyMoves(st, s.s).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.survivors[s.s].room) }))
   if (s.t === 'killerMove') return killerMoves(st, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
+  if (s.t === 'killerAnyMove') return antidoteKillerMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   if (s.t === 'carryMove') return carryMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   return []
 })
@@ -194,6 +199,7 @@ const POWER_HINT: Record<string, string> = {
   spirit: 'ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น — คลิกเป้าหมายบนแผนที่',
   legion: 'ผู้รอดชีวิตทุกคนในห้องนี้บาดเจ็บ — ถ้ามีคนบาดเจ็บอยู่แล้วอย่างน้อย 1 คน ได้ +1 ▲',
   plague: 'วาง Vile Purge ในห้องนี้และห้องที่เชื่อมกันที่เลือก — ผู้รอดชีวิตที่เดินเข้าไปต้องเก็บไปปิด Perk 1 อัน (อันที่ 3 = บาดเจ็บ)',
+  clown: 'วาง Afterpiece Tonic หรือ Antidote ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกว่าอันไหน',
   trickster: 'ผู้รอดชีวิตในห้องนี้และห้องที่เชื่อมกันได้ Knife คนละ 1 เล่ม — เล่มที่ 3 บาดเจ็บ, เกิน 3 = Sacrifice +1',
   blight: 'สุ่มทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามเส้นทางสีนั้น — เข้าห้องใหม่ได้: Interact ที่นั่น หรือพุ่งต่อ',
 }
@@ -457,10 +463,17 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </div>
     </template>
 
-    <template v-else-if="step.t === 'anyMove'">
-      <p>ช่วยลงจาก Hook แล้ว: <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง (หน้า 13) หรือจะอยู่ห้องเดิมก็ได้</p>
+    <template v-else-if="step.t === 'anyMove' || step.t === 'killerAnyMove'">
+      <p v-if="step.t === 'killerAnyMove'">
+        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>Afterpiece Antidote</b> — {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
+      </p>
+      <p v-else-if="step.why === 'antidote'">
+        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>Afterpiece Antidote</b> — <b>{{ st.survivors[step.s].name }}</b> เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
+      </p>
+      <p v-else>ช่วยลงจาก Hook แล้ว: <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง (หน้า 13) หรือจะอยู่ห้องเดิมก็ได้</p>
+      <p class="muted small">คลิกเส้นทางบนแผนที่ — คลิกห้องที่อยู่เพื่ออยู่ห้องเดิม</p>
       <div class="buttons">
-        <button v-for="m in moves" :key="m.path" @click="act({ t: 'move', path: m.path })">{{ m.label }}</button>
+        <button v-for="m in moves.filter((m) => here({ t: 'move', path: m.path }))" :key="m.path" @click="act({ t: 'move', path: m.path })">{{ m.label }}</button>
       </div>
       <button class="primary" @click="act({ t: 'stop' })">อยู่ห้องเดิม</button>
     </template>
@@ -664,6 +677,11 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             <b>ใช้พลัง: {{ powerName(st) }}</b> —
             <BpText :text="POWER_HINT[st.killer.characterId] ?? ''" />
           </p>
+          <!-- The Clown: what each token does, and where it stands now -->
+          <ul v-if="st.killer.characterId === 'clown'" class="afterpiece">
+            <li><img :src="asset(TONIC_IMAGE)" alt="" /><span><b>Tonic</b> — ผู้รอดชีวิตในห้องนั้นวางการ์ดหงาย · {{ st.afterpiece?.tonic ? `อยู่ที่ ${roomName(st, st.afterpiece.tonic)}` : 'ยังไม่วาง' }}</span></li>
+            <li><img :src="asset(ANTIDOTE_IMAGE)" alt="" /><span><b>Antidote</b> — ใครเข้าห้องนั้นเดินต่อได้อีก 1 ทาง · {{ st.afterpiece?.antidote ? `อยู่ที่ ${roomName(st, st.afterpiece.antidote)}` : 'ยังไม่วาง' }}</span></li>
+          </ul>
           <div class="buttons">
             <button v-for="(i, n) in kInteractions.powers.filter((i) => here(powerAct(i)))" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
           </div>
@@ -679,7 +697,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           >
         </p>
         <div class="buttons col">
-          <button v-for="(i, n) in perkPicked ? [] : kInteractions.plain" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
+          <button v-for="(i, n) in perkPicked ? [] : kInteractions.plain.filter((i) => here({ t: 'interact', i }))" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
           <button v-if="kInteractions.undying.length" class="undying" @click="emit('undyingOn', true), sfx.click()">
             🃏 Undying (<BpText :text="PERKS.undying.cost" /> <BpIcon />): ทิ้งการ์ด แล้ว Interact ในห้องข้าง ๆ
           </button>
@@ -925,6 +943,26 @@ p {
   border-color: rgb(155 107 214 / 0.6);
 }
 /* the perk as its card: picture on the left, name, cost, text and what a click does */
+.afterpiece {
+  list-style: none;
+  margin: 0.2rem 0 0.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+.afterpiece li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.afterpiece img,
+.token-inline {
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  vertical-align: middle;
+}
 .perk-card {
   display: grid;
   grid-template-columns: 64px 1fr;

@@ -10,6 +10,7 @@ import {
   boardOf,
   pathDef,
   tokenOf,
+  antidoteKillerMoves,
   carryMoves,
   hookHere,
   isPower,
@@ -29,7 +30,7 @@ import {
 import { PERKS, type PerkId } from './engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { ANTIDOTE_IMAGE, TONIC_IMAGE, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -46,6 +47,8 @@ export interface BoardAction {
   action?: Action
   /** A move along a path: the room it leads to (a fork's icon offers several). */
   dest?: string
+  /** A picture for the chooser in place of a face: the token it places (The Clown's Afterpiece). */
+  icon?: string
 }
 
 /** What the screen is in the middle of choosing, beyond the engine's step. */
@@ -281,11 +284,16 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       break
     case 'anyMove':
       moves(anyMoves(st, s.s), st.survivors[s.s].room)
-      // after a rescue they may stay put (house rule): their own room says so
+      // after a rescue (house rule) or the Afterpiece Antidote they may stay put: their own room says so
       add(`room:${st.survivors[s.s].room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
       break
     case 'killerMove':
       moves(killerMoves(st, s.card), st.killer.room)
+      break
+    case 'killerAnyMove':
+      // the Afterpiece Antidote: on along any path, or stay (his own room says so)
+      moves(antidoteKillerMoves(st), st.killer.room)
+      add(`room:${st.killer.room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
       break
     case 'carryMove':
       moves(carryMoves(st), st.killer.room)
@@ -461,6 +469,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             break
           case 'purge':
             add(`room:${i.room}`, label, run)
+            break
+          case 'afterpiece':
+            // a room offers both tokens: the chooser shows each one's picture
+            add(`room:${i.room}`, label, run)
+            out[out.length - 1].icon = i.which === 'tonic' ? TONIC_IMAGE : ANTIDOTE_IMAGE
             break
           case 'phantasm':
           case 'frenzy':

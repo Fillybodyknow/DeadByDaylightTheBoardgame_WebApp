@@ -247,6 +247,7 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
       case 'rollFail':
       case 'greatRoll':
       case 'carryRoll':
+      case 'preEnter':
       case 'itemUsed':
       case 'itemDiscard':
       case 'afterSurvivorInteract':
@@ -347,6 +348,8 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   // Feral Frenzy: the room, and everyone in it
   // Vile Purge: his room and the one picked
   if (i.k === 'purge') f.rooms.push(room, i.room)
+  // an Afterpiece token: the room it goes to
+  if (i.k === 'afterpiece') f.dests.push(i.room)
   if (i.k === 'frenzy') {
     f.rooms.push(room)
     st.survivors.forEach((sv, s) => sv.status === 'board' && sv.room === room && f.survivors.push(s))

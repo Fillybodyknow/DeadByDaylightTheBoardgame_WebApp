@@ -27,6 +27,12 @@ const props = defineProps<{ st: GameState }>()
 const killerSeat = computed(() => online.value?.seat === KILLER_PLAYER)
 const planningKiller = computed(() => props.st.step.t === 'planKiller' || killerSeat.value)
 
+/** The Clown's Afterpiece Tonic: survivors in its room set their card face up. */
+const tonicNames = computed(() => {
+  const room = props.st.afterpiece?.tonic
+  return room ? props.st.survivors.filter((sv) => sv.room === room && sv.status === 'board').map((sv) => sv.name) : []
+})
+
 /** Stridor: that survivor sets their card first, face up, before anyone else plans. */
 const stridorStep = computed(() => (props.st.step.t === 'planStridor' ? props.st.step.s : null))
 /** The card Stridor has already turned face up, for everyone who plans after it. */
@@ -281,6 +287,8 @@ function confirmKiller() {
     <h2>วางแผน: เลือกการ์ดเคลื่อนที่คนละ 1 ใบ</h2>
     <p class="muted">คุยกันได้ แต่ต้องพูดให้ฆาตกรได้ยิน (หน้า 8) — การ์ดจะคว่ำไว้จนถึงเทิร์นของแต่ละคน</p>
     <p v-if="stridorCard" class="stridor-note">👁 Stridor: {{ stridorCard.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[stridorCard.card] }}</b></p>
+    <!-- The Clown's Afterpiece Tonic: who in its room will set their card face up -->
+    <p v-if="tonicNames.length" class="stridor-note">🧪 Afterpiece Tonic: {{ tonicNames.join(', ') }} อยู่ห้องเดียวกับ Tonic — การ์ดจะวาง<b>หงาย</b></p>
 
     <!-- whose card is being picked: a tab per survivor -->
     <div class="tabs" role="tablist">

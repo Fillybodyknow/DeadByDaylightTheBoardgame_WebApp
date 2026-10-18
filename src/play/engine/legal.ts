@@ -6,6 +6,7 @@ import {
   crowdPayments,
   crowdPledges,
   purgeOptions,
+  antidoteKillerMoves,
   itemUses,
   killerInteractions,
   killerMoves,
@@ -121,6 +122,10 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'killerMove':
       for (const m of killerMoves(st, step.card)) out.push({ t: 'move', path: m.path.id })
+      break
+    case 'killerAnyMove':
+      for (const m of antidoteKillerMoves(st)) out.push({ t: 'move', path: m.path.id })
+      out.push({ t: 'stop' })
       break
     case 'killerInteract':
       if (step.canInteract) for (const i of killerInteractions(st)) if (!step.powerOnly || isPower(i)) out.push({ t: 'interact', i })

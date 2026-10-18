@@ -44,6 +44,7 @@ export function stepOwner(st: GameState): PerkOwner | null {
       return s.ctx.s
     case 'planKiller':
     case 'killerMove':
+    case 'killerAnyMove':
     case 'killerInteract':
     case 'killerBonusOffer':
     case 'carryDice':

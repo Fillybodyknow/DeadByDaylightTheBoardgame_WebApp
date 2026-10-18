@@ -51,6 +51,9 @@ export type PerkId =
   | 'dark_devotion'
   | 'corrupt_intervention'
   | 'infectious_fright'
+  | 'coulrophobia'
+  | 'bamboozle'
+  | 'pop_goes_the_weasel'
   // survivors
   | 'prove_thyself'
   | 'leader'
@@ -190,6 +193,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   dark_devotion: def('dark_devotion', 'Dark Devotion', 2, 'killer', 'plague', 0, 'ถามตอนเริ่มเก็บกวาด'),
   corrupt_intervention: def('corrupt_intervention', 'Corrupt Intervention', 1, 'killer', 'plague', 1, 'ถามตอนเริ่มเฟสวางแผน'),
   infectious_fright: def('infectious_fright', 'Infectious Fright', 1, 'killer', 'plague', 2, 'ถามหลังโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ'),
+  coulrophobia: def('coulrophobia', 'Coulrophobia', 2, 'killer', 'clown', 0, 'ถามเมื่อผู้รอดชีวิตจะเดินด้วยการ์ดเข้าห้องของคุณ'),
+  bamboozle: def('bamboozle', 'Bamboozle', 1, 'killer', 'clown', 1, 'ถามตอนเริ่มเฟสวางแผน'),
+  pop_goes_the_weasel: def('pop_goes_the_weasel', 'Pop Goes the Weasel', 0, 'killer', 'clown', 2, 'ถามหลังทำให้ผู้รอดชีวิตบาดเจ็บ หรือแขวนบน Hook'),
   rancor: def('rancor', 'Rancor', 2, 'killer', 'spirit', 0, 'ถามเมื่อคุณเดินออกจากห้องที่มีผู้รอดชีวิตบาดเจ็บ'),
   haunted_ground: def('haunted_ground', 'Haunted Ground', 1, 'killer', 'spirit', 1, 'ถามหลังผู้รอดชีวิตเปิด prop'),
   spirit_fury: def('spirit_fury', 'Spirit Fury', 0, 'killer', 'spirit', 2, 'ถามหลังคุณทำลาย Pallet'),
@@ -220,4 +226,4 @@ export const PRINTED_PERKS: Record<string, PerkId[]> = Object.values(PERKS).redu
 }, {})
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown']

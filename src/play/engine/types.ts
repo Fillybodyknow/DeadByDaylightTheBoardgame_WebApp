@@ -224,6 +224,8 @@ export type KillerInteraction =
   | { k: 'showstopper' }
   /** The Plague: a Vile Purge in his room and in connected room `room`. */
   | { k: 'purge'; room: string }
+  /** The Clown: his Afterpiece Tonic or Antidote into `room` (his or a connected one), moved if out. */
+  | { k: 'afterpiece'; which: 'tonic' | 'antidote'; room: string }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
   | { k: 'wrath' }
   /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */
@@ -288,6 +290,8 @@ export type PerkWindow =
   | { k: 'interact'; s: number }
   /** The killer's interact step, before interacting (Iron Maiden). */
   | { k: 'killerInteract' }
+  /** Survivor `s` is about to move into the killer's room `to` with a card (Coulrophobia). */
+  | { k: 'preEnter'; s: number; to: string; path: string }
   /** Survivor `s` is about to interact with generator / exit gate `prop` (No Way Out). */
   | { k: 'genInteract'; s: number; prop: string }
   | { k: 'roll' }
@@ -338,7 +342,10 @@ export type Step =
   | { t: 'survivorInteract'; s: number; canInteract: boolean; exclude?: string; survivalOnly?: boolean }
   | { t: 'bonusOffer'; s: number }
   /** Move along any path (after a rescue, p.13). */
-  | { t: 'anyMove'; s: number }
+  /** `why`: The Clown's Afterpiece Antidote (else a rescue, p.13). */
+  | { t: 'anyMove'; s: number; why?: 'antidote' }
+  /** The Clown's Afterpiece Antidote: the killer walked in, and may move on along any path. */
+  | { t: 'killerAnyMove' }
   | { t: 'keepItem'; s: number; drawn: string }
   /**
    * `keep`: Bond rolled two dice and one must be kept. `passed`: survivors who said they
@@ -359,7 +366,12 @@ export type Step =
   | { t: 'carryMove'; s: number; steps: number }
   /** A survivor may discard an item to stop what the killer is doing. */
   /** `carry`: the killer is carrying survivor `s` with `steps` left (a Firecracker costs him the step). */
-  | { t: 'reaction'; item: 'flashlight' | 'firecracker'; holders: number[]; pending: Action; carry?: { s: number; steps: number } }
+  /**
+   * `antidote`: the move it would stop is the Afterpiece Antidote's (The Clown). `then`: the move
+   * comes from a perk (Starstruck, Diversion) — with nobody reacting these tasks make it, instead
+   * of `pending` being replayed.
+   */
+  | { t: 'reaction'; item: 'flashlight' | 'firecracker'; holders: number[]; pending: Action; carry?: { s: number; steps: number }; antidote?: boolean; then?: Task[] }
   /** Use this perk now? `done` is set when the offer comes from a trigger with more to ask. */
   | {
       t: 'offer'
@@ -406,7 +418,13 @@ export type Task =
   | { k: 'survivorTurn'; s: number }
   | { k: 'survivorInteract'; s: number }
   | { k: 'endSurvivorTurn'; s: number }
-  | { k: 'anyMove'; s: number }
+  | { k: 'anyMove'; s: number; why?: 'antidote' }
+  /** The killer entered the room with the Afterpiece Antidote. */
+  | { k: 'killerAntidote' }
+  /** A survivor's card move, after Coulrophobia had its chance to stop it. */
+  | { k: 'survivorGo'; s: number; path: string; to: string }
+  /** The killer moved by a perk (Starstruck, Diversion), once no Firecracker stopped him. */
+  | { k: 'killerGo'; path: string; to: string }
   /**
    * `extra`: a turn from Devour Hope at the start of cleanup (cleanup is already queued).
    * `begun`: the start-of-turn perks were asked. `chosen`: The Twins picked who takes it.
@@ -594,6 +612,8 @@ export interface GameState {
   turnHurt?: number[]
   /** Rooms with one of The Hag's Phantasm Traps (7 tokens, one per room). */
   phantasm: string[]
+  /** The Clown's Afterpiece Tonic and Antidote: the rooms they stand in (one of each). */
+  afterpiece?: { tonic?: string; antidote?: string }
   /** The survivor whose turn began in a locker (Dance With Me). */
   lockerTurn?: number | null
   /** Rooms with one of The Plague's Vile Purges (10 tokens, one per room, the rest on survivors). */

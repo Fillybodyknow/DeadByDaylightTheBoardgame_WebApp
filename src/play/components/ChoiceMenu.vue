@@ -32,7 +32,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   <div class="menu card" :style="style" role="menu">
     <p class="title">เลือกสิ่งที่จะทำ</p>
     <button v-for="(a, i) in actions" :key="i" role="menuitem" @click="pick(a)">
-      <FaceLabel :st="st" :who="a.who" :text="a.label" />
+      <FaceLabel :st="st" :who="a.who" :text="a.label" :icon="a.icon" />
     </button>
     <button class="cancel" @click="emit('close')">ยกเลิก</button>
   </div>

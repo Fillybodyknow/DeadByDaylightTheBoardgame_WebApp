@@ -15,7 +15,7 @@ import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
+import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import BpText from '../../components/BpText.vue'
@@ -137,15 +137,20 @@ const rooms = computed(() =>
 const rects = computed(() => {
   const minis = new Map<string, Rect>()
   const tiles = new Map<string, Rect>()
+  const tokens = new Map<string, Rect>()
   for (const r of rooms.value) {
-    r.props.forEach((p, i) => tiles.set(p.id, tileRect(r.box, i, r.props.length)))
+    // killer tokens lying here sit in the props' row after them, the same size (the row shrinks to fit)
+    const here = roomTokens.value.filter((t) => t.room === r.id)
+    const n = r.props.length + here.length
+    r.props.forEach((p, i) => tiles.set(p.id, tileRect(r.box, i, n)))
+    here.forEach((t, i) => tokens.set(t.key, tileRect(r.box, r.props.length + i, n)))
     // the survivors standing take the slots in turn; one being carried rides on the killer
     let slot = 0
     for (const s of r.survivors) minis.set(`s${s}`, props.st.survivors[s].status === 'carried' ? carryRect(r.box) : miniRect(r.box, slot++))
     if (r.killer) minis.set('k', miniRect(r.box, 0, true))
     if (r.victor) minis.set('v', victorRect(r.box, r.killer))
   }
-  return { minis, tiles }
+  return { minis, tiles, tokens }
 })
 
 // One per path icon: a fork's other pairs share the first one's icon (and its state).
@@ -168,16 +173,27 @@ const paths = computed(() =>
 
 const PHANTASM_IMAGE = 'assets/killers/tokens/hag-phantasm-trap.webp'
 
-function phantasmStyle(room: string) {
-  const [x, y, w, h] = board.value.rooms.find((r) => r.id === room)!.box
-  return { left: pct(x + w * 0.8), top: pct(y + h * 0.58), width: pct(w * 0.17) }
+/**
+ * Killer tokens lying in a room (a Phantasm Trap, a Vile Purge, the Afterpiece Tonic / Antidote):
+ * placed with the prop tiles (`rects`), after them in their row and the same size.
+ */
+interface RoomToken {
+  key: string
+  room: string
+  image: string
+  kind: 'phantasm' | 'purge' | 'tonic' | 'antidote'
+  title: string
 }
-
-/** The Plague's Vile Purges: high on the room's right, above where the Hag's traps go. */
-function purgeStyle(room: string) {
-  const [x, y, w, h] = board.value.rooms.find((r) => r.id === room)!.box
-  return { left: pct(x + w * 0.82), top: pct(y + h * 0.2), width: pct(w * 0.14) }
-}
+const roomTokens = computed(() => {
+  const st = props.st
+  const out: RoomToken[] = []
+  for (const room of st.phantasm) out.push({ key: `ph-${room}`, room, image: PHANTASM_IMAGE, kind: 'phantasm', title: 'Phantasm Trap' })
+  for (const room of st.purge ?? []) out.push({ key: `vp-${room}`, room, image: VILE_PURGE_IMAGE, kind: 'purge', title: 'Vile Purge — ผู้รอดชีวิตที่เดินเข้ามาต้องเก็บไปปิด Perk 1 อัน' })
+  const a = st.afterpiece ?? {}
+  if (a.tonic) out.push({ key: 'ap-tonic', room: a.tonic, image: TONIC_IMAGE, kind: 'tonic', title: 'Afterpiece Tonic — ผู้รอดชีวิตในห้องนี้วางการ์ดหงาย' })
+  if (a.antidote) out.push({ key: 'ap-antidote', room: a.antidote, image: ANTIDOTE_IMAGE, kind: 'antidote', title: 'Afterpiece Antidote — ใครเข้าห้องนี้เดินต่อได้อีก 1 ทาง' })
+  return out
+})
 
 const entityProp = computed(() => {
   const e = props.st.entity
@@ -484,7 +500,7 @@ function guard(e: MouseEvent) {
     <template v-for="r in rooms" :key="`c-${r.id}`">
       <component
         :is="propTargets.includes(p.id) || canAct(p.id) || roomTarget(r.id) ? 'button' : 'div'"
-        v-for="(p, i) in r.props"
+        v-for="p in r.props"
         :key="p.id"
         class="tile"
         :data-prop="p.id"
@@ -500,7 +516,7 @@ function guard(e: MouseEvent) {
             hooked: p.occupant !== null && p.kind === 'hook',
           },
         ]"
-        :style="rectStyle(tileRect(r.box, i, r.props.length))"
+        :style="rectStyle(rects.tiles.get(p.id)!)"
         :title="p.revealed ? (occupantTitle(p) ?? interactTargets[p.id] ?? 'คลิกขวาดูรายละเอียด') : `เปิด prop สี${CATEGORY_TH[p.category]}`"
         @click="clickTile(p.id, r.id)"
         @contextmenu.prevent="p.revealed && emit('inspect', { k: 'prop', id: p.id })"
@@ -583,25 +599,8 @@ function guard(e: MouseEvent) {
       </component>
     </template>
 
-    <img
-      v-for="room in st.phantasm"
-      :key="`ph-${room}`"
-      class="phantasm"
-      :style="phantasmStyle(room)"
-      :src="asset(PHANTASM_IMAGE)"
-      alt="Phantasm Trap"
-      title="Phantasm Trap"
-    />
-
-    <img
-      v-for="room in st.purge ?? []"
-      :key="`vp-${room}`"
-      class="purge"
-      :style="purgeStyle(room)"
-      :src="asset(VILE_PURGE_IMAGE)"
-      alt="Vile Purge"
-      title="Vile Purge — ผู้รอดชีวิตที่เดินเข้ามาต้องเก็บไปปิด Perk 1 อัน"
-    />
+    <!-- killer tokens in a room: tiles after the props, the same size -->
+    <img v-for="t in roomTokens" :key="t.key" class="room-token" :class="t.kind" :style="rectStyle(rects.tokens.get(t.key)!)" :src="asset(t.image)" :alt="t.title" :title="t.title" />
 
     <template v-for="p in paths" :key="p.id">
       <img v-if="p.token" class="path-token" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" :src="asset(p.token)" alt="" />
@@ -1024,31 +1023,32 @@ button.tile.act {
   border-color: #fff;
 }
 
-.purge {
-  position: absolute;
-  /* under the minis: a killer standing there hides it rather than the other way round */
-  z-index: 1;
-  pointer-events: none;
-  border-radius: 6px;
-  box-shadow: 0 0 0 2px #b6e36a, 0 0 12px rgb(182 227 106 / 0.8);
-  animation: ooze 2.6s ease-in-out infinite;
-}
-@keyframes ooze {
-  50% {
-    box-shadow: 0 0 0 2px #b6e36a, 0 0 22px rgb(182 227 106 / 0.95);
-  }
-}
-.phantasm {
+/* a killer token in a room's title bar, ringed in its own colour */
+.room-token {
   position: absolute;
   z-index: 2;
   pointer-events: none;
-  filter: drop-shadow(0 0 8px rgb(160 255 200 / 0.8));
+  border-radius: 7px;
+  object-fit: cover;
+  /* a tile's cell, drawn as big as the prop hexagons in it (they leave a margin) */
+  transform: scale(0.8);
+}
+.room-token.phantasm {
+  box-shadow: 0 0 0 2px #a0ffc8, 0 0 10px rgb(160 255 200 / 0.8);
   animation: haunt 2.4s ease-in-out infinite;
+}
+.room-token.purge {
+  box-shadow: 0 0 0 2px #b6e36a, 0 0 10px rgb(182 227 106 / 0.8);
+}
+.room-token.tonic {
+  box-shadow: 0 0 0 2px #ff9ad5, 0 0 10px rgb(255 154 213 / 0.8);
+}
+.room-token.antidote {
+  box-shadow: 0 0 0 2px #8fd8ff, 0 0 10px rgb(143 216 255 / 0.8);
 }
 @keyframes haunt {
   50% {
-    transform: translateY(-6%);
-    opacity: 0.75;
+    opacity: 0.7;
   }
 }
 /* Madness: a green glow and the badge below — never a ring, which would hide the health ring. */

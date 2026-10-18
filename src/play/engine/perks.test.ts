@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apply, perkButtons, survivorMoves, charlotteRoom, createGame, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { apply, anyMoves, antidoteKillerMoves, perkButtons, survivorMoves, charlotteRoom, createGame, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { actorsOf } from './seats'
 import { PERKS, PRINTED_PERKS, type PerkId } from './perks'
@@ -7,7 +7,7 @@ import type { Action, GameState, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
 const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate']
-const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague']
+const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown']
 
 function game(killer = 'trapper', seed = 1): GameState {
   let st = createGame({ board: 'macmillan', survivors: SURVIVORS.map((id) => ({ id, name: id })), killer: { id: killer, name: killer }, players: 5, seed })
@@ -49,7 +49,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(90)
+    expect(Object.keys(PERKS)).toHaveLength(93)
   })
 })
 
@@ -372,7 +372,7 @@ describe('perks', () => {
         const eager = options.filter(
           (a: Action) =>
             (a.t === 'perk' && a.use) ||
-            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp'].includes(a.i.k)) ||
+            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp'].includes(a.i.k)) ||
             (a.t === 'useItem'),
         )
         rng = (rng * 1103515245 + 12345) >>> 0
@@ -1617,5 +1617,196 @@ describe('Kate Denson', () => {
     expect(g.step).toMatchObject({ t: 'offer', perk: 'dance_with_me' })
     const c = perkChoices(g, 'dance_with_me', 0, (g.step as Extract<GameState['step'], { t: 'offer' }>).w)[0]
     expect(c.path).not.toBe(m.path.id)
+  })
+})
+
+describe('The Clown', () => {
+  /** The Clown with only these perks, about to interact; everyone else in the shack. */
+  function clown(...perks: PerkId[]) {
+    const st = game('clown')
+    only(st, ...perks)
+    killerInteracting(st)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true, acted: true }))
+    return st
+  }
+  /** A card move survivor 0 can make from the shack. */
+  const walk = (st: GameState) => (['sneak', 'sprint', 'crouch', 'vault'] as const).flatMap((card) => survivorMoves(st, 0, card).map((x) => ({ ...x, card })))[0]
+  function moving(st: GameState, card: 'sneak' | 'sprint' | 'crouch' | 'vault') {
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.canInteract = true
+    st.step = { t: 'survivorMove', s: 0, card }
+    st.queue = [{ k: 'survivorInteract', s: 0 }, { k: 'endSurvivorTurn', s: 0 }]
+  }
+
+  it('Afterpiece: a token into his room or a connected one, moved when it is out already', () => {
+    const st = clown()
+    st.killer.room = 'shack'
+    const m = walk(st)
+    let g = apply(st, { t: 'interact', i: { k: 'afterpiece', which: 'tonic', room: m.to } })
+    expect(g.afterpiece).toEqual({ tonic: m.to })
+    g = { ...g, killer: { ...g.killer, powerUsed: false } }
+    killerInteracting(g)
+    expect(killerInteractions(g)).not.toContainEqual({ k: 'afterpiece', which: 'tonic', room: m.to })
+    g = apply(g, { t: 'interact', i: { k: 'afterpiece', which: 'tonic', room: 'shack' } })
+    expect(g.afterpiece).toEqual({ tonic: 'shack' })
+  })
+
+  it('Afterpiece Tonic: survivors in its room set their card face up', () => {
+    let st = game('clown')
+    // Bamboozle's offer at the start of planning: passed
+    while (st.step.t === 'offer') st = apply(st, { t: 'perk', perk: st.step.perk, use: false })
+    st.afterpiece = { tonic: st.survivors[1].room }
+    st = apply(st, { t: 'planSurvivors', cards: ['sneak', 'sprint', 'crouch', 'vault'] })
+    const room = st.afterpiece!.tonic
+    st.survivors.forEach((sv) => expect(sv.plannedRevealed).toBe(sv.room === room && sv.status === 'board'))
+  })
+
+  it('Afterpiece Antidote: walking in, a survivor may move on along any path', () => {
+    const st = clown()
+    st.killer.room = 'backlot'
+    const m = walk(st)
+    st.afterpiece = { antidote: m.to }
+    st.props.forEach((p) => p.room === m.to && (p.revealed = true))
+    moving(st, m.card)
+    let g = apply(st, { t: 'move', path: m.path.id })
+    for (let n = 0; n < 4 && g.step.t !== 'anyMove'; n++) g = apply(g, legalActions(g)[0])
+    expect(g.step).toEqual({ t: 'anyMove', s: 0, why: 'antidote' })
+    const stay = apply(g, { t: 'stop' })
+    expect(stay.survivors[0].room).toBe(m.to)
+  })
+
+  it('Afterpiece Antidote: the killer walking in may move on too', () => {
+    const st = clown()
+    st.killer.room = 'shack'
+    const p = touchingPaths(st, 'shack').find((x) => (x.a === 'shack' || x.kind !== 'vault') && !st.paths[x.id]?.wall)!
+    const to = p.a === 'shack' ? p.b : p.a
+    st.afterpiece = { antidote: to }
+    st.props.forEach((x) => x.room === to && (x.revealed = true))
+    st.killer.planned = [p.kind, 'wait']
+    st.killer.revealedCount = 1
+    st.step = { t: 'killerMove', turn: 0, card: p.kind }
+    st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+    let g = apply(st, { t: 'move', path: p.id })
+    for (let n = 0; n < 4 && g.step.t !== 'killerAnyMove'; n++) g = apply(g, legalActions(g)[0])
+    expect(g.step).toEqual({ t: 'killerAnyMove' })
+  })
+
+  it("a Firecracker stops the killer's Antidote move into its holder's room", () => {
+    const st = clown()
+    st.killer.room = 'shack'
+    st.afterpiece = { antidote: 'shack' }
+    const m = antidoteKillerMoves(st)[0]
+    Object.assign(st.survivors[1], { room: m.to, item: 'firecracker' })
+    st.step = { t: 'killerAnyMove' }
+    const asked = apply(st, { t: 'move', path: m.path.id })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'firecracker', holders: [1], antidote: true })
+    const stopped = apply(asked, { t: 'react', s: 1 })
+    expect(stopped.killer.room).toBe('shack')
+    expect(stopped.survivors[1].item).toBeNull()
+    // nobody reacts: he goes on
+    let on = apply(asked, { t: 'react', s: null })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.killer.room).toBe(m.to)
+  })
+
+  it('Coulrophobia: a survivor moving into his room is stopped and cannot interact', () => {
+    const st = clown('coulrophobia')
+    const m = walk(st)
+    st.killer.room = m.to
+    moving(st, m.card)
+    const offered = apply(st, { t: 'move', path: m.path.id })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'coulrophobia' })
+    const g = apply(offered, { t: 'perk', perk: 'coulrophobia', use: true, choice: {} })
+    expect(g.survivors[0].room).toBe('shack')
+    expect(g.step).toMatchObject({ t: 'survivorInteract', s: 0, canInteract: false })
+    // passing: the move goes on
+    let pass = apply(offered, { t: 'perk', perk: 'coulrophobia', use: false })
+    while (pass.step.t === 'revealProp') pass = apply(pass, legalActions(pass)[0])
+    expect(pass.survivors[0].room).toBe(m.to)
+  })
+
+  it('Bamboozle: the Entity on a path is a wall to the survivors, open to him', () => {
+    const st = clown('bamboozle')
+    const m = walk(st)
+    const used = apply({ ...st, step: { t: 'offer', perk: 'bamboozle', owner: 'killer', w: { k: 'planningStart' }, done: [] }, queue: [{ k: 'plan' }] }, { t: 'perk', perk: 'bamboozle', use: true, choice: { path: m.path.id } })
+    expect(survivorMoves(used, 0, m.card).map((x) => x.path.id)).not.toContain(m.path.id)
+    expect(anyMoves(used, 0).map((x) => x.path.id)).not.toContain(m.path.id)
+  })
+
+  it('Pop Goes the Weasel: after an attack, a crow, chest or empty locker next door is removed', () => {
+    const st = clown('pop_goes_the_weasel')
+    st.killer.room = 'shack'
+    const next = walk(st).to
+    const chest = placeProp(st, 'chest', next)
+    const offered = apply(st, { t: 'interact', i: { k: 'attack', target: 0 } })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'pop_goes_the_weasel' })
+    const g = apply(offered, { t: 'perk', perk: 'pop_goes_the_weasel', use: true, choice: { prop: chest.id } })
+    expect(g.props.find((p) => p.id === chest.id)!.removed).toBe(true)
+  })
+})
+
+describe("a Firecracker stops any move of the killer into its holder's room", () => {
+  it("The Hillbilly's chainsaw: stopped before it runs, the card kept, his interaction lost", () => {
+    const st = game('hillbilly')
+    only(st)
+    st.killer.room = 'scrapyard'
+    st.killer.hand = ['sprint', 'crouch', 'wait']
+    st.survivors.forEach((sv) => (sv.room = 'backlot'))
+    Object.assign(st.survivors[2], { room: 'shack', item: 'firecracker' })
+    killerInteracting(st)
+    const asked = apply(st, { t: 'interact', i: { k: 'chainsaw', card: 'sprint', path: 'p16' } })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'firecracker', holders: [2] })
+    const stopped = apply(asked, { t: 'react', s: 2 })
+    expect(stopped.killer.room).toBe('scrapyard')
+    expect(stopped.survivors[2].wounded).toBe(false)
+    let on = apply(asked, { t: 'react', s: null })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.killer.room).toBe('shack')
+  })
+
+  it('Diversion: the killer sent along a path is kept out by a Firecracker there', () => {
+    let st = createGame({ board: 'macmillan', survivors: ['adam', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    only(st, 'diversion')
+    const room = st.killer.room
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', planned: 'sneak', plannedRevealed: true }))
+    st.survivors[0].room = room
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.canInteract = true
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const i = survivorInteractions(st, 0).find((x) => x.k === 'diversion') as { k: 'diversion'; path: string }
+    const p = touchingPaths(st, room).find((x) => x.id === i.path)!
+    const to = p.a === room ? p.b : p.a
+    Object.assign(st.survivors[1], { room: to, item: 'firecracker' })
+    const asked = apply(st, { t: 'interact', i })
+    expect(asked.step).toMatchObject({ t: 'reaction', holders: [1] })
+    expect(apply(asked, { t: 'react', s: 1 }).killer.room).toBe(room)
+    let on = apply(asked, { t: 'react', s: null })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.killer.room).toBe(to)
+  })
+
+  it('Starstruck: stopped on the way, and nobody is picked up', () => {
+    const st = game('trickster')
+    only(st, 'starstruck')
+    killerInteracting(st)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true }))
+    st.killer.room = 'shack'
+    st.survivors[0].wounded = true
+    const p = touchingPaths(st, 'shack')[0]
+    const to = p.a === 'shack' ? p.b : p.a
+    Object.assign(st.survivors[2], { room: to, item: 'firecracker' })
+    st.props.forEach((x) => x.room === to && (x.revealed = true))
+    const offered = apply(st, { t: 'interact', i: { k: 'pickUp', target: 0 } })
+    const w = (offered.step as Extract<GameState['step'], { t: 'offer' }>).w
+    const c = perkChoices(offered, 'starstruck', 'killer', w).find((x) => x.target === 2 && x.path === p.id)!
+    const asked = apply(offered, { t: 'perk', perk: 'starstruck', use: true, choice: c })
+    expect(asked.step).toMatchObject({ t: 'reaction', holders: [2] })
+    const stopped = apply(asked, { t: 'react', s: 2 })
+    expect(stopped.killer.room).toBe('shack')
+    expect(stopped.survivors.some((sv) => sv.status === 'carried')).toBe(false)
   })
 })

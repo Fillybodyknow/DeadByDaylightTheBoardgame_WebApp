@@ -8,7 +8,8 @@ import { killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import BpText from '../../components/BpText.vue'
 
-const props = defineProps<{ st: GameState; who: PerkOwner | null | undefined; text: string }>()
+/** `icon`: a picture in place of the face (a token: The Clown's Afterpiece). */
+const props = defineProps<{ st: GameState; who: PerkOwner | null | undefined; text: string; icon?: string }>()
 
 const face = computed(() => {
   const w = props.who
@@ -19,7 +20,8 @@ const face = computed(() => {
 
 <template>
   <span class="face-label">
-    <Mini v-if="face" class="chip" :class="{ wounded: typeof who === 'number' && st.survivors[who].wounded }" :src="asset(face)" />
+    <img v-if="icon" class="chip token" :src="asset(icon)" alt="" />
+    <Mini v-else-if="face" class="chip" :class="{ wounded: typeof who === 'number' && st.survivors[who].wounded }" :src="asset(face)" />
     <span><BpText :text="text" /></span>
   </span>
 </template>
@@ -36,6 +38,10 @@ const face = computed(() => {
   height: 30px;
   flex: none;
   box-shadow: 0 0 0 1px rgb(255 255 255 / 0.25);
+}
+.chip.token {
+  border-radius: 6px;
+  object-fit: cover;
 }
 .chip.wounded {
   box-shadow: 0 0 0 2px var(--blood-bright);

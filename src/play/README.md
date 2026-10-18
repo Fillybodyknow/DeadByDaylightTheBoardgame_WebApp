@@ -118,11 +118,11 @@ and the host starts the game.
   not in yet.
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
   Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (90 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (93 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -190,6 +190,11 @@ The rulebook leaves these open (see the ⚠️ notes in `docs/rules-th.md`). The
   as two survival props, one more than the tiles allow).
 - Firecracker stopping the killer counts as a failed move: the killer stays and loses that
   turn's interaction. Flashlight uses up the killer's interaction for that turn.
+- A Firecracker stops any move of the killer into its holder's room ("prevent the Killer from
+  moving into your space"): his card moves, carrying, the Afterpiece Antidote's move, the
+  Hillbilly's chainsaw (asked before it runs: the card stays in his hand), Starstruck's move (no
+  pick-up then) and a Diversion (on a survivor's turn he has no interaction to lose). Not the
+  teleports (Blink, Wailing Bell, a Phantasm Trap) — and Yamaoka's Haunting doesn't move him.
 - A survivor in a locker who must move leaves the locker first, even if the move then fails.
 
 Killer powers:
@@ -315,6 +320,20 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   there.
 - Iron Maiden: before interacting (a button in his interact step; then he still interacts), an
   empty revealed locker and an empty revealed hook in another room swap places, anywhere.
+- Afterpiece (The Clown): one Tonic and one Antidote; the power puts either into his room or a
+  connected one, moving it if it is out already. On the board a room offers both, as a small menu.
+  Tonic: survivors on the board in its room when the cards are set (planning, Predator) set theirs
+  face up. Antidote: whoever enters its room by their own move (a card, a perk, the rescue move;
+  the killer by any move or teleport, not while carrying or in the middle of an interaction) may
+  move on along any path — the killer's not over a pallet — or stay; the board's own room says stay.
+  A Firecracker in the room ahead stops the killer's Antidote move as it stops a card move (he's
+  left where he is and loses the turn's interaction).
+- Coulrophobia: asked when a survivor's card move would take them into his room (perk moves and the
+  rescue move aren't asked); used, they stay and can't interact this turn.
+- Bamboozle: the Entity on a path's icon (a fork is one; not on a wall or under a pallet) until
+  cleanup. Survivors can't pass it, as a wall; he passes freely, carrying too, and it stays.
+- Pop Goes the Weasel: after an attack (wounding) or a hanging; a revealed crow, chest or empty
+  locker in a room connected to his.
 - Vile Purge (The Plague): his room and a connected one, each only if it has none (10 tokens:
   on the board and on survivors). A survivor entering a room with one by any move of their own
   (a perk's too; not carried) takes it after the room's reveal and covers a perk of their choice
