@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CastBuilder } from './casts'
+import { online } from './game'
 import { createGame, apply } from './engine/engine'
 import { legalActions } from './engine/legal'
 import type { GameState, LogEntry } from './engine/types'
@@ -68,5 +69,21 @@ describe('a power that wounds a whole room', () => {
     expect(casts).toHaveLength(1)
     expect(casts[0]!.kind).toBe('power')
     expect(casts[0]!.targets).toEqual([0, 1, 2, 3])
+  })
+})
+
+describe('an item got online', () => {
+  it('shows its back to everyone but its holder', () => {
+    const prev = game()
+    const e: LogEntry = { round: 1, text: 'meg ค้น Chest ได้ Flashlight', who: 1, ev: { k: 'itemGot', s: 1 } }
+    // the killer's device (seat 1): hidden
+    online.value = { room: {} as never, seat: 1, latest: () => null }
+    const hidden = new CastBuilder(prev, prev).of(e)!
+    expect(hidden.title).not.toContain('Flashlight')
+    expect(hidden.image).toContain('back')
+    // Meg's own device: the item shows
+    online.value = { room: {} as never, seat: prev.handPlayers[prev.survivors[1].hand], latest: () => null }
+    expect(new CastBuilder(prev, prev).of(e)!.title).toContain('Flashlight')
+    online.value = null
   })
 })

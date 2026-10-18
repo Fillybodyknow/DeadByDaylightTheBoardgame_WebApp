@@ -12,6 +12,8 @@ import {
   tokenOf,
   antidoteKillerMoves,
   carryMoves,
+  carnifexProps,
+  connectedRoomsOf,
   hookHere,
   isPower,
   itemUses,
@@ -30,7 +32,7 @@ import {
 import { PERKS, type PerkId } from './engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { ANTIDOTE_IMAGE, TONIC_IMAGE, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { ANTIDOTE_IMAGE, GUARD_IMAGE, TONIC_IMAGE, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -402,6 +404,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           out[out.length - 1].dest = perkDest(st, s.owner, c)
         } else if (c.prop) add(`prop:${c.prop}`, label, run)
         else if (c.target !== undefined) add(`s:${c.target}`, label, run, 'act', c.target)
+        // a Guard into a room (Face the Darkness): the room, with the Guard's picture
+        else if (c.room && c.guard) {
+          add(`room:${c.room}`, label, run)
+          out[out.length - 1].icon = GUARD_IMAGE[c.guard]
+        }
       }
       break
     }
@@ -470,6 +477,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           case 'purge':
             add(`room:${i.room}`, label, run)
             break
+          case 'guard':
+            // a room offers every Guard: the chooser shows each one's picture
+            add(`room:${i.room}`, label, run)
+            out[out.length - 1].icon = GUARD_IMAGE[i.guard]
+            break
           case 'afterpiece':
             // a room offers both tokens: the chooser shows each one's picture
             add(`room:${i.room}`, label, run)
@@ -511,6 +523,12 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       add('victor', 'เล่นเทิร์นนี้ด้วย Victor', go({ t: 'twin', victor: true }, sfx.select))
       break
 
+    case 'carnifexProp':
+      for (const p of carnifexProps(st)) add(`prop:${p.id}`, 'Carnifex: นำ prop นี้ออก', go({ t: 'guardProp', prop: p.id }, sfx.select))
+      break
+    case 'carnifexMove':
+      for (const room of connectedRoomsOf(st, st.guards!.carnifex!)) add(`room:${room}`, `Carnifex → ${roomName(st, room)}`, go({ t: 'guardRoom', room }, sfx.drop))
+      break
     case 'pickSurvivor':
       for (const t of s.options) add(`s:${t}`, `${st.survivors[t].name} โดน Chainsaw`, go({ t: 'pick', s: t }, sfx.select), 'act', t)
       break

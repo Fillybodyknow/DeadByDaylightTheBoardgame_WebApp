@@ -33,6 +33,12 @@ function fork(id: string, [a, b, c]: [string, string, string], kind: PathKind, x
   ]
 }
 
+/** A crossing: one icon joining four rooms, as six pairs sharing the first pair's icon. */
+function cross(id: string, [a, b, c, d]: [string, string, string, string], kind: PathKind, x: number, y: number, wall = false, h = H): PathDef[] {
+  const pairs: [string, string][] = [[a, b], [a, c], [a, d], [b, c], [b, d], [c, d]]
+  return pairs.map(([p, q], i) => (i ? { ...path(`${id}${'abcdef'[i]}`, p, q, kind, x, y, wall, h), token: id } : path(id, p, q, kind, x, y, wall, h)))
+}
+
 export const macmillan: BoardDef = {
   id: 'macmillan',
   name: 'MacMillan Estate',
@@ -202,4 +208,106 @@ export const crotusPrenn: BoardDef = {
   ],
 }
 
-export const boards: Record<string, BoardDef> = { macmillan, autohaven, ormond, 'crotus-prenn': crotusPrenn }
+// The next two boards are AI-generated images (the maps aren't in the box), each uncropped at its own
+// aspect: measured on a 2000-wide preview, 2000 × 1486.5 and 2000 × 1480.2.
+
+const WH = 1486.5
+
+export const witheredIsle: BoardDef = {
+  id: 'withered-isle',
+  name: 'Withered Isle',
+  image: 'assets/maps/withered-isle-AI-Gen.webp',
+  aspect: 1184 / 880,
+  rooms: [
+    room('thicket', 'Thicket', null, [O, S, A, A], 128, 10, 576, 272, WH),
+    room('north-porch', 'North Porch', null, [O, B, S, A], 846, 17, 1291, 272, WH),
+    room('pasture', 'Pasture', 0, [O, S, S, A], 1505, 17, 1958, 272, WH),
+    room('mansion-parlor', 'Mansion Parlor', null, [O, B, S, A], 534, 351, 981, 606, WH),
+    room('playground', 'Playground', 5, [O, B, S, A], 1356, 351, 1806, 605, WH),
+    room('gazebo', 'Gazebo', null, [O, B, S, A], 125, 659, 576, 919, WH),
+    room('front-porch', 'Front Porch', null, [B, B, S, S], 985, 664, 1432, 922, WH),
+    room('south-porch', 'South Porch', 4, [O, B, A, A], 1514, 858, 1965, 1118, WH),
+    room('docks', 'Docks', 2, [O, B, S, A], 542, 970, 990, 1226, WH),
+    room('mansion', 'Mansion', 1, [O, B, S, A], 24, 1196, 473, 1456, WH),
+    room('garden-plot', 'Garden Plot', 3, [O, B, S, A], 1083, 1199, 1530, 1456, WH),
+  ],
+  paths: [
+    path('p1', 'thicket', 'north-porch', 'sneak', 711, 64, true, WH),
+    path('p2', 'north-porch', 'pasture', 'sneak', 1400, 64, false, WH),
+    path('p3', 'north-porch', 'mansion-parlor', 'crouch', 711, 213, true, WH),
+    path('p4', 'pasture', 'playground', 'crouch', 1400, 213, false, WH),
+    path('p5', 'thicket', 'mansion', 'sprint', 73, 399, false, WH),
+    path('p6', 'thicket', 'gazebo', 'vault', 235, 483, false, WH),
+    path('p7', 'thicket', 'mansion-parlor', 'sneak', 407, 399, false, WH),
+    path('p8', 'mansion-parlor', 'gazebo', 'crouch', 407, 547, true, WH),
+    path('p9', 'north-porch', 'front-porch', 'sprint', 1078, 466, false, WH),
+    path('p10', 'north-porch', 'playground', 'vault', 1223, 399, false, WH),
+    path('p11', 'front-porch', 'playground', 'vault', 1223, 547, false, WH),
+    path('p12', 'mansion-parlor', 'front-porch', 'sneak', 851, 728, false, WH),
+    path('p13', 'gazebo', 'front-porch', 'sprint', 716, 858, false, WH),
+    path('p14', 'playground', 'south-porch', 'sneak', 1645, 728, false, WH),
+    path('p15', 'pasture', 'south-porch', 'sprint', 1919, 728, false, WH),
+    path('p16', 'gazebo', 'mansion', 'crouch', 201, 1061, false, WH),
+    path('p17', 'gazebo', 'docks', 'vault', 382, 1061, false, WH),
+    path('p18', 'docks', 'front-porch', 'crouch', 1108, 1061, false, WH),
+    path('p19', 'front-porch', 'garden-plot', 'sneak', 1247, 1061, false, WH),
+    path('p20', 'front-porch', 'south-porch', 'crouch', 1389, 1061, false, WH),
+    path('p21', 'mansion', 'docks', 'sneak', 628, 1331, false, WH),
+    path('p22', 'mansion', 'garden-plot', 'sprint', 772, 1404, false, WH),
+    path('p23', 'docks', 'garden-plot', 'crouch', 926, 1331, true, WH),
+    path('p24', 'garden-plot', 'south-porch', 'sprint', 1738, 1331, false, WH),
+  ],
+}
+
+const FH = 1480.2
+
+/** One sprint icon in the middle of Forsaken Boneyard joins four rooms (`cross`). */
+export const forsakenBoneyard: BoardDef = {
+  id: 'forsaken-boneyard',
+  name: 'Forsaken Boneyard',
+  image: 'assets/maps/forsaken-boneyard-AI-Gen.webp',
+  aspect: 1189 / 880,
+  rooms: [
+    room('eyrie-balcony', 'Eyrie Balcony', 1, [O, B, S, S, A], 37, 13, 500, 387, FH),
+    room('north-library', 'North Library', 5, [O, B, S, A], 769, 109, 1223, 373, FH),
+    room('sepulchre', 'Sepulchre', 2, [O, B, B, S, S], 1509, 13, 1968, 390, FH),
+    room('twisted-tree', 'Twisted Tree', null, [O, B, S, S, S], 168, 538, 627, 908, FH),
+    room('eyrie-balcony-east', 'Eyrie Balcony East', null, [O, B, A, A, A], 836, 535, 1292, 908, FH),
+    room('the-arch', 'The Arch', null, [O, O, B, S, A], 1505, 538, 1968, 922, FH),
+    room('graveyard', 'Graveyard', 4, [O, B, S, S, A, A], 37, 1063, 496, 1443, FH),
+    room('south-library', 'South Library', 0, [O, B, A, A], 779, 1077, 1233, 1346, FH),
+    room('fountain', 'Fountain', 3, [O, B, S, A, A], 1509, 1060, 1968, 1443, FH),
+  ],
+  paths: [
+    path('p1', 'eyrie-balcony', 'sepulchre', 'sprint', 1366, 71, false, FH),
+    path('p2', 'eyrie-balcony', 'north-library', 'sneak', 639, 182, false, FH),
+    path('p3', 'north-library', 'sepulchre', 'crouch', 1356, 219, true, FH),
+    path('p4', 'twisted-tree', 'north-library', 'sneak', 580, 320, true, FH),
+    path('p5', 'twisted-tree', 'eyrie-balcony', 'vault', 269, 458, false, FH),
+    path('p6', 'eyrie-balcony', 'graveyard', 'sprint', 84, 720, false, FH),
+    path('p7', 'twisted-tree', 'graveyard', 'vault', 272, 984, false, FH),
+    ...cross('p8', ['twisted-tree', 'eyrie-balcony-east', 'north-library', 'south-library'], 'sprint', 732, 723, false, FH),
+    path('p9', 'north-library', 'eyrie-balcony-east', 'crouch', 1003, 451, false, FH),
+    path('p10', 'eyrie-balcony-east', 'sepulchre', 'vault', 1413, 458, false, FH),
+    path('p11', 'sepulchre', 'the-arch', 'sneak', 1699, 463, false, FH),
+    path('p12', 'sepulchre', 'the-arch', 'sprint', 1864, 463, false, FH),
+    path('p13', 'eyrie-balcony-east', 'the-arch', 'vault', 1376, 732, false, FH),
+    path('p14', 'eyrie-balcony-east', 'fountain', 'vault', 1371, 984, false, FH),
+    path('p15', 'the-arch', 'fountain', 'crouch', 1699, 984, false, FH),
+    path('p16', 'the-arch', 'fountain', 'sprint', 1864, 984, false, FH),
+    path('p17', 'twisted-tree', 'south-library', 'crouch', 636, 1018, false, FH),
+    path('p18', 'eyrie-balcony-east', 'south-library', 'sneak', 1001, 984, true, FH),
+    path('p19', 'graveyard', 'south-library', 'crouch', 636, 1203, true, FH),
+    path('p20', 'graveyard', 'fountain', 'sprint', 636, 1379, false, FH),
+    path('p21', 'south-library', 'fountain', 'sneak', 1371, 1253, false, FH),
+  ],
+}
+
+export const boards: Record<string, BoardDef> = {
+  macmillan,
+  autohaven,
+  ormond,
+  'crotus-prenn': crotusPrenn,
+  'withered-isle': witheredIsle,
+  'forsaken-boneyard': forsakenBoneyard,
+}

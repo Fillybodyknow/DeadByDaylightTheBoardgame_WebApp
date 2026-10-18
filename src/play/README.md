@@ -121,17 +121,18 @@ and the host starts the game.
 
 - Boards: **MacMillan Estate** (11 rooms, 22 paths), **Autohaven Wreckers** (10 rooms, 19 path
   icons, two of them forks), **Ormond** (10 rooms, 22 paths), **Crotus Prenn Asylum** (10 rooms,
-  18 path icons, one fork) — each with 4 breakable walls and all 44 props. Offline the board is
+  18 path icons, one fork), **Withered Isle** (11 rooms, 24 paths) and **Forsaken Boneyard** (9 rooms,
+  21 path icons, one of them joining four rooms) — each with 4 breakable walls and all 44 props.
+  The last two use AI-generated images of the maps (`*-AI-Gen.webp`), not the printed art. Offline the board is
   picked before the trial; online the killer picks it and everyone else sees his choice on a card
-  above their character picker (which is long enough to hide anything under it). Forsaken Boneyard and Withered Isle are
-  not in yet.
+  above their character picker (which is long enough to hide anything under it).
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
   Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (99 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (102 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -197,6 +198,10 @@ The rulebook leaves these open (see the ⚠️ notes in `docs/rules-th.md`). The
   card; its wall, pallet or bear trap sits on the icon and blocks all of them.
 - Crotus Prenn's Receiving Desk holds O, B, S, A (as the user confirmed; the printed icons read
   as two survival props, one more than the tiles allow).
+- Withered Isle's Pasture holds O, S, S, A: its third icon is drawn oddly on the AI image, and
+  survival is the only reading that matches the tiles (12 survival, 12 altruism).
+- Forsaken Boneyard's middle sprint icon has lines to four rooms (Twisted Tree, North Library,
+  Eyrie Balcony East, South Library): like a fork, it joins every pair of them with one icon.
 - Firecracker stopping the killer counts as a failed move: the killer stays and loses that
   turn's interaction. Flashlight uses up the killer's interaction for that turn.
 - A Firecracker stops any move of the killer into its holder's room ("prevent the Killer from
@@ -329,6 +334,18 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   there.
 - Iron Maiden: before interacting (a button in his interact step; then he still interacts), an
   empty revealed locker and an empty revealed hook in another room swap places, anywhere.
+- Guards (The Knight): one Carnifex, one Assassin, one Jailer; the power (or Face the Darkness at
+  the start of his turn) puts any of them into his room or a connected one, moving it if it is
+  out (on the map a room offers them in a small menu with each one's picture). Several may share
+  a room. Carnifex: after the cleanup-start perks, it removes a revealed survival or altruism prop
+  in its room (not an occupied locker; the killer picks among several), then moves to a connected
+  room of his choice. Assassin: anyone entering its room by their own move (not carried) rolls the
+  danger die after the reveal; a failure wounds. Jailer: every skill check (repair, gate, totem,
+  heal) by a survivor on the board in its room is on the danger die; a failure wounds them and the
+  Jailer leaves the game for good. Not being searched: in a locker they are off the board (p.12). The killer still gains ▲ for the failures.
+- Nowhere to Hide: asked before the search roll; it is on the danger die.
+- Hubris: a survivor entering his room by any move pays 1 ▲; with none, they can't interact this
+  turn if it is their turn (on someone else's turn there is no interaction to lose).
 - Afterpiece (The Clown): one Tonic and one Antidote; the power puts either into his room or a
   connected one, moving it if it is out already. On the board a room offers both, as a small menu.
   Tonic: survivors on the board in its room when the cards are set (planning, Predator) set theirs
@@ -433,3 +450,6 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   instead (colour by colour, as usual).
 - Built to Last: after using an item (key re-rolls and Flashlight / Firecracker too). Not for
   items whose use draws a new one (Map's draw, Commodious Toolbox).
+  "Not again this turn" is the turn it was used in only: each of the killer's cards is a turn of
+  its own (p.10), so a Flashlight kept on his first turn stops him again on his second. The offer
+  says so then, as the user asked (it read as a bug).

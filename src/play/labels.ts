@@ -1,7 +1,7 @@
 // Thai labels for actions, steps and pieces.
 
 import { killerById, survivorById } from '../data'
-import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, wrathGain } from './engine/engine'
+import { CARD_NAMES, GUARD_NAMES, ITEM_NAMES, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import type { GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
 import type { Perk } from '../types'
@@ -38,6 +38,12 @@ export const KILLER_CARD_BACK = 'assets/movement/back_movement_card.webp'
 /** The Doctor's Madness token. */
 export const MADNESS_IMAGE = 'assets/killers/tokens/doctor-madness.webp'
 /** The Clown's tokens (resized to 256 px, as Madness). */
+/** The Knight's Guards (resized to 256 px). */
+export const GUARD_IMAGE = {
+  carnifex: 'assets/killers/tokens/knight-carnifex.webp',
+  assassin: 'assets/killers/tokens/knight-assassin.webp',
+  jailer: 'assets/killers/tokens/knight-jailer.webp',
+} as const
 export const TONIC_IMAGE = 'assets/killers/tokens/clown-afterpiece-tonic.webp'
 export const ANTIDOTE_IMAGE = 'assets/killers/tokens/clown-afterpiece-antidote.webp'
 /** The Plague's Vile Purge token (resized to 256 px, as Madness). */
@@ -178,6 +184,8 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Blighted Corruption: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
     case 'hoard':
       return 'Hoarder: นำ Chest ออก (+2 ▲)'
+    case 'guard':
+      return `${GUARD_NAMES[i.guard]} → ${roomName(st, i.room)}${st.guards?.[i.guard] ? ' (ย้าย)' : ''}`
     case 'afterpiece':
       return `${i.which === 'tonic' ? 'Afterpiece Tonic' : 'Afterpiece Antidote'} → ${roomName(st, i.room)}${st.afterpiece?.[i.which] ? ' (ย้าย)' : ''}`
     case 'purge': {
@@ -217,6 +225,7 @@ export const ROLL_TITLE: Record<RollContext['k'], string> = {
   overwhelm: 'Overwhelming Presence',
   noMither: 'No Mither',
   breakdown: 'Breakdown',
+  assassin: 'หลบ Assassin',
   deadHard: 'Dead Hard',
 }
 
@@ -447,6 +456,14 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `ทอย Danger Die — สำเร็จ: ${name((w as { s: number }).s)} หนีไปตามเส้นทางแทนถูกแขวน`
     case 'wgl_forever':
       return `${st.killer.name} ออกจากห้องไม่ได้ (ยัง Interact ได้)`
+    case 'face_the_darkness':
+      return `${GUARD_NAMES[c.guard!]} → ${roomName(st, c.room!)}${st.guards?.[c.guard!] ? ' (ย้าย)' : ''}`
+    case 'nowhere_to_hide':
+      return 'ให้คนใน Locker ทอย Danger Die แทน'
+    case 'hubris': {
+      const sv = st.survivors[(w as { s: number }).s]
+      return sv.bp > 0 ? `${sv.name} ต้องจ่าย 1 ▲ (มี ${sv.bp})` : `${sv.name} ไม่มี ▲ — Interact ไม่ได้เทิร์นนี้`
+    }
     case 'coulrophobia': {
       const { s } = w as Extract<PerkWindow, { k: 'preEnter' }>
       return `ห้าม ${name(s)} เข้าห้อง (Interact ไม่ได้เทิร์นนี้)`

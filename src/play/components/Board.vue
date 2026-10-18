@@ -10,12 +10,12 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { components } from '../../data'
 import { asset } from '../../i18n'
 import { boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, victorRoom } from '../engine/engine'
-import type { GameEvent, GameState, Prop } from '../engine/types'
+import type { GameEvent, GameState, Guard, Prop } from '../engine/types'
 import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
+import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import BpText from '../../components/BpText.vue'
@@ -94,6 +94,29 @@ function victorRect(box: number[], withCharlotte: boolean): Rect {
   return { x: x + w * (withCharlotte ? 0.6 : 0.8), y: y + h * 0.24, w: w * MINI * 0.95 }
 }
 
+/**
+ * The minis' row of a room with The Knight's Guards in it (minis of their own): survivors from
+ * the left as usual, the Guards right to left from the killer's corner (left of him and Victor).
+ * When they can't all stand apart, everyone closes up evenly along the row, so no one is hidden.
+ */
+function rowWithGuards(box: number[], ns: number, ng: number, killer: boolean, victor: boolean): { survivors: Rect[]; guards: Rect[] } {
+  const [x, y, w, h] = box
+  const gs = MINI * 0.95
+  const right = killer && victor ? 0.6 : killer ? 0.78 : victor ? 0.8 : 0.97
+  let sx = Array.from({ length: ns }, (_, i) => 0.03 + i * (MINI + 0.02))
+  let gx = Array.from({ length: ng }, (_, i) => right - 0.02 - gs - i * (gs + 0.02))
+  const survivorsEnd = ns ? sx[ns - 1] + MINI : 0.03
+  if (ng && survivorsEnd + 0.01 > gx[ng - 1]) {
+    const step = (right - 0.02 - gs - 0.03) / (ns + ng - 1)
+    sx = sx.map((_, i) => 0.03 + i * step)
+    gx = gx.map((_, i) => 0.03 + (ns + ng - 1 - i) * step)
+  }
+  return {
+    survivors: sx.map((at) => ({ x: x + w * at, y: y + h * 0.2, w: w * MINI })),
+    guards: gx.map((at) => ({ x: x + w * at, y: y + h * 0.22, w: w * gs })),
+  }
+}
+
 function miniRect(box: number[], i: number, killer = false): Rect {
   const [x, y, w, h] = box
   return { x: x + w * (killer ? 0.78 : 0.03 + i * (MINI + 0.02)), y: y + h * 0.2, w: w * (killer ? MINI * 1.25 : MINI) }
@@ -130,6 +153,7 @@ const rooms = computed(() =>
     // The Twins: Charlotte is the killer's mini; Victor is a second, smaller one
     killer: !props.st.startPending && charlotteRoom(props.st) === r.id,
     victor: !props.st.startPending && victorRoom(props.st) === r.id,
+    guards: (Object.entries(props.st.guards ?? {}) as [Guard, string | undefined][]).flatMap(([g, room]) => (room === r.id ? [g] : [])),
   })),
 )
 
@@ -146,9 +170,12 @@ const rects = computed(() => {
     here.forEach((t, i) => tokens.set(t.key, tileRect(r.box, r.props.length + i, n)))
     // the survivors standing take the slots in turn; one being carried rides on the killer
     let slot = 0
-    for (const s of r.survivors) minis.set(`s${s}`, props.st.survivors[s].status === 'carried' ? carryRect(r.box) : miniRect(r.box, slot++))
+    const standing = r.survivors.filter((s) => props.st.survivors[s].status !== 'carried').length
+    const row = rowWithGuards(r.box, standing, r.guards.length, r.killer, r.victor)
+    for (const s of r.survivors) minis.set(`s${s}`, props.st.survivors[s].status === 'carried' ? carryRect(r.box) : row.survivors[slot++])
     if (r.killer) minis.set('k', miniRect(r.box, 0, true))
     if (r.victor) minis.set('v', victorRect(r.box, r.killer))
+    r.guards.forEach((g, i) => minis.set(`g-${g}`, row.guards[i]))
   }
   return { minis, tiles, tokens }
 })
@@ -194,6 +221,13 @@ const roomTokens = computed(() => {
   if (a.antidote) out.push({ key: 'ap-antidote', room: a.antidote, image: ANTIDOTE_IMAGE, kind: 'antidote', title: 'Afterpiece Antidote — ใครเข้าห้องนี้เดินต่อได้อีก 1 ทาง' })
   return out
 })
+
+/** What each of The Knight's Guards does, on its mini. */
+const GUARD_TITLE: Record<Guard, string> = {
+  carnifex: 'Carnifex — เริ่มเก็บกวาด: นำ prop เขียว/น้ำเงินออก แล้วย้ายไปห้องข้าง ๆ',
+  assassin: 'Assassin — เดินเข้าห้องนี้ต้องทอย Danger Die (พลาด = บาดเจ็บ)',
+  jailer: 'Jailer — Skill Check ในห้องนี้ใช้ Danger Die (พลาด = บาดเจ็บ)',
+}
 
 const entityProp = computed(() => {
   const e = props.st.entity
@@ -597,6 +631,17 @@ function guard(e: MouseEvent) {
       >
         <img :src="asset(VICTOR_MINI)" alt="Victor" draggable="false" />
       </component>
+      <!-- The Knight's Guards: minis of their own, beside the killer's corner -->
+      <div
+        v-for="g in r.guards"
+        :key="g"
+        :data-mini="`g-${g}`"
+        class="mini guard"
+        :style="rectStyle(rects.minis.get(`g-${g}`)!)"
+        :title="GUARD_TITLE[g]"
+      >
+        <img :src="asset(GUARD_IMAGE[g])" :alt="g" draggable="false" />
+      </div>
     </template>
 
     <!-- killer tokens in a room: tiles after the props, the same size -->
@@ -966,6 +1011,13 @@ button.tile.picked::after {
     0 0 0 5px rgb(0 0 0 / 0.7),
     0 0 18px 5px rgb(255 30 30 / 0.7);
   filter: drop-shadow(0 0 8px rgb(255 30 30 / 0.85));
+}
+/* The Knight's Guards: his pieces, in a duller red than his own ring */
+.mini.guard {
+  box-shadow:
+    0 0 0 2px #b8332b,
+    0 0 0 4px rgb(0 0 0 / 0.7),
+    0 0 10px 3px rgb(200 40 30 / 0.55);
 }
 /* crop the square art to its printed ring (same as Mini.vue) */
 .mini > img {

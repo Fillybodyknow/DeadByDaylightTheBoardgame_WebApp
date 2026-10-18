@@ -168,6 +168,8 @@ export type RollContext =
   | { k: 'noMither'; s: number; target: number }
   /** Dead Hard (danger die): a success sends `target` along a path instead of onto the hook. */
   | { k: 'deadHard'; s: number; target: number }
+  /** The Knight's Assassin (danger die): walking into its room, a failure wounds. */
+  | { k: 'assassin'; s: number }
   /** Breakdown (danger die): a success takes a sacrifice progress from the killer. */
   | { k: 'breakdown'; s: number }
 
@@ -232,6 +234,8 @@ export type KillerInteraction =
   | { k: 'purge'; room: string }
   /** The Clown: his Afterpiece Tonic or Antidote into `room` (his or a connected one), moved if out. */
   | { k: 'afterpiece'; which: 'tonic' | 'antidote'; room: string }
+  /** The Knight: a Guard into his room or a connected one (moved if it is out already). */
+  | { k: 'guard'; guard: Guard; room: string }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
   | { k: 'wrath' }
   /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */
@@ -321,7 +325,13 @@ export interface PerkChoice {
   card2?: MoveCard
   /** Appraisal: keep the item gained (`keepNew`) or the one already held (`keepOld`). */
   mode?: 'bp' | 'bonus' | 'take' | 'give' | 'keepNew' | 'keepOld'
+  /** Face the Darkness: the Guard placed, and its room. */
+  guard?: Guard
+  room?: string
 }
+
+/** The Knight's three Guards. */
+export type Guard = 'carnifex' | 'assassin' | 'jailer'
 
 export type PerkOwner = number | 'killer'
 
@@ -423,6 +433,9 @@ export type Step =
   /** The Plague's passive: survivor `s` covers one of their perks with a Vile Purge (`cover`), or
    * takes one off in a locker (`uncover`). */
   | { t: 'purgeChoice'; s: number; mode: 'cover' | 'uncover' }
+  /** The Knight's Carnifex, at the start of cleanup: the prop it removes, then the room it goes to. */
+  | { t: 'carnifexProp' }
+  | { t: 'carnifexMove' }
   | { t: 'gameOver'; winner: 'survivors' | 'killer' }
 
 /** Queued work that runs once the current step has its input. */
@@ -489,6 +502,9 @@ export type Task =
   | { k: 'survivorDo'; s: number; i: SurvivorInteraction }
   /** A survivor entered `room` with a Vile Purge in it (after its reveal). */
   | { k: 'purgeTake'; s: number; room: string }
+  /** The Knight's Carnifex at the start of cleanup: its prop, then its move. */
+  | { k: 'carnifex' }
+  | { k: 'carnifexMove' }
 
 export type Action =
   | { t: 'setupReveal'; prop: string }
@@ -522,6 +538,9 @@ export type Action =
   | { t: 'crowdPick'; card: MoveCard }
   /** The perk a Vile Purge covers or comes off. */
   | { t: 'purgeChoice'; perk: PerkId }
+  /** The Carnifex's prop / room. */
+  | { t: 'guardProp'; prop: string }
+  | { t: 'guardRoom'; room: string }
   | { t: 'keepItem'; keep: 'new' | 'old' }
   | { t: 'carryDice'; n: number }
   | { t: 'reroll'; s: number; die: number }
@@ -592,6 +611,8 @@ export type GameEvent =
   | { k: 'palletBreak'; path: string }
   | { k: 'wallBreak'; path: string }
   | { k: 'item'; s: number; item: string }
+  /** Survivor `s` got an item (a chest, a Map's draw, the one kept of two): secret online. */
+  | { k: 'itemGot'; s: number }
   | { k: 'bp'; who: number | 'killer'; n: number }
   | { k: 'gameOver'; winner: 'survivors' | 'killer' }
 
@@ -639,6 +660,11 @@ export interface GameState {
   phantasm: string[]
   /** The Clown's Afterpiece Tonic and Antidote: the rooms they stand in (one of each). */
   afterpiece?: { tonic?: string; antidote?: string }
+  /** The Knight's Guards: the rooms they stand in. `jailerGone`: the Jailer is out of play. */
+  guards?: { carnifex?: string; assassin?: string; jailer?: string }
+  jailerGone?: boolean
+  /** The survivor whose skill check the Jailer turned into a danger-die roll (until it resolves). */
+  jailerRoll?: number | null
   /** The survivor whose turn began in a locker (Dance With Me). */
   lockerTurn?: number | null
   /** Rooms with one of The Plague's Vile Purges (10 tokens, one per room, the rest on survivors). */
@@ -660,6 +686,8 @@ export interface GameState {
   deception?: boolean
   /** Built to Last: this survivor's kept item can't be used again this turn. */
   itemLock?: number | null
+  /** Built to Last this round: who kept which item (its offer on a later turn says why it is back). */
+  kept?: { s: number; item: string }[]
   /** The Blight's power: the card it drew, while that move is being made. */
   rushCard?: PathKind | null
   rng: number

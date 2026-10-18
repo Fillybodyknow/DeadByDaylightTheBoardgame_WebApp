@@ -53,6 +53,8 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'phantasmChoice':
     case 'twinChoice':
     case 'crowdPick':
+    case 'carnifexProp':
+    case 'carnifexMove':
       return 'killer'
     default:
       return null

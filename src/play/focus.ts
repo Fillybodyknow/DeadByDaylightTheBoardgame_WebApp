@@ -82,6 +82,7 @@ const ROLL_WHAT: Record<RollContext['k'], (st: GameState, ctx: RollContext) => s
   phantasm: () => 'Phantasm Trap — แต้มที่ได้ = ▲ ที่ Hag รับ หรือจ่ายเพื่อวาร์ป',
   overwhelm: () => 'Overwhelming Presence — ล้มเหลว = item เสียเปล่า',
   noMither: (st, c) => `No Mither — สำเร็จ = ${c.k === 'noMither' ? st.survivors[c.target].name : ''} ไม่บาดเจ็บ`,
+  assassin: () => 'หลบ Assassin — ล้มเหลว = บาดเจ็บ',
   breakdown: () => 'Breakdown — สำเร็จ = ฆาตกรเสีย Sacrifice Progress 1 แต้ม',
   deadHard: (st, c) => `Dead Hard — สำเร็จ = ${c.k === 'deadHard' ? st.survivors[c.target].name : ''} หนีแทนถูกแขวน`,
 }
@@ -354,7 +355,7 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   // Vile Purge: his room and the one picked
   if (i.k === 'purge') f.rooms.push(room, i.room)
   // an Afterpiece token: the room it goes to
-  if (i.k === 'afterpiece') f.dests.push(i.room)
+  if (i.k === 'afterpiece' || i.k === 'guard') f.dests.push(i.room)
   if (i.k === 'frenzy') {
     f.rooms.push(room)
     st.survivors.forEach((sv, s) => sv.status === 'board' && sv.room === room && f.survivors.push(s))

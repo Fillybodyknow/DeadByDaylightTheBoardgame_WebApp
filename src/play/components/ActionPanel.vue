@@ -33,6 +33,7 @@ import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import {
   ANTIDOTE_IMAGE,
+  GUARD_IMAGE,
   TONIC_IMAGE,
   orderedChoices,
   cardCaption,
@@ -116,6 +117,8 @@ const actor = computed<number | 'killer' | null>(() => {
     case 'turnStart':
       return s.s
     case 'pickSurvivor':
+    case 'carnifexProp':
+    case 'carnifexMove':
       return 'killer'
     case 'roll':
       return s.ctx.s
@@ -143,6 +146,12 @@ const moves = computed(() => {
   if (s.t === 'carryMove') return carryMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   return []
 })
+
+/** Where a Guard of The Knight stands, for the power's panel. */
+const guardWhere = (g: 'carnifex' | 'assassin' | 'jailer') => (props.st.guards?.[g] ? `อยู่ที่ ${roomName(props.st, props.st.guards[g]!)}` : 'ยังไม่วาง')
+
+/** Survivor `s` holds an item kept by Built to Last on an earlier turn of this round. */
+const keptBefore = (s: number) => (props.st.kept ?? []).some((k) => k.s === s && k.item === props.st.survivors[s].item)
 
 const hasDiversion = computed(() => {
   const s = step.value
@@ -199,6 +208,7 @@ const POWER_HINT: Record<string, string> = {
   spirit: 'ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น — คลิกเป้าหมายบนแผนที่',
   legion: 'ผู้รอดชีวิตทุกคนในห้องนี้บาดเจ็บ — ถ้ามีคนบาดเจ็บอยู่แล้วอย่างน้อย 1 คน ได้ +1 ▲',
   plague: 'วาง Vile Purge ในห้องนี้และห้องที่เชื่อมกันที่เลือก — ผู้รอดชีวิตที่เดินเข้าไปต้องเก็บไปปิด Perk 1 อัน (อันที่ 3 = บาดเจ็บ)',
+  knight: 'วาง Guard (Carnifex / Assassin / Jailer) ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกตัว',
   clown: 'วาง Afterpiece Tonic หรือ Antidote ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกว่าอันไหน',
   trickster: 'ผู้รอดชีวิตในห้องนี้และห้องที่เชื่อมกันได้ Knife คนละ 1 เล่ม — เล่มที่ 3 บาดเจ็บ, เกิน 3 = Sacrifice +1',
   blight: 'สุ่มทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามเส้นทางสีนั้น — เข้าห้องใหม่ได้: Interact ที่นั่น หรือพุ่งต่อ',
@@ -440,6 +450,12 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </div>
     </template>
 
+    <!-- The Knight's Carnifex at the start of cleanup: both picked on the map -->
+    <template v-else-if="step.t === 'carnifexProp' || step.t === 'carnifexMove'">
+      <p><img class="token-inline" :src="asset(GUARD_IMAGE.carnifex)" alt="" /> <b>Carnifex</b> — {{ step.t === 'carnifexProp' ? 'เลือก prop สีเขียว / น้ำเงินในห้องของมันที่จะนำออก' : 'เลือกห้องที่เชื่อมกันที่มันจะย้ายไป' }}</p>
+      <p class="board-hint">🎯 คลิกบนแผนที่ — {{ step.t === 'carnifexProp' ? 'prop ที่กระพริบ' : 'ห้องที่กระพริบ' }}</p>
+    </template>
+
     <template v-else-if="step.t === 'pickSurvivor'">
       <p>Chainsaw — เลือกผู้รอดชีวิตในห้องที่จะบาดเจ็บ</p>
       <p v-if="step.options.some((s) => !here({ t: 'pick', s }))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกผู้รอดชีวิตที่กระพริบ</p>
@@ -678,6 +694,12 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             <b>ใช้พลัง: {{ powerName(st) }}</b> —
             <BpText :text="POWER_HINT[st.killer.characterId] ?? ''" />
           </p>
+          <!-- The Knight: what each Guard does, and where it stands now -->
+          <ul v-if="st.killer.characterId === 'knight'" class="afterpiece">
+            <li><img :src="asset(GUARD_IMAGE.carnifex)" alt="" /><span><b>Carnifex</b> — เริ่มเก็บกวาด: นำ prop เขียว/น้ำเงินในห้องออก แล้วย้ายไปห้องข้าง ๆ · {{ guardWhere('carnifex') }}</span></li>
+            <li><img :src="asset(GUARD_IMAGE.assassin)" alt="" /><span><b>Assassin</b> — ใครเดินเข้าห้องทอย Danger Die พลาด = บาดเจ็บ · {{ guardWhere('assassin') }}</span></li>
+            <li><img :src="asset(GUARD_IMAGE.jailer)" alt="" /><span><b>Jailer</b> — Skill Check ในห้อง (ไม่รวมคนใน Locker) ใช้ Danger Die พลาด = บาดเจ็บ (Jailer ออก) · {{ st.jailerGone ? 'ออกจากเกมแล้ว' : guardWhere('jailer') }}</span></li>
+          </ul>
           <!-- The Clown: what each token does, and where it stands now -->
           <ul v-if="st.killer.characterId === 'clown'" class="afterpiece">
             <li><img :src="asset(TONIC_IMAGE)" alt="" /><span><b>Tonic</b> — ผู้รอดชีวิตในห้องนั้นวางการ์ดหงาย · {{ st.afterpiece?.tonic ? `อยู่ที่ ${roomName(st, st.afterpiece.tonic)}` : 'ยังไม่วาง' }}</span></li>
@@ -763,6 +785,10 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         {{ st.killer.name }} กำลังจะเข้าห้องของคุณ — ใช้ <b>Firecracker</b> กันไว้ไหม?
       </p>
       <p v-else>{{ st.killer.name }} กำลังจะ Interact ในห้องของคุณ — ใช้ <b>Flashlight</b> กันไว้ไหม?</p>
+      <!-- an item kept by Built to Last on an earlier turn: the card forbids only that turn -->
+      <p v-for="s in step.holders.filter(keptBefore)" :key="`kept-${s}`" class="board-hint">
+        Built to Last: {{ st.survivors[s].name }} เก็บ {{ ITEM_NAMES[st.survivors[s].item!] ?? st.survivors[s].item }} ไว้ในเทิร์นก่อน — ห้ามใช้ซ้ำแค่ในเทิร์นนั้น เทิร์นนี้ใช้ได้อีก
+      </p>
       <div class="buttons">
         <button v-for="s in step.holders" :key="s" class="primary" @click="act({ t: 'react', s })"><FaceLabel :st="st" :who="s" :text="`${st.survivors[s].name} ใช้`" /></button>
         <button @click="act({ t: 'react', s: null })">ไม่ใช้</button>

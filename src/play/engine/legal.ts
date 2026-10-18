@@ -4,6 +4,8 @@ import {
   anyMoves,
   carryMoves,
   crowdPayments,
+  carnifexProps,
+  connectedRoomsOf,
   crowdPledges,
   purgeOptions,
   antidoteKillerMoves,
@@ -80,6 +82,12 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'turnStart':
       out.push({ t: 'continue' })
+      break
+    case 'carnifexProp':
+      for (const p of carnifexProps(st)) out.push({ t: 'guardProp', prop: p.id })
+      break
+    case 'carnifexMove':
+      for (const room of connectedRoomsOf(st, st.guards!.carnifex!)) out.push({ t: 'guardRoom', room })
       break
     case 'pickSurvivor':
       for (const s of step.options) out.push({ t: 'pick', s })

@@ -128,8 +128,13 @@ export class CastBuilder {
     }
     else image = pictureOf(e.text)
 
-    // Online, an item found in a chest stays hidden from everyone but its finder.
-    if (typeof owner === 'number' && /ค้น Chest ได้/.test(title) && itemHidden(this.st, owner)) title = title.replace(/ ได้ .*/, '')
+    // Online, an item got (from a chest, a Map's draw, the one kept of two) stays hidden from
+    // everyone but its holder: the card shows its back and says only that one was got.
+    if (ev?.k === 'itemGot' && itemHidden(this.st, ev.s)) {
+      title = /ค้น Chest/.test(title) ? `${this.st.survivors[ev.s].name} ค้น Chest ได้ item 1 ใบ` : `${this.st.survivors[ev.s].name} ได้ item 1 ใบ`
+      sub = 'ไม่เปิดเผย'
+      image = 'assets/items/back.webp'
+    }
 
     if (owner === 'killer' && this.power) {
       // this batch used the power: its first killer card is the power's

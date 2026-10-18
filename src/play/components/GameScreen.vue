@@ -18,7 +18,7 @@ import { timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
 import { STEP_NAME, boardActionKeys, perkPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
-import { BEAR_TRAP_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
+import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
 import SoundSettings from '../../components/SoundSettings.vue'
 import ActionPanel from './ActionPanel.vue'
 import ActionReveal from './ActionReveal.vue'
@@ -429,6 +429,8 @@ function rollIcon(st: GameState, ctx: RollContext['k'], s: number, target: numbe
     case 'deadHard':
     case 'breakdown':
       return { src: PROP_IMAGE.hook, round: false }
+    case 'assassin':
+      return { src: GUARD_IMAGE.assassin, round: false }
     default:
       // struggling, a hatchet, a phantasm trap, Overwhelming Presence: the killer
       return { src: killerMini(st), round: true }
@@ -481,6 +483,8 @@ function diceResult(ctx: RollContext['k'], dice: Die[]): Pick<DiceShow, 'outcome
       return fail ? { outcome: 'item เสียเปล่า!', tone: 'bad' } : { outcome: 'ใช้ item ได้', tone: 'great' }
     case 'noMither':
       return fail ? { outcome: 'ไม่สำเร็จ — โดนโจมตี', tone: 'bad' } : { outcome: 'ไม่บาดเจ็บ! ฆาตกร +1 ▲', tone: 'great' }
+    case 'assassin':
+      return fail ? { outcome: 'โดน Assassin!', tone: 'bad' } : { outcome: 'หลบได้!', tone: 'great' }
     case 'breakdown':
       return fail ? { outcome: 'ไม่สำเร็จ', tone: 'bad' } : { outcome: 'ฆาตกรเสีย Sacrifice Progress!', tone: 'great' }
     case 'deadHard':
