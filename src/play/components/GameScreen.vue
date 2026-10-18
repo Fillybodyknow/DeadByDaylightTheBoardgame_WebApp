@@ -13,7 +13,7 @@ import { canUndo, controls, dispatch, myTurn, online, quitGame, undo } from '../
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
-import { closeOnlineGame, isHost, leaveRoom, roomSettings, session } from '../online/session'
+import { closeOnlineGame, isHost, leaveRoom, returnToLobby, roomSettings, session } from '../online/session'
 import { timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
@@ -881,10 +881,10 @@ function leave() {
   if (over.value || confirm('ออกจากเกมนี้? (เกมจะหายไป)')) quitGame()
 }
 
-/** The summary's "play again": online, the whole room goes back to its lobby (the game is over,
- * so anyone may), sides kept, to pick again; on one device, a new game. */
+/** The summary's "play again": online, this player back to the lobby (the room follows once
+ * everyone is); on one device, a new game. */
 function playAgain() {
-  if (online.value) void closeOnlineGame()
+  if (online.value) void returnToLobby()
   else quitGame()
 }
 

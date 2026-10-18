@@ -453,6 +453,28 @@ export function backToLobby() {
   return update((cur) => ({ ...cur, phase: 'lobby', seats: {}, players: 0, picks: {}, locked: {} }))
 }
 
+/** Seated players still on the game's summary (not back in the lobby yet). */
+export const stillInGame = computed(() => {
+  const d = session.data
+  if (!d?.game) return []
+  return Object.values(d.seats).filter((s) => !d.members[s.id]?.back)
+})
+
+/**
+ * The game is over: this player goes back to the lobby (or, `back` false, to the summary again).
+ * The room resets once every seated player has gone back; until then they wait in the lobby.
+ */
+export async function returnToLobby(back = true) {
+  await update((cur) => {
+    const mine = cur.members[session.me]
+    if (!mine || !cur.game || cur.game.phase !== 'over') return null
+    const { back: _was, ...rest } = mine
+    void _was
+    return { ...cur, members: { ...cur.members, [session.me]: back ? { ...rest, back: true } : rest } }
+  })
+  if (back && stillInGame.value.length === 0) await closeOnlineGame()
+}
+
 /** Host: end the game for everyone and go back to the lobby (sides kept, everyone un-ready). */
 export function closeOnlineGame() {
   return guard(async () => {
@@ -464,7 +486,8 @@ export function closeOnlineGame() {
       players: 0,
       picks: {},
       locked: {},
-      members: Object.fromEntries(Object.entries(cur.members).map(([id, m]) => [id, { ...m, ready: false }])),
+      // everyone un-ready, and no one left waiting (the database takes no undefined: `back` is dropped)
+      members: Object.fromEntries(Object.entries(cur.members).map(([id, { back, ...m }]) => (void back, [id, { ...m, ready: false }]))),
     }))
   })
 }

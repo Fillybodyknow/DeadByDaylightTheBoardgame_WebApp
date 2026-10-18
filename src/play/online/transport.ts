@@ -28,6 +28,8 @@ export interface Member {
   side: Side | null
   ready: boolean
   joinedAt: number
+  /** The game is over and this member went back to the lobby (waiting for the others). */
+  back?: boolean
 }
 
 /**
