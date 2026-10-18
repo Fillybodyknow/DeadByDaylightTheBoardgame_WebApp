@@ -171,9 +171,10 @@ export function createRoom(name: string, roomName = '', password = '') {
     const room = await backend.create(code, session.me)
     const pw = password.trim()
     const hash = pw ? await hashPassword(code, pw) : ''
-    await room.updateRoom((cur) => ({ ...cur, name: roomName.trim() || randomRoomName(), ...(hash ? { passwordHash: hash } : {}) }))
     remember(code, name)
+    // in the room first: Firebase holds lobby writes until the room is being listened to
     enter(room)
+    await room.updateRoom((cur) => ({ ...cur, name: roomName.trim() || randomRoomName(), ...(hash ? { passwordHash: hash } : {}) }))
     await join(name)
     return code
   })
