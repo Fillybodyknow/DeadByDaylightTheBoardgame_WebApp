@@ -1,0 +1,2324 @@
+[
+  {
+    "id": "ace-in-the-hole",
+    "side": "survivor",
+    "name": "Ace in the Hole",
+    "cost": 1,
+    "flavor": {
+      "en": "Lady Luck always seems to be throwing something good your way.",
+      "th": "โชคชะตาดูเหมือนจะส่งสิ่งดี ๆ มาให้คุณเสมอ"
+    },
+    "text": {
+      "en": "Before you interact, swap a prop in your space with another from the same category in a connected space. Generators with progress, occupied lockers, and occupied hooks can't be swapped.",
+      "th": "ก่อน Interact, ให้สลับ prop ในห้องของคุณ กับ prop อื่นที่มีสีเดียวกัน จากห้องที่เชื่อมกัน, ไม่สามารถสลับ เครื่องปั่นไฟ ที่มีความคืบหน้า, ตู้หลบที่มีคนอยู่ และ ตะขอแขวน ที่มีคนอยู่ได้"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/ace-in-the-hole.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/ace-in-the-hole.webp"
+    }
+  },
+  {
+    "id": "adrenaline",
+    "side": "survivor",
+    "name": "Adrenaline",
+    "cost": 2,
+    "flavor": {
+      "en": "You are fuelled by unexpected energy when on the verge of escape.",
+      "th": "คุณมีแรงขับจากพลังที่คาดไม่ถึงเมื่อใกล้จะหนีรอด"
+    },
+    "text": {
+      "en": "At the start of cleanup, if a generator was completed this round, take a Survivor bonus turn.",
+      "th": "เมื่อเริ่มเฟส Cleanup, ถ้ามี เครื่องปั่นไฟ ถูกซ่อมเสร็จในรอบนี้, ให้เล่น Survivor bonus turn"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/adrenaline.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/adrenaline.webp"
+    }
+  },
+  {
+    "id": "aftercare",
+    "side": "survivor",
+    "name": "Aftercare",
+    "cost": 0,
+    "flavor": {
+      "en": "One good deed can make all the difference.",
+      "th": "ความดีเพียงหนึ่งอย่างอาจสร้างความแตกต่างได้ทั้งหมด"
+    },
+    "text": {
+      "en": "After you or another Survivor becomes healthy, sabotage an unoccupied hook anywhere on the game board.",
+      "th": "หลังจากคุณ หรือ ผู้รอดชีวิตคนอื่นกลับมาไม่บาดเจ็บ, ให้ ทำลาย ตะขอแขวน ที่ว่างอยู่ที่ใดก็ได้บนกระดานเกม"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/aftercare.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/aftercare.webp"
+    }
+  },
+  {
+    "id": "alert",
+    "side": "survivor",
+    "name": "Alert",
+    "cost": 1,
+    "flavor": {
+      "en": "Your acute senses are on high alert.",
+      "th": "ประสาทสัมผัสอันเฉียบคมของคุณตื่นตัวสูงสุด"
+    },
+    "text": {
+      "en": "When the Killer breaks a pallet, moves through a breakable wall, or damages a generator, move along any path.",
+      "th": "เมื่อฆาตกรทำลาย แผ่นพาเลท, เคลื่อนที่ผ่านกำแพงทำลายได้, หรือ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/alert.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/alert.webp"
+    }
+  },
+  {
+    "id": "any-means-necessary",
+    "side": "survivor",
+    "name": "Any Means Necessary",
+    "cost": 0,
+    "flavor": {
+      "en": "You'll go to any length to gain an advantage.",
+      "th": "คุณจะทำทุกวิถีทางเพื่อให้ได้เปรียบ"
+    },
+    "text": {
+      "en": "At the end of your turn, if you are healthy, become wounded to take a Survivor bonus turn.",
+      "th": "เมื่อจบเทิร์นของคุณ, ถ้าคุณไม่บาดเจ็บ, ให้ยอมบาดเจ็บ, เพื่อเล่น Survivor bonus turn"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/any-means-necessary.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/any-means-necessary.webp"
+    }
+  },
+  {
+    "id": "appraisal",
+    "side": "survivor",
+    "name": "Appraisal",
+    "cost": 2,
+    "flavor": {
+      "en": "You have a careful eye that notices what many overlook.",
+      "th": "คุณมีสายตาละเอียดที่สังเกตสิ่งที่คนส่วนใหญ่มองข้าม"
+    },
+    "text": {
+      "en": "When another Survivor would discard an item, you gain it instead. If you have more than one item, discard until you only have one.",
+      "th": "เมื่อผู้รอดชีวิตคนอื่นจะทิ้ง item, ให้คุณรับ item นั้นแทน, ถ้าคุณมี item มากกว่าหนึ่งชิ้น, ให้ทิ้งจนเหลือหนึ่งชิ้น"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/appraisal.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/appraisal.webp"
+    }
+  },
+  {
+    "id": "autodidact",
+    "side": "survivor",
+    "name": "Autodidact",
+    "cost": 2,
+    "flavor": {
+      "en": "There's no limit to what you can achieve with hard work.",
+      "th": "ไม่มีขีดจำกัดสำหรับสิ่งที่คุณทำได้ด้วยการทำงานหนัก"
+    },
+    "text": {
+      "en": "When you or another Survivor in your space or a connected space rolls a success, change the result to a great success instead.",
+      "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ ผล สำเร็จ, ให้เปลี่ยนเป็น ผล สำเร็จอย่างยิ่ง แทน"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/autodidact.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/autodidact.webp"
+    }
+  },
+  {
+    "id": "background-player",
+    "side": "survivor",
+    "name": "Background Player",
+    "cost": 2,
+    "flavor": {
+      "en": "You are not usually the centre of attention and in some cases, this can be a good thing.",
+      "th": "โดยปกติคุณไม่ใช่ศูนย์กลางของความสนใจ และ ในบางกรณีนี่อาจเป็นเรื่องดี"
+    },
+    "text": {
+      "en": "At the end of your turn, if there is a sacrificed Survivor, take a Survivor bonus turn.",
+      "th": "เมื่อจบเทิร์นของคุณ, ถ้ามีผู้รอดชีวิตที่ถูกสังเวยอยู่, ให้เล่น Survivor bonus turn"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/background-player.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/background-player.webp"
+    }
+  },
+  {
+    "id": "blood-rush",
+    "side": "survivor",
+    "name": "Blood Rush",
+    "cost": 0,
+    "flavor": {
+      "en": "Your mind and body are honed for great feats, allowing you to push through with extra effort when necessary.",
+      "th": "จิตใจ และ ร่างกายของคุณถูกฝึกให้ทำสิ่งยิ่งใหญ่ ช่วยให้ฝ่าฟันไปได้เมื่อจำเป็นต้องออกแรงพิเศษ"
+    },
+    "text": {
+      "en": "At the end of your turn, if there is no sacrifice progress on your board, take a Survivor bonus turn. Add a sacrifice progress to your board.",
+      "th": "เมื่อจบเทิร์นของคุณ, ถ้าไม่มี sacrifice progress บนบอร์ดของคุณ, ให้เล่น Survivor bonus turn, และเพิ่ม sacrifice progress ลงบนบอร์ดของคุณ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/blood-rush.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/blood-rush.webp"
+    }
+  },
+  {
+    "id": "boil-over",
+    "side": "survivor",
+    "name": "Boil Over",
+    "cost": 2,
+    "flavor": {
+      "en": "You are a battler and do everything to escape a foe's grasp.",
+      "th": "คุณเป็นนักสู้ และ ทำทุกอย่างเพื่อหนีจากเงื้อมมือของศัตรู"
+    },
+    "text": {
+      "en": "When you or another Survivor in your space is picked up, after the Killer decides how many dice to roll, the Survivor who was picked up may roll 4 skill check dice instead of the number the Killer chose.",
+      "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่นในห้องของคุณถูก pick up, หลังจากฆาตกรตัดสินใจว่าจะให้ทอยเต๋ากี่ลูก, ผู้รอดชีวิตที่ถูก pick up อาจทอยเต๋า Skill Check 4 ลูกแทนจำนวนที่ฆาตกรเลือก"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/boil-over.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/boil-over.webp"
+    }
+  },
+  {
+    "id": "bond",
+    "side": "survivor",
+    "name": "Bond",
+    "cost": 1,
+    "flavor": {
+      "en": "Shared experiences have formed a bond between you and friends.",
+      "th": "ประสบการณ์ร่วมกันสร้างสายสัมพันธ์ระหว่างคุณกับเพื่อน ๆ"
+    },
+    "text": {
+      "en": "When another survivor in your space or a connected space would perform a skill check, roll two skill check dice and keep either result instead.",
+      "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณ หรือ ห้องที่เชื่อมกัน ต้องทำ Skill Check, ให้ทอยเต๋า Skill Check สองลูก และเลือกผลใดผลหนึ่งแทน"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/bond.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/bond.webp"
+    }
+  },
+  {
+    "id": "built-to-last",
+    "side": "survivor",
+    "name": "Built to Last",
+    "cost": 2,
+    "flavor": {
+      "en": "You know how to get the most out of your tools.",
+      "th": "คุณรู้วิธีใช้เครื่องมือให้คุ้มค่าที่สุด"
+    },
+    "text": {
+      "en": "When you would discard an item after using it, keep it instead. You cannot use it again during this turn.",
+      "th": "เมื่อคุณจะทิ้ง item หลังใช้, ให้เก็บไว้แทน, คุณใช้มันอีกครั้งในเทิร์นนี้ไม่ได้"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/built-to-last.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/built-to-last.webp"
+    }
+  },
+  {
+    "id": "calm-spirit",
+    "side": "survivor",
+    "name": "Calm Spirit",
+    "cost": 0,
+    "flavor": {
+      "en": "Animals seem to trust you as they often stay calm in your presence.",
+      "th": "สัตว์ดูเหมือนจะไว้ใจคุณ เพราะมักสงบนิ่งเมื่ออยู่ใกล้คุณ"
+    },
+    "text": {
+      "en": "As an interaction, move a crow in your space to any space on the game board.",
+      "th": "Perk นี้เป็นการ Interact, ให้ย้าย อีกา ในห้องของคุณไปยังห้องใดก็ได้บนกระดานเกม"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/calm-spirit.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/calm-spirit.webp"
+    }
+  },
+  {
+    "id": "clairvoyance",
+    "side": "survivor",
+    "name": "Clairvoyance",
+    "cost": 1,
+    "flavor": {
+      "en": "There is an intrinsic energy in you that sees beyond your vision.",
+      "th": "มีพลังภายในตัวคุณที่มองเห็นได้เกินกว่าสายตา"
+    },
+    "text": {
+      "en": "At the start of the planning phase, reveal a prop anywhere on the game board.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้เปิด prop ที่ใดก็ได้บนกระดานเกม"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/clairvoyance.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/clairvoyance.webp"
+    }
+  },
+  {
+    "id": "corrective-action",
+    "side": "survivor",
+    "name": "Corrective Action",
+    "cost": 2,
+    "flavor": {
+      "en": "You quickly analyse problems and correct others' work when they make a mistake.",
+      "th": "คุณวิเคราะห์ปัญหาได้อย่างรวดเร็ว และ แก้ไขงานของคนอื่นเมื่อพวกเขาทำพลาด"
+    },
+    "text": {
+      "en": "When you or another survivor in your space or a connected space rolls a \"4\", treat it as a great success instead.",
+      "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ \"4\", ให้ถือเป็น ผล สำเร็จอย่างยิ่ง แทน"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/corrective-action.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/corrective-action.webp"
+    }
+  },
+  {
+    "id": "cut-loose",
+    "side": "survivor",
+    "name": "Cut Loose",
+    "cost": 1,
+    "flavor": {
+      "en": "You get in enough trouble, you know how to get out of it.",
+      "th": "คุณเจอเรื่องวุ่นวายมามากพอ จึงรู้วิธีหนีออกมา"
+    },
+    "text": {
+      "en": "When you reveal 'Vault' (Yellow) as your set movement card, treat it as 'Sneak', 'Crouch', or 'Sprint' instead.",
+      "th": "เมื่อคุณเปิด 'Vault' (สีเหลือง) เป็นการ์ดเคลื่อนที่ที่วางไว้, ให้ถือเป็น 'Sneak', 'Crouch' หรือ 'Sprint' แทน"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/cut-loose.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/cut-loose.webp"
+    }
+  },
+  {
+    "id": "dance-with-me",
+    "side": "survivor",
+    "name": "Dance With Me",
+    "cost": 0,
+    "flavor": {
+      "en": "You know your way around the dance floor.",
+      "th": "คุณรู้ทางของตัวเองบนฟลอร์เต้นรำ"
+    },
+    "text": {
+      "en": "After you move, if you occupied a locker at the start of the turn, move again along any other path before interacting.",
+      "th": "หลังจากคุณเคลื่อนที่, ถ้าคุณอยู่บน ตู้หลบ เมื่อเริ่มเทิร์น, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/dance-with-me.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/dance-with-me.webp"
+    }
+  },
+  {
+    "id": "dark-sense",
+    "side": "survivor",
+    "name": "Dark Sense",
+    "cost": 1,
+    "flavor": {
+      "en": "You see through The Fog easier than others.",
+      "th": "คุณมองทะลุหมอกได้ง่ายกว่าคนอื่น"
+    },
+    "text": {
+      "en": "When you enter a space with no props during your turn, move again along any other path before interacting (if you would interact).",
+      "th": "เมื่อคุณเข้าไปในห้องที่ไม่มี prop ในเทิร์นของคุณ, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact (ถ้าคุณจะ Interact)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/dark-sense.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/dark-sense.webp"
+    }
+  },
+  {
+    "id": "dead-hard",
+    "side": "survivor",
+    "name": "Dead Hard",
+    "cost": 2,
+    "flavor": {
+      "en": "You can take a beating and keep on going.",
+      "th": "คุณทนการรุมซ้อมได้ และ สู้ต่อไป"
+    },
+    "text": {
+      "en": "When another Survivor in your space would be sacrificed, roll the danger die. On a success, that Survivor moves along any path instead of being sacrificed.",
+      "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณจะถูกสังเวย, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ผู้รอดชีวิตคนนั้นเคลื่อนที่ไปตามเส้นทางใดก็ได้แทนที่จะถูกสังเวย"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/dead-hard.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/dead-hard.webp"
+    }
+  },
+  {
+    "id": "deception",
+    "side": "survivor",
+    "name": "Deception",
+    "cost": 0,
+    "flavor": {
+      "en": "Your adventurous lifestyle requires moments of crafty misdirection.",
+      "th": "ไลฟ์สไตล์ผจญภัยของคุณต้องอาศัยจังหวะเบี่ยงเบนความสนใจอย่างเจ้าเล่ห์"
+    },
+    "text": {
+      "en": "When you would move during your turn, remain in your space instead. You cannot interact this turn. Gain a {BP}.",
+      "th": "เมื่อคุณจะเคลื่อนที่ในเทิร์นของคุณ, ให้อยู่ในห้องของคุณแทน, คุณ Interact ไม่ได้ในเทิร์นนี้, ได้รับ 1 {BP}"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/deception.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/deception.webp"
+    }
+  },
+  {
+    "id": "deja-vu",
+    "side": "survivor",
+    "name": "Déjà Vu",
+    "cost": 2,
+    "flavor": {
+      "en": "Paranoia paired with the horror of failure drives you to avoid repeating the same mistakes.",
+      "th": "ความหวาดระแวงผสานกับความกลัวความล้มเหลว ผลักดันให้คุณไม่ทำผิดซ้ำเดิม"
+    },
+    "text": {
+      "en": "When the Killer damages a generator in another space, interact with a generator in your space.",
+      "th": "เมื่อฆาตกร ทำความเสียหายกับ เครื่องปั่นไฟ ในห้องอื่น, ให้ Interact กับ เครื่องปั่นไฟ ในห้องของคุณ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/deja-vu.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/deja-vu.webp"
+    }
+  },
+  {
+    "id": "deliverance",
+    "side": "survivor",
+    "name": "Deliverance",
+    "cost": 1,
+    "flavor": {
+      "en": "You are always on the lookout for ways to help others.",
+      "th": "คุณคอยมองหาวิธีช่วยเหลือผู้อื่นอยู่เสมอ"
+    },
+    "text": {
+      "en": "After you sabotage an occupied hook or the hook you are on is sabotaged by another Survivor, either you or the other Survivor becomes healthy (your choice).",
+      "th": "หลังจากคุณ ทำลาย ตะขอแขวน ที่มีคนอยู่ หรือ ตะขอแขวน ที่คุณอยู่ถูกผู้รอดชีวิตคนอื่น ทำลาย, ให้คุณ หรือ ผู้รอดชีวิตอีกคนกลับมาไม่บาดเจ็บ (คุณเป็นผู้เลือก)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/deliverance.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/deliverance.webp"
+    }
+  },
+  {
+    "id": "distortion",
+    "side": "survivor",
+    "name": "Distortion",
+    "cost": 1,
+    "flavor": {
+      "en": "Your calm demeanor belies subtle cunning.",
+      "th": "ท่าทีสงบของคุณซ่อนไหวพริบอันแยบยล"
+    },
+    "text": {
+      "en": "After you move into the Killer's space during your turn, move again along any other path before interacting.",
+      "th": "หลังจากคุณเคลื่อนที่เข้าไปในห้องของฆาตกรในเทิร์นของคุณ, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ก่อน Interact"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/distortion.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/distortion.webp"
+    }
+  },
+  {
+    "id": "empathy",
+    "side": "survivor",
+    "name": "Empathy",
+    "cost": 0,
+    "flavor": {
+      "en": "You can understand others intuitively, and this helps you ease their pain.",
+      "th": "คุณเข้าใจผู้อื่นได้ด้วยสัญชาตญาณ และ นี่ช่วยบรรเทาความเจ็บปวดของพวกเขา"
+    },
+    "text": {
+      "en": "At the start of your turn, you may take a {BP} from a willing Survivor, OR; you may give a {BP} to a willing Survivor.",
+      "th": "เมื่อเริ่มเทิร์นของคุณ, คุณอาจรับ 1 {BP} จากผู้รอดชีวิตที่เต็มใจ หรือ ให้ 1 {BP} แก่ผู้รอดชีวิตที่เต็มใจ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/empathy.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/empathy.webp"
+    }
+  },
+  {
+    "id": "fogwise",
+    "side": "survivor",
+    "name": "Fogwise",
+    "cost": 1,
+    "flavor": {
+      "en": "In your countless years in The Fog, you have seen it all, and when you are focused, you can remember most of it too.",
+      "th": "ตลอดหลายปีนับไม่ถ้วนใน The Fog คุณเห็นมาหมดแล้ว และ เมื่อคุณมีสมาธิ คุณก็จำได้เกือบทั้งหมด"
+    },
+    "text": {
+      "en": "At the start of your turn, remove a breakable wall or pallet from a connected path. Place it on another connected path without any other component.",
+      "th": "เมื่อเริ่มเทิร์นของคุณ, ให้เก็บ กำแพงทำลายได้ หรือ แผ่นพาเลท ออกจากเส้นทางที่เชื่อมกัน, แล้ว วางลงบนเส้นทางที่เชื่อมกันอีกเส้นที่ไม่มีชิ้นส่วนอื่น"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/fogwise.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/fogwise.webp"
+    }
+  },
+  {
+    "id": "for-the-people",
+    "side": "survivor",
+    "name": "For the People",
+    "cost": 1,
+    "flavor": {
+      "en": "You risk life and injury for others.",
+      "th": "คุณเสี่ยงชีวิต และ บาดเจ็บเพื่อผู้อื่น"
+    },
+    "text": {
+      "en": "After you enter a space, if you are not wounded, become wounded to have another Survivor in your space become healthy or to add a progress to a generator (you can still interact this turn).",
+      "th": "หลังจากคุณเข้าไปในห้อง, ถ้าคุณไม่บาดเจ็บ, ให้ยอมบาดเจ็บ, เพื่อให้ผู้รอดชีวิตอีกคนในห้องของคุณกลับมาไม่บาดเจ็บ หรือ เพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ (คุณยัง Interact ได้ในเทิร์นนี้)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/for-the-people.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/for-the-people.webp"
+    }
+  },
+  {
+    "id": "friendly-competition",
+    "side": "survivor",
+    "name": "Friendly Competition",
+    "cost": 2,
+    "flavor": {
+      "en": "You revel in the community spirit of a competition, and inspire others to follow suit.",
+      "th": "คุณเพลิดเพลินกับจิตวิญญาณของชุมชนในการแข่งขัน และ สร้างแรงบันดาลใจให้คนอื่นทำตาม"
+    },
+    "text": {
+      "en": "After you interact with a generator, if another Survivor interacted with the same generator this round, add 1 progress to that generator.",
+      "th": "หลังจากคุณ Interact กับ เครื่องปั่นไฟ, ถ้ามีผู้รอดชีวิตคนอื่น Interact กับ เครื่องปั่นไฟ เครื่องเดียวกันในรอบนี้, ให้เพิ่มความคืบหน้า 1 แต้มให้ เครื่องปั่นไฟ นั้น"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/friendly-competition.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/friendly-competition.webp"
+    }
+  },
+  {
+    "id": "guardian",
+    "side": "survivor",
+    "name": "Guardian",
+    "cost": 1,
+    "flavor": {
+      "en": "You risk it all to help those in need.",
+      "th": "คุณยอมเสี่ยงทุกอย่างเพื่อช่วยผู้ที่ต้องการความช่วยเหลือ"
+    },
+    "text": {
+      "en": "When the Killer enters your space, force the Killer to interact with you instead of taking any other action this turn. Discard this perk from play. (You can now access the perk it was covering).",
+      "th": "เมื่อฆาตกรเข้ามาในห้องของคุณ, ให้บังคับฆาตกร Interact กับคุณแทนการกระทำอื่นใดในเทิร์นนี้, ทิ้ง perk นี้ออกจากเกม (ตอนนี้คุณใช้ perk ที่มันทับอยู่ได้แล้ว)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/guardian.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/guardian.webp"
+    }
+  },
+  {
+    "id": "head-on",
+    "side": "survivor",
+    "name": "Head On",
+    "cost": 1,
+    "flavor": {
+      "en": "When your mind is set, there better be no one standing in your way.",
+      "th": "เมื่อใจตั้งมั่นแล้ว อย่าให้มีใครมาขวางทาง"
+    },
+    "text": {
+      "en": "After the Killer enters your space, remove a locker in your space to prevent the Killer from interacting this turn.",
+      "th": "หลังจากฆาตกรเข้ามาในห้องของคุณ, ให้เก็บ ตู้หลบ ในห้องของคุณออก, เพื่อป้องกันไม่ให้ฆาตกร Interact ในเทิร์นนี้"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/head-on.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/head-on.webp"
+    }
+  },
+  {
+    "id": "hope",
+    "side": "survivor",
+    "name": "Hope",
+    "cost": 0,
+    "flavor": {
+      "en": "The growing odds of a successful escape fill you with hope and give you wings.",
+      "th": "โอกาสหนีรอดที่เพิ่มขึ้นเติมความหวัง และ มอบปีกให้คุณ"
+    },
+    "text": {
+      "en": "When a generator is completed, gain a {BP}.",
+      "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้ได้รับ 1 {BP}"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/hope.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/hope.webp"
+    }
+  },
+  {
+    "id": "inner-focus",
+    "side": "survivor",
+    "name": "Inner Focus",
+    "cost": 1,
+    "flavor": {
+      "en": "You have honed your ability to see through the haze of the Ravage.",
+      "th": "คุณฝึกฝนความสามารถในการมองทะลุหมอกควันของ Ravage"
+    },
+    "text": {
+      "en": "When you would move with your card, instead roll two Skill Check dice and choose one. Move directly to the corresponding starting space on the board. (You then interact as normal).",
+      "th": "เมื่อคุณจะเคลื่อนที่ด้วยการ์ดของคุณ, ให้ทอยเต๋า Skill Check สองลูกแทน และ เลือกหนึ่งผล, แล้วเคลื่อนที่ตรงไปยังห้องเริ่มต้นที่ตรงกันบนกระดาน (จากนั้น Interact ตามปกติ)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/inner-focus.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/inner-focus.webp"
+    }
+  },
+  {
+    "id": "inner-healing",
+    "side": "survivor",
+    "name": "Inner Healing",
+    "cost": 2,
+    "flavor": {
+      "en": "You look inwards and trust your instincts when you feel lost and alone.",
+      "th": "คุณมองเข้าไปในใจ และ เชื่อสัญชาตญาณของตัวเองเมื่อรู้สึกหลงทางและโดดเดี่ยว"
+    },
+    "text": {
+      "en": "At the start of your turn, you become healthy. Discard this perk from play. (You can now access the perk it was covering).",
+      "th": "เมื่อเริ่มเทิร์นของคุณ, คุณกลับมาไม่บาดเจ็บ, ทิ้ง perk นี้ออกจากเกม (ตอนนี้คุณใช้ perk ที่มันทับอยู่ได้แล้ว)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/inner-healing.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/inner-healing.webp"
+    }
+  },
+  {
+    "id": "kindred",
+    "side": "survivor",
+    "name": "Kindred",
+    "cost": 0,
+    "flavor": {
+      "en": "Your bond with others helps you intuitively understand one another.",
+      "th": "สายสัมพันธ์กับผู้อื่นช่วยให้พวกคุณเข้าใจกันได้โดยสัญชาตญาณ"
+    },
+    "text": {
+      "en": "After you sabotage a hook or the hook you are on is sabotaged by another Survivor, both of you and the other Survivor (if there is one) gain a {BP}.",
+      "th": "หลังจากคุณ ทำลาย ตะขอแขวน หรือ ตะขอแขวน ที่คุณอยู่ถูกผู้รอดชีวิตคนอื่น ทำลาย, ทั้งคุณ และ ผู้รอดชีวิตคนนั้น (ถ้ามี) ได้รับ 1 {BP}"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/kindred.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/kindred.webp"
+    }
+  },
+  {
+    "id": "kinship",
+    "side": "survivor",
+    "name": "Kinship",
+    "cost": 1,
+    "flavor": {
+      "en": "The importance of friendship has given you strength.",
+      "th": "ความสำคัญของมิตรภาพมอบพละกำลังให้คุณ"
+    },
+    "text": {
+      "en": "As an interaction, interact with another Survivor in your space or a connected space to have them take a Survivor bonus turn after this one. Discard this perk from play. (You can now access the perk it was covering).",
+      "th": "Perk นี้เป็นการ Interact, ให้ Interact กับผู้รอดชีวิตอีกคนในห้องของคุณ หรือ ห้องที่เชื่อมกัน, เพื่อให้เขาเล่น Survivor bonus turn ต่อจากเทิร์นนี้, ทิ้ง perk นี้ออกจากเกม (ตอนนี้คุณใช้ perk ที่มันทับอยู่ได้แล้ว)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/kinship.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/kinship.webp"
+    }
+  },
+  {
+    "id": "leader",
+    "side": "survivor",
+    "name": "Leader",
+    "cost": 1,
+    "flavor": {
+      "en": "You're able to organize a team to cooperate more efficiently.",
+      "th": "คุณสามารถจัดระเบียบทีมให้ร่วมมือกันได้อย่างมีประสิทธิภาพมากขึ้น"
+    },
+    "text": {
+      "en": "When another Survivor in your space moves, move with them, OR; when you move, another Survivor in your space moves with you.",
+      "th": "เมื่อผู้รอดชีวิตคนอื่นในห้องของคุณเคลื่อนที่, ให้เคลื่อนที่ไปกับเขา, หรือ เมื่อคุณเคลื่อนที่, ผู้รอดชีวิตคนอื่นในห้องของคุณเคลื่อนที่ไปกับคุณ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/leader.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/leader.webp"
+    }
+  },
+  {
+    "id": "lightweight",
+    "side": "survivor",
+    "name": "Lightweight",
+    "cost": 1,
+    "flavor": {
+      "en": "Your tracks are hard to follow.",
+      "th": "ร่องรอยของคุณตามได้ยาก"
+    },
+    "text": {
+      "en": "At the end of the planning phase, discard a movement card and move along that card's path.",
+      "th": "เมื่อจบเฟส Planning, ให้ทิ้งการ์ดเคลื่อนที่หนึ่งใบ และ เคลื่อนที่ไปตามเส้นทางของการ์ดใบนั้น"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/lightweight.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/lightweight.webp"
+    }
+  },
+  {
+    "id": "lucky-break",
+    "side": "survivor",
+    "name": "Lucky Break",
+    "cost": 2,
+    "flavor": {
+      "en": "You've had your share of scrapes and bruises, but luck is always on your side.",
+      "th": "คุณเคยผ่านแผลถลอก และ รอยช้ำมามากพอแล้ว แต่โชคอยู่ข้างคุณเสมอ"
+    },
+    "text": {
+      "en": "After any Survivor rolls a great success, you become healthy.",
+      "th": "หลังจากผู้รอดชีวิตคนใดก็ได้ทอยได้ ผล สำเร็จอย่างยิ่ง, คุณจะกลับมาไม่บาดเจ็บ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/lucky-break.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/lucky-break.webp"
+    }
+  },
+  {
+    "id": "made-for-this",
+    "side": "survivor",
+    "name": "Made for This",
+    "cost": 2,
+    "flavor": {
+      "en": "You were born to survive, and raised to adapt.",
+      "th": "คุณเกิดมาเพื่อรอดชีวิต และ ถูกเลี้ยงมาให้ปรับตัว"
+    },
+    "text": {
+      "en": "When the killer would pick you up (before rolling dice), add a sacrifice progress to the sacrifice track instead. You are not picked up.",
+      "th": "เมื่อฆาตกรจะ pick up คุณ (ก่อนทอยเต๋า), ให้เพิ่ม sacrifice progress ลงในแทร็ก sacrifice แทน, คุณจะไม่ถูก pick up"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/made-for-this.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/made-for-this.webp"
+    }
+  },
+  {
+    "id": "no-one-left-behind",
+    "side": "survivor",
+    "name": "No One Left Behind",
+    "cost": 1,
+    "flavor": {
+      "en": "It is inconceivable to leave someone behind.",
+      "th": "เป็นไปไม่ได้ที่จะทิ้งใครไว้ข้างหลัง"
+    },
+    "text": {
+      "en": "As an interaction, interact with an exit gate (even if it's not powered up) to allow any Survivor to move along any path.",
+      "th": "Perk นี้เป็นการ Interact, ให้ Interact กับ ประตูทางออก (แม้ยังไม่ได้เปิดใช้งาน), เพื่อให้ผู้รอดชีวิตคนใดก็ได้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/no-one-left-behind.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/no-one-left-behind.webp"
+    }
+  },
+  {
+    "id": "off-the-record",
+    "side": "survivor",
+    "name": "Off the Record",
+    "cost": 0,
+    "flavor": {
+      "en": "You've learned that a quiet approach is sometimes best.",
+      "th": "คุณเรียนรู้ว่าบางครั้งแนวทางเงียบ ๆ ก็ดีที่สุด"
+    },
+    "text": {
+      "en": "When you or another Survivor in your space or a connected space rolls a failure, you gain a {BP} instead of the Killer.",
+      "th": "เมื่อคุณ หรือ ผู้รอดชีวิตคนอื่น ในห้องของคุณ หรือ ห้องที่เชื่อมกัน ทอยได้ ผล ล้มเหลว, คุณได้รับ 1 {BP} แทนฆาตกร"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/off-the-record.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/off-the-record.webp"
+    }
+  },
+  {
+    "id": "overcome",
+    "side": "survivor",
+    "name": "Overcome",
+    "cost": 0,
+    "flavor": {
+      "en": "You have calculated how much energy you can risk to expend.",
+      "th": "คุณคำนวณแล้วว่าสามารถเสี่ยงใช้พลังงานได้มากเท่าใด"
+    },
+    "text": {
+      "en": "At the end of your turn, if you are wounded, gain 1 {BP}.",
+      "th": "เมื่อจบเทิร์นของคุณ, ถ้าคุณบาดเจ็บ, ให้ได้รับ 1 {BP}"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/overcome.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/overcome.webp"
+    }
+  },
+  {
+    "id": "plunderers-instinct",
+    "side": "survivor",
+    "name": "Plunderer's Instinct",
+    "cost": 1,
+    "flavor": {
+      "en": "You always seem to find just what you need.",
+      "th": "คุณดูเหมือนจะหาของที่ต้องการเจอเสมอ"
+    },
+    "text": {
+      "en": "When you would draw one item, draw three. Keep one and discard the other two.",
+      "th": "เมื่อคุณจะจั่ว item หนึ่งใบ, ให้จั่วสามใบ, เก็บไว้หนึ่งใบ และ ทิ้งอีกสองใบ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/plunderers-instinct.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/plunderers-instinct.webp"
+    }
+  },
+  {
+    "id": "premonition",
+    "side": "survivor",
+    "name": "Premonition",
+    "cost": 1,
+    "flavor": {
+      "en": "You have the undeniable capability to sense danger.",
+      "th": "คุณมีความสามารถรับรู้อันตรายอย่างปฏิเสธไม่ได้"
+    },
+    "text": {
+      "en": "When the Killer enters your space, before they interact, interact with a crow in your space.",
+      "th": "เมื่อฆาตกรเข้ามาในห้องของคุณ, ก่อนที่เขาจะ Interact, ให้ Interact กับ อีกา ในห้องของคุณ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/premonition.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/premonition.webp"
+    }
+  },
+  {
+    "id": "quick-and-quiet",
+    "side": "survivor",
+    "name": "Quick & Quiet",
+    "cost": 1,
+    "flavor": {
+      "en": "You make less noise when running and hiding.",
+      "th": "คุณทำเสียงน้อยลงเมื่อวิ่ง และ ซ่อนตัว"
+    },
+    "text": {
+      "en": "When the Killer enters your space (before they interact), interact with a locker in your space.",
+      "th": "เมื่อฆาตกรเข้ามาในห้องของคุณ (ก่อนที่เขาจะ Interact), ให้ Interact กับ ตู้หลบ ในห้องของคุณ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/quick-and-quiet.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/quick-and-quiet.webp"
+    }
+  },
+  {
+    "id": "quick-gambit",
+    "side": "survivor",
+    "name": "Quick Gambit",
+    "cost": 2,
+    "flavor": {
+      "en": "When you have the Killer's attention, you know how to keep it.",
+      "th": "เมื่อคุณเรียกความสนใจของฆาตกรได้ คุณรู้วิธีรักษามันไว้"
+    },
+    "text": {
+      "en": "When you leave the Killer's space, the Killer moves with you.",
+      "th": "เมื่อคุณออกจากห้องของฆาตกร, ฆาตกรจะเคลื่อนที่ไปพร้อมกับคุณ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/quick-gambit.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/quick-gambit.webp"
+    }
+  },
+  {
+    "id": "renewal",
+    "side": "survivor",
+    "name": "Renewal",
+    "cost": 2,
+    "flavor": {
+      "en": "When things seem hopeless, you muster the strength to push through.",
+      "th": "เมื่อทุกอย่างดูสิ้นหวัง คุณรวบรวมกำลังเพื่อฝ่าฟันไปให้ได้"
+    },
+    "text": {
+      "en": "At the end of any Survivor turn, if you successfully healed another Survivor or another Survivor successfully healed you, take a Survivor bonus turn.",
+      "th": "เมื่อจบเทิร์นของผู้รอดชีวิตคนใดก็ได้, ถ้าคุณ heal ผู้รอดชีวิตคนอื่นสำเร็จ หรือ ผู้รอดชีวิตคนอื่น heal คุณสำเร็จ, ให้เล่น Survivor bonus turn"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/renewal.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/renewal.webp"
+    }
+  },
+  {
+    "id": "residual-manifest",
+    "side": "survivor",
+    "name": "Residual Manifest",
+    "cost": 2,
+    "flavor": {
+      "en": "A lifetime of chasing the darkness has taught you that the best disinfectant is light.",
+      "th": "ชีวิตที่ไล่ล่าความมืดสอนคุณว่าน้ำยาฆ่าเชื้อที่ดีที่สุดคือแสงสว่าง"
+    },
+    "text": {
+      "en": "When the Killer would interact in your space, discard an item to prevent that interaction.",
+      "th": "เมื่อฆาตกรจะ Interact ในห้องของคุณ, ให้ทิ้ง item, เพื่อป้องกัน Interaction นั้น"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/residual-manifest.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/residual-manifest.webp"
+    }
+  },
+  {
+    "id": "resilience",
+    "side": "survivor",
+    "name": "Resilience",
+    "cost": 2,
+    "flavor": {
+      "en": "You are motivated in dire situations.",
+      "th": "คุณมีแรงฮึดในสถานการณ์คับขัน"
+    },
+    "text": {
+      "en": "At the start of cleanup, if you were wounded this round, take a Survivor bonus turn.",
+      "th": "เมื่อเริ่มเฟส Cleanup, ถ้าคุณบาดเจ็บในรอบนี้, ให้เล่น Survivor bonus turn"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/resilience.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/resilience.webp"
+    }
+  },
+  {
+    "id": "saboteur",
+    "side": "survivor",
+    "name": "Saboteur",
+    "cost": 0,
+    "flavor": {
+      "en": "Sometimes the best defense is a strong offense.",
+      "th": "บางครั้งการป้องกันที่ดีที่สุดคือการรุกที่แข็งแกร่ง"
+    },
+    "text": {
+      "en": "After you sabotage a hook, either gain a {BP}, or spend 2 {BP} to take a Survivor bonus turn.",
+      "th": "หลังจากคุณ ทำลาย ตะขอแขวน, ให้รับ 1 {BP} หรือ จ่าย 2 {BP}, เพื่อเล่น Survivor bonus turn"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/saboteur.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/saboteur.webp"
+    }
+  },
+  {
+    "id": "self-aware",
+    "side": "survivor",
+    "name": "Self-Aware",
+    "cost": 1,
+    "flavor": {
+      "en": "You know your weaknesses and refuse to hide from them.",
+      "th": "คุณรู้จุดอ่อนของตัวเอง และ ไม่ยอมหลบซ่อนจากมัน"
+    },
+    "text": {
+      "en": "At the start of your turn, draw 4 Survivor perk cards and replace this perk with one of them. This perk and the unchosen perk cards are discarded.",
+      "th": "เมื่อเริ่มเทิร์นของคุณ, ให้จั่ว perk การ์ดของผู้รอดชีวิต 4 ใบ และ แทนที่ perk นี้ด้วยหนึ่งในนั้น, perk นี้ และ perk การ์ดที่ไม่ได้เลือกจะถูกทิ้ง"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/self-aware.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/self-aware.webp"
+    }
+  },
+  {
+    "id": "self-care",
+    "side": "survivor",
+    "name": "Self-Care",
+    "cost": 1,
+    "flavor": {
+      "en": "You know a thing or two about first aid.",
+      "th": "คุณรู้เรื่องการปฐมพยาบาลอยู่บ้าง"
+    },
+    "text": {
+      "en": "At the start of your turn, roll the danger die. On a success, you become healthy.",
+      "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, คุณจะกลับมาไม่บาดเจ็บ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/self-care.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/self-care.webp"
+    }
+  },
+  {
+    "id": "self-preservation",
+    "side": "survivor",
+    "name": "Self-Preservation",
+    "cost": 1,
+    "flavor": {
+      "en": "Life is unforgiving. Sometimes it's best to keep your head down.",
+      "th": "ชีวิตไม่ปรานี บางครั้งการก้มหัวหลบก็ดีที่สุด"
+    },
+    "text": {
+      "en": "After the turn when another Survivor is wounded or sacrificed, interact with a locker in your space.",
+      "th": "หลังเทิร์นที่ผู้รอดชีวิตคนอื่นบาดเจ็บ หรือ ถูกสังเวย, ให้ Interact กับ ตู้หลบ ในห้องของคุณ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/self-preservation.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/self-preservation.webp"
+    }
+  },
+  {
+    "id": "shadow-step",
+    "side": "survivor",
+    "name": "Shadow Step",
+    "cost": 1,
+    "flavor": {
+      "en": "A Boon that conceals the truth.",
+      "th": "Boon ที่ปกปิดความจริง"
+    },
+    "text": {
+      "en": "After moving along a path, place the Entity on that path. Players cannot move along that path.",
+      "th": "หลังจากเคลื่อนที่ตามเส้นทางหนึ่ง, ให้วาง The Entity บนเส้นทางนั้น, ผู้เล่นเคลื่อนที่ตามเส้นทางนั้นไม่ได้"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/shadow-step.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/shadow-step.webp"
+    }
+  },
+  {
+    "id": "situational-awareness",
+    "side": "survivor",
+    "name": "Situational Awareness",
+    "cost": 1,
+    "flavor": {
+      "en": "You are aware of your surroundings and share the information with others.",
+      "th": "คุณรู้เท่าทันสิ่งรอบตัว และ แบ่งปันข้อมูลให้คนอื่น"
+    },
+    "text": {
+      "en": "At the end of your turn, take a Survivor bonus turn. Discard this perk from play. (You can now access the perk it was covering).",
+      "th": "เมื่อจบเทิร์นของคุณ, ให้เล่น Survivor bonus turn, ทิ้ง perk นี้ออกจากเกม (ตอนนี้คุณใช้ perk ที่มันทับอยู่ได้แล้ว)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/situational-awareness.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/situational-awareness.webp"
+    }
+  },
+  {
+    "id": "slippery-meat",
+    "side": "survivor",
+    "name": "Slippery Meat",
+    "cost": 4,
+    "flavor": {
+      "en": "You have developed an efficient way to get off hooks.",
+      "th": "คุณพัฒนาวิธีหลุดจากตะขอแขวนได้อย่างมีประสิทธิภาพ"
+    },
+    "text": {
+      "en": "At the start of the planning phase, if you are sacrificed, sabotage the hook you are on. You do not move or interact after this. (You can still set a card and take a normal turn after.)",
+      "th": "เมื่อเริ่มเฟส Planning, ถ้าคุณถูกสังเวยอยู่, ให้ ทำลาย ตะขอแขวน ที่คุณอยู่, คุณจะไม่เคลื่อนที่ หรือ Interact หลังจากนี้ (คุณยังวางการ์ด และ เล่นเทิร์นตามปกติได้หลังจากนั้น)"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/slippery-meat.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/slippery-meat.webp"
+    }
+  },
+  {
+    "id": "small-game",
+    "side": "survivor",
+    "name": "Small Game",
+    "cost": 1,
+    "flavor": {
+      "en": "You have the undeniable capability to sense danger.",
+      "th": "คุณมีความสามารถรับรู้อันตรายอย่างปฏิเสธไม่ได้"
+    },
+    "text": {
+      "en": "After you successfully cleanse a Hex Totem, the Killer loses 2 {BP}.",
+      "th": "หลังจากคุณ ชำระล้าง โทเท็มคำสาป สำเร็จ, ฆาตกรเสีย 2 {BP}"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/small-game.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/small-game.webp"
+    }
+  },
+  {
+    "id": "smash-hit",
+    "side": "survivor",
+    "name": "Smash Hit",
+    "cost": 0,
+    "flavor": {
+      "en": "After your rival makes a mistake, you seize the opportunity.",
+      "th": "หลังจากคู่แข่งทำพลาด คุณก็คว้าโอกาสนั้นไว้"
+    },
+    "text": {
+      "en": "When the Killer breaks a pallet, moves through a breakable wall, or damages a generator, gain a {BP}.",
+      "th": "เมื่อฆาตกรทำลาย แผ่นพาเลท, เคลื่อนที่ผ่านกำแพงทำลายได้, หรือ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ได้รับ 1 {BP}"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/smash-hit.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/smash-hit.webp"
+    }
+  },
+  {
+    "id": "solidarity",
+    "side": "survivor",
+    "name": "Solidarity",
+    "cost": 1,
+    "flavor": {
+      "en": "Sharing painful experiences has the power to heal.",
+      "th": "การแบ่งปันประสบการณ์ที่เจ็บปวดมีพลังในการเยียวยา"
+    },
+    "text": {
+      "en": "As an interaction, you may interact with another Survivor in a connected space to use the \"heal\" interaction on them.",
+      "th": "Perk นี้เป็นการ Interact, คุณอาจ Interact กับผู้รอดชีวิตอีกคนในห้องที่เชื่อมกัน, เพื่อใช้ Interaction \"heal\" กับเขา"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/solidarity.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/solidarity.webp"
+    }
+  },
+  {
+    "id": "spine-chill",
+    "side": "survivor",
+    "name": "Spine Chill",
+    "cost": 1,
+    "flavor": {
+      "en": "An unnatural tingle warns you of impending doom.",
+      "th": "ความรู้สึกเสียวสันหลังอย่างผิดธรรมชาติเตือนคุณถึงหายนะที่ใกล้เข้ามา"
+    },
+    "text": {
+      "en": "When the Killer enters your space, roll the danger die. On a success, move along any path.",
+      "th": "เมื่อฆาตกรเข้ามาในห้องของคุณ, ให้ทอย Danger Die, หากได้ ผล สำเร็จ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/spine-chill.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/spine-chill.webp"
+    }
+  },
+  {
+    "id": "streetwise",
+    "side": "survivor",
+    "name": "Streetwise",
+    "cost": 1,
+    "flavor": {
+      "en": "Long nights out taught you to do a lot with what you've got.",
+      "th": "คืนอันยาวนานบนท้องถนนสอนให้คุณทำอะไรได้มากมายจากสิ่งที่มี"
+    },
+    "text": {
+      "en": "After you interact with a chest, the chest is not removed.",
+      "th": "หลังจากคุณ Interact กับ กล่องไอเทม, กล่องไอเทม จะไม่ถูกเก็บออก"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/streetwise.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/streetwise.webp"
+    }
+  },
+  {
+    "id": "strength-in-shadows",
+    "side": "survivor",
+    "name": "Strength in Shadows",
+    "cost": 1,
+    "flavor": {
+      "en": "A chance for renewed power down where danger calls home.",
+      "th": "โอกาสของพลังที่ฟื้นคืนในที่ซึ่งอันตรายเรียกว่าบ้าน"
+    },
+    "text": {
+      "en": "At the start of your turn, choose a wounded Survivor without a sacrifice progress on their board. Add a sacrifice progress to their board and they become healthy.",
+      "th": "เมื่อเริ่มเทิร์นของคุณ, ให้เลือกผู้รอดชีวิตที่บาดเจ็บ และไม่มี sacrifice progress บนบอร์ดของเขา, เพิ่ม sacrifice progress 1 แต้มลงบนบอร์ดของเขา, แล้วเขาจะกลับมาไม่บาดเจ็บ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/strength-in-shadows.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/strength-in-shadows.webp"
+    }
+  },
+  {
+    "id": "technician",
+    "side": "survivor",
+    "name": "Technician",
+    "cost": 0,
+    "flavor": {
+      "en": "You are apt at handling machinery with the greatest care and precision.",
+      "th": "คุณถนัดในการจัดการเครื่องจักรด้วยความระมัดระวัง และ แม่นยำสูงสุด"
+    },
+    "text": {
+      "en": "When you roll a failure while interacting with a generator, interact again. The second interaction must target a different prop or Survivor.",
+      "th": "เมื่อคุณทอยได้ ผล ล้มเหลว ขณะ Interact กับ เครื่องปั่นไฟ, ให้ Interact อีกครั้ง, การ Interact ครั้งที่สองต้องเป็นกับ prop หรือผู้รอดชีวิตคนละอย่าง"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/technician.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/technician.webp"
+    }
+  },
+  {
+    "id": "this-is-not-happening",
+    "side": "survivor",
+    "name": "This Is Not Happening",
+    "cost": 1,
+    "flavor": {
+      "en": "You perform at your best when you are under extreme stress.",
+      "th": "คุณทำได้ดีที่สุดเมื่ออยู่ภายใต้ความกดดันสุดขีด"
+    },
+    "text": {
+      "en": "When performing a skill check, roll the danger die instead.",
+      "th": "เมื่อทำ Skill Check, ให้ทอย Danger Die แทน"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/this-is-not-happening.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/this-is-not-happening.webp"
+    }
+  },
+  {
+    "id": "troubleshooter",
+    "side": "survivor",
+    "name": "Troubleshooter",
+    "cost": 1,
+    "flavor": {
+      "en": "No amount of distraction will shake you from your primary task.",
+      "th": "ไม่มีสิ่งรบกวนใดทำให้คุณเสียสมาธิจากงานหลัก"
+    },
+    "text": {
+      "en": "After moving, move again along any other path, as long as the space you move into has a generator.",
+      "th": "หลังจากเคลื่อนที่, ให้เคลื่อนที่อีกครั้งตามเส้นทางอื่นใดก็ได้ ตราบใดที่ห้องที่คุณเข้าไปมี เครื่องปั่นไฟ"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/troubleshooter.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/troubleshooter.webp"
+    }
+  },
+  {
+    "id": "up-the-ante",
+    "side": "survivor",
+    "name": "Up the Ante",
+    "cost": 2,
+    "flavor": {
+      "en": "All will be well in the end, you just know it.",
+      "th": "ทุกอย่างจะดีในที่สุด คุณรู้ดี"
+    },
+    "text": {
+      "en": "At the end of your turn, take a Survivor bonus turn. The Killer gains 2 {BP}.",
+      "th": "เมื่อจบเทิร์นของคุณ, ให้เล่น Survivor bonus turn, ฆาตกรได้รับ 2 {BP}"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/up-the-ante.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/up-the-ante.webp"
+    }
+  },
+  {
+    "id": "urban-evasion",
+    "side": "survivor",
+    "name": "Urban Evasion",
+    "cost": 1,
+    "flavor": {
+      "en": "Years of evading the cops taught you a thing or two about stealth.",
+      "th": "หลายปีที่หลบตำรวจสอนคุณเรื่องการลอบเร้นไม่น้อย"
+    },
+    "text": {
+      "en": "At the start of any Survivor turn, remove a breakable wall from play. Return it to play in the same path at the end of that Survivor turn.",
+      "th": "เมื่อเริ่มเทิร์นของผู้รอดชีวิตคนใดก็ได้, ให้เก็บกำแพงทำลายได้หนึ่งอันออกจากเกม, แล้ววางกลับในเส้นทางเดิม เมื่อจบเทิร์นของผู้รอดชีวิตนั้น"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/urban-evasion.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/urban-evasion.webp"
+    }
+  },
+  {
+    "id": "visionary",
+    "side": "survivor",
+    "name": "Visionary",
+    "cost": 0,
+    "flavor": {
+      "en": "You're remarkably focused on your means of escape.",
+      "th": "คุณจดจ่ออย่างยิ่งกับหนทางหนีของคุณ"
+    },
+    "text": {
+      "en": "When you would reveal a prop, reveal any prop in a connected space instead.",
+      "th": "เมื่อคุณจะเปิด prop, ให้เปิด prop ใดก็ได้ในห้องที่เชื่อมกันแทน"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/visionary.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/visionary.webp"
+    }
+  },
+  {
+    "id": "weaving-spiders",
+    "side": "survivor",
+    "name": "Weaving Spiders",
+    "cost": 0,
+    "flavor": {
+      "en": "The place where fear festers and terror treads is also where those with the gift can reach across the veil.",
+      "th": "ที่ซึ่งความกลัวเน่าหนอง และ ความสยองย่างกรายก็คือที่ซึ่งผู้มีพรสวรรค์เอื้อมข้ามม่านไปได้ด้วย"
+    },
+    "text": {
+      "en": "As an interaction, all Survivors in your space may collectively pay 6 {BP}. If they do, add up to 3 progress to any face-up generator and the Killer gains a sacrifice progress.",
+      "th": "Perk นี้เป็นการ Interact, ผู้รอดชีวิตทุกคนในห้องของคุณอาจร่วมกันจ่าย 6 {BP}, หากทำเช่นนั้น, ให้เพิ่มความคืบหน้าสูงสุด 3 แต้ม ให้ เครื่องปั่นไฟ ที่หงายหน้าเครื่องใดก็ได้, และฆาตกรได้รับ sacrifice progress 1 แต้ม"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/weaving-spiders.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/weaving-spiders.webp"
+    }
+  },
+  {
+    "id": "well-make-it",
+    "side": "survivor",
+    "name": "We'll Make It",
+    "cost": 2,
+    "flavor": {
+      "en": "Helping others heightens your morale.",
+      "th": "การช่วยเหลือผู้อื่นทำให้ขวัญกำลังใจของคุณสูงขึ้น"
+    },
+    "text": {
+      "en": "After you successfully heal another Survivor, that Survivor takes a Survivor bonus turn.",
+      "th": "หลังจากคุณ heal ผู้รอดชีวิตคนอื่นสำเร็จ, ผู้รอดชีวิตคนนั้นเล่น Survivor bonus turn"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/well-make-it.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/well-make-it.webp"
+    }
+  },
+  {
+    "id": "were-gonna-live-forever",
+    "side": "survivor",
+    "name": "We're Gonna Live Forever",
+    "cost": 1,
+    "flavor": {
+      "en": "Your few friends deserve the best protection.",
+      "th": "เพื่อนไม่กี่คนของคุณสมควรได้รับการปกป้องที่ดีที่สุด"
+    },
+    "text": {
+      "en": "When the Killer would leave your space, prevent that move. The Killer can still interact in your space.",
+      "th": "เมื่อฆาตกรจะออกจากห้องของคุณ, ให้ห้ามการเคลื่อนที่นั้น, ฆาตกรยัง Interact ในห้องของคุณได้"
+    },
+    "image": {
+      "en": "assets/survivors/perks-en/edit_perks_mode/were-gonna-live-forever.webp",
+      "th": "assets/survivors/perks-th/edit_perks_mode/were-gonna-live-forever.webp"
+    }
+  },
+  {
+    "id": "a-nurses-calling",
+    "side": "killer",
+    "name": "A Nurse's Calling",
+    "cost": 0,
+    "flavor": {
+      "en": "You are drawn to those in need of help.",
+      "th": "คุณถูกดึงดูดไปหาผู้ที่ต้องการความช่วยเหลือ"
+    },
+    "text": {
+      "en": "After a Survivor becomes healthy, gain 2 {BP}.",
+      "th": "หลังจากผู้รอดชีวิตกลับมาไม่บาดเจ็บ, ให้ได้รับ 2 {BP}"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/a-nurses-calling.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/a-nurses-calling.webp"
+    }
+  },
+  {
+    "id": "agitation",
+    "side": "killer",
+    "name": "Agitation",
+    "cost": 1,
+    "flavor": {
+      "en": "You get excited in anticipation of hooking your prey.",
+      "th": "คุณตื่นเต้นเมื่อได้คาดหวังว่าจะเอาเหยื่อขึ้นตะขอแขวน"
+    },
+    "text": {
+      "en": "After you attack a healthy Survivor, move along any path.",
+      "th": "หลังจากคุณโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/agitation.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/agitation.webp"
+    }
+  },
+  {
+    "id": "bamboozle",
+    "side": "killer",
+    "name": "Bamboozle",
+    "cost": 1,
+    "flavor": {
+      "en": "The Entity's realm shifts and twists around you.",
+      "th": "อาณาจักรของ The Entity บิดเบี้ยวเปลี่ยนรูปไปรอบตัวคุณ"
+    },
+    "text": {
+      "en": "At the start of the planning phase, place the Entity on a path. Players treat it as a breakable wall (you may pass through it freely).",
+      "th": "เมื่อเริ่มเฟส Planning, ให้วาง The Entity บนเส้นทางหนึ่ง, ผู้เล่นทุกคนถือว่าเป็นกำแพงทำลายได้ (คุณเดินผ่านได้อย่างอิสระ)"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/bamboozle.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/bamboozle.webp"
+    }
+  },
+  {
+    "id": "beast-of-prey",
+    "side": "killer",
+    "name": "Beast of Prey",
+    "cost": 1,
+    "flavor": {
+      "en": "Your lust for a kill makes you totally unpredictable.",
+      "th": "ความกระหายที่จะฆ่าทำให้คุณคาดเดาไม่ได้เลย"
+    },
+    "text": {
+      "en": "At the start of the planning phase, move along any path.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/beast-of-prey.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/beast-of-prey.webp"
+    }
+  },
+  {
+    "id": "bitter-murmur",
+    "side": "killer",
+    "name": "Bitter Murmur",
+    "cost": 1,
+    "flavor": {
+      "en": "The bitter whispers of The Entity drive you forward.",
+      "th": "เสียงกระซิบอันขมขื่นของ The Entity ผลักดันคุณไปข้างหน้า"
+    },
+    "text": {
+      "en": "After you move along a one-way path or breakable wall, move again along any path before interacting.",
+      "th": "หลังจากคุณเคลื่อนที่ไปตามเส้นทางทางเดียว หรือ กำแพงทำลายได้, ให้เคลื่อนที่อีกครั้งตามเส้นทางใดก็ได้ก่อน Interact"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/bitter-murmur.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/bitter-murmur.webp"
+    }
+  },
+  {
+    "id": "bloodhound",
+    "side": "killer",
+    "name": "Bloodhound",
+    "cost": 0,
+    "flavor": {
+      "en": "Like a hound, you smell traces of blood at a great distance.",
+      "th": "เหมือนสุนัขล่าเนื้อ คุณได้กลิ่นเลือดจากระยะไกล"
+    },
+    "text": {
+      "en": "After you sacrifice a Survivor, they lose a {BP} and you gain a {BP}. (You still gain {BP}, even if they do not have any to lose.)",
+      "th": "หลังจากคุณสังเวยผู้รอดชีวิต, เขาเสีย 1 {BP} และคุณได้รับ 1 {BP} (คุณยังได้รับ {BP} แม้เขาไม่มี {BP} ให้เสีย)"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/bloodhound.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/bloodhound.webp"
+    }
+  },
+  {
+    "id": "claustrophobia",
+    "side": "killer",
+    "name": "Claustrophobia",
+    "cost": 1,
+    "flavor": {
+      "en": "Your ties to the Entity manifest when your prey attempts to get away.",
+      "th": "สายสัมพันธ์ของคุณกับ The Entity ปรากฏขึ้นเมื่อเหยื่อพยายามหลบหนี"
+    },
+    "text": {
+      "en": "After a survivor successfully repairs a generator, place the Entity on any path. Survivors cannot move along that path.",
+      "th": "หลังจากผู้รอดชีวิตซ่อม เครื่องปั่นไฟ สำเร็จ, ให้วาง The Entity บนเส้นทางใดก็ได้, ผู้รอดชีวิตเคลื่อนที่ตามเส้นทางนั้นไม่ได้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/claustrophobia.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/claustrophobia.webp"
+    }
+  },
+  {
+    "id": "corrupt-intervention",
+    "side": "killer",
+    "name": "Corrupt Intervention",
+    "cost": 1,
+    "flavor": {
+      "en": "Your prayers invoke a dark power that meddles with the Survivors' chances of survival.",
+      "th": "คำอธิษฐานของคุณเรียกพลังมืดที่เข้าแทรกแซงโอกาสรอดของผู้รอดชีวิต"
+    },
+    "text": {
+      "en": "At the start of the planning phase, place the Entity on a revealed generator in any space. It cannot be interacted with.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้วาง The Entity บน เครื่องปั่นไฟ ที่เปิดแล้วในห้องใดก็ได้, ห้าม Interact กับมัน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/corrupt-intervention.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/corrupt-intervention.webp"
+    }
+  },
+  {
+    "id": "crowd-control",
+    "side": "killer",
+    "name": "Crowd Control",
+    "cost": 1,
+    "flavor": {
+      "en": "Those lesser than you must be properly herded.",
+      "th": "ผู้ที่ด้อยกว่าคุณต้องถูกต้อนอย่างเหมาะสม"
+    },
+    "text": {
+      "en": "At the start of the planning phase, choose a survivor. The Survivors may collectively spend 2 {BP}. Otherwise, you select what movement card the chosen Survivor will set from their hand for the turn.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, ผู้รอดชีวิตทุกคนรวมกันอาจจ่าย 2 {BP} ได้, ถ้าไม่, คุณเป็นผู้เลือกว่าผู้รอดชีวิตที่ถูกเลือกจะวางการ์ดเคลื่อนที่ใบไหนจากมือของเขาในเทิร์นนั้น"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/crowd-control.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/crowd-control.webp"
+    }
+  },
+  {
+    "id": "dead-mans-switch",
+    "side": "killer",
+    "name": "Dead Man's Switch",
+    "cost": 1,
+    "flavor": {
+      "en": "Your machinations render escape impossible.",
+      "th": "แผนการของคุณทำให้การหนีเป็นไปไม่ได้"
+    },
+    "text": {
+      "en": "After you sacrifice a Survivor, a generator or exit gate of your choice loses a progress.",
+      "th": "หลังจากคุณสังเวยผู้รอดชีวิต, เครื่องปั่นไฟ หรือ ประตูทางออก ที่คุณเลือกจะเสียความคืบหน้า 1 แต้ม"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/dead-mans-switch.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/dead-mans-switch.webp"
+    }
+  },
+  {
+    "id": "deerstalker",
+    "side": "killer",
+    "name": "Deerstalker",
+    "cost": 2,
+    "flavor": {
+      "en": "You know how to track weakened prey.",
+      "th": "คุณรู้วิธีตามรอยเหยื่อที่อ่อนแอ"
+    },
+    "text": {
+      "en": "When a wounded Survivor leaves your space, they roll the danger die. On a failure, they remain in place and cannot interact this turn.",
+      "th": "เมื่อผู้รอดชีวิตที่บาดเจ็บออกจากห้องของคุณ, เขาต้องทอย Danger Die, หากได้ ผล ล้มเหลว, เขาจะอยู่ที่เดิม และ Interact ไม่ได้ในเทิร์นนี้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/deerstalker.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/deerstalker.webp"
+    }
+  },
+  {
+    "id": "devour-hope",
+    "side": "killer",
+    "name": "Devour Hope",
+    "cost": 1,
+    "flavor": {
+      "en": "The false hope of Survivors ignites your hunger.",
+      "th": "ความหวังลม ๆ แล้ง ๆ ของผู้รอดชีวิตจุดประกายความหิวโหยของคุณ"
+    },
+    "text": {
+      "en": "At the start of cleanup, if a generator was completed this round, take a Killer bonus turn. (You can only take one Killer bonus turn per round.)",
+      "th": "เมื่อเริ่มเฟส Cleanup, ถ้ามี เครื่องปั่นไฟ ถูกซ่อมเสร็จในรอบนี้, ให้เล่น Killer bonus turn (เล่น Killer bonus turn ได้เพียงหนึ่งครั้งต่อรอบ)"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/devour-hope.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/devour-hope.webp"
+    }
+  },
+  {
+    "id": "discordance",
+    "side": "killer",
+    "name": "Discordance",
+    "cost": 0,
+    "flavor": {
+      "en": "You can sense where others are gathered.",
+      "th": "คุณรับรู้ได้ว่าคนอื่นรวมตัวกันอยู่ที่ไหน"
+    },
+    "text": {
+      "en": "When a Survivor enters the same space as another Survivor, gain a {BP} for each Survivor and Killer in that space.",
+      "th": "เมื่อผู้รอดชีวิตเข้าไปในห้องเดียวกับผู้รอดชีวิตอีกคน, ให้ได้รับ 1 {BP} ต่อผู้รอดชีวิต และ ฆาตกรแต่ละคนในห้องนั้น"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/discordance.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/discordance.webp"
+    }
+  },
+  {
+    "id": "dissolution",
+    "side": "killer",
+    "name": "Dissolution",
+    "cost": 1,
+    "flavor": {
+      "en": "Everything turns to dust. It is as inescapable as the coming of the night.",
+      "th": "ทุกสิ่งกลายเป็นผุยผง หนีไม่พ้นเหมือนการมาถึงของค่ำคืน"
+    },
+    "text": {
+      "en": "At the start of the planning phase, place a {BP} on a path without any other component. Survivors that move along that path become wounded. Remove that {BP} from the board at the end of cleanup.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้วาง {BP} หนึ่งอันบนเส้นทางที่ไม่มีชิ้นส่วนอื่น, ผู้รอดชีวิตที่เคลื่อนที่ผ่านเส้นทางนั้นจะบาดเจ็บ, เมื่อจบเฟส Cleanup, ให้เก็บ {BP} นั้นออกจากกระดาน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/dissolution.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/dissolution.webp"
+    }
+  },
+  {
+    "id": "distressing",
+    "side": "killer",
+    "name": "Distressing",
+    "cost": 2,
+    "flavor": {
+      "en": "Your horrifying emanation strikes at a supernaturally long distance",
+      "th": "ความน่าสะพรึงที่แผ่ออกมาจากคุณส่งผลได้ไกลอย่างเหนือธรรมชาติ"
+    },
+    "text": {
+      "en": "After a Survivor moves into a space containing a locker, they interact with a locker.",
+      "th": "หลังจากผู้รอดชีวิตเคลื่อนที่เข้าไปในห้องที่มี ตู้หลบ, เขาต้อง Interact กับ ตู้หลบ"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/distressing.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/distressing.webp"
+    }
+  },
+  {
+    "id": "dragons-grip",
+    "side": "killer",
+    "name": "Dragon's Grip",
+    "cost": 1,
+    "flavor": {
+      "en": "Your supernatural strength cascades through their bones.",
+      "th": "พละกำลังเหนือธรรมชาติของคุณแล่นผ่านกระดูกของพวกเขา"
+    },
+    "text": {
+      "en": "When you damage a generator, discard up to 2 movement cards. Each Survivor in a space connected to that generator by either card's path either spends a {BP} or becomes wounded.",
+      "th": "เมื่อคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ทิ้งการ์ดเคลื่อนที่ได้สูงสุด 2 ใบ, ผู้รอดชีวิตแต่ละคนในห้องที่เชื่อมกับ เครื่องปั่นไฟ นั้นด้วยเส้นทางของการ์ดใบใดใบหนึ่ง ต้องจ่าย 1 {BP} หรือบาดเจ็บ"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/dragons-grip.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/dragons-grip.webp"
+    }
+  },
+  {
+    "id": "enduring",
+    "side": "killer",
+    "name": "Enduring",
+    "cost": 2,
+    "flavor": {
+      "en": "Let nothing stand in your way.",
+      "th": "อย่าให้สิ่งใดขวางทางคุณ"
+    },
+    "text": {
+      "en": "When you would move along a path with a pallet, destroy the pallet and complete your turn as normal. You can still interact this turn.",
+      "th": "เมื่อคุณจะเคลื่อนที่ผ่านเส้นทางที่มี แผ่นพาเลท, ให้ทำลาย แผ่นพาเลท นั้น และ จบเทิร์นตามปกติ, คุณยัง Interact ในเทิร์นนี้ได้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/enduring.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/enduring.webp"
+    }
+  },
+  {
+    "id": "fearmonger",
+    "side": "killer",
+    "name": "Fearmonger",
+    "cost": 1,
+    "flavor": {
+      "en": "Your distressing presence drains and weakens your prey.",
+      "th": "การปรากฏตัวอันน่าหวาดหวั่นของคุณบั่นทอนเหยื่อจนอ่อนแรง"
+    },
+    "text": {
+      "en": "At the start of the planning phase, choose a Survivor in your space or a connected space. That Survivor cannot activate perks during this round.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคนในห้องของคุณ หรือ ห้องที่เชื่อมกัน, ผู้รอดชีวิตคนนั้นใช้ perk ไม่ได้ตลอดรอบนี้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/fearmonger.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/fearmonger.webp"
+    }
+  },
+  {
+    "id": "forced-hesitation",
+    "side": "killer",
+    "name": "Forced Hesitation",
+    "cost": 2,
+    "flavor": {
+      "en": "You have learnt the emotional weaknesses of the organics, and how to exploit them.",
+      "th": "คุณเรียนรู้จุดอ่อนทางอารมณ์ของสิ่งมีชีวิตอินทรีย์ และ วิธีใช้ประโยชน์จากมัน"
+    },
+    "text": {
+      "en": "At the end of the planning phase, discard 'Wait' from your hand. If you did, discard a Survivor's set movement card, then that Survivor may immediately interact in their current space.",
+      "th": "เมื่อจบเฟส Planning, ให้ทิ้ง 'Wait' จากมือของคุณ, ถ้าทำเช่นนั้น, ให้ทิ้งการ์ดเคลื่อนที่ที่วางไว้ของผู้รอดชีวิตหนึ่งคน, แล้วผู้รอดชีวิตคนนั้นสามารถ Interact ได้ทันทีในห้องปัจจุบัน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/forced-hesitation.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/forced-hesitation.webp"
+    }
+  },
+  {
+    "id": "genetic-limits",
+    "side": "killer",
+    "name": "Genetic Limits",
+    "cost": 1,
+    "flavor": {
+      "en": "Around you, the limits of human life become readily apparent.",
+      "th": "รอบตัวคุณ ขีดจำกัดของชีวิตมนุษย์ปรากฏชัดเจน"
+    },
+    "text": {
+      "en": "At the end of the planning phase, choose a Survivor with a sacrifice progress on their board. For the rest of the round, they cannot use perks.",
+      "th": "เมื่อจบเฟส Planning, ให้เลือกผู้รอดชีวิตที่มี sacrifice progress บนบอร์ดของเขา, เขาใช้ perk ไม่ได้ตลอดที่เหลือของรอบ"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/genetic-limits.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/genetic-limits.webp"
+    }
+  },
+  {
+    "id": "haunted-ground",
+    "side": "killer",
+    "name": "Haunted Ground",
+    "cost": 1,
+    "flavor": {
+      "en": "Trespassers in your home fill you with profane rage.",
+      "th": "ผู้บุกรุกในบ้านของคุณทำให้คุณเต็มไปด้วยความโกรธอันชั่วร้าย"
+    },
+    "text": {
+      "en": "After a Survivor reveals a prop, swap that prop with another revealed prop from the same category. Generators with progress, pallets on paths, occupied lockers, and occupied hooks can't be swapped.",
+      "th": "หลังจากผู้รอดชีวิตเปิด prop, ให้สลับ prop นั้นกับ prop อื่นที่เปิดแล้วและมีสีเดียวกัน, ไม่สามารถสลับ เครื่องปั่นไฟ ที่มีความคืบหน้า, แผ่นพาเลท บนเส้นทาง, ตู้หลบ ที่มีคนอยู่ และ ตะขอแขวน ที่มีคนอยู่ได้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/haunted-ground.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/haunted-ground.webp"
+    }
+  },
+  {
+    "id": "hoarder",
+    "side": "killer",
+    "name": "Hoarder",
+    "cost": 0,
+    "flavor": {
+      "en": "You protect what little you have.",
+      "th": "คุณปกป้องสิ่งเล็กน้อยที่คุณมี"
+    },
+    "text": {
+      "en": "As an interaction, interact with a chest to remove it and gain 2 {BP}.",
+      "th": "Perk นี้เป็นการ Interact, ให้ Interact กับ กล่องไอเทม เพื่อเก็บมันออก และได้รับ 2 {BP}"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/hoarder.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/hoarder.webp"
+    }
+  },
+  {
+    "id": "hubris",
+    "side": "killer",
+    "name": "Hubris",
+    "cost": 1,
+    "flavor": {
+      "en": "You show no mercy, especially to those foolish enough to resist.",
+      "th": "คุณไม่แสดงความปรานี โดยเฉพาะต่อผู้โง่เขลาที่กล้าขัดขืน"
+    },
+    "text": {
+      "en": "When a Survivor enters your space, they must spend a {BP}. If they cannot, that Survivor cannot interact this turn.",
+      "th": "เมื่อผู้รอดชีวิตเข้าไปในห้องของคุณ, เขาต้องจ่าย 1 {BP}, ถ้าจ่ายไม่ได้, ผู้รอดชีวิตคนนั้นจะ Interact ไม่ได้ในเทิร์นนี้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/hubris.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/hubris.webp"
+    }
+  },
+  {
+    "id": "infectious-fright",
+    "side": "killer",
+    "name": "Infectious Fright",
+    "cost": 1,
+    "flavor": {
+      "en": "The cries of the unfaithful make your heart leap.",
+      "th": "เสียงร้องของผู้ไร้ศรัทธาทำให้หัวใจคุณเต้นแรง"
+    },
+    "text": {
+      "en": "After you attack a healthy Survivor, move a Survivor in a connected space along any path.",
+      "th": "หลังจากคุณโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ให้ย้ายผู้รอดชีวิตหนึ่งคนในห้องที่เชื่อมกัน ไปตามเส้นทางใดก็ได้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/infectious-fright.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/infectious-fright.webp"
+    }
+  },
+  {
+    "id": "insidious",
+    "side": "killer",
+    "name": "Insidious",
+    "cost": 2,
+    "flavor": {
+      "en": "Unlocks your stealth ability.",
+      "th": "ปลดล็อกความสามารถในการซ่อนตัวของคุณ"
+    },
+    "text": {
+      "en": "When you would attack a healthy Survivor, if you have not moved this turn, pick them up instead.",
+      "th": "เมื่อคุณจะโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ, ถ้าคุณยังไม่ได้เคลื่อนที่ในเทิร์นนี้, ให้ pick up เขาแทน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/insidious.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/insidious.webp"
+    }
+  },
+  {
+    "id": "iron-grasp",
+    "side": "killer",
+    "name": "Iron Grasp",
+    "cost": 1,
+    "flavor": {
+      "en": "Your powerful grasp on Survivors causes escape to be nearly impossible.",
+      "th": "การจับกุมอันทรงพลังของคุณทำให้ผู้รอดชีวิตแทบหนีไม่ได้"
+    },
+    "text": {
+      "en": "After a Survivor rolls the dice during a sacrifice attempt, they re-roll all skill check dice.",
+      "th": "หลังจากผู้รอดชีวิตทอยเต๋าระหว่างการพยายามสังเวย, เขาต้องทอยเต๋า Skill Check ทั้งหมดใหม่"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/iron-grasp.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/iron-grasp.webp"
+    }
+  },
+  {
+    "id": "iron-maiden",
+    "side": "killer",
+    "name": "Iron Maiden",
+    "cost": 2,
+    "flavor": {
+      "en": "When a hook is out of reach, you improvise.",
+      "th": "เมื่อ ตะขอแขวน อยู่ไกลเกินเอื้อม คุณก็ด้นสดเอา"
+    },
+    "text": {
+      "en": "Before interacting, swap the positions of an unoccupied locker and an unoccupied hook anywhere on the game board.",
+      "th": "ก่อน Interact, ให้สลับตำแหน่งของ ตู้หลบ ที่ว่างหนึ่งอันกับ ตะขอแขวน ที่ว่างหนึ่งอันที่ใดก็ได้บนกระดาน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/iron-maiden.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/iron-maiden.webp"
+    }
+  },
+  {
+    "id": "jolt",
+    "side": "killer",
+    "name": "Jolt",
+    "cost": 3,
+    "flavor": {
+      "en": "Your eerie presence charges the air and interferes with technology.",
+      "th": "การปรากฏตัวอันน่าขนลุกของคุณทำให้อากาศเต็มไปด้วยพลังงาน และ รบกวนเครื่องจักร"
+    },
+    "text": {
+      "en": "After a Survivor rolls a \"1\" or a \"2\", treat that roll as a failure instead. You gain a {BP} as if they had rolled a failure.",
+      "th": "หลังจากผู้รอดชีวิตทอยได้ \"1\" หรือ \"2\", ให้ถือว่าเป็น ผล ล้มเหลว แทน, คุณได้รับ 1 {BP} เหมือนเขาทอยได้ ผล ล้มเหลว"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/jolt.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/jolt.webp"
+    }
+  },
+  {
+    "id": "leverage",
+    "side": "killer",
+    "name": "Leverage",
+    "cost": 1,
+    "flavor": {
+      "en": "Kick your competitors when they're down. Never let them regain lost ground.",
+      "th": "เตะคู่แข่งตอนที่พวกเขาล้มลง อย่าให้พวกเขากลับมาได้ในสิ่งที่เสียไป"
+    },
+    "text": {
+      "en": "At the start of the planning phase, choose a Survivor. That Survivor cannot become healthy this round.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, ผู้รอดชีวิตคนนั้นไม่สามารถกลับมาไม่บาดเจ็บได้ในรอบนี้"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/leverage.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/leverage.webp"
+    }
+  },
+  {
+    "id": "monstrous-shrine",
+    "side": "killer",
+    "name": "Monstrous Shrine",
+    "cost": 0,
+    "flavor": {
+      "en": "Your fervent care of the hooks has aroused The Entity's interest.",
+      "th": "การดูแลตะขอแขวนอย่างแรงกล้าของคุณดึงความสนใจของ The Entity"
+    },
+    "text": {
+      "en": "After sacrificing a Survivor, if there are no other Survivors in your space, gain 2 {BP}.",
+      "th": "หลังจากสังเวยผู้รอดชีวิต, ถ้าไม่มีผู้รอดชีวิตคนอื่นในห้องของคุณ, ให้ได้รับ 2 {BP}"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/monstrous-shrine.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/monstrous-shrine.webp"
+    }
+  },
+  {
+    "id": "nemesis",
+    "side": "killer",
+    "name": "Nemesis",
+    "cost": 2,
+    "flavor": {
+      "en": "You seek retribution on those who have wronged you.",
+      "th": "คุณเรียกร้องการล้างแค้นจากผู้ที่ทำผิดต่อคุณ"
+    },
+    "text": {
+      "en": "After a Survivor interacts with a pallet or locker in your space or a connected space, remove the pallet or locker.",
+      "th": "หลังจากผู้รอดชีวิต Interact กับ แผ่นพาเลท หรือ ตู้หลบ ในห้องของคุณ หรือ ห้องที่เชื่อมกัน, ให้เก็บ แผ่นพาเลท หรือ ตู้หลบ นั้นออก"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/nemesis.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/nemesis.webp"
+    }
+  },
+  {
+    "id": "no-one-escapes-death",
+    "side": "killer",
+    "name": "No One Escapes Death",
+    "cost": 0,
+    "flavor": {
+      "en": "A dark force drives you when your prey are on the verge of escaping.",
+      "th": "พลังมืดผลักดันคุณเมื่อเหยื่อใกล้จะหนีรอด"
+    },
+    "text": {
+      "en": "At the end of your turn, if the exit gates are powered up, take a Killer bonus turn. (You can only take one Killer bonus turn per round.)",
+      "th": "เมื่อจบเทิร์นของคุณ, ถ้า ประตูทางออก เปิดใช้งานแล้ว, ให้เล่น Killer bonus turn (เล่น Killer bonus turn ได้เพียงหนึ่งครั้งต่อรอบ)"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/no-one-escapes-death.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/no-one-escapes-death.webp"
+    }
+  },
+  {
+    "id": "nowhere-to-hide",
+    "side": "killer",
+    "name": "Nowhere to Hide",
+    "cost": 1,
+    "flavor": {
+      "en": "The machinations of the weak and craven draw your ire.",
+      "th": "แผนการของผู้อ่อนแอ และ ขี้ขลาดปลุกความโกรธของคุณ"
+    },
+    "text": {
+      "en": "When you search a locker, the Survivor in the locker must roll the danger die instead.",
+      "th": "เมื่อคุณ ค้นตู้หลบ, ผู้รอดชีวิตใน ตู้หลบ ต้องทอย Danger Die แทน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/nowhere-to-hide.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/nowhere-to-hide.webp"
+    }
+  },
+  {
+    "id": "oppression",
+    "side": "killer",
+    "name": "Oppression",
+    "cost": 2,
+    "flavor": {
+      "en": "Life has been difficult for you, so you will make it difficult for others.",
+      "th": "ชีวิตของคุณยากลำบาก คุณจึงทำให้คนอื่นลำบากด้วย"
+    },
+    "text": {
+      "en": "When you damage a generator, remove a progress from up to 2 other generators anywhere on the game board.",
+      "th": "เมื่อคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ให้ลบความคืบหน้า 1 แต้ม จาก เครื่องปั่นไฟ เครื่องอื่นไม่เกิน 2 เครื่องบนกระดาน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/oppression.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/oppression.webp"
+    }
+  },
+  {
+    "id": "overcharge",
+    "side": "killer",
+    "name": "Overcharge",
+    "cost": 2,
+    "flavor": {
+      "en": "You are fuelled by your hate for progress.",
+      "th": "คุณมีแรงขับจากความเกลียดชังต่อความก้าวหน้า"
+    },
+    "text": {
+      "en": "After you damage a generator, a Survivor in your space or a connected space becomes wounded.",
+      "th": "หลังจากคุณ ทำความเสียหายกับ เครื่องปั่นไฟ, ผู้รอดชีวิตหนึ่งคนในห้องของคุณหรือห้องที่เชื่อมกันจะบาดเจ็บ"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/overcharge.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/overcharge.webp"
+    }
+  },
+  {
+    "id": "overwhelming-presence",
+    "side": "killer",
+    "name": "Overwhelming Presence",
+    "cost": 1,
+    "flavor": {
+      "en": "Your mere presense ignites panic among your prey.",
+      "th": "เพียงการปรากฏตัวของคุณก็จุดชนวนความตื่นตระหนกในหมู่เหยื่อ"
+    },
+    "text": {
+      "en": "When a Survivor in your space or a connected space uses an item, they roll the danger die. On a failure, the item is discarded with no effect.",
+      "th": "เมื่อผู้รอดชีวิตในห้องของคุณหรือห้องที่เชื่อมกันใช้ item, เขาต้องทอย Danger Die, หากได้ ผล ล้มเหลว, item จะถูกทิ้งโดยไม่เกิดผล"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/overwhelming-presence.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/overwhelming-presence.webp"
+    }
+  },
+  {
+    "id": "pain-resonance",
+    "side": "killer",
+    "name": "Pain Resonance",
+    "cost": 3,
+    "flavor": {
+      "en": "Overwhelming pain reverberates outwards.",
+      "th": "ความเจ็บปวดอันท่วมท้นสะท้อนก้องออกไป"
+    },
+    "text": {
+      "en": "As an interaction, interact with an unoccupied hook. A Survivor in a connected space becomes wounded.",
+      "th": "Perk นี้เป็นการ Interact, ให้ Interact กับ ตะขอแขวน ที่ว่างอยู่, ผู้รอดชีวิตหนึ่งคนในห้องที่เชื่อมกันจะบาดเจ็บ"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/pain-resonance.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/pain-resonance.webp"
+    }
+  },
+  {
+    "id": "pentimento",
+    "side": "killer",
+    "name": "Pentimento",
+    "cost": 0,
+    "flavor": {
+      "en": "You reveal the true power of the Totems, hidden within their remains.",
+      "th": "คุณเผยพลังที่แท้จริงของ โทเท็ม ซึ่งซ่อนอยู่ในซากของมัน"
+    },
+    "text": {
+      "en": "After a Survivor successfully cleanses a Hex Totem, you gain 2 {BP}.",
+      "th": "หลังจากผู้รอดชีวิต ชำระล้าง โทเท็มคำสาป สำเร็จ, คุณได้รับ 2 {BP}"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/pentimento.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/pentimento.webp"
+    }
+  },
+  {
+    "id": "pop-goes-the-weasel",
+    "side": "killer",
+    "name": "Pop Goes the Weasel",
+    "cost": 0,
+    "flavor": {
+      "en": "A deep bond with The Entity unlocks great strength.",
+      "th": "สายสัมพันธ์ลึกซึ้งกับ The Entity ปลดล็อกพละกำลังมหาศาล"
+    },
+    "text": {
+      "en": "After wounding or sacrificing a Survivor, remove a crow, an unoccupied locker, or a chest in a connected space.",
+      "th": "หลังจากทำให้ผู้รอดชีวิตบาดเจ็บ หรือ สังเวยผู้รอดชีวิต, ให้เก็บ อีกา, ตู้หลบ ที่ว่าง หรือ กล่องไอเทม ในห้องที่เชื่อมกันออกหนึ่งอย่าง"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/pop-goes-the-weasel.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/pop-goes-the-weasel.webp"
+    }
+  },
+  {
+    "id": "predator",
+    "side": "killer",
+    "name": "Predator",
+    "cost": 2,
+    "flavor": {
+      "en": "You possess an acute tracking ability.",
+      "th": "คุณมีความสามารถในการติดตามเหยื่ออย่างเฉียบคม"
+    },
+    "text": {
+      "en": "At the end of the planning phase, choose a Survivor. They discard their set movement card, then replace it with a new one.",
+      "th": "เมื่อจบเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, เขาต้องทิ้งการ์ดเคลื่อนที่ที่วางไว้, แล้ว เปลี่ยนเป็นใบใหม่"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/predator.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/predator.webp"
+    }
+  },
+  {
+    "id": "retribution",
+    "side": "killer",
+    "name": "Retribution",
+    "cost": 0,
+    "flavor": {
+      "en": "Those who cross you will be punished.",
+      "th": "ผู้ที่ขัดขวางคุณจะถูกลงโทษ"
+    },
+    "text": {
+      "en": "When a Survivor attempts to cleanse a Hex Totem, they roll the danger die instead. On a success, you gain 2 {BP}.",
+      "th": "เมื่อผู้รอดชีวิตพยายาม ชำระล้าง โทเท็มคำสาป, เขาต้องทอย Danger Die แทน, หากได้ ผล สำเร็จ, คุณได้รับ 2 {BP}"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/retribution.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/retribution.webp"
+    }
+  },
+  {
+    "id": "ruin",
+    "side": "killer",
+    "name": "Ruin",
+    "cost": 1,
+    "flavor": {
+      "en": "Your presence bleeds into the environment, accelerating natural deterioration.",
+      "th": "การปรากฏตัวของคุณซึมเข้าสู่สิ่งแวดล้อม เร่งการเสื่อมสลายตามธรรมชาติ"
+    },
+    "text": {
+      "en": "At the start of the planning phase, remove a progress from a generator, as long as there are no Survivors in that generator's space.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้ลบความคืบหน้า 1 แต้มจาก เครื่องปั่นไฟ หนึ่งเครื่อง ตราบใดที่ไม่มีผู้รอดชีวิตอยู่ในห้องของ เครื่องปั่นไฟ นั้น"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/ruin.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/ruin.webp"
+    }
+  },
+  {
+    "id": "septic-touch",
+    "side": "killer",
+    "name": "Septic Touch",
+    "cost": 1,
+    "flavor": {
+      "en": "The Land of the Shadows subsumes all. Healing only delays the inevitable.",
+      "th": "ดินแดนแห่งเงามืดกลืนกินทุกสิ่ง การรักษาเพียงถ่วงเวลาสิ่งที่หนีไม่พ้น"
+    },
+    "text": {
+      "en": "After a Survivor reveals a non-objective prop in your space or a connected space, remove that prop from the game board.",
+      "th": "หลังจากผู้รอดชีวิตเปิด prop ที่ไม่ใช่สีเหลืองในห้องของคุณหรือห้องที่เชื่อมกัน, ให้เก็บ prop นั้นออกจากกระดาน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/septic-touch.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/septic-touch.webp"
+    }
+  },
+  {
+    "id": "sloppy-butcher",
+    "side": "killer",
+    "name": "Sloppy Butcher",
+    "cost": 1,
+    "flavor": {
+      "en": "You know where to hit to make them bleed.",
+      "th": "คุณรู้ว่าต้องฟันตรงไหนให้เลือดไหล"
+    },
+    "text": {
+      "en": "When a Survivor attempts to heal, they roll the danger die instead.",
+      "th": "เมื่อผู้รอดชีวิตพยายาม heal, เขาต้องทอย Danger Die แทน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/sloppy-butcher.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/sloppy-butcher.webp"
+    }
+  },
+  {
+    "id": "spies-from-the-shadows",
+    "side": "killer",
+    "name": "Spies from the Shadows",
+    "cost": 0,
+    "flavor": {
+      "en": "The Entity's servants speak to you.",
+      "th": "สมุนของ The Entity กระซิบบอกคุณ"
+    },
+    "text": {
+      "en": "When a crow is revealed, gain a {BP}.",
+      "th": "เมื่อ อีกา ถูกเปิด, ให้ได้รับ 1 {BP}"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/spies-from-the-shadows.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/spies-from-the-shadows.webp"
+    }
+  },
+  {
+    "id": "spirit-fury",
+    "side": "killer",
+    "name": "Spirit Fury",
+    "cost": 0,
+    "flavor": {
+      "en": "Each pallet you break magnifies the wrath of The Entity.",
+      "th": "แผ่นพาเลท ทุกอันที่คุณทำลายยิ่งขยายความเดือดดาลของ The Entity"
+    },
+    "text": {
+      "en": "After you break a pallet, gain 2 {BP}.",
+      "th": "หลังจากคุณทำลาย แผ่นพาเลท, ให้ได้รับ 2 {BP}"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/spirit-fury.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/spirit-fury.webp"
+    }
+  },
+  {
+    "id": "starstruck",
+    "side": "killer",
+    "name": "Starstruck",
+    "cost": 2,
+    "flavor": {
+      "en": "Your unmatched showmanship dazzles all.",
+      "th": "ความเป็นนักแสดงที่ไร้ใครเทียบของคุณทำให้ทุกคนตะลึง"
+    },
+    "text": {
+      "en": "When you would pick up a Survivor, move along any path and then pick up a different survivor instead. (They do not need to be wounded.)",
+      "th": "เมื่อคุณจะ pick up ผู้รอดชีวิต, ให้เคลื่อนที่ไปตามเส้นทางใดก็ได้, แล้ว pick up ผู้รอดชีวิตอีกคนแทน (เขาไม่จำเป็นต้องบาดเจ็บ)"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/starstruck.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/starstruck.webp"
+    }
+  },
+  {
+    "id": "territorial-imperative",
+    "side": "killer",
+    "name": "Territorial Imperative",
+    "cost": 2,
+    "flavor": {
+      "en": "You are keenly aware of incursions into your territory.",
+      "th": "คุณรู้ตัวไวเมื่อมีผู้บุกรุกเข้ามาในอาณาเขตของคุณ"
+    },
+    "text": {
+      "en": "After interacting, use your Killer power. (You can only use your Killer power once per round.)",
+      "th": "หลังจาก Interact, ให้ใช้พลังฆาตกรของคุณ (ใช้พลังฆาตกรได้เพียงครั้งเดียวต่อรอบ)"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/territorial-imperative.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/territorial-imperative.webp"
+    }
+  },
+  {
+    "id": "thanatophobia",
+    "side": "killer",
+    "name": "Thanatophobia",
+    "cost": 1,
+    "flavor": {
+      "en": "Their courage fades in the face of their undeniable mortality.",
+      "th": "ความกล้าของพวกเขาเลือนหายเมื่อเผชิญหน้ากับความตายที่หนีไม่พ้น"
+    },
+    "text": {
+      "en": "When a wounded survivor would perform a skill check, they roll the danger die instead.",
+      "th": "เมื่อผู้รอดชีวิตที่บาดเจ็บต้องทำ Skill Check, ให้เขาทอย Danger Die แทน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/thanatophobia.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/thanatophobia.webp"
+    }
+  },
+  {
+    "id": "thrill-of-the-hunt",
+    "side": "killer",
+    "name": "Thrill of the Hunt",
+    "cost": 2,
+    "flavor": {
+      "en": "The false hope of Survivors fills you with excitement.",
+      "th": "ความหวังลม ๆ แล้ง ๆ ของผู้รอดชีวิตทำให้คุณตื่นเต้น"
+    },
+    "text": {
+      "en": "When a Survivor leaves your space, move with them.",
+      "th": "เมื่อผู้รอดชีวิตออกจากห้องของคุณ, ให้เคลื่อนที่ไปพร้อมกับเขา"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/thrill-of-the-hunt.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/thrill-of-the-hunt.webp"
+    }
+  },
+  {
+    "id": "thwack",
+    "side": "killer",
+    "name": "Thwack!",
+    "cost": 1,
+    "flavor": {
+      "en": "Your prey is terrified by your relentless pursuit.",
+      "th": "เหยื่อของคุณหวาดกลัวการไล่ล่าอย่างไม่ลดละของคุณ"
+    },
+    "text": {
+      "en": "After you reveal a survival or altruism prop, remove it.",
+      "th": "หลังจากคุณเปิด prop สีน้ำเงิน หรือ สีเขียว, ให้เก็บ prop นั้นออก"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/thwack.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/thwack.webp"
+    }
+  },
+  {
+    "id": "tinkerer",
+    "side": "killer",
+    "name": "Tinkerer",
+    "cost": 0,
+    "flavor": {
+      "en": "You are acutely aware of the smells and sounds of working engines.",
+      "th": "คุณไวต่อกลิ่น และ เสียงของเครื่องยนต์ที่กำลังทำงาน"
+    },
+    "text": {
+      "en": "When a generator is completed,  pick up and replace one of your set movement cards with a different card from your hand.",
+      "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้หยิบการ์ดเคลื่อนที่ที่วางไว้ใบหนึ่งขึ้นมา, แล้ว เปลี่ยนเป็นการ์ดอื่นจากมือของคุณ"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/tinkerer.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/tinkerer.webp"
+    }
+  },
+  {
+    "id": "undone",
+    "side": "killer",
+    "name": "Undone",
+    "cost": 1,
+    "flavor": {
+      "en": "Hope is the delusion that keeps its victims alive.",
+      "th": "ความหวังคือภาพลวงที่ทำให้เหยื่อยังมีชีวิตอยู่"
+    },
+    "text": {
+      "en": "When progress would be added to a generator in your space. one less progress is added instead (can be 0).",
+      "th": "เมื่อจะเพิ่มความคืบหน้าให้ เครื่องปั่นไฟ ในห้องของคุณ, ให้เพิ่มน้อยลง 1 แต้มแทน (อาจเหลือ 0 ได้)"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/undone.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/undone.webp"
+    }
+  },
+  {
+    "id": "undying",
+    "side": "killer",
+    "name": "Undying",
+    "cost": 1,
+    "flavor": {
+      "en": "The vile powers that flow throughout the trial coalesce around you.",
+      "th": "พลังชั่วร้ายที่ไหลผ่านการพิจารณาคดีมารวมตัวรอบตัวคุณ"
+    },
+    "text": {
+      "en": "As an interaction, discard a movement card except 'Wait' to interact with a prop in a space connected by that card's path.",
+      "th": "Perk นี้เป็นการ Interact, ให้ทิ้งการ์ดเคลื่อนที่ใบใดก็ได้ ยกเว้น 'Wait', เพื่อ Interact กับ prop ในห้องที่เชื่อมกัน ด้วยเส้นทางของการ์ดนั้น"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/undying.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/undying.webp"
+    }
+  },
+  {
+    "id": "unforeseen",
+    "side": "killer",
+    "name": "Unforeseen",
+    "cost": 1,
+    "flavor": {
+      "en": "Terror takes many forms and whispers devastating lies in its victims' ears",
+      "th": "ความหวาดกลัวมีหลายรูปแบบ และ กระซิบคำโกหกที่ทำลายล้างข้างหูเหยื่อ"
+    },
+    "text": {
+      "en": "When a generator is completed, move directly to that generator's space.",
+      "th": "เมื่อ เครื่องปั่นไฟ ถูกซ่อมเสร็จ, ให้เคลื่อนที่ตรงไปยังห้องของ เครื่องปั่นไฟ นั้น"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/unforeseen.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/unforeseen.webp"
+    }
+  },
+  {
+    "id": "unnerving-presence",
+    "side": "killer",
+    "name": "Unnerving Presence",
+    "cost": 1,
+    "flavor": {
+      "en": "Your presense alone instills great fear.",
+      "th": "เพียงการปรากฏตัวของคุณก็สร้างความหวาดกลัวอย่างยิ่ง"
+    },
+    "text": {
+      "en": "When a Survivor in your space or a connected space would perform a skill check, they roll the danger die instead.",
+      "th": "เมื่อผู้รอดชีวิตในห้องของคุณ หรือ ห้องที่เชื่อมกัน ต้องทำ Skill Check, ให้เขาทอย Danger Die แทน"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/unnerving-presence.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/unnerving-presence.webp"
+    }
+  },
+  {
+    "id": "unrelenting",
+    "side": "killer",
+    "name": "Unrelenting",
+    "cost": 2,
+    "flavor": {
+      "en": "A dark power motivates you to continue the hunt.",
+      "th": "พลังมืดกระตุ้นให้คุณล่าต่อไป"
+    },
+    "text": {
+      "en": "After interacting with a Survivor in your space, interact with a different Survivor in your space.",
+      "th": "หลังจาก Interact กับผู้รอดชีวิตในห้องของคุณ, ให้ Interact กับผู้รอดชีวิตอีกคนในห้องของคุณ"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/unrelenting.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/unrelenting.webp"
+    }
+  },
+  {
+    "id": "whispers",
+    "side": "killer",
+    "name": "Whispers",
+    "cost": 1,
+    "flavor": {
+      "en": "You have a rudimentary understanding of The Entity's voice.",
+      "th": "คุณเข้าใจเสียงของ The Entity อยู่บ้าง"
+    },
+    "text": {
+      "en": "At the start of the planning phase, choose a Survivor. That Survivor either chooses to spend a {BP}, or place their movement card face up.",
+      "th": "เมื่อเริ่มเฟส Planning, ให้เลือกผู้รอดชีวิตหนึ่งคน, ผู้รอดชีวิตคนนั้นเลือกว่าจะจ่าย 1 {BP} หรือ วางการ์ดเคลื่อนที่หงายหน้า"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/whispers.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/whispers.webp"
+    }
+  },
+  {
+    "id": "zanshin-tactics",
+    "side": "killer",
+    "name": "Zanshin Tactics",
+    "cost": 2,
+    "flavor": {
+      "en": "You are mentally alert and aware of key points on the battlefield.",
+      "th": "คุณตื่นตัวทางจิตใจ และ รับรู้จุดสำคัญในสนามรบ"
+    },
+    "text": {
+      "en": "At the start of your turn, discard a set movement card and replace it with a new one.",
+      "th": "เมื่อเริ่มเทิร์นของคุณ, ให้ทิ้งการ์ดเคลื่อนที่ที่วางไว้หนึ่งใบ และ เปลี่ยนเป็นใบใหม่"
+    },
+    "image": {
+      "en": "assets/killers/perks-en/edit_perks_mode/zanshin-tactics.webp",
+      "th": "assets/killers/perks-th/edit_perks_mode/zanshin-tactics.webp"
+    }
+  }
+]
