@@ -8,7 +8,7 @@ import { CARD_NAMES } from './engine/engine'
 import type { GameState, LogEntry, MoveCard } from './engine/types'
 import type { ActionShow } from './fx/bus'
 import { itemHidden } from './game'
-import { BEAR_TRAP_IMAGE, KNIFE_IMAGE, PROP_IMAGE, cardImage, powerName } from './labels'
+import { BEAR_TRAP_IMAGE, KNIFE_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, powerName } from './labels'
 
 /** Events that already have a reveal of their own, or are the game's bookkeeping. */
 const SKIP = new Set(['perk', 'item', 'roll', 'reveal', 'repair', 'genDone', 'gatesPowered', 'gate', 'sacrifice', 'round', 'heal', 'cleanse', 'carryEscape', 'gameOver', 'bp', 'phantasmSet'])
@@ -78,6 +78,8 @@ export class CastBuilder {
     if ((ev?.k === 'knife' || (ev?.k === 'wound' && ev.by === 'power')) && this.powerHits.includes(ev.s) && !this.power) return null
     const owner = e.who
     const key = String(owner)
+    // The Twins: a turn taken with Victor is logged under his name
+    const victor = owner === 'killer' && ((ev?.k === 'move' && ev.who === 'victor') || /^Victor\b/.test(e.text))
     let [title, sub] = splitText(e.text)
     let image: string | undefined
     let kind: ActionShow['kind'] = 'action'
@@ -114,7 +116,12 @@ export class CastBuilder {
     else if (ev?.k === 'damage') image = PROP_IMAGE.generator
     else if (ev?.k === 'trapSet') image = BEAR_TRAP_IMAGE
     else if (ev?.k === 'madness') kind = 'passive'
-    else if (ev?.k === 'knife') {
+    else if (ev?.k === 'purge') {
+      // The Plague's passive: a Vile Purge taken (a perk covered), or shed in a locker
+      kind = 'passive'
+      image = VILE_PURGE_IMAGE
+      target = ev.s
+    } else if (ev?.k === 'knife') {
       // The Trickster's passive: Knives shed in a locker
       kind = 'passive'
       image = KNIFE_IMAGE
@@ -140,12 +147,12 @@ export class CastBuilder {
         sub = `${sub ? `${sub} · ` : ''}${who}`
         this.shownFor.add(key)
         this.count++
-        return { owner, kind, title, sub, image, targets: this.powerHits }
+        return { owner, kind, title, sub, image, targets: this.powerHits, ...(victor ? { victor } : {}) }
       }
     }
     this.shownFor.add(key)
     this.count++
-    return { owner, kind, title, sub: sub ?? '', image, target }
+    return { owner, kind, title, sub: sub ?? '', image, target, ...(victor ? { victor } : {}) }
   }
 
   /** A power used without a line of its own (its effect had no card above): a card for it. */

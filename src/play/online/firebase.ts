@@ -50,8 +50,9 @@ type Lobby = Omit<RoomData, 'game' | 'rev'>
 
 /** The lobby node: everything in the room but the game. */
 function lobbyOf(r: RoomData): Lobby {
-  // `double` is optional: the database rejects undefined, so it is only written when set
-  return { host: r.host, createdAt: r.createdAt, phase: r.phase, members: r.members, seats: r.seats, players: r.players, picks: r.picks, locked: r.locked, ...(r.double ? { double: r.double } : {}), ...(r.board ? { board: r.board } : {}) }
+  // `double`, `board` and `settings` are optional: the database rejects undefined, so they are
+  // only written when set
+  return { host: r.host, createdAt: r.createdAt, phase: r.phase, members: r.members, seats: r.seats, players: r.players, picks: r.picks, locked: r.locked, ...(r.double ? { double: r.double } : {}), ...(r.board ? { board: r.board } : {}), ...(r.settings ? { settings: r.settings } : {}) }
 }
 interface GameNode {
   rev: number

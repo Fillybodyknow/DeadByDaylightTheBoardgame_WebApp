@@ -246,6 +246,7 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
       case 'entered':
       case 'rollFail':
       case 'greatRoll':
+      case 'carryRoll':
       case 'itemUsed':
       case 'itemDiscard':
       case 'afterSurvivorInteract':
@@ -276,7 +277,7 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
     f.dests.push(step.room)
     f.survivors.push(step.s)
     facts.push(killerFact(st, step.s))
-    facts.push({ who: 'killer', icon: '▲', text: `มี ${st.killer.bp} ▲ · ไม่วาร์ป = +${step.face} ▲ · วาร์ป = −${step.face} ▲` })
+    facts.push({ who: 'killer', icon: '▲', text: `มี ${st.killer.bp} ▲ · ไม่วาร์ป = +1 ▲ · วาร์ป = −${step.face} ▲` })
     for (const t of st.survivors.keys())
       if (st.survivors[t].status === 'board' && st.survivors[t].room === step.room) facts.push({ who: t, icon: '👻', text: where(st, t) })
     return { focus: dedupe(f), facts }
@@ -344,6 +345,8 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
     f.survivors.push(...showstopperTargets(st))
   }
   // Feral Frenzy: the room, and everyone in it
+  // Vile Purge: his room and the one picked
+  if (i.k === 'purge') f.rooms.push(room, i.room)
   if (i.k === 'frenzy') {
     f.rooms.push(room)
     st.survivors.forEach((sv, s) => sv.status === 'board' && sv.room === room && f.survivors.push(s))

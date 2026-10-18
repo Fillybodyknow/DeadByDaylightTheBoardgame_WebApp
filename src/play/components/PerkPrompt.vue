@@ -5,7 +5,7 @@
 // and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
-import { CARD_NAMES, KILLER_CARDS, crowdPayments, crowdPledges, pledgedPay, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
+import { CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
 import { actionKey, perkPicked, perksToPick } from '../boardActions'
@@ -14,11 +14,13 @@ import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
-import { KILLER_CARD_BACK, ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, perkText, playerOf, survivorMini, windowLabel } from '../labels'
+import { KILLER_CARD_BACK, VILE_PURGE_IMAGE, ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, pathLabel, perkText, playerOf, survivorMini, windowLabel, windowWho } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
 import Mini from './Mini.vue'
+import BpIcon from '../../components/BpIcon.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ st: GameState; hidden: boolean; onBoard: Set<string> }>()
 
@@ -102,9 +104,10 @@ const offerList = computed(() => {
 })
 
 /** What is being decided now, if anything worth the panel. */
-const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | 'guess' | 'crowd' | null>(() => {
+const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | 'guess' | 'crowd' | 'purge' | null>(() => {
   const s = step.value
   if (s.t === 'offer') return 'offer'
+  if (s.t === 'purgeChoice') return 'purge'
   if (s.t === 'crowdPay' || s.t === 'crowdPick') return 'crowd'
   if (s.t === 'sparkChoice') return 'spark'
   if (s.t === 'phantasmChoice') return 'phantasm'
@@ -122,7 +125,7 @@ const decider = computed<PerkOwner | null>(() => {
   if (s.t === 'turnStart') return s.s
   // online, a helper's device names the helper: it's their key or perk being asked about
   if (s.t === 'roll') return buttons.value[0]?.owner ?? (rollMine.value ? s.ctx.s : (passers.value[0] ?? s.ctx.s))
-  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess' || s.t === 'crowdPay') return s.s
+  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess' || s.t === 'crowdPay' || s.t === 'purgeChoice') return s.s
   if (s.t === 'phantasmChoice' || s.t === 'crowdPick') return 'killer'
   return null
 })
@@ -158,6 +161,31 @@ function pledgeLabel(s: number): string {
   if (p === 0) return props.st.survivors[s].bp ? 'ไม่ลง' : 'ไม่มี ▲'
   return `ลง ${p} ▲`
 }
+
+/** Vile Purge: the perk opened big, waiting for the confirm. */
+const purgePick = ref<PerkId | null>(null)
+watch(
+  () => JSON.stringify(step.value),
+  () => (purgePick.value = null),
+)
+function openPurge(p: PerkId) {
+  fxSound.flip()
+  purgePick.value = p
+}
+function confirmPurge() {
+  const p = purgePick.value
+  purgePick.value = null
+  if (p) act({ t: 'purgeChoice', perk: p })
+}
+
+/** Killer perks moving a survivor along a path: the survivor first, then the path. */
+const movesSomeone = computed(() => step.value.t === 'offer' && (step.value.perk === 'dark_devotion' || step.value.perk === 'infectious_fright'))
+const moveTargets = computed(() => (movesSomeone.value ? [...new Set(offerChoices.value.map((c) => c.target!))] : []))
+const moveWho = ref<number | null>(null)
+watch(
+  () => JSON.stringify(step.value),
+  () => (moveWho.value = null),
+)
 
 const hagMoves = computed(() => {
   const s = step.value
@@ -428,10 +456,13 @@ const boardCount = computed(() => {
       <header @click="collapsed && (collapsed = false)">
         <Mini class="face" :class="killerSide ? 'aura-killer' : 'aura-survivor'" :src="asset(face)" />
         <div class="head-text">
-          <p class="eyebrow">⚡ {{ kind === 'spark' || kind === 'phantasm' || kind === 'guess' ? 'Power' : kind === 'replace' ? 'Predator' : 'Perk' }} — ถึงคราวตัดสินใจ</p>
+          <p class="eyebrow">⚡ {{ kind === 'spark' || kind === 'phantasm' || kind === 'guess' ? 'Power' : kind === 'purge' ? 'Passive' : kind === 'replace' ? 'Predator' : 'Perk' }} — ถึงคราวตัดสินใจ</p>
           <strong class="who">{{ who }}</strong>
-          <p v-if="collapsed" class="why">{{ summary }}</p>
-          <p v-else-if="step.t === 'offer' && windowLabel(st, step.w)" class="why">{{ windowLabel(st, step.w) }}</p>
+          <p v-if="collapsed" class="why"><BpText :text="summary" /></p>
+          <!-- the moment, with the mini of whom it is about (not when that is the one deciding) -->
+          <p v-else-if="step.t === 'offer' && windowLabel(st, step.w)" class="why">
+            <FaceLabel :st="st" :who="windowWho(step.w) === step.owner ? null : windowWho(step.w)" :text="windowLabel(st, step.w)" />
+          </p>
         </div>
         <!-- narrow screens only: on wide ones the side panel's tab folds it, with the panel -->
         <button
@@ -466,9 +497,9 @@ const boardCount = computed(() => {
           <img v-if="perkImage(o.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(o.perk))" :alt="PERKS[o.perk].name" />
           <div>
             <h3>
-              {{ PERKS[o.perk].name }} <span class="cost">{{ cost(o.perk) }}</span>
+              {{ PERKS[o.perk].name }} <span class="cost"><BpText :text="cost(o.perk)" /></span>
             </h3>
-            <p class="text small">{{ perkText(o.perk) }}</p>
+            <p class="text small"><BpText :text="perkText(o.perk)" /></p>
             <!-- picked: a card from the hand below, or a survivor on the board (or a button here) -->
             <p v-if="perkPicked === o.perk && o.choices.some((c) => c.card)" class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง แล้วกดยืนยัน</p>
             <p v-if="perkPicked === o.perk && o.choices.some((c) => !c.card && !here(perkAct(o.perk, c)))" class="board-hint">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</p>
@@ -490,7 +521,7 @@ const boardCount = computed(() => {
         </div>
         <div class="choices">
           <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
-            {{ cardPick && activePerk ? `ยืนยัน: ${PERKS[activePerk].name} — ${perkChoiceLabel(st, activePerk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน' }}
+            <BpText :text="cardPick && activePerk ? `ยืนยัน: ${PERKS[activePerk].name} — ${perkChoiceLabel(st, activePerk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน'" />
           </button>
           <button @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้ทั้งหมด</button>
           <button class="quiet" @click="act({ t: 'perk', perk: step.perk, use: false, quiet: true })">ไม่ใช้ และไม่ต้องถามอีกในรอบนี้</button>
@@ -503,9 +534,9 @@ const boardCount = computed(() => {
           <img v-if="perkImage(step.perk)" class="thumb zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(step.perk))" :alt="PERKS[step.perk].name" />
           <div>
             <h2>
-              ใช้ {{ PERKS[step.perk].name }}? <span class="cost">{{ cost(step.perk) }}</span>
+              ใช้ {{ PERKS[step.perk].name }}? <span class="cost"><BpText :text="cost(step.perk)" /></span>
             </h2>
-            <p class="text">{{ perkText(step.perk) }}</p>
+            <p class="text"><BpText :text="perkText(step.perk)" /></p>
           </div>
         </div>
         <!-- Tinkerer: the planned cards, then the hand -->
@@ -530,7 +561,7 @@ const boardCount = computed(() => {
         </div>
         <!-- Lightborn / Open-Handed: the planned cards side by side — click the one to turn face up -->
         <div v-else-if="isLightborn" class="tinker">
-          <p class="tinker-step">{{ openHanded ? 'คลิกการ์ดของฆาตกรที่จะเปิดหงาย' : 'คลิกการ์ดที่จะเปิดหงาย (+1 ▲)' }}</p>
+          <p class="tinker-step"><BpText :text="openHanded ? 'คลิกการ์ดของฆาตกรที่จะเปิดหงาย' : 'คลิกการ์ดที่จะเปิดหงาย (+1 ▲)'" /></p>
           <div class="card-row">
             <button
               v-for="p in openHanded ? plannedCards : plannedCards.slice(0, 2)"
@@ -551,15 +582,36 @@ const boardCount = computed(() => {
           </p>
         </template>
         <p v-else-if="handChoices.length" class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง{{ MOVE_PERKS.includes(step.perk) ? ' — ชี้เพื่อดูเส้นทาง' : '' }}</p>
+        <!-- a survivor moved along a path (Dark Devotion, Infectious Fright): who, then where -->
+        <template v-if="movesSomeone">
+          <p class="board-hint">🎯 คลิกผู้รอดชีวิตบนแผนที่ แล้วคลิกเส้นทาง — หรือเลือกด้านล่าง</p>
+          <div class="who-row">
+            <button v-for="t in moveTargets" :key="t" type="button" class="who-chip" :class="{ on: moveWho === t }" @click="moveWho = moveWho === t ? null : t">
+              <FaceLabel :st="st" :who="t" :text="st.survivors[t].name" />
+            </button>
+          </div>
+          <div v-if="moveWho !== null" class="choices">
+            <button
+              v-for="(c, i) in offerChoices.filter((c) => c.target === moveWho)"
+              :key="i"
+              class="primary"
+              @mouseenter="hover(step.owner, c)"
+              @mouseleave="hover(step.owner, null)"
+              @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })"
+            >
+              {{ pathLabel(st, c.path!, st.survivors[moveWho].room) }}
+            </button>
+          </div>
+        </template>
         <div class="choices">
           <button v-if="isGrip" class="primary" :disabled="!gripChoice" @click="confirmGrip">
-            {{ gripChoice ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, gripChoice)}` : 'เลือกการ์ดจากมือก่อน' }}
+            <BpText :text="gripChoice ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, gripChoice)}` : 'เลือกการ์ดจากมือก่อน'" />
           </button>
           <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
-            {{ cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน' }}
+            <BpText :text="cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน'" />
           </button>
           <button
-            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression && !isLightborn)"
+            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression && !isLightborn && !movesSomeone)"
             :key="i"
             class="primary"
             @mouseenter="hover(step.owner, c)"
@@ -592,9 +644,9 @@ const boardCount = computed(() => {
           <img v-if="perkImage(b.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
           <div>
             <h3>
-              {{ PERKS[b.perk].name }} <span class="cost">{{ cost(b.perk) }}</span>
+              {{ PERKS[b.perk].name }} <span class="cost"><BpText :text="cost(b.perk)" /></span>
             </h3>
-            <p class="text small">{{ perkText(b.perk) }}</p>
+            <p class="text small"><BpText :text="perkText(b.perk)" /></p>
             <!-- Breakout is a person and then a path: both are picked on the board, one at a time -->
             <template v-if="perkOpen(b.perk)">
             <p v-if="b.perk === 'breakout'" class="board-hint">🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง</p>
@@ -617,19 +669,19 @@ const boardCount = computed(() => {
 
       <!-- Carter's Spark: pay or take it -->
       <template v-else-if="step.t === 'sparkChoice' && step.grip">
-        <p class="lead"><b>Dragon's Grip!</b> {{ st.survivors[step.s].name }} จ่าย 1 ▲ หรือบาดเจ็บ</p>
+        <p class="lead"><b>Dragon's Grip!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือบาดเจ็บ</p>
         <div class="choices">
-          <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 ▲ (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
+          <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 <BpIcon /> (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
           <button @click="act({ t: 'spark', pay: false })">ไม่จ่าย — บาดเจ็บ</button>
         </div>
       </template>
       <template v-else-if="step.t === 'sparkChoice'">
         <p class="lead">
-          <b>Carter's Spark!</b> {{ st.survivors[step.s].name }} จ่าย 1 ▲ หรือ{{ st.survivors[step.s].madness ? 'บาดเจ็บ (มี Madness อยู่แล้ว)' : 'ติด Madness' }}
+          <b>Carter's Spark!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือ{{ st.survivors[step.s].madness ? 'บาดเจ็บ (มี Madness อยู่แล้ว)' : 'ติด Madness' }}
         </p>
         <p class="text small">Madness: ทอย Danger Die แทน Skill Check จนกว่าจะทอยล้มเหลว และทำให้ Bonus Turn ของ Doctor ถูกลง</p>
         <div class="choices">
-          <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 ▲ (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
+          <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 <BpIcon /> (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
           <button @click="act({ t: 'spark', pay: false })">ไม่จ่าย — {{ st.survivors[step.s].madness ? 'บาดเจ็บ' : 'ติด Madness' }}</button>
         </div>
       </template>
@@ -640,7 +692,7 @@ const boardCount = computed(() => {
           <b>Phantasm Trap!</b> {{ st.survivors[step.s].name }} ทอยได้ <b>{{ step.face }}</b> ที่ {{ roomName(st, step.room) }}
         </p>
         <div class="choices">
-          <button @click="act({ t: 'phantasm', teleport: false })">ไม่วาร์ป — รับ +{{ step.face }} ▲</button>
+          <button @click="act({ t: 'phantasm', teleport: false })">ไม่วาร์ป — รับ +1 <BpIcon /></button>
           <template v-if="st.killer.bp >= step.face">
             <button
               v-for="(i, n) in hagMoves.filter((i) => here({ t: 'phantasm', teleport: true, i }))"
@@ -652,9 +704,9 @@ const boardCount = computed(() => {
             >
               <FaceLabel :st="st" :who="'target' in i ? i.target : null" :text="`วาร์ป (${step.face} ▲) แล้ว${killerInteractionLabel(st, i)}`" />
             </button>
-            <button v-if="here({ t: 'phantasm', teleport: true })" @click="act({ t: 'phantasm', teleport: true })">วาร์ปเฉย ๆ ({{ step.face }} ▲)</button>
+            <button v-if="here({ t: 'phantasm', teleport: true })" @click="act({ t: 'phantasm', teleport: true })">วาร์ปเฉย ๆ ({{ step.face }} <BpIcon />)</button>
           </template>
-          <p v-else class="small">▲ ไม่พอวาร์ป (มี {{ st.killer.bp }}, ต้องใช้ {{ step.face }})</p>
+          <p v-else class="small"><BpIcon /> ไม่พอวาร์ป (มี {{ st.killer.bp }}, ต้องใช้ {{ step.face }})</p>
         </div>
       </template>
 
@@ -665,19 +717,36 @@ const boardCount = computed(() => {
         <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: วาง ${CARD_NAMES[cardPick.card!]} (คว่ำ)` : 'เลือกการ์ดจากมือก่อน' }}</button>
       </template>
 
+      <!-- The Plague's Vile Purge: which perk it covers, or (in a locker) which it comes off -->
+      <template v-else-if="step.t === 'purgeChoice'">
+        <p class="lead">
+          <img class="purge-token" :src="asset(VILE_PURGE_IMAGE)" alt="" />
+          <template v-if="step.mode === 'cover'"><b>Vile Purge!</b> {{ st.survivors[step.s].name }} ต้องเอาไปปิด Perk 1 อัน — Perk ที่ถูกปิดใช้ไม่ได้</template>
+          <template v-else><b>ซ่อนใน Locker</b> — {{ st.survivors[step.s].name }} เอา Vile Purge ออกได้ 1 อัน: เลือก Perk ที่จะเปิดคืน</template>
+        </p>
+        <p class="text small">มี {{ (st.survivors[step.s].purged ?? []).length }}/3 — อันที่ 3 ทิ้งทั้งหมดและบาดเจ็บ (บาดเจ็บอยู่แล้ว = ฆาตกรได้ Sacrifice Progress)</p>
+        <div class="purge-perks">
+          <button v-for="p in purgeOptions(st, step.s, step.mode)" :key="p" type="button" class="purge-perk" @click="openPurge(p)">
+            <img v-if="perkImage(p)" :src="asset(perkImage(p))" :alt="PERKS[p].name" />
+            <strong>{{ PERKS[p].name }}</strong>
+            <small>👆 ดูแล้วยืนยัน</small>
+          </button>
+        </div>
+      </template>
+
       <!-- Crowd Control: the survivors buy it off together, or the killer sets the card -->
       <template v-else-if="step.t === 'crowdPay'">
         <p class="lead">
           <b>Crowd Control!</b> {{ st.killer.name }} เลือก <b>{{ st.survivors[step.s].name }}</b>
         </p>
-        <p class="text small">ผู้รอดชีวิตรวมกันจ่าย 2 ▲ (ใครจ่ายก็ได้) — ถ้าไม่จ่าย {{ st.killer.name }} จะเลือกการ์ดเคลื่อนที่ที่ {{ st.survivors[step.s].name }} ต้องวางรอบนี้ (เปิดหน้า)</p>
+        <p class="text small">ผู้รอดชีวิตรวมกันจ่าย 2 <BpIcon /> (ใครจ่ายก็ได้) — ถ้าไม่จ่าย {{ st.killer.name }} จะเลือกการ์ดเคลื่อนที่ที่ {{ st.survivors[step.s].name }} ต้องวางรอบนี้ (เปิดหน้า)</p>
         <!-- online: each player puts in their own ▲; at 2, anyone confirms -->
         <template v-if="online">
           <div class="pledges">
             <div v-for="(sv, s) in st.survivors" :key="s" class="pledge" :class="{ on: (pledges[s] ?? 0) > 0, waiting: pledges[s] === null }">
               <Mini class="face" :src="asset(survivorMini(st, s))" :alt="sv.name" />
-              <span class="pledge-who">{{ sv.name }} <span class="muted">({{ sv.bp }} ▲)</span></span>
-              <span v-if="!controls(st, s) || !sv.bp" class="pledge-state">{{ pledgeLabel(s) }}</span>
+              <span class="pledge-who">{{ sv.name }} <span class="muted">({{ sv.bp }} <BpIcon />)</span></span>
+              <span v-if="!controls(st, s) || !sv.bp" class="pledge-state"><BpText :text="pledgeLabel(s)" /></span>
               <span v-else class="pledge-btns">
                 <button
                   v-for="n in [0, 1, 2]"
@@ -687,25 +756,25 @@ const boardCount = computed(() => {
                   :disabled="n > sv.bp || pledgeTotal - (pledges[s] ?? 0) + n > 2"
                   @click="act({ t: 'crowdPledge', s, n })"
                 >
-                  {{ n ? `ลง ${n} ▲` : 'ไม่ลง' }}
+                  <BpText :text="n ? `ลง ${n} ▲` : 'ไม่ลง'" />
                 </button>
               </span>
             </div>
           </div>
-          <p class="pledge-total" :class="{ full: pledgeTotal === 2 }">รวม {{ pledgeTotal }}/2 ▲</p>
+          <p class="pledge-total" :class="{ full: pledgeTotal === 2 }">รวม {{ pledgeTotal }}/2 <BpIcon /></p>
           <div class="choices">
             <!-- nothing goes through by itself: the chosen survivor's player confirms, paying or refusing -->
             <button v-if="!controls(st, step.s)" class="primary" disabled>
-              {{ pledgeTotal === 2 ? `ครบ 2 ▲ — รอ ${st.survivors[step.s].name} ยืนยัน` : pledgesIn ? `รอ ${st.survivors[step.s].name} ยืนยันไม่จ่าย` : `รอทุกคนตัดสินใจ (รวม ${pledgeTotal}/2 ▲)` }}
+              <BpText :text="pledgeTotal === 2 ? `ครบ 2 ▲ — รอ ${st.survivors[step.s].name} ยืนยัน` : pledgesIn ? `รอ ${st.survivors[step.s].name} ยืนยันไม่จ่าย` : `รอทุกคนตัดสินใจ (รวม ${pledgeTotal}/2 ▲)`" />
             </button>
-            <button v-else-if="pledgeTotal === 2" class="primary crowd-pay" @click="act({ t: 'crowdPay', pay: pledgedPay(pledges) })">ยืนยัน: จ่าย 2 ▲</button>
+            <button v-else-if="pledgeTotal === 2" class="primary crowd-pay" @click="act({ t: 'crowdPay', pay: pledgedPay(pledges) })">ยืนยัน: จ่าย 2 <BpIcon /></button>
             <button v-else-if="pledgesIn" class="primary crowd-refuse" @click="act({ t: 'crowdPay', pay: [] })">ยืนยัน: ไม่จ่าย — ให้ {{ st.killer.name }} เลือกการ์ด</button>
-            <button v-else class="primary" disabled>รอทุกคนตัดสินใจ (อีก {{ 2 - pledgeTotal }} ▲ ถึงจะจ่ายได้)</button>
+            <button v-else class="primary" disabled>รอทุกคนตัดสินใจ (อีก {{ 2 - pledgeTotal }} <BpIcon /> ถึงจะจ่ายได้)</button>
           </div>
           <p class="small muted">{{ st.survivors[step.s].name }} เป็นคนกดยืนยัน — ก่อนนั้นทุกคนเปลี่ยนที่ตัวเองลงได้</p>
         </template>
         <template v-else-if="canPay">
-          <p class="small">คลิกผู้รอดชีวิตเพื่อใส่ 1 ▲ ของเขา (คลิกซ้ำ = 2 ▲) — รวมให้ครบ 2 ▲</p>
+          <p class="small">คลิกผู้รอดชีวิตเพื่อใส่ 1 <BpIcon /> ของเขา (คลิกซ้ำ = 2 <BpIcon />) — รวมให้ครบ 2 <BpIcon /></p>
           <div class="payers">
             <button
               v-for="(sv, s) in st.survivors"
@@ -718,12 +787,12 @@ const boardCount = computed(() => {
             >
               <Mini class="face" :src="asset(survivorMini(st, s))" :alt="sv.name" />
               <span class="payer-name">{{ sv.name }}</span>
-              <span class="payer-bp">{{ sv.bp - paid(s) }} ▲<b v-if="paid(s)"> −{{ paid(s) }}</b></span>
+              <span class="payer-bp">{{ sv.bp - paid(s) }} <BpIcon /><b v-if="paid(s)"> −{{ paid(s) }}</b></span>
             </button>
           </div>
           <div class="choices">
             <button class="primary crowd-pay" :disabled="payPick.length < 2" @click="act({ t: 'crowdPay', pay: payPick })">
-              {{ payPick.length < 2 ? `เลือกอีก ${2 - payPick.length} ▲` : 'ยืนยัน: จ่าย 2 ▲' }}
+              <BpText :text="payPick.length < 2 ? `เลือกอีก ${2 - payPick.length} ▲` : 'ยืนยัน: จ่าย 2 ▲'" />
             </button>
             <button v-if="payPick.length" @click="payPick = []">ล้างที่เลือก</button>
           </div>
@@ -759,10 +828,10 @@ const boardCount = computed(() => {
           <img v-if="perkImage(b.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
           <div>
             <h3>
-              <FaceLabel :st="st" :who="b.owner" :text="`${ownerLabel(st, b.owner)}: ${PERKS[b.perk].name}`" /> <span class="cost">{{ cost(b.perk) }}</span>
+              <FaceLabel :st="st" :who="b.owner" :text="`${ownerLabel(st, b.owner)}: ${PERKS[b.perk].name}`" /> <span class="cost"><BpText :text="cost(b.perk)" /></span>
             </h3>
-            <p class="text small">{{ perkText(b.perk) }}</p>
-            <button v-for="(c, n) in b.choices" :key="n" class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">ใช้ — {{ perkChoiceLabel(st, b.perk, b.owner, b.w, c) }}</button>
+            <p class="text small"><BpText :text="perkText(b.perk)" /></p>
+            <button v-for="(c, n) in b.choices" :key="n" class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">ใช้ — <BpText :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
           </div>
         </div>
         <div class="choices">
@@ -782,6 +851,25 @@ const boardCount = computed(() => {
       </template>
     </aside>
   </transition>
+  </Teleport>
+  <!-- Vile Purge: the perk picked, big with its text, before it is covered (or freed) -->
+  <Teleport to="body">
+    <div v-if="purgePick && step.t === 'purgeChoice'" class="purge-modal" role="dialog" aria-modal="true" @click.self="purgePick = null">
+      <div class="purge-box">
+        <img v-if="perkImage(purgePick)" :src="asset(perkImage(purgePick))" :alt="PERKS[purgePick].name" />
+        <div class="purge-info">
+          <p class="eyebrow"><img class="purge-token" :src="asset(VILE_PURGE_IMAGE)" alt="" />Vile Purge — {{ step.mode === 'cover' ? 'Perk ที่จะถูกปิด' : 'Perk ที่จะเปิดคืน' }}</p>
+          <h2>{{ PERKS[purgePick].name }} <span class="cost"><BpText :text="PERKS[purgePick].cost ? `${PERKS[purgePick].cost} ▲` : 'ฟรี'" /></span></h2>
+          <p class="text"><BpText :text="perkText(purgePick)" /></p>
+          <p class="muted small"><BpText :text="PERKS[purgePick].when" /></p>
+          <p class="small warn-line">{{ step.mode === 'cover' ? 'ปิดแล้วใช้ Perk นี้ไม่ได้ จนกว่าจะซ่อนใน Locker เพื่อเอา Vile Purge ออก' : 'Perk นี้จะใช้ได้อีกครั้ง' }}</p>
+          <div class="choices">
+            <button class="primary" @click="confirmPurge">{{ step.mode === 'cover' ? `ยืนยัน: ปิด ${PERKS[purgePick].name}` : `ยืนยัน: เปิด ${PERKS[purgePick].name} คืน` }}</button>
+            <button @click="purgePick = null">เลือกใบอื่น</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </Teleport>
   <Teleport to="body">
     <div v-if="zoomed" class="perk-zoom" role="dialog" aria-modal="true" @click="zoomed = null">
@@ -1026,6 +1114,98 @@ h3 {
 .choices {
   display: grid;
   gap: 0.4rem;
+}
+/* who to move (Dark Devotion, Infectious Fright): a row of faces */
+.who-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+}
+.who-chip {
+  padding: 0.25rem 0.55rem;
+  border-radius: 99px;
+}
+.who-chip.on {
+  box-shadow: 0 0 0 2px var(--blood-bright);
+  background: rgb(255 60 60 / 0.15);
+}
+/* Vile Purge: the perk picked, big, before the confirm */
+.purge-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgb(4 5 7 / 0.88);
+}
+.purge-box {
+  display: flex;
+  gap: 1.4rem;
+  align-items: center;
+  max-width: min(860px, 94vw);
+  padding: 1.2rem;
+  border: 1px solid #b6e36a;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgb(16 20 12 / 0.98), rgb(8 9 10 / 0.98));
+  box-shadow: 0 0 40px rgb(182 227 106 / 0.25), 0 24px 60px rgb(0 0 0 / 0.85);
+}
+.purge-box > img {
+  width: min(300px, 38vw);
+  border-radius: 10px;
+  flex: none;
+}
+.purge-info {
+  display: grid;
+  gap: 0.5rem;
+}
+.purge-info h2 {
+  margin: 0;
+}
+.purge-info .text {
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+.warn-line {
+  color: #d9f7a8;
+}
+@media (max-width: 700px) {
+  .purge-box {
+    flex-direction: column;
+  }
+}
+/* Vile Purge: the perks to pick from, as cards */
+.purge-token {
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+  margin-right: 0.35rem;
+  border-radius: 4px;
+}
+.purge-perks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+.purge-perk {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  padding: 0.4rem;
+  border-radius: 10px;
+}
+.purge-perk img {
+  width: 100%;
+  aspect-ratio: 0.72;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.purge-perk:hover {
+  box-shadow: 0 0 0 2px #b6e36a, 0 0 14px rgb(182 227 106 / 0.6);
+}
+.purge-perk small {
+  color: #b6e36a;
 }
 /* Crowd Control online: one row per survivor, what they put in */
 .pledges {

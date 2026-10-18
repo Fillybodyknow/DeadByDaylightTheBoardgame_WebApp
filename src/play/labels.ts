@@ -37,6 +37,8 @@ export const SURVIVOR_CARD_BACK = 'assets/movement/back_movement_card.webp'
 export const KILLER_CARD_BACK = 'assets/movement/back_movement_card.webp'
 /** The Doctor's Madness token. */
 export const MADNESS_IMAGE = 'assets/killers/tokens/doctor-madness.webp'
+/** The Plague's Vile Purge token (resized to 256 px, as Madness). */
+export const VILE_PURGE_IMAGE = 'assets/killers/tokens/plague-vile-purge.webp'
 /** The Trickster's Knife token (resized to 256 px, as Madness). */
 export const KNIFE_IMAGE = 'assets/killers/tokens/trickster-knife.webp'
 export const BEAR_TRAP_IMAGE = 'assets/killers/tokens/trapper-bear-trap.webp'
@@ -173,6 +175,10 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Blighted Corruption: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
     case 'hoard':
       return 'Hoarder: นำ Chest ออก (+2 ▲)'
+    case 'purge': {
+      const rooms = [st.killer.room, i.room].filter((r) => !(st.purge ?? []).includes(r)).map((r) => roomName(st, r))
+      return `Vile Purge → ${rooms.join(' + ')}`
+    }
     case 'showstopper': {
       const who = showstopperTargets(st).map((s) => st.survivors[s])
       return `Showstopper: Knife ให้ ${who.map((sv) => `${sv.name} (${sv.knives ?? 0}→${Math.min(3, (sv.knives ?? 0) + 1)})`).join(', ')}`
@@ -251,6 +257,17 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `เดินทาง ${pathLabel(st, c.path!, st.killer.room)}`
     case 'sprint_burst':
       return `วิ่งต่อทาง ${pathLabel(st, c.path!, from(o))}`
+    case 'dance_with_me':
+      return `เดินต่อทาง ${pathLabel(st, c.path!, from(o))}`
+    case 'boil_over': {
+      const { s, n } = w as Extract<PerkWindow, { k: 'carryRoll' }>
+      return `${name(s)} ทอยดิ้น 4 ลูก แทน ${n} ลูก`
+    }
+    case 'windows_of_opportunity': {
+      const p = prop(st, c.prop!)
+      const what = p.kind === 'chest' ? 'ค้น Chest' : p.kind === 'locker' ? 'เข้าไปซ่อนใน Locker' : p.kind === 'crow' ? 'ไล่ Crow' : `ทิ้ง Pallet บนทาง ${iconLabel(st, c.path!, p.room!)}`
+      return `${what} ที่ ${roomName(st, p.room!)}`
+    }
     case 'stridor':
       return `${name(c.target!)} ต้องเปิดการ์ด`
     case 'lightborn':
@@ -408,6 +425,13 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       const p = prop(st, c.prop!)
       return `เปิด prop สี${PROP_CATEGORY_TH[p.category]} ที่ ${roomName(st, p.room!)} แทน`
     }
+    case 'dark_devotion':
+    case 'infectious_fright':
+      return `ย้าย ${name(c.target!)} ไปทาง ${pathLabel(st, c.path!, st.survivors[c.target!].room)}`
+    case 'corrupt_intervention': {
+      const g = prop(st, c.prop!)
+      return `Entity บน Generator ที่ ${roomName(st, g.room!)} (${g.progress}/${PROGRESS_MAX})`
+    }
     case 'no_way_out':
       return `ห้าม ${name((w as { s: number }).s)} Interact`
     case 'crowd_control':
@@ -458,6 +482,25 @@ export function cardCaption(perk: PerkId, c: PerkChoice): string {
       return 'ยอมบาดเจ็บ'
     default:
       return 'Bonus Turn'
+  }
+}
+
+/** Whom an offer's moment is about, for their mini beside its heading (null: nobody in particular). */
+export function windowWho(w: PerkWindow): PerkOwner | null {
+  if ('s' in w) return w.s
+  if ('target' in w) return w.target
+  if (w.k === 'preRoll') return w.ctx.s
+  switch (w.k) {
+    case 'killerEntered':
+    case 'killerBreak':
+    case 'killerTurnBegin':
+    case 'killerTurnEnd':
+    case 'killerInteract':
+    case 'afterKillerInteract':
+    case 'palletBlock':
+      return 'killer'
+    default:
+      return null
   }
 }
 
@@ -522,6 +565,8 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return `${st.survivors[w.s].name} เข้า ${roomName(st, st.survivors[w.s].room)}`
     case 'rollFail':
       return `${st.survivors[w.s].name} ทอยล้มเหลว (${st.killer.name} จะได้ +${w.fails} ▲)`
+    case 'carryRoll':
+      return `${st.killer.name} ให้ ${st.survivors[w.s].name} ทอยดิ้น ${w.n} ลูก`
     case 'greatRoll':
       return `${st.survivors[w.s].name} ทอยได้สำเร็จอย่างยิ่ง`
     case 'killerTurnEnd':

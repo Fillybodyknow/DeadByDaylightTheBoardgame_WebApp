@@ -3,6 +3,7 @@ import { apply, createGame, tryApply, type GameConfig } from './engine'
 import { legalActions } from './legal'
 import { actorsOf, handsToPlan, mayAct, playerOfSurvivor } from './seats'
 import type { Action, GameState, MoveCard } from './types'
+import { timeoutActions } from '../online/timeout'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from '../online/logArchive'
 
 const config = (seed = 1, players: GameConfig['players'] = 5): GameConfig => ({
@@ -393,5 +394,28 @@ describe('Crowd Control online: each player puts in their own ▲', () => {
     expect(actorsOf(st)).toContain(playerOfSurvivor(st, 0))
     for (const s of [0, 1, 2, 3].filter((s) => !mine.includes(s))) st = apply(st, { t: 'crowdPledge', s, n: 0 })
     expect(st.step.t).toBe('crowdPay') // all said no: still waits for the confirm
+  })
+})
+
+describe('turn timer (room settings): what runs out of time answers', () => {
+  it('passes on a perk, but leaves a move or a plan to the player', () => {
+    let st = createGame({ ...config(1, 5), killer: { id: 'trickster', name: 'trickster' } })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    // Crowd Control's offer is the killer's: he says no
+    expect(timeoutActions(st, 1)).toEqual([{ t: 'perk', perk: 'crowd_control', use: false }])
+    expect(timeoutActions(st, 2)).toEqual([])
+    st = apply(st, { t: 'perk', perk: 'crowd_control', use: false })
+    expect(st.step.t).toBe('planSurvivors')
+    expect(timeoutActions(st, 2)).toEqual([])
+  })
+
+  it('Crowd Control: nothing put in, then the chosen survivor confirms the refusal', () => {
+    let st = createGame({ ...config(1, 5), killer: { id: 'trickster', name: 'trickster' } })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    st = apply(st, { t: 'perk', perk: 'crowd_control', use: true, choice: { target: 1 } })
+    for (const p of [2, 4, 5]) for (const a of timeoutActions(st, p)) st = apply(st, a)
+    expect(st.step.t).toBe('crowdPay')
+    // Meg's player (3): their own nothing, then the confirm
+    expect(timeoutActions(st, 3)).toEqual([{ t: 'crowdPledge', s: 1, n: 0 }, { t: 'crowdPay', pay: [] }])
   })
 })

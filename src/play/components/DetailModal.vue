@@ -11,6 +11,8 @@ import { BEAR_TRAP_IMAGE, PROP_IMAGE, itemImage, ownerLabel, perkImage, perkText
 import { perkUsed } from '../engine/engine'
 import { itemHidden } from '../game'
 import Mini from './Mini.vue'
+import BpIcon from '../../components/BpIcon.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ st: GameState; target: InspectTarget }>()
 const emit = defineEmits<{ close: [] }>()
@@ -54,7 +56,8 @@ const perkList = computed(() => {
   const owner: PerkOwner | null = t.k === 'survivor' ? t.s : t.k === 'killer' ? 'killer' : null
   if (owner === null) return []
   const perks = owner === 'killer' ? props.st.killer.perks : props.st.survivors[owner].perks
-  return perks.map((p) => ({ p, used: perkUsed(props.st, owner, p) }))
+  const covered = owner === 'killer' ? [] : (props.st.survivors[owner].purged ?? [])
+  return perks.map((p) => ({ p, used: perkUsed(props.st, owner, p), covered: covered.includes(p) }))
 })
 
 const item = computed(() => {
@@ -74,14 +77,14 @@ const item = computed(() => {
           <Mini class="face aura-survivor" :src="asset(survivor.data?.images.mini ?? '')" />
           <div>
             <h2>{{ survivor.sv.name }}</h2>
-            <p class="muted">{{ tr(survivor.data?.title) }} · ผู้เล่น {{ playerOf(st, survivor.s) }}</p>
+            <p class="muted"><BpText :text="tr(survivor.data?.title)" /> · ผู้เล่น {{ playerOf(st, survivor.s) }}</p>
           </div>
         </header>
         <ul class="facts">
           <li :class="survivor.sv.wounded ? 'bad' : 'good'">{{ survivor.sv.wounded ? 'บาดเจ็บ' : 'ไม่บาดเจ็บ' }}</li>
           <li>{{ STATUS_TH[survivor.sv.status] }} · {{ roomName(st, survivor.sv.room) }}</li>
-          <li>{{ survivor.sv.bp }}/{{ survivorMax(st, survivor.s) }} ▲</li>
-          <li v-if="survivor.sv.knives" :class="{ bad: survivor.sv.knives === 3 }">Knife {{ survivor.sv.knives }}/3 — ▲ สูงสุด −{{ 2 * survivor.sv.knives }}{{ survivor.sv.knives === 3 ? ' · หายบาดเจ็บไม่ได้' : '' }} (เข้า Locker เพื่อทิ้ง)</li>
+          <li>{{ survivor.sv.bp }}/{{ survivorMax(st, survivor.s) }} <BpIcon /></li>
+          <li v-if="survivor.sv.knives" :class="{ bad: survivor.sv.knives === 3 }">Knife {{ survivor.sv.knives }}/3 — <BpIcon /> สูงสุด −{{ 2 * survivor.sv.knives }}{{ survivor.sv.knives === 3 ? ' · หายบาดเจ็บไม่ได้' : '' }} (เข้า Locker เพื่อทิ้ง)</li>
           <li>{{ survivor.sv.item ? (itemHidden(st, survivor.s) ? 'ถือ item อยู่ (ไม่เปิดเผย)' : `ถือ ${ITEM_NAMES[survivor.sv.item]}`) : 'ไม่มี item' }}</li>
           <li>{{ survivor.sv.sacrificeToken ? 'ยังไม่เคยถูกแขวน' : 'เคยถูกแขวนแล้ว' }}</li>
         </ul>
@@ -98,7 +101,7 @@ const item = computed(() => {
           </div>
         </header>
         <ul class="facts">
-          <li>{{ st.killer.bp }}/{{ KILLER_BP.max }} ▲</li>
+          <li>{{ st.killer.bp }}/{{ KILLER_BP.max }} <BpIcon /></li>
           <li v-if="st.killer.characterId === 'trapper'"><img class="inline" :src="asset(BEAR_TRAP_IMAGE)" alt="" /> เหลือ {{ st.killer.trapsInSupply }} อัน</li>
           <li :class="st.killer.powerUsed ? 'bad' : 'good'">{{ st.killer.powerUsed ? 'ใช้พลังแล้วรอบนี้' : 'ใช้พลังได้' }}</li>
         </ul>
@@ -106,23 +109,23 @@ const item = computed(() => {
           <img v-if="killer.power.image?.th" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(killer.power.image.th)" :alt="killer.power.name" />
           <img v-if="killer.passiveImage?.th" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(killer.passiveImage.th)" alt="Passive" />
         </div>
-        <p class="rule"><b>Power — {{ killer.power.name }}:</b> {{ tr(killer.power.text) }}</p>
+        <p class="rule"><b>Power — {{ killer.power.name }}:</b> <BpText :text="tr(killer.power.text)" /></p>
         <p v-if="killer.passive" class="rule"><b>Passive:</b> {{ tr(killer.passive) }}</p>
       </template>
 
       <!-- a character's perks, used or not this round -->
       <section v-if="perkList.length" class="perk-list">
         <h3>Perks</h3>
-        <div v-for="{ p, used } in perkList" :key="p" class="perk-row" :class="{ used }">
+        <div v-for="{ p, used, covered } in perkList" :key="p" class="perk-row" :class="{ used: used || covered }">
           <img v-if="perkImage(p)" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(p))" :alt="PERKS[p].name" />
           <div>
             <div class="perk-head">
               <strong>{{ PERKS[p].name }}</strong>
-              <span class="cost">{{ PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี' }}</span>
-              <span class="state" :class="used ? 'bad' : 'good'">{{ used ? 'ใช้แล้วรอบนี้' : 'ยังใช้ได้รอบนี้' }}</span>
+              <span class="cost"><BpText :text="PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี'" /></span>
+              <span class="state" :class="used || covered ? 'bad' : 'good'">{{ covered ? 'ถูก Vile Purge ปิด (ซ่อนใน Locker เพื่อเอาออก)' : used ? 'ใช้แล้วรอบนี้' : 'ยังใช้ได้รอบนี้' }}</span>
             </div>
-            <p class="rule small">{{ perkText(p) }}</p>
-            <p class="muted small">{{ PERKS[p].when }}</p>
+            <p class="rule small"><BpText :text="perkText(p)" /></p>
+            <p class="muted small"><BpText :text="PERKS[p].when" /></p>
           </div>
         </div>
       </section>
@@ -150,16 +153,16 @@ const item = computed(() => {
         <header>
           <div>
             <h2>{{ PERKS[perk.perk].name }}</h2>
-            <p class="muted">perk ของ {{ ownerLabel(st, perk.owner) }} · {{ PERKS[perk.perk].cost ? `${PERKS[perk.perk].cost} ▲` : 'ฟรี' }} · ใช้ได้ 1 ครั้ง/รอบ</p>
+            <p class="muted">perk ของ {{ ownerLabel(st, perk.owner) }} · <BpText :text="PERKS[perk.perk].cost ? `${PERKS[perk.perk].cost} ▲` : 'ฟรี'" /> · ใช้ได้ 1 ครั้ง/รอบ</p>
           </div>
         </header>
         <ul class="facts">
           <li :class="perkUsed(st, perk.owner, perk.perk) ? 'bad' : 'good'">{{ perkUsed(st, perk.owner, perk.perk) ? 'ใช้แล้วรอบนี้' : 'ยังใช้ได้รอบนี้' }}</li>
-          <li>{{ PERKS[perk.perk].when }}</li>
+          <li><BpText :text="PERKS[perk.perk].when" /></li>
         </ul>
         <div class="item-wrap">
           <img v-if="perkImage(perk.perk)" class="item-img zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(perk.perk))" :alt="PERKS[perk.perk].name" />
-          <p class="rule">{{ perkText(perk.perk) }}</p>
+          <p class="rule"><BpText :text="perkText(perk.perk)" /></p>
         </div>
       </template>
 
@@ -173,7 +176,7 @@ const item = computed(() => {
         </header>
         <div class="item-wrap">
           <img class="item-img zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(itemImage(item.id))" :alt="ITEM_NAMES[item.id]" />
-          <p class="rule">{{ item.text.th.replaceAll('{BP}', '▲') }}</p>
+          <p class="rule"><BpText :text="item.text.th.replaceAll('{BP}', '▲')" /></p>
         </div>
       </template>
     </div>

@@ -11,6 +11,7 @@ import { fx } from '../fx/bus'
 import { ITEM_NAMES } from '../engine/engine'
 import { itemImage, killerMini, ownerLabel, perkImage, perkText, survivorMini } from '../labels'
 import Mini from './Mini.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ st: GameState }>()
 
@@ -81,15 +82,15 @@ const face = computed(() => {
           <img v-if="card.image" class="card" :class="{ 'item-card': isItem }" :src="asset(card.image)" :alt="card.name" />
           <div v-else class="card text-card">
             <strong>{{ card.name }}</strong>
-            <p>{{ card.text }}</p>
+            <p><BpText :text="card.text" /></p>
           </div>
           <span class="shine" aria-hidden="true" />
         </div>
 
         <div class="caption">
           <h2>{{ card.name }}</h2>
-          <span class="cost">{{ card.price }}</span>
-          <p v-if="current.detail" class="detail">{{ current.detail }}</p>
+          <span class="cost"><BpText :text="card.price" /></span>
+          <p v-if="current.detail" class="detail"><BpText :text="current.detail" /></p>
         </div>
         <p class="hint">แตะเพื่อไปต่อ</p>
       </div>

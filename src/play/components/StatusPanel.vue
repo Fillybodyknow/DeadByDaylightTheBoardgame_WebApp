@@ -4,16 +4,18 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components, items, killerById } from '../../data'
 import { asset } from '../../i18n'
-import { ITEM_NAMES, KILLER_BP, isPower, survivorMax, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
+import { ITEM_NAMES, KILLER_BP, isPower, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
 import type { InspectTarget } from '../inspect'
-import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
+import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import ObjectiveHud from './ObjectiveHud.vue'
 import PerkDiamonds from './PerkDiamonds.vue'
+import BpIcon from '../../components/BpIcon.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ st: GameState; powerOn?: boolean }>()
 const emit = defineEmits<{ use: [s: number, use: ItemUse]; inspect: [target: InspectTarget]; pick: [s: number]; power: [on: boolean] }>()
@@ -163,10 +165,13 @@ function onPowerSlot() {
       </div>
       <div class="line small">
         <span class="ptag" :class="{ me: mine.includes('killer') }" :title="`ผู้เล่น 1${mine.includes('killer') ? ' (คุณ)' : ''}`">{{ mine.includes('killer') ? 'คุณ' : 'P1' }}</span>
-        <span class="bp">{{ st.killer.bp }}/{{ KILLER_BP.max }} ▲</span>
+        <span class="bp">{{ st.killer.bp }}/{{ KILLER_BP.max }} <BpIcon /></span>
         <span v-if="st.killer.characterId === 'trapper'" class="traps"><img :src="asset(BEAR_TRAP_IMAGE)" alt="" /> ×{{ st.killer.trapsInSupply }}</span>
         <span v-if="st.killer.characterId === 'hag'" class="traps" title="Phantasm Trap ที่ยังวางได้"
           ><img :src="asset('assets/killers/tokens/hag-phantasm-trap.webp')" alt="" /> ×{{ 7 - st.phantasm.length }}</span
+        >
+        <span v-if="st.killer.characterId === 'plague'" class="traps" title="Vile Purge ที่ยังวางได้"
+          ><img :src="asset(VILE_PURGE_IMAGE)" alt="" /> ×{{ purgeSupply(st) }}</span
         >
         <span v-if="st.sealedCard" class="warn" title="The Third Seal">ห้ามใช้ {{ st.sealedCard }}</span>
         <span v-if="st.killer.powerUsed" class="muted">ใช้พลังแล้ว</span>
@@ -230,7 +235,7 @@ function onPowerSlot() {
       </div>
       <div class="line small">
         <span class="ptag" :class="{ me: mine.includes(s) }" :title="`ผู้เล่น ${playerOf(st, s)}${mine.includes(s) ? ' (คุณ)' : ''}`">{{ mine.includes(s) ? 'คุณ' : `P${playerOf(st, s)}` }}</span>
-        <span class="bp">{{ st.survivors[s].bp }}/{{ survivorMax(st, s) }} ▲</span>
+        <span class="bp">{{ st.survivors[s].bp }}/{{ survivorMax(st, s) }} <BpIcon /></span>
         <!-- The Trickster's Knives: one token each, the ▲ maximum 2 lower for every one -->
         <span v-if="st.survivors[s].knives" class="knives" :class="{ full: st.survivors[s].knives === 3 }" :title="`Knife ${st.survivors[s].knives}/3 — ▲ สูงสุดลดลง ${2 * st.survivors[s].knives!}${st.survivors[s].knives === 3 ? ' · หายบาดเจ็บไม่ได้' : ''} · เข้า Locker เพื่อทิ้ง`">
           <img :src="asset(KNIFE_IMAGE)" alt="Knife" /><b>{{ st.survivors[s].knives }}/3</b>
@@ -342,9 +347,9 @@ function onPowerSlot() {
           <div class="item-body">
             <img class="item-card" :src="asset(itemImage(itemOpen.id))" :alt="itemOpen.name" />
             <div class="item-side">
-              <p class="item-text">{{ itemOpen.text }}</p>
+              <p class="item-text"><BpText :text="itemOpen.text" /></p>
               <div class="buttons">
-                <button v-for="(u, i) in itemOpen.uses" :key="i" class="primary" @click="use(itemOpen.s, u)">{{ itemUseLabel(st, itemOpen.s, itemOpen.id, u) }}</button>
+                <button v-for="(u, i) in itemOpen.uses" :key="i" class="primary" @click="use(itemOpen.s, u)"><BpText :text="itemUseLabel(st, itemOpen.s, itemOpen.id, u)" /></button>
                 <p v-if="!itemOpen.uses.length" class="muted small">ตอนนี้ยังใช้ไม่ได้</p>
                 <button v-if="boardItem(itemOpen.s)" @click="emit('pick', itemOpen.s), (openItem = null)">🗺 เลือกเป้าหมายบนแผนที่</button>
                 <button class="ghost" @click="openItem = null">ปิด</button>

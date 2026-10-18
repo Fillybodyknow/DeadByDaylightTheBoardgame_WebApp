@@ -37,6 +37,19 @@ describe('action cards', () => {
   })
 })
 
+describe('The Twins', () => {
+  it("a turn taken with Victor shows Victor, not Charlotte", () => {
+    const prev = game()
+    const b = new CastBuilder(prev, prev)
+    const moved: LogEntry = { round: 1, text: 'Victor → Shack', who: 'killer', ev: { k: 'move', who: 'victor', from: 'a', to: 'shack', path: 'p1' } }
+    b.of({ round: 1, text: 'Victor เปิด Sprint', who: 'killer' })
+    expect(b.of(moved)?.victor).toBe(true)
+    const hit: LogEntry = { round: 1, text: 'Victor โจมตี meg — บาดเจ็บ', who: 'killer', ev: { k: 'wound', s: 1, by: 'attack' } }
+    expect(new CastBuilder(prev, prev).of(hit)?.victor).toBe(true)
+    expect(new CastBuilder(prev, prev).of(move('killer'))?.victor).toBeUndefined()
+  })
+})
+
 describe('a power that wounds a whole room', () => {
   it('shows one card naming everyone hit, however many', () => {
     let prev = createGame({ board: 'macmillan', survivors: ['dwight', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'legion', name: 'legion' }, players: 5, seed: 1 })

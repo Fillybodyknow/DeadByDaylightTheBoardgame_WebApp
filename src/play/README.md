@@ -61,6 +61,24 @@ and the host starts the game.
   `unplanKiller`; the "ยกเลิก — เลือกการ์ดใหม่" button in the waiting panel). Nobody learns anything new from it — the survivors' cards are face down to the killer
   either way (p.8) — it only saves the wait. On one shared device the survivors still plan first
   and the device then goes to the killer, behind the hand-off curtain.
+- **Room settings** (`online/settings.ts`, the lobby's ⚙ card): the host sets them before
+  seating everyone, everyone sees them (with chips for what differs from the defaults), and a
+  change makes everyone say ready again. Stored in the lobby node as a partial object, so older
+  rooms play with the defaults.
+  - **Turn timer** (none / 60 / 90 / 120 s): counted on each device from when a decision shows
+    (after its animations). At zero the player's own device answers what can be passed over
+    (`online/timeout.ts`: no to a perk, an item or a bonus turn, a roll taken as rolled, nothing
+    put in for Crowd Control); a move, an interaction or a plan stays theirs and the room is
+    told they are over time. A device that is closed answers nothing.
+  - **Map**: picked by the killer (default), by the killer in secret (the survivors learn it
+    when the game starts), by the host, or drawn when the picks open.
+  - **The killer's pick**: hidden from the survivors (default) or shown to them as it is made.
+    Either way it is in the room's data (friends, not strangers).
+  - **Characters**: picked, or drawn for everyone when the picks open (players only confirm);
+    survivors may repeat a teammate's (the second gets a number after the name); the host may
+    ban characters (never picked or drawn; at least 4 survivors — 1 with repeats — and 1
+    killer stay).
+  - **Starting ▲**: survivors 0–4, the killer 2–6 (the rulebook's 2 and 4 by default, p.6).
 - **Backends** (`online/`):
   - `firebase.ts` is the Realtime Database. Its URL goes in the project root's `.env.local`
     (git-ignored) as `VITE_FIREBASE_DATABASE_URL`; the deploy reads it from the repo's Actions
@@ -100,11 +118,11 @@ and the host starts the game.
   not in yet.
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit, The Legion, The Trickster** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (84 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (90 perks).
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -138,8 +156,6 @@ needs its graph in `boards.ts`), the 2-player rule, then bots from the automated
 - Hanging is the killer's choice: picking up a survivor next to a free hook, or carrying one
   into a room with a free hook while steps are left, the killer may hang them there or carry on
   (the rulebook, p.18, hangs at once). Ending the carry on a free hook still hangs.
-- The Hag's Phantasm Trap: when she doesn't teleport, she gains ▲ equal to the die (the card
-  says "gain a ▲"). Teleporting still costs ▲ equal to the die.
 - A survivor being carried may use their own key to re-roll a die of their roll to struggle
   free (the key says "at any time"). No other item, and no key on anyone else's roll, while carried.
 - A Firecracker also stops the killer while he carries someone: he can't enter that room and
@@ -299,6 +315,18 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   there.
 - Iron Maiden: before interacting (a button in his interact step; then he still interacts), an
   empty revealed locker and an empty revealed hook in another room swap places, anywhere.
+- Vile Purge (The Plague): his room and a connected one, each only if it has none (10 tokens:
+  on the board and on survivors). A survivor entering a room with one by any move of their own
+  (a perk's too; not carried) takes it after the room's reveal and covers a perk of their choice
+  (it can't be used: `perkReady`). The third clears them all and wounds; already wounded, a
+  sacrifice progress instead. Hiding in a locker (any way) takes one off — they choose which perk
+  it frees — into their room, or back to the box if the room has one.
+- Corrupt Intervention: the Entity on a revealed generator, gone at cleanup like any Entity.
+  A prop under the Entity can't be interacted with by anyone (items, such as a toolbox, still
+  work on it: they aren't interactions).
+- Dark Devotion / Infectious Fright move a survivor along any path a survivor may take; on the
+  board the survivor is picked first, then the path (as Breakout). Infectious Fright: from a
+  connected room only, after an attack (attacks are only on healthy survivors).
 - The Trickster's Knives: a survivor's ▲ maximum is 6 − 2 per Knife; ▲ above it are lost the
   moment the Knife comes (and stay lost when the Knives go). The third Knife wounds (nothing more
   if already wounded); a fourth is a sacrifice progress for him instead. With three, no heal of
@@ -324,6 +352,14 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   killer's; at its end, if another survivor was wounded (by anything, a perk of their own too) or
   hung on a hook during it, she may repair a generator / hide in a locker in her room — an
   interaction out of her own turn. Both may be offered at the same moment; each once a round.
+- Windows of Opportunity (Kate): her interaction for the turn (a perk card in her interact step,
+  picked first), with a survival or altruism prop in a connected room: rummage a chest, chase
+  a crow, drop a pallet (on a free path of that room), or hide in an empty locker — then she
+  moves into that room first (revealing it, as any move does). Desperate Measures may follow.
+- Boil Over: asked once the killer has chosen the dice, when the survivor picked up is Kate (she
+  may answer while carried) or was in her room; never when he chose 4 already.
+- Dance With Me: after her card move on a turn (a bonus turn too) that began with her in a
+  locker, along any path but the one she just took, before interacting.
 - Poised (Jane): a great success on a skill check (repair, gate, totem, heal) during a survivor's
   turn, by any survivor on the board with a card in hand. Jane pays; the roller then picks the card
   (or lets the turn go). The bonus turn comes after the interaction that rolled, before the

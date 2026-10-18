@@ -13,6 +13,7 @@ import { KILLER_PLAYER } from '../engine/seats'
 import { game, online, receive, restoreLocal } from '../game'
 import { firebaseBackend, firebaseConfigured } from './firebase'
 import { localBackend } from './local'
+import { settingsOf, playableKillers, playableSurvivors, type RoomSettings } from './settings'
 import { clientId, newRoomCode, type Backend, type Room, type RoomData, type Side } from './transport'
 
 /** Firebase when configured (.env.local), otherwise the same-browser test backend. */
@@ -37,6 +38,8 @@ let unsubscribe: (() => void) | null = null
 let unwatchConnection: (() => void) | null = null
 
 export const isHost = computed(() => !!session.data && session.data.host === session.me)
+/** The room's settings, defaults filled in. */
+export const roomSettings = computed(() => settingsOf(session.data?.settings))
 export const me = computed(() => session.data?.members[session.me] ?? null)
 
 /** Player number this device sits at, or null. */
@@ -247,6 +250,17 @@ export function setDouble(id: string) {
   })
 }
 
+/** Host: change the room's settings (lobby only). Everyone says "ready" again, so the change is seen. */
+export function setSettings(patch: Partial<RoomSettings>) {
+  return update((cur) => {
+    if (session.me !== cur.host || cur.phase !== 'lobby') return null
+    const members = Object.fromEntries(Object.entries(cur.members).map(([k, m]) => [k, { ...m, ready: false }]))
+    return { ...cur, settings: { ...settingsOf(cur.settings), ...patch }, members }
+  })
+}
+
+const draw = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)]
+
 /**
  * Host: seat everyone (killer = player 1, survivors in join order, the one playing two survivors
  * first as player 2) and go to character picks.
@@ -263,7 +277,22 @@ export function proceedToPick() {
     if (!killer || survivors.length < MIN_SURVIVOR_PLAYERS || ms.some(([, m]) => !m.side || !m.ready)) return null
     const seats: RoomData['seats'] = { [KILLER_PLAYER]: { id: killer[0], name: killer[1].name } }
     survivors.forEach(([id, m], i) => (seats[String(i + 2)] = { id, name: m.name }))
-    return { ...cur, phase: 'pick', seats, players: survivors.length + 1, picks: {}, locked: {} }
+    const s = settingsOf(cur.settings)
+    // drawn at once, so everyone sees the result while confirming: the board, and with random
+    // characters every pick (none banned; teammates differ unless repeats are allowed)
+    const board = s.map === 'random' ? draw(Object.keys(boards)) : cur.board
+    const picks: Record<string, string> = {}
+    if (s.random) {
+      const free = (list: { id: string }[]) => list.map((c) => c.id).filter((id) => !s.bans.includes(id))
+      const pool = free(playableSurvivors())
+      for (const slot of [0, 1, 2, 3]) {
+        const left = s.dupes ? pool : pool.filter((id) => !Object.values(picks).includes(id))
+        if (left.length) picks[String(slot)] = draw(left)
+      }
+      const ks = free(playableKillers())
+      if (ks.length) picks.killer = draw(ks)
+    }
+    return { ...cur, phase: 'pick', seats, players: survivors.length + 1, picks, locked: {}, ...(board ? { board } : {}) }
   })
 }
 
@@ -277,10 +306,13 @@ export function pickCharacter(slot: 'killer' | number, id: string | null) {
   return update((cur) => {
     const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
     if (cur.phase !== 'pick' || !seat || cur.locked[seat]) return null
+    const s = settingsOf(cur.settings)
+    // drawn characters stay; banned ones can't be picked
+    if (s.random || (id && s.bans.includes(id))) return null
     const player = Number(seat)
     if (slot === 'killer' ? player !== KILLER_PLAYER : !slotsOf(player, cur.players).includes(slot)) return null
     const key = String(slot)
-    if (id && slot !== 'killer' && Object.entries(cur.picks).some(([k, v]) => k !== 'killer' && k !== key && v === id)) return null
+    if (id && slot !== 'killer' && !s.dupes && Object.entries(cur.picks).some(([k, v]) => k !== 'killer' && k !== key && v === id)) return null
     const picks = { ...cur.picks }
     if (id) picks[key] = id
     else delete picks[key]
@@ -308,12 +340,22 @@ export const allLocked = computed(() => {
   return !!d && d.phase === 'pick' && pickWaiting.value.length === 0
 })
 
-/** The killer picks the board (any time before the game starts); everyone sees it. */
+/** Who picks the board under the room's settings: the killer's seat, the host, or nobody (drawn). */
+export const mayPickBoard = computed(() => {
+  const d = session.data
+  if (!d || d.phase !== 'pick') return false
+  const how = roomSettings.value.map
+  return how === 'killer' || how === 'secret' ? mySeat.value === KILLER_PLAYER : how === 'host' ? isHost.value : false
+})
+
+/** The board is picked (any time before the game starts); everyone sees it. */
 export function setBoard(id: string) {
   if (!boards[id]) return
   return update((cur) => {
     const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
-    return cur.phase === 'pick' && Number(seat) === KILLER_PLAYER ? { ...cur, board: id } : null
+    const how = settingsOf(cur.settings).map
+    const may = how === 'killer' || how === 'secret' ? Number(seat) === KILLER_PLAYER : how === 'host' && session.me === cur.host
+    return cur.phase === 'pick' && may ? { ...cur, board: id } : null
   })
 }
 
@@ -328,9 +370,15 @@ export function startOnlineGame() {
     session.room!.startGame(
       createGame({
         board: d.board && boards[d.board] ? d.board : macmillan.id,
-        survivors: survivors.map((id) => ({ id, name: survivorById.get(id)!.name })),
+        // the same survivor twice (repeats allowed): the second is told apart by a number
+        survivors: survivors.map((id, i) => {
+          const name = survivorById.get(id)!.name
+          const n = survivors.slice(0, i).filter((x) => x === id).length
+          return { id, name: n ? `${name} ${n + 1}` : name }
+        }),
         killer: { id: killer, name: killerById.get(killer)!.name },
         players: d.players as 3 | 4 | 5,
+        startBp: { survivor: roomSettings.value.survivorBp, killer: roomSettings.value.killerBp },
         seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
       }),
     ),

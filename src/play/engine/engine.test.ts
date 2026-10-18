@@ -87,14 +87,30 @@ describe('MacMillan board', () => {
 })
 
 describe('setup', () => {
-  it('deals all 44 props face down and starts minis in start rooms', () => {
-    const st = createGame(config(7))
+  it('deals all 44 props face down; the minis roll their start rooms after the reveals (p.6)', () => {
+    let st = createGame(config(7))
     expect(st.props).toHaveLength(44)
     expect(st.props.every((p) => !p.revealed)).toBe(true)
+    expect(st.step).toEqual({ t: 'setupReveal', s: st.firstPlayer })
+    expect(st.startPending).toBe(true)
+    expect(st.log.some((e) => /เริ่มที่/.test(e.text))).toBe(false)
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    expect(st.startPending).toBeUndefined()
     const startRooms = macmillan.rooms.filter((r) => r.startFace !== null).map((r) => r.id)
     for (const sv of st.survivors) expect(startRooms).toContain(sv.room)
     expect(startRooms).toContain(st.killer.room)
-    expect(st.step).toEqual({ t: 'setupReveal', s: st.firstPlayer })
+    // the four reveals come first in the log, then the five start rolls
+    const lastReveal = st.log.findLastIndex((e) => e.ev?.k === 'reveal')
+    const firstStart = st.log.findIndex((e) => /เริ่มที่/.test(e.text))
+    expect(firstStart).toBeGreaterThan(lastReveal)
+    expect(st.log.filter((e) => /เริ่มที่/.test(e.text))).toHaveLength(5)
+  })
+
+  it("starts with the ▲ the online room set, else the rulebook's (p.6)", () => {
+    const st = createGame({ ...config(2), startBp: { survivor: 0, killer: 6 } })
+    expect(st.survivors.map((sv) => sv.bp)).toEqual([0, 0, 0, 0])
+    expect(st.killer.bp).toBe(6)
+    expect(createGame(config(2)).killer.bp).toBe(4)
   })
 
   it('lets each survivor reveal one prop, then plans', () => {

@@ -13,6 +13,7 @@ import type { MoveCard } from '../engine/types'
 import { CARD_NAMES } from '../engine/engine'
 import { CARD_TH, cardImage, cardLabel } from '../labels'
 import { openHands } from '../hands'
+import BpText from '../../components/BpText.vue'
 
 export interface HandCard {
   card: MoveCard
@@ -69,7 +70,7 @@ onBeforeUnmount(() => hands(-1))
     <!-- The hand rests sunk, names showing, and rises while the pointer is on it — also when a
          perk asks for a card (it glows, and its prompt sits just above the names). -->
     <div class="hand" :class="{ ask: !!prompt, passive }" role="group" :aria-label="label">
-      <p v-if="prompt" class="prompt">⚡ {{ prompt }}</p>
+      <p v-if="prompt" class="prompt">⚡ <BpText :text="prompt" /></p>
       <div class="fan">
         <button
           v-for="(c, i) in cards"
@@ -91,7 +92,7 @@ onBeforeUnmount(() => hands(-1))
             <img :src="asset(cardImage(c.card))" :alt="cardLabel(c.card)" draggable="false" />
             <!-- the card's name in its colour, on the part of a resting card that shows -->
             <span class="tag" :class="c.card"><b>{{ CARD_NAMES[c.card] }}</b><small>{{ CARD_TH[c.card] }}</small></span>
-            <span v-if="c.picked && c.badge" class="badge">{{ c.badge }}</span>
+            <span v-if="c.picked && c.badge" class="badge"><BpText :text="c.badge" /></span>
             <img v-if="c.takenBy" class="taken-by" :src="asset(c.takenBy)" alt="" />
             <span v-if="c.count !== undefined" class="count" :class="{ none: !c.count }">×{{ c.count }}</span>
           </span>

@@ -15,9 +15,10 @@ import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
+import { BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{
   st: GameState
@@ -120,14 +121,15 @@ function propImage(p: Prop): string {
   return p.revealed ? PROP_IMAGE[p.kind] : `assets/props/back-${p.category}.webp`
 }
 
+// During setup's reveals the minis aren't on the board yet: their start rooms are rolled after.
 const rooms = computed(() =>
   board.value.rooms.map((r) => ({
     ...r,
     props: propsIn(props.st, r.id),
-    survivors: props.st.survivors.flatMap((sv, i) => (sv.room === r.id && (sv.status === 'board' || sv.status === 'carried') ? [i] : [])),
+    survivors: props.st.startPending ? [] : props.st.survivors.flatMap((sv, i) => (sv.room === r.id && (sv.status === 'board' || sv.status === 'carried') ? [i] : [])),
     // The Twins: Charlotte is the killer's mini; Victor is a second, smaller one
-    killer: charlotteRoom(props.st) === r.id,
-    victor: victorRoom(props.st) === r.id,
+    killer: !props.st.startPending && charlotteRoom(props.st) === r.id,
+    victor: !props.st.startPending && victorRoom(props.st) === r.id,
   })),
 )
 
@@ -169,6 +171,12 @@ const PHANTASM_IMAGE = 'assets/killers/tokens/hag-phantasm-trap.webp'
 function phantasmStyle(room: string) {
   const [x, y, w, h] = board.value.rooms.find((r) => r.id === room)!.box
   return { left: pct(x + w * 0.8), top: pct(y + h * 0.58), width: pct(w * 0.17) }
+}
+
+/** The Plague's Vile Purges: high on the room's right, above where the Hag's traps go. */
+function purgeStyle(room: string) {
+  const [x, y, w, h] = board.value.rooms.find((r) => r.id === room)!.box
+  return { left: pct(x + w * 0.82), top: pct(y + h * 0.2), width: pct(w * 0.14) }
 }
 
 const entityProp = computed(() => {
@@ -585,6 +593,16 @@ function guard(e: MouseEvent) {
       title="Phantasm Trap"
     />
 
+    <img
+      v-for="room in st.purge ?? []"
+      :key="`vp-${room}`"
+      class="purge"
+      :style="purgeStyle(room)"
+      :src="asset(VILE_PURGE_IMAGE)"
+      alt="Vile Purge"
+      title="Vile Purge — ผู้รอดชีวิตที่เดินเข้ามาต้องเก็บไปปิด Perk 1 อัน"
+    />
+
     <template v-for="p in paths" :key="p.id">
       <img v-if="p.token" class="path-token" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" :src="asset(p.token)" alt="" />
       <span
@@ -604,7 +622,7 @@ function guard(e: MouseEvent) {
     </template>
 
     <div v-for="f in effects" :key="f.id" class="fx" :class="[f.kind, f.tone]" :style="{ left: pct(f.x), top: pct(f.y) }">
-      <span v-if="f.text">{{ f.text }}</span>
+      <span v-if="f.text"><BpText :text="f.text" /></span>
       <template v-if="f.kind === 'spikes'"><i v-for="n in 7" :key="n" :style="{ '--n': n }" /></template>
       <template v-if="f.kind === 'debris'"><i v-for="n in 8" :key="n" :style="{ '--n': n }" /></template>
     </div>
@@ -1006,6 +1024,20 @@ button.tile.act {
   border-color: #fff;
 }
 
+.purge {
+  position: absolute;
+  /* under the minis: a killer standing there hides it rather than the other way round */
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px #b6e36a, 0 0 12px rgb(182 227 106 / 0.8);
+  animation: ooze 2.6s ease-in-out infinite;
+}
+@keyframes ooze {
+  50% {
+    box-shadow: 0 0 0 2px #b6e36a, 0 0 22px rgb(182 227 106 / 0.95);
+  }
+}
 .phantasm {
   position: absolute;
   z-index: 2;

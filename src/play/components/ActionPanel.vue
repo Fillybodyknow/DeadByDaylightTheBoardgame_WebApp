@@ -57,6 +57,8 @@ import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
 import { choicePreview, decisionFocus, powerPreview, preview } from '../focus'
 import Mini from './Mini.vue'
+import BpIcon from '../../components/BpIcon.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{
   st: GameState
@@ -71,6 +73,8 @@ const props = defineProps<{
 
 // Perk and power choices the board already offers are made there; the panel points at it.
 const here = (a: Action) => !props.onBoard.has(actionKey(a))
+/** Windows of Opportunity's pallets are picked on the board, the pallet and then its path. */
+const boardPallet = (perk: PerkId, c: PerkChoice) => perk === 'windows_of_opportunity' && !!c.path
 const perkAct = (perk: PerkId, c: PerkChoice): Action => ({ t: 'perk', perk, use: true, choice: c })
 const powerAct = (i: KillerInteraction): Action => ({ t: 'interact', i })
 /** A choice of the perk on offer that isn't on the board. */
@@ -145,6 +149,13 @@ const sInteractions = computed(() => {
   return s.t === 'survivorInteract' && s.canInteract ? survivorInteractions(props.st, s.s).filter((i) => i.k !== 'calmSpirit' && i.k !== 'diversion') : []
 })
 
+/**
+ * The interactions left for the panel: the board offers the rest (board first). A pallet is played
+ * there in two clicks, the pallet then the path, so a room full of pallets doesn't fill the panel.
+ */
+const panelInteractions = computed(() => sInteractions.value.filter((i) => i.k !== 'dropPallet' && here({ t: 'interact', i })))
+const hasPallet = computed(() => sInteractions.value.some((i) => i.k === 'dropPallet'))
+
 /** Calm Spirit: one entry per crow, each with the rooms it can be sent to. */
 const calmSpirit = computed(() => {
   const s = step.value
@@ -182,6 +193,7 @@ const POWER_HINT: Record<string, string> = {
   twins: 'วาง Victor ในห้องนี้ (ถ้าอยู่ที่อื่นจะย้ายมา) — เทิร์นต่อไปเลือกเล่นด้วย Victor ได้',
   spirit: 'ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น — คลิกเป้าหมายบนแผนที่',
   legion: 'ผู้รอดชีวิตทุกคนในห้องนี้บาดเจ็บ — ถ้ามีคนบาดเจ็บอยู่แล้วอย่างน้อย 1 คน ได้ +1 ▲',
+  plague: 'วาง Vile Purge ในห้องนี้และห้องที่เชื่อมกันที่เลือก — ผู้รอดชีวิตที่เดินเข้าไปต้องเก็บไปปิด Perk 1 อัน (อันที่ 3 = บาดเจ็บ)',
   trickster: 'ผู้รอดชีวิตในห้องนี้และห้องที่เชื่อมกันได้ Knife คนละ 1 เล่ม — เล่มที่ 3 บาดเจ็บ, เกิน 3 = Sacrifice +1',
   blight: 'สุ่มทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามเส้นทางสีนั้น — เข้าห้องใหม่ได้: Interact ที่นั่น หรือพุ่งต่อ',
 }
@@ -341,6 +353,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <!-- setup -->
     <template v-if="step.t === 'setupReveal'">
       <p>เตรียมเกม: คลิก <b>ไทล์คว่ำ</b> ที่ใดก็ได้บนแผนที่ เพื่อเปิด prop 1 อัน — สีบอกหมวด (หน้า 6)</p>
+      <p class="muted small">เปิดครบทุกคนแล้ว ทุกตัวละครจะทอยเต๋าหาห้องเริ่มแล้วลงกระดาน</p>
     </template>
 
     <template v-else-if="step.t === 'revealProp'">
@@ -354,13 +367,13 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
     <!-- a perk's moment -->
     <template v-else-if="step.t === 'offer'">
-      <p class="eyebrow">{{ windowLabel(st, step.w) }}</p>
+      <p class="eyebrow"><BpText :text="windowLabel(st, step.w)" /></p>
       <div class="perk-offer">
         <img v-if="perkImage(step.perk)" :src="asset(perkImage(step.perk))" alt="" />
         <div>
           <strong>ใช้ {{ PERKS[step.perk].name }}?</strong>
-          <span class="cost">{{ PERKS[step.perk].cost ? `${PERKS[step.perk].cost} ▲` : 'ฟรี' }}</span>
-          <p class="small">{{ perkText(step.perk) }}</p>
+          <span class="cost"><BpText :text="PERKS[step.perk].cost ? `${PERKS[step.perk].cost} ▲` : 'ฟรี'" /></span>
+          <p class="small"><BpText :text="perkText(step.perk)" /></p>
         </div>
       </div>
       <p v-if="offerChoices.some((c) => !offerHere(c))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
@@ -392,7 +405,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p>เริ่มเทิร์น — ใช้ perk ก่อนเดินได้</p>
       <p v-if="buttons.some((b) => b.perk !== 'breakout' && b.choices.some((c) => !here(perkAct(b.perk, c))))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
       <div v-for="b in buttons" :key="b.perk" class="perk-group">
-        <span class="perk-name">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
+        <span class="perk-name">{{ PERKS[b.perk].name }} <span class="cost"><BpText :text="PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี'" /></span></span>
         <!-- Breakout: a person and then a path, both picked on the board (a pair per button would be a wall of them) -->
         <span v-if="b.perk === 'breakout'" class="muted small">🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง</span>
         <template v-else>
@@ -416,7 +429,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </button>
         <button class="primary twin" @click="act({ t: 'twin', victor: true })">
           <Mini class="twin-mini aura-killer" :src="asset(VICTOR_MINI)" alt="" />
-          <span>Victor — {{ roomName(st, victorRoom(st)!) }} (อุ้มไม่ได้: จับแล้ว +1 ▲)</span>
+          <span>Victor — {{ roomName(st, victorRoom(st)!) }} (อุ้มไม่ได้: จับแล้ว +1 <BpIcon />)</span>
         </button>
       </div>
     </template>
@@ -461,7 +474,8 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p v-else class="muted">ไม่มีอะไรให้ Interact ในห้องนี้</p>
       <div class="buttons col">
         <!-- a perk picked: its targets only, the ordinary interactions wait -->
-        <button v-for="(i, n) in perkPicked ? [] : sInteractions" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="survivorInteractionLabel(st, step.s, i)" /></button>
+        <button v-for="(i, n) in perkPicked ? [] : panelInteractions" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="survivorInteractionLabel(st, step.s, i)" /></button>
+        <p v-if="hasPallet && !perkPicked" class="board-hint">🎯 ทิ้ง Pallet: คลิก Pallet บนแผนที่ แล้วเลือกเส้นทาง</p>
         <!-- Diversion is played on the board: the killer, then the path -->
         <p v-if="hasDiversion" class="board-hint">🎯 Diversion: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
         <details v-for="c in calmSpirit" :key="c.prop" class="calm">
@@ -477,15 +491,15 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <button type="button" class="perk-name perk-card" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
           <img v-if="perkImage(b.perk)" :src="asset(perkImage(b.perk))" alt="" />
           <span class="perk-card-body">
-            <span class="perk-card-title">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
-            <span class="perk-card-text">{{ perkText(b.perk) }}</span>
+            <span class="perk-card-title">{{ PERKS[b.perk].name }} <span class="cost"><BpText :text="PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี'" /></span></span>
+            <span class="perk-card-text"><BpText :text="perkText(b.perk)" /></span>
             <span class="perk-card-hint">{{ perkPicked === b.perk ? '🎯 เลือกเป้าหมาย — คลิกอีกครั้งเพื่อยกเลิก' : '👆 คลิกเพื่อใช้' }}</span>
           </span>
         </button>
         <template v-if="perkPicked === b.perk">
           <!-- a swap (Ace in the Hole, Iron Maiden) is two props, one click each on the board -->
           <span v-if="SWAPS.includes(b.perk)" class="muted small">🎯 {{ b.perk === 'iron_maiden' ? 'คลิก Locker ว่างบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย' }}</span>
-          <button v-for="(c, i) in SWAPS.includes(b.perk) ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+          <button v-for="(c, i) in SWAPS.includes(b.perk) ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)) && !boardPallet(b.perk, c))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
           <span v-if="!SWAPS.includes(b.perk) && b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
         </template>
       </div>
@@ -495,7 +509,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <!-- bonus turns -->
     <template v-else-if="step.t === 'bonusOffer' || step.t === 'killerBonusOffer'">
       <p v-if="step.t === 'bonusOffer'">Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง (หน้า 9)</p>
-      <p v-else>จ่าย {{ bonusCost(st) }} ▲ (มี {{ st.killer.bp }}) เพื่อเล่นเทิร์นที่ 3? (หน้า 10)</p>
+      <p v-else>จ่าย {{ bonusCost(st) }} <BpIcon /> (มี {{ st.killer.bp }}) เพื่อเล่นเทิร์นที่ 3? (หน้า 10)</p>
       <p class="muted small">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทาง · คลิกเพื่อเลือก แล้วกดยืนยัน</p>
       <div class="buttons col">
         <button class="primary" :disabled="!bonusPick" @click="confirmBonus">{{ bonusPick ? `ยืนยัน: Bonus Turn ด้วย ${CARD_NAMES[bonusPick]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
@@ -549,7 +563,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
       <!-- Undying / Yamaoka's Haunting, a step at a time: the card (hand or path), the room, the target -->
       <template v-else-if="stepKind">
-        <p v-if="stepKind === 'undying'"><b>Undying</b> ({{ PERKS.undying.cost }} ▲) — ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</p>
+        <p v-if="stepKind === 'undying'"><b>Undying</b> (<BpText :text="PERKS.undying.cost" /> <BpIcon />) — ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</p>
         <p v-else><b>ใช้พลัง: Yamaoka's Haunting</b> — ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น</p>
 
         <template v-if="!undyingCard">
@@ -571,8 +585,8 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           <p v-if="undyingHere.some((i) => !here(powerAct(i)))" class="board-hint">🎯 คลิกเป้าหมายที่กระพริบในห้องนั้นบนแผนที่</p>
           <div class="buttons col">
             <template v-for="(i, n) in undyingHere" :key="n">
-              <button v-if="here(powerAct(i))" @click="act({ t: 'interact', i })">{{ killerInteractionLabel(st, i.i) }}</button>
-              <span v-else class="undying-target">🎯 {{ killerInteractionLabel(st, i.i) }}</span>
+              <button v-if="here(powerAct(i))" @click="act({ t: 'interact', i })"><BpText :text="killerInteractionLabel(st, i.i)" /></button>
+              <span v-else class="undying-target">🎯 <BpText :text="killerInteractionLabel(st, i.i)" /></span>
             </template>
             <button v-if="undyingRooms.length > 1" @click="emit('undyingRoom', null)">เปลี่ยนห้อง</button>
             <button @click="emit('undyingCard', null)">เปลี่ยนการ์ด / เส้นทาง</button>
@@ -648,7 +662,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <template v-else>
           <p>
             <b>ใช้พลัง: {{ powerName(st) }}</b> —
-            {{ POWER_HINT[st.killer.characterId] ?? '' }}
+            <BpText :text="POWER_HINT[st.killer.characterId] ?? ''" />
           </p>
           <div class="buttons">
             <button v-for="(i, n) in kInteractions.powers.filter((i) => here(powerAct(i)))" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
@@ -667,7 +681,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <div class="buttons col">
           <button v-for="(i, n) in perkPicked ? [] : kInteractions.plain" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
           <button v-if="kInteractions.undying.length" class="undying" @click="emit('undyingOn', true), sfx.click()">
-            🃏 Undying ({{ PERKS.undying.cost }} ▲): ทิ้งการ์ด แล้ว Interact ในห้องข้าง ๆ
+            🃏 Undying (<BpText :text="PERKS.undying.cost" /> <BpIcon />): ทิ้งการ์ด แล้ว Interact ในห้องข้าง ๆ
           </button>
           <button v-if="kInteractions.powers.length" class="power" @click="emit('powerOn', true), sfx.click()">⚡ ใช้พลัง: {{ powerName(st) }}</button>
           <span v-else-if="st.killer.powerUsed" class="muted small">ใช้พลังไปแล้วรอบนี้</span>
@@ -679,15 +693,15 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           <button type="button" class="perk-name perk-card" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
             <img v-if="perkImage(b.perk)" :src="asset(perkImage(b.perk))" alt="" />
             <span class="perk-card-body">
-              <span class="perk-card-title">{{ PERKS[b.perk].name }} <span class="cost">{{ PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี' }}</span></span>
-              <span class="perk-card-text">{{ perkText(b.perk) }}</span>
+              <span class="perk-card-title">{{ PERKS[b.perk].name }} <span class="cost"><BpText :text="PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี'" /></span></span>
+              <span class="perk-card-text"><BpText :text="perkText(b.perk)" /></span>
               <span class="perk-card-hint">{{ perkPicked === b.perk ? '🎯 เลือกเป้าหมาย — คลิกอีกครั้งเพื่อยกเลิก' : '👆 คลิกเพื่อใช้' }}</span>
             </span>
           </button>
           <template v-if="perkPicked === b.perk">
             <!-- a swap (Ace in the Hole, Iron Maiden) is two props, one click each on the board -->
             <span v-if="SWAPS.includes(b.perk)" class="muted small">🎯 {{ b.perk === 'iron_maiden' ? 'คลิก Locker ว่างบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย' }}</span>
-            <button v-for="(c, i) in SWAPS.includes(b.perk) ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+            <button v-for="(c, i) in SWAPS.includes(b.perk) ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)) && !boardPallet(b.perk, c))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
             <span v-if="!SWAPS.includes(b.perk) && b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
           </template>
         </div>

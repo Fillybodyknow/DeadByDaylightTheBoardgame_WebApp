@@ -11,6 +11,7 @@ import type { Die } from '../engine/types'
 import { fxSound } from '../fx/audio'
 import { fx, type SkillVerdict } from '../fx/bus'
 import DiceRow from './DiceRow.vue'
+import BpText from '../../components/BpText.vue'
 
 // Dice and perk cards are shown in the order they happened (`id` counts up as they are queued):
 // a perk that sets a roll up comes before it (Unnerving Presence, Bond), one that answers it
@@ -45,15 +46,23 @@ function verdictOf(d: Die, greatOnly: boolean): SkillVerdict {
   return isGreat(d) ? 'great' : succeeded(d) && (!greatOnly || d.asSuccess) ? 'good' : 'fail'
 }
 
-/** Lay out one ring: the zone somewhere in the lower half, the needle's stop from the die. */
-function check(verdict: SkillVerdict, greatOnly: boolean): Check {
+/** The good zone in four bands, one per success face: a 4 stops next to the great zone, a 1 far off. */
+const BAND = (GOOD_DEG - GREAT_DEG - 8) / 4
+
+/**
+ * Lay out one ring: the zone somewhere in the lower half, the needle's stop from the die. A good
+ * success lands the closer to the great zone the higher it rolled (`face` 1–4; anything else, such
+ * as a failure Iron Will counts, stops at the far end).
+ */
+function check(verdict: SkillVerdict, greatOnly: boolean, face?: number): Check {
   const zone = rand(110, 250)
   const width = greatOnly ? GREAT_DEG : GOOD_DEG
+  const band = face !== undefined && face >= 1 && face <= 4 ? 4 - face : 3
   const stop =
     verdict === 'great'
       ? zone + rand(2, GREAT_DEG - 2)
       : verdict === 'good'
-        ? zone + GREAT_DEG + rand(4, GOOD_DEG - GREAT_DEG - 4)
+        ? zone + GREAT_DEG + 4 + band * BAND + rand(1, BAND - 1)
         : // a miss overshoots the zone, or stops short of it
           Math.random() < 0.7
           ? zone + width + rand(8, 40)
@@ -79,7 +88,7 @@ watch(
     if (!c) return
     const greatOnly = c.greatOnly ?? c.dice.every((d) => d.kind === 'danger')
     const verdicts = c.verdicts ?? c.dice.map((d) => verdictOf(d, greatOnly))
-    checks.value = verdicts.map((v) => check(v, greatOnly))
+    checks.value = verdicts.map((v, i) => check(v, greatOnly, c.dice[i]?.kind === 'skill' ? c.dice[i].face : undefined))
     angle.value = checks.value.map(() => 0)
     phase.value = 'warn'
     fxSound.skillWarn()
@@ -142,7 +151,7 @@ const anyFail = computed(() => shownDice.value.some((d) => isFailure(d) && !d.as
 <template>
   <transition name="dice">
     <div v-if="current" class="skill-modal" :class="[phase, phase === 'landed' ? result : '']" role="status" @click="next">
-      <p class="who">{{ current.title }}</p>
+      <p class="who"><BpText :text="current.title" /></p>
 
       <div class="rings" :class="{ many: checks.length > 2 }">
         <div v-for="(k, i) in checks" :key="`${current.id}-${i}`" class="ring" :class="[phase, phase === 'landed' ? k.verdict : '']">
@@ -179,12 +188,12 @@ const anyFail = computed(() => shownDice.value.some((d) => isFailure(d) && !d.as
             <span class="fill" :style="{ width: `${bar.pct}%` }" />
           </div>
         </div>
-        <span v-if="bar" class="bar-text">{{ bar.text }}</span>
+        <span v-if="bar" class="bar-text"><BpText :text="bar.text" /></span>
       </div>
 
       <div class="dice-line" :class="{ show: phase === 'landed' }">
         <DiceRow :dice="shownDice" />
-        <span class="outcome" :class="[current.tone, { fail: anyFail }]">{{ current.outcome }}</span>
+        <span class="outcome" :class="[current.tone, { fail: anyFail }]"><BpText :text="current.outcome" /></span>
       </div>
       <p class="hint">แตะเพื่อข้าม</p>
     </div>

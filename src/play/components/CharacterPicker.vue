@@ -23,8 +23,10 @@ const props = withDefaults(
     takenLabel?: string
     /** Roulette title, e.g. whose pick it is. */
     rollTitle?: string
+    /** Banned by the room's host: shown, never picked or drawn. */
+    banned?: string[]
   }>(),
-  { taken: () => [], selected: () => [], remaining: 1, locked: false, takenLabel: 'มีคนเลือกแล้ว', rollTitle: '' },
+  { taken: () => [], selected: () => [], remaining: 1, locked: false, takenLabel: 'มีคนเลือกแล้ว', rollTitle: '', banned: () => [] },
 )
 const emit = defineEmits<{ pick: [id: string]; unpick: [id: string] }>()
 
@@ -43,7 +45,7 @@ const list = computed(() =>
     .sort((a, b) => Number(playable(b)) - Number(playable(a))),
 )
 
-const isTaken = (id: string) => props.taken.includes(id)
+const isTaken = (id: string) => props.taken.includes(id) || props.banned.includes(id)
 const isMine = (id: string) => props.selected.includes(id)
 
 // ---------- preview ----------
@@ -126,6 +128,7 @@ function onReelDone(id: string) {
         <img :class="{ 'aura-killer': kind === 'killer' && isMine(c.id), 'aura-survivor': kind === 'survivor' && isMine(c.id) }" :src="asset(c.images.mini)" :alt="c.name" loading="lazy" />
         <span>{{ c.name }}</span>
         <small v-if="!playable(c)" class="muted">เร็ว ๆ นี้</small>
+        <small v-else-if="banned.includes(c.id)" class="muted">🚫 ถูกแบน</small>
         <small v-else-if="isTaken(c.id)" class="muted">{{ takenLabel }}</small>
         <small v-else-if="isMine(c.id)" class="mine-label">✓ เลือกแล้ว</small>
         <small v-else :class="c.difficulty">{{ c.difficulty === 'easy' ? 'ง่าย' : 'ยาก' }}</small>

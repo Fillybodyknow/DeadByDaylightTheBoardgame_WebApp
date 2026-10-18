@@ -8,7 +8,8 @@ import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { boards } from '../engine/boards'
 
-const props = defineProps<{ modelValue: string; readonly?: boolean }>()
+/** `chooser`: who picks it, for the read-only card ("ฆาตกร", "หัวห้อง"); "สุ่ม" for a drawn one. */
+const props = withDefaults(defineProps<{ modelValue: string; readonly?: boolean; chooser?: string }>(), { chooser: 'ฆาตกร' })
 const emit = defineEmits<{ 'update:modelValue': [id: string] }>()
 
 const list = Object.values(boards)
@@ -31,7 +32,7 @@ function random() {
   <section v-if="readonly" class="card map-chosen">
     <img :src="asset(chosen.image)" :alt="chosen.name" />
     <div>
-      <small class="muted">แผนที่ที่ฆาตกรเลือก</small>
+      <small class="muted">{{ chooser === 'สุ่ม' ? 'แผนที่ที่สุ่มได้' : `แผนที่ที่${chooser}เลือก` }}</small>
       <h2>{{ chosen.name }}</h2>
       <p class="muted small">ทุกตัวจะทอยหาห้องเริ่มต้นตอนเข้า Trial (หน้า 6)</p>
     </div>

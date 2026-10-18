@@ -11,6 +11,8 @@ import { asset } from '../i18n'
 import { renderMd, rulesSections, searchRules } from '../rulesDoc'
 import { loading } from '../loading'
 import { useLobbyStore, type MiniKey } from '../stores/lobby'
+import BpIcon from '../components/BpIcon.vue'
+import BpText from '../components/BpText.vue'
 
 const lobby = useLobbyStore()
 const router = useRouter()
@@ -144,7 +146,7 @@ function rematch() {
           <div>
             <h3>ลูกเต๋า Skill Check (ดำ)</h3>
             <div class="faces">
-              <figure><img :src="asset(components.skillDieFaces[5])" alt="" /><figcaption class="fail">0 ล้มเหลว<br />Killer +1 ▲</figcaption></figure>
+              <figure><img :src="asset(components.skillDieFaces[5])" alt="" /><figcaption class="fail">0 ล้มเหลว<br />Killer +1 <BpIcon /></figcaption></figure>
               <figure><img :src="asset(components.skillDieFaces[3])" alt="" /><figcaption>1–4 สำเร็จ</figcaption></figure>
               <figure><img :src="asset(components.skillDieFaces[2])" alt="" /><figcaption class="great">5 สำเร็จยิ่งใหญ่</figcaption></figure>
             </div>
@@ -159,7 +161,7 @@ function rematch() {
         </div>
 
         <details v-for="sec in quickSections" :key="sec.num" class="card sec" :open="openQuick === sec.num" @toggle="($event.target as HTMLDetailsElement).open && (openQuick = sec.num)">
-          <summary>{{ sec.title }}</summary>
+          <summary><BpText :text="sec.title" /></summary>
           <div class="md" v-html="renderMd(sec.body)" />
         </details>
       </div>
@@ -168,7 +170,7 @@ function rematch() {
         <input v-model="query" type="search" placeholder="พิมพ์คำค้น เช่น pallet, ตู้, hook, ทอยใหม่" autofocus />
         <p v-if="query.trim().length >= 2 && !results.length" class="muted">ไม่พบ</p>
         <div v-for="r in results" :key="r.section.num" class="card hit">
-          <h3>{{ r.section.num }}. {{ r.section.title }}</h3>
+          <h3>{{ r.section.num }}. <BpText :text="r.section.title" /></h3>
           <div class="md" v-html="highlight(renderMd(r.lines.join('\n')))" />
         </div>
       </div>

@@ -48,6 +48,9 @@ export type PerkId =
   | 'no_way_out'
   | 'crowd_control'
   | 'starstruck'
+  | 'dark_devotion'
+  | 'corrupt_intervention'
+  | 'infectious_fright'
   // survivors
   | 'prove_thyself'
   | 'leader'
@@ -91,6 +94,9 @@ export type PerkId =
   | 'poised'
   | 'solidarity'
   | 'head_on'
+  | 'windows_of_opportunity'
+  | 'boil_over'
+  | 'dance_with_me'
 
 export interface PerkDef {
   id: PerkId
@@ -181,6 +187,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   no_way_out: def('no_way_out', 'No Way Out', 1, 'killer', 'trickster', 0, 'ถามเมื่อผู้รอดชีวิตที่มี ▲ น้อยกว่าคุณจะ Interact กับ Generator / Exit Gate'),
   crowd_control: def('crowd_control', 'Crowd Control', 1, 'killer', 'trickster', 1, 'ถามตอนเริ่มเฟสวางแผน'),
   starstruck: def('starstruck', 'Starstruck', 2, 'killer', 'trickster', 2, 'ถามเมื่อคุณจะอุ้มผู้รอดชีวิต'),
+  dark_devotion: def('dark_devotion', 'Dark Devotion', 2, 'killer', 'plague', 0, 'ถามตอนเริ่มเก็บกวาด'),
+  corrupt_intervention: def('corrupt_intervention', 'Corrupt Intervention', 1, 'killer', 'plague', 1, 'ถามตอนเริ่มเฟสวางแผน'),
+  infectious_fright: def('infectious_fright', 'Infectious Fright', 1, 'killer', 'plague', 2, 'ถามหลังโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ'),
   rancor: def('rancor', 'Rancor', 2, 'killer', 'spirit', 0, 'ถามเมื่อคุณเดินออกจากห้องที่มีผู้รอดชีวิตบาดเจ็บ'),
   haunted_ground: def('haunted_ground', 'Haunted Ground', 1, 'killer', 'spirit', 1, 'ถามหลังผู้รอดชีวิตเปิด prop'),
   spirit_fury: def('spirit_fury', 'Spirit Fury', 0, 'killer', 'spirit', 2, 'ถามหลังคุณทำลาย Pallet'),
@@ -198,6 +207,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   built_to_last: def('built_to_last', 'Built to Last', 2, 'survivor', 'felix', 2, 'ถามเมื่อจะทิ้ง item หลังใช้'),
   poised: def('poised', 'Poised', 1, 'survivor', 'jane', 0, 'ถามเมื่อผู้รอดชีวิตทอย Skill Check ได้สำเร็จอย่างยิ่งในเทิร์นผู้รอดชีวิต'),
   solidarity: def('solidarity', 'Solidarity', 1, 'survivor', 'jane', 1, 'ปุ่มแทนการ Interact: รักษาผู้รอดชีวิตในห้องที่เชื่อมกัน'),
+  windows_of_opportunity: def('windows_of_opportunity', 'Windows of Opportunity', 1, 'survivor', 'kate', 0, 'ปุ่มแทนการ Interact: prop สีน้ำเงิน / เขียวในห้องที่เชื่อมกัน'),
+  boil_over: def('boil_over', 'Boil Over', 2, 'survivor', 'kate', 1, 'ถามหลังฆาตกรเลือกจำนวนเต๋าตอนอุ้มคุณหรือคนในห้องคุณ'),
+  dance_with_me: def('dance_with_me', 'Dance With Me', 0, 'survivor', 'kate', 2, 'ถามหลังเดินด้วยการ์ด ถ้าเริ่มเทิร์นใน Locker'),
   head_on: def('head_on', 'Head On', 1, 'survivor', 'jane', 2, 'ถามเมื่อฆาตกรเข้าห้องของคุณในเทิร์นฆาตกร'),
 }
 
@@ -208,4 +220,4 @@ export const PRINTED_PERKS: Record<string, PerkId[]> = Object.values(PERKS).redu
 }, {})
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague']

@@ -9,8 +9,9 @@ import { asset } from '../../i18n'
 import type { GameState } from '../engine/types'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
-import { killerMini, survivorMini } from '../labels'
+import { VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ st: GameState }>()
 
@@ -64,7 +65,7 @@ const shape = computed(() => {
       <div class="panel">
         <span class="label">{{ LABEL[current.kind] }}</span>
         <div class="row">
-          <Mini class="face" :class="killer ? 'aura-killer' : 'aura-survivor'" :src="asset(face(current.owner))" />
+          <Mini class="face" :class="killer ? 'aura-killer' : 'aura-survivor'" :src="asset(current.victor ? VICTOR_MINI : face(current.owner))" />
           <template v-if="current.image">
             <span class="arrow" aria-hidden="true">›</span>
             <span v-if="shape === 'power'" class="pic power" :style="{ backgroundImage: `url(${asset(current.image)})` }" />
@@ -82,8 +83,8 @@ const shape = computed(() => {
             <Mini class="face target" :src="asset(face(current.target))" />
           </template>
         </div>
-        <h2>{{ current.title }}</h2>
-        <p v-if="current.sub" class="sub">{{ current.sub }}</p>
+        <h2><BpText :text="current.title" /></h2>
+        <p v-if="current.sub" class="sub"><BpText :text="current.sub" /></p>
       </div>
     </div>
   </transition>

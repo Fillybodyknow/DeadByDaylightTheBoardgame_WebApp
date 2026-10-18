@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { GENERATORS_TO_POWER, SACRIFICE_TO_WIN, generatorsDone } from '../engine/engine'
 import type { GameState } from '../engine/types'
 import { roundSummary } from '../stats'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ st: GameState; round: number }>()
 const emit = defineEmits<{ close: [] }>()
@@ -36,7 +37,7 @@ const gained = computed(() => sum.value.sacrificeAfter - sum.value.sacrificeBefo
       </div>
 
       <ul v-if="sum.lines.length" class="lines">
-        <li v-for="(l, i) in sum.lines" :key="i" :class="l.tone" :style="{ animationDelay: `${120 + i * 70}ms` }">{{ l.text }}</li>
+        <li v-for="(l, i) in sum.lines" :key="i" :class="l.tone" :style="{ animationDelay: `${120 + i * 70}ms` }"><BpText :text="l.text" /></li>
       </ul>
       <p v-else class="muted">รอบนี้เงียบ… ไม่มีใครบาดเจ็บหรือถูกแขวน</p>
 

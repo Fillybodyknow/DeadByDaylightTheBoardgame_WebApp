@@ -6,6 +6,8 @@ import type { GameState } from '../engine/types'
 import { killerMini, playerOf, survivorMini } from '../labels'
 import { gameStats, timeline } from '../stats'
 import Mini from './Mini.vue'
+import BpIcon from '../../components/BpIcon.vue'
+import BpText from '../../components/BpText.vue'
 
 /** `online`: "play again" takes the room back to its lobby rather than to a new game here. */
 const props = defineProps<{ st: GameState; winner: 'survivors' | 'killer'; online?: boolean }>()
@@ -86,7 +88,7 @@ const mvp = computed(() => {
           <li><b>{{ stats.killer.trapsSprung }}</b>/{{ stats.killer.trapsSet }} Trap ทำงาน</li>
           <li><b>{{ stats.killer.damaged }}</b> ทำลาย Gen</li>
           <li><b>{{ stats.killer.breaks }}</b> ทุบ Pallet/กำแพง</li>
-          <li><b>{{ stats.killer.bp }}</b> ▲ ที่ได้</li>
+          <li><b>{{ stats.killer.bp }}</b> <BpIcon /> ที่ได้</li>
         </ul>
       </section>
 
@@ -95,7 +97,7 @@ const mvp = computed(() => {
         <ol class="timeline">
           <li v-for="(e, i) in events" :key="i" :class="e.tone">
             <span class="round">รอบ {{ e.round }}</span>
-            {{ e.text }}
+            <BpText :text="e.text" />
           </li>
         </ol>
       </section>

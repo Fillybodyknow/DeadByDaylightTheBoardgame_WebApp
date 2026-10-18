@@ -5,7 +5,7 @@
 //   nothing of the killer's side); the killer picks and sees the survivors' picks; when
 //   everyone has locked in, the killer starts the game.
 import { computed, ref, watch } from 'vue'
-import { survivorById } from '../../data'
+import { killerById, survivorById } from '../../data'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { KILLER_PLAYER } from '../engine/seats'
@@ -17,12 +17,14 @@ import {
   leaveRoom,
   lobbyBlocker,
   lockPicks,
+  mayPickBoard,
   me,
   memberList,
   mySeat,
   pickCharacter,
   pickWaiting,
   proceedToPick,
+  roomSettings,
   session,
   setBoard,
   setDouble,
@@ -35,6 +37,7 @@ import {
 import CharacterPicker from './CharacterPicker.vue'
 import MapPicker from './MapPicker.vue'
 import Mini from './Mini.vue'
+import RoomSettingsCard from './RoomSettingsCard.vue'
 import SyncBadge from './SyncBadge.vue'
 
 const data = computed(() => session.data!)
@@ -68,6 +71,9 @@ function saveName() {
   const n = name.value.trim()
   if (n && n !== me.value?.name) void setName(n)
 }
+
+/** Names on a side, for its card. */
+const sideNames = (s: 'killer' | 'survivor') => memberList.value.filter((m) => m.side === s).map((m) => m.name)
 
 const killerTaken = computed(() => memberList.value.some((m) => m.side === 'killer' && m.id !== session.me))
 const survivorCount = computed(() => memberList.value.filter((m) => m.side === 'survivor').length)
@@ -130,10 +136,16 @@ const survivorSlots = computed(() =>
   }),
 )
 
-/** Survivors a teammate already took (not counting this player's own slots). */
+/** Survivors a teammate already took (not counting this player's own slots); none with repeats allowed. */
 const takenByOthers = computed(
-  () => new Set(survivorSlots.value.filter((s) => !s.mine && s.character).map((s) => s.character!.id)),
+  () => new Set(roomSettings.value.dupes ? [] : survivorSlots.value.filter((s) => !s.mine && s.character).map((s) => s.character!.id)),
 )
+
+/** Who picks the board, for the read-only card. */
+const boardChooser = computed(() => ({ killer: 'ฆาตกร', secret: 'ฆาตกร', host: 'หัวห้อง', random: 'สุ่ม' })[roomSettings.value.map])
+
+/** The killer's pick, for the survivors when the room shows it. */
+const shownKiller = computed(() => (roomSettings.value.showKiller && data.value.picks.killer ? killerById.get(data.value.picks.killer) : undefined))
 
 /** Put a survivor in the slot being filled, then move on to the next empty one. */
 function pickSurvivor(id: string) {
@@ -187,22 +199,35 @@ function start() {
 
     <!-- ================= lobby ================= -->
     <template v-if="data.phase === 'lobby'">
+      <!-- the room's settings first: everyone reads them before choosing a side -->
+      <RoomSettingsCard />
+
       <section class="card">
+        <!-- name, then the side (the main choice, big), then ready -->
+        <label class="field">
+          ชื่อของคุณ
+          <input v-model="name" maxlength="16" placeholder="ชื่อที่เพื่อนจะเห็น" @focus="nameFocused = true" @blur="saveName" @keyup.enter="saveName" />
+        </label>
+        <p class="pick-side">เลือกฝั่ง</p>
+        <div class="sides">
+          <button class="side killer" :class="{ on: me?.side === 'killer' }" :disabled="session.busy || (killerTaken && me?.side !== 'killer')" @click="side('killer')">
+            <span class="side-icon" aria-hidden="true">🔪</span>
+            <span class="side-name">Killer</span>
+            <span class="side-count">{{ sideNames('killer').length }}/1 คน</span>
+            <span class="side-who">{{ sideNames('killer').join(', ') || 'ว่าง' }}</span>
+            <span v-if="me?.side === 'killer'" class="side-mine">✓ ฝั่งของคุณ</span>
+            <span v-else-if="killerTaken" class="side-full">เต็มแล้ว</span>
+          </button>
+          <button class="side survivor" :class="{ on: me?.side === 'survivor' }" :disabled="session.busy || (survivorCount >= 4 && me?.side !== 'survivor')" @click="side('survivor')">
+            <span class="side-icon" aria-hidden="true">🏃</span>
+            <span class="side-name">Survivor</span>
+            <span class="side-count">{{ survivorCount }}/4 คน</span>
+            <span class="side-who">{{ sideNames('survivor').join(', ') || 'ว่าง' }}</span>
+            <span v-if="me?.side === 'survivor'" class="side-mine">✓ ฝั่งของคุณ</span>
+            <span v-else-if="survivorCount >= 4" class="side-full">เต็มแล้ว</span>
+          </button>
+        </div>
         <div class="me-row">
-          <label class="field">
-            ชื่อของคุณ
-            <input v-model="name" maxlength="16" placeholder="ชื่อที่เพื่อนจะเห็น" @focus="nameFocused = true" @blur="saveName" @keyup.enter="saveName" />
-          </label>
-          <div class="sides">
-            <button class="side killer" :class="{ on: me?.side === 'killer' }" :disabled="session.busy || (killerTaken && me?.side !== 'killer')" @click="side('killer')">
-              🔪 Killer
-              <small>{{ killerTaken && me?.side !== 'killer' ? 'มีคนเลือกแล้ว' : '1 คน' }}</small>
-            </button>
-            <button class="side survivor" :class="{ on: me?.side === 'survivor' }" :disabled="session.busy || (survivorCount >= 4 && me?.side !== 'survivor')" @click="side('survivor')">
-              🏃 Survivor
-              <small>{{ survivorCount }}/4 คน</small>
-            </button>
-          </div>
           <button class="ready" :class="{ primary: !me?.ready, done: me?.ready }" :disabled="session.busy || !me?.side" @click="toggleReady">
             {{ me?.ready ? '✓ พร้อมแล้ว (กดเพื่อยกเลิก)' : me?.side ? 'พร้อม' : 'เลือกฝั่งก่อน' }}
           </button>
@@ -266,14 +291,40 @@ function start() {
       </section>
 
       <!-- the killer's map, on top: the character picker below is long, and this would be lost under it -->
-      <MapPicker v-if="!amKiller" :model-value="data.board ?? 'macmillan'" readonly />
+      <!-- the killer, for the survivors when the room shows it -->
+      <section v-if="roomSettings.showKiller && !amKiller" class="card drawn">
+        <Mini v-if="shownKiller" class="mini aura-killer" :src="asset(shownKiller.images.mini)" />
+        <span v-else class="empty">?</span>
+        <span>
+          <small class="muted">ฆาตกร{{ data.locked['1'] ? ' (ยืนยันแล้ว)' : '' }}</small>
+          <strong class="killer-name">{{ shownKiller?.name ?? 'กำลังเลือก…' }}</strong>
+        </span>
+      </section>
+
+      <!-- a secret map (room settings): the survivors learn it when the game starts -->
+      <section v-if="!mayPickBoard && roomSettings.map === 'secret'" class="card">
+        <h2>🗺 แผนที่ลับ</h2>
+        <p class="muted">ฆาตกรเลือกแผนที่แบบลับ — จะรู้ตอนเริ่มเกม</p>
+      </section>
+      <MapPicker v-else-if="!mayPickBoard" :model-value="data.board ?? 'macmillan'" :chooser="boardChooser" readonly />
+
+      <!-- characters drawn for everyone (room settings): nothing to pick, only to confirm -->
+      <section v-if="roomSettings.random && mySeat" class="card">
+        <h2>🎲 สุ่มตัวละครให้แล้ว</h2>
+        <p class="muted">หัวห้องตั้งให้สุ่มตัวละครทุกคน — ตรวจดูแล้วกดยืนยันด้านล่าง</p>
+        <div v-if="amKiller && data.picks.killer" class="drawn">
+          <Mini class="mini aura-killer" :src="asset(killerById.get(data.picks.killer)?.images.mini ?? '')" />
+          <strong>{{ killerById.get(data.picks.killer)?.name }}</strong>
+        </div>
+      </section>
 
       <!-- survivor players pick survivors -->
-      <section v-if="mySlots.length" class="card">
+      <section v-if="mySlots.length && !roomSettings.random" class="card">
         <h2>เลือก Survivor {{ mySlots.length > 1 ? `(คุณคุม ${mySlots.length} ตัว — แตะช่องด้านบนเพื่อสลับ)` : '' }}</h2>
         <CharacterPicker
           kind="survivor"
           :taken="[...takenByOthers]"
+          :banned="roomSettings.bans"
           :selected="myPicks"
           :remaining="mySlots.length - myPicks.length"
           :locked="locked"
@@ -285,11 +336,12 @@ function start() {
       </section>
 
       <!-- the killer picks a killer; survivors never see this part -->
-      <section v-if="amKiller" class="card killer-card">
+      <section v-if="amKiller && !roomSettings.random" class="card killer-card">
         <h2>🔪 เลือกฆาตกร</h2>
         <CharacterPicker
           kind="killer"
           :selected="data.picks.killer ? [data.picks.killer] : []"
+          :banned="roomSettings.bans"
           :remaining="data.picks.killer ? 0 : 1"
           :locked="locked"
           @pick="pickCharacter('killer', $event)"
@@ -297,8 +349,8 @@ function start() {
         />
       </section>
 
-      <!-- the killer picks the board (the survivors' copy of it is above) -->
-      <MapPicker v-if="amKiller" :model-value="data.board ?? 'macmillan'" @update:model-value="setBoard" />
+      <!-- whoever picks the board (the killer, or the host); everyone else's copy of it is above -->
+      <MapPicker v-if="mayPickBoard" :model-value="data.board ?? 'macmillan'" @update:model-value="setBoard" />
 
       <section v-if="mySeat" class="card actions">
         <button class="lockbtn" :class="{ primary: !locked }" :disabled="session.busy || !myPicksComplete" @click="toggleLock">
@@ -369,14 +421,20 @@ h2 {
 }
 .me-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 1rem;
+  margin-top: 0.9rem;
+}
+.me-row .ready {
+  flex: 1;
+}
+.pick-side {
+  margin: 0.9rem 0 0.4rem;
+  font-weight: 600;
 }
 .field {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  max-width: 22rem;
 }
 input {
   font: inherit;
@@ -386,20 +444,57 @@ input {
   border-radius: var(--radius);
   padding: 0.5rem 0.7rem;
 }
+/* the two sides as big cards, side by side: the room's main choice */
 .sides {
-  display: flex;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
 }
 .side {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 8.5rem;
-  padding: 0.6rem 0.9rem;
-  font-size: 1.05rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  padding: 1rem 0.8rem 0.9rem;
+  border-radius: 12px;
+  text-align: center;
 }
-.side small {
-  font-size: 0.75rem;
+.side.killer {
+  background: linear-gradient(180deg, rgb(120 10 10 / 0.35), rgb(0 0 0 / 0.25));
+}
+.side.survivor {
+  background: linear-gradient(180deg, rgb(140 100 20 / 0.3), rgb(0 0 0 / 0.25));
+}
+.side-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.side-name {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  letter-spacing: 0.04em;
+}
+.side-count {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.side-who {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+.side-mine {
+  margin-top: 0.2rem;
+  padding: 0.05rem 0.6rem;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.12);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.side-full {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
   color: var(--muted);
 }
 .side.killer.on {
@@ -417,6 +512,19 @@ input {
 .ready.done {
   border-color: var(--ok);
   color: var(--ok);
+}
+.drawn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.drawn .mini {
+  width: 56px;
+  height: 56px;
+}
+.killer-name {
+  display: block;
+  font-size: 1.15rem;
 }
 .members {
   list-style: none;
@@ -500,12 +608,14 @@ input {
   box-shadow: 0 0 0 2px var(--warn) inset;
 }
 .slot .mini,
-.slot .empty {
+.slot .empty,
+.drawn .empty {
   width: 48px;
   height: 48px;
   flex: none;
 }
-.slot .empty {
+.slot .empty,
+.drawn .empty {
   display: grid;
   place-items: center;
   border-radius: 50%;

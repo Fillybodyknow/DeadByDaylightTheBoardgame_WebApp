@@ -6,6 +6,7 @@ import { asset } from '../../i18n'
 import type { GameState, PerkOwner } from '../engine/types'
 import { killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ st: GameState; who: PerkOwner | null | undefined; text: string }>()
 
@@ -19,7 +20,7 @@ const face = computed(() => {
 <template>
   <span class="face-label">
     <Mini v-if="face" class="chip" :class="{ wounded: typeof who === 'number' && st.survivors[who].wounded }" :src="asset(face)" />
-    <span>{{ text }}</span>
+    <span><BpText :text="text" /></span>
   </span>
 </template>
 

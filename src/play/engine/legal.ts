@@ -5,6 +5,7 @@ import {
   carryMoves,
   crowdPayments,
   crowdPledges,
+  purgeOptions,
   itemUses,
   killerInteractions,
   killerMoves,
@@ -91,6 +92,9 @@ export function legalActions(st: GameState): Action[] {
         out.push({ t: 'phantasm', teleport: true })
         for (const i of phantasmInteractions(st, step.room)) out.push({ t: 'phantasm', teleport: true, i })
       }
+      break
+    case 'purgeChoice':
+      for (const perk of purgeOptions(st, step.s, step.mode)) out.push({ t: 'purgeChoice', perk })
       break
     case 'replaceCard':
       for (const card of new Set(st.survivorHands[st.survivors[step.s].hand])) out.push({ t: 'replace', card })

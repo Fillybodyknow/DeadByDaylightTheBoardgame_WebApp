@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset, lang, tr } from '../i18n'
 import type { Killer, Perk, Survivor } from '../types'
 import RichText from './RichText.vue'
+import BpIcon from './BpIcon.vue'
+import BpText from './BpText.vue'
 
 // One character's board: perks, and for killers the power and passive panels.
 // `perks` overrides the printed perks (Devout mode picks).
@@ -59,11 +61,11 @@ const t = computed(() =>
       <div>
         <h2>{{ character.name }}</h2>
         <p class="muted meta">
-          <template v-if="survivor && tr(survivor.title)">{{ tr(survivor.title) }} · </template>
+          <template v-if="survivor && tr(survivor.title)"><BpText :text="tr(survivor.title)" /> · </template>
           <template v-if="killer?.realName">{{ killer.realName }} · </template>
-          <span :class="character.difficulty">{{ t[character.difficulty] }}</span> · ▲ {{ character.bloodpoints.start }} / {{ character.bloodpoints.max }}
+          <span :class="character.difficulty">{{ t[character.difficulty] }}</span> · <BpIcon /> {{ character.bloodpoints.start }} / {{ character.bloodpoints.max }}
         </p>
-        <button type="button" class="small" @click="showBoard = !showBoard">{{ showBoard ? t.text : t.board }}</button>
+        <button type="button" class="small" @click="showBoard = !showBoard"><BpText :text="showBoard ? t.text : t.board" /></button>
       </div>
     </header>
 
@@ -115,7 +117,7 @@ const t = computed(() =>
             loading="lazy"
           />
           <article v-else class="card perk">
-            <h3><span class="cost">{{ p.cost }}</span> {{ p.name }}</h3>
+            <h3><span class="cost"><BpText :text="p.cost" /></span> {{ p.name }}</h3>
             <p class="muted flavor">{{ tr(p.flavor) }}</p>
             <RichText :text="tr(p.text)" />
           </article>

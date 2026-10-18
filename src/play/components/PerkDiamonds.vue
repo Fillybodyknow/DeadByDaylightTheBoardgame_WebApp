@@ -7,14 +7,16 @@ import { asset } from '../../i18n'
 import { perkUsed } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { GameState, PerkOwner } from '../engine/types'
-import { perkImage } from '../labels'
+import { VILE_PURGE_IMAGE, perkImage } from '../labels'
 
 const props = defineProps<{ st: GameState; owner: PerkOwner }>()
 const emit = defineEmits<{ open: [perk: PerkId] }>()
 
 const perks = computed(() => {
   const list = props.owner === 'killer' ? props.st.killer.perks : props.st.survivors[props.owner].perks
-  return list.slice(0, 3).map((p) => ({ p, used: perkUsed(props.st, props.owner, p), image: perkImage(p) }))
+  // a perk under one of The Plague's Vile Purges is covered: it can't be used
+  const covered = props.owner === 'killer' ? [] : (props.st.survivors[props.owner].purged ?? [])
+  return list.slice(0, 3).map((p) => ({ p, used: perkUsed(props.st, props.owner, p), covered: covered.includes(p), image: perkImage(p) }))
 })
 const killer = computed(() => props.owner === 'killer')
 </script>
@@ -26,11 +28,12 @@ const killer = computed(() => props.owner === 'killer')
       :key="x.p"
       type="button"
       class="diamond"
-      :class="[`at-${i}`, { used: x.used }]"
-      :title="`${PERKS[x.p].name}${PERKS[x.p].cost ? ` (${PERKS[x.p].cost} ▲)` : ' (ฟรี)'}${x.used ? ' — ใช้แล้วรอบนี้' : ''} · คลิกเพื่อดู`"
+      :class="[`at-${i}`, { used: x.used, covered: x.covered }]"
+      :title="`${PERKS[x.p].name}${PERKS[x.p].cost ? ` (${PERKS[x.p].cost} ▲)` : ' (ฟรี)'}${x.covered ? ' — ถูก Vile Purge ปิด ใช้ไม่ได้' : x.used ? ' — ใช้แล้วรอบนี้' : ''} · คลิกเพื่อดู`"
       @click.stop="emit('open', x.p)"
     >
       <span class="face" :style="x.image ? { backgroundImage: `url(${asset(x.image)})` } : {}" />
+      <img v-if="x.covered" class="purge" :src="asset(VILE_PURGE_IMAGE)" alt="Vile Purge" />
     </button>
   </div>
 </template>
@@ -89,6 +92,21 @@ const killer = computed(() => props.owner === 'killer')
   background-size: 230% auto;
   background-position: 50% 14%;
   background-repeat: no-repeat;
+}
+/* covered by a Vile Purge: the token sits on it */
+.diamond.covered {
+  background: linear-gradient(135deg, #d9f7a8, #5d7d1e);
+}
+.diamond.covered .face {
+  filter: grayscale(1) brightness(0.35);
+}
+.purge {
+  position: absolute;
+  inset: 22%;
+  width: 56%;
+  height: 56%;
+  border-radius: 3px;
+  pointer-events: none;
 }
 /* used this round: dim and grey, as the PC game greys a perk on cooldown */
 .diamond.used {

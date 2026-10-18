@@ -11,6 +11,7 @@
 // its own numbered slot, and whoever loses the slot re-checks their action against the new state.
 
 import type { Action, GameState } from '../engine/types'
+import type { RoomSettings } from './settings'
 
 export interface SeatInfo {
   /** Client id of the device sitting here. */
@@ -47,8 +48,10 @@ export interface RoomData {
   players: number
   /** Lobby with 3 survivor players: the member who plays two survivors (unset: the first to join). */
   double?: string
-  /** The board the killer picked (unset: MacMillan Estate). */
+  /** The board picked (by the killer or the host, or drawn; unset: MacMillan Estate). */
   board?: string
+  /** The host's room settings (anything unset: its default, see settings.ts). */
+  settings?: Partial<RoomSettings>
   /** Character picks: 'killer' → killer id, survivor slot '0'..'3' → survivor id. */
   picks: Record<string, string>
   /** Player number → picks confirmed. */

@@ -6,6 +6,7 @@ import { asset } from '../../i18n'
 import { fx } from '../fx/bus'
 import { fxSound } from '../fx/audio'
 import Mini from './Mini.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ paused: boolean }>()
 
@@ -38,8 +39,8 @@ onBeforeUnmount(() => clearTimeout(timer))
       <div class="band">
         <Mini v-if="current.image" class="face" :class="current.tone === 'killer' ? 'aura-killer' : 'aura-survivor'" :src="asset(current.image)" />
         <div>
-          <strong>{{ current.title }}</strong>
-          <span v-if="current.sub">{{ current.sub }}</span>
+          <strong><BpText :text="current.title" /></strong>
+          <span v-if="current.sub"><BpText :text="current.sub" /></span>
         </div>
       </div>
     </div>

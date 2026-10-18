@@ -54,6 +54,8 @@ export interface PerkShow {
 export interface ActionShow {
   id: number
   owner: PerkOwner
+  /** The Twins: done by Victor on a turn taken with him (his mini, not Charlotte's). */
+  victor?: boolean
   /** move: a movement card; power: the killer's power; passive: a killer passive. */
   kind: 'move' | 'action' | 'power' | 'passive'
   /** "Meg ทิ้ง Pallet บนเส้นทาง" */

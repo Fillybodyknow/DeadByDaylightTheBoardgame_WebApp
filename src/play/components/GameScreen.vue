@@ -13,7 +13,8 @@ import { canUndo, controls, dispatch, myTurn, online, quitGame, undo } from '../
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
-import { closeOnlineGame, isHost, leaveRoom, session } from '../online/session'
+import { closeOnlineGame, isHost, leaveRoom, roomSettings, session } from '../online/session'
+import { timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
 import { STEP_NAME, boardActionKeys, perkPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
@@ -33,6 +34,7 @@ import Planning from './Planning.vue'
 import RoundSummary from './RoundSummary.vue'
 import StatusPanel from './StatusPanel.vue'
 import SyncBadge from './SyncBadge.vue'
+import BpText from '../../components/BpText.vue'
 
 const props = defineProps<{ st: GameState }>()
 
@@ -342,8 +344,12 @@ const modeBar = computed(() => {
       text: perkPicked.value === 'iron_maiden' ? 'Iron Maiden: คลิก Locker ว่างที่กระพริบบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`,
       cancel: () => (perkPicked.value = null),
     }
-  if (breakoutTarget.value !== null)
-    return { text: `Breakout: ย้าย ${view.value.survivors[breakoutTarget.value].name} — คลิกเส้นทางบนแผนที่`, cancel: () => (breakoutTarget.value = null) }
+  if (breakoutTarget.value !== null) {
+    // Breakout, or a killer perk that moves a survivor (Dark Devotion, Infectious Fright)
+    const s = view.value.step
+    const name = s.t === 'offer' ? PERKS[s.perk].name : 'Breakout'
+    return { text: `${name}: ย้าย ${view.value.survivors[breakoutTarget.value].name} — คลิกเส้นทางบนแผนที่`, cancel: () => (breakoutTarget.value = null) }
+  }
   if (trapPath.value) return { text: 'Bear Trap หมดมือ: คลิก Bear Trap บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
   if (itemPick.value !== null) return { text: 'เลือกเป้าหมายของ item บนแผนที่', cancel: () => (itemPick.value = null) }
   if (forkMoves.value)
@@ -561,6 +567,8 @@ const askWhat = computed(() => {
   const st = props.st
   const s = st.step
   switch (s.t) {
+    case 'setupReveal':
+      return 'เตรียมเกม — เปิด prop 1 อันบนแผนที่'
     case 'planSurvivors':
     case 'planKiller':
       return 'วางแผน — เลือกการ์ดเคลื่อนที่'
@@ -645,6 +653,52 @@ watch(
   },
   { immediate: true },
 )
+
+// ---------- online: the room's turn timer (room settings) ----------
+// Each decision gets the room's time, counted from when it shows (after the animations before
+// it). When it runs out, the player's own device answers what can be passed over (timeout.ts);
+// a move or a plan stays theirs, and the whole room is told they are over time.
+
+const turnLimit = computed(() => (online.value && props.st.phase !== 'over' ? roomSettings.value.timer : 0))
+const fxBusy = computed(() => fx.dice.length > 0 || fx.perks.length > 0 || fx.boardBusy)
+/** Changes with every new decision (or new set of players being waited on). */
+const waitKey = computed(() => JSON.stringify([props.st.step, actorsOf(props.st)]))
+const turnStarted = ref(Date.now())
+const clock = ref(Date.now())
+watch([waitKey, fxBusy], () => (turnStarted.value = clock.value = Date.now()))
+let clockTimer: number | null = null
+watch(
+  turnLimit,
+  (limit) => {
+    if (clockTimer !== null) clearInterval(clockTimer)
+    clockTimer = limit ? window.setInterval(() => (clock.value = Date.now()), 500) : null
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => clockTimer !== null && clearInterval(clockTimer))
+
+/** Seconds left on this decision; null without a timer (or while animations play). */
+const timeLeft = computed(() => {
+  if (!turnLimit.value || fxBusy.value) return null
+  return Math.max(0, Math.ceil(turnLimit.value - (clock.value - turnStarted.value) / 1000))
+})
+
+/** Who the room waits on, by name, for everyone else's timer pill. */
+const waitingNames = computed(() => {
+  const seats = session.data?.seats ?? {}
+  return actorsOf(props.st).map((p) => seats[String(p)]?.name ?? `ผู้เล่น ${p}`)
+})
+
+let timedOut = ''
+watch(timeLeft, (t) => {
+  if (t !== 0 || !yourTurn.value || timedOut === waitKey.value) return
+  timedOut = waitKey.value
+  const acts = timeoutActions(props.st, online.value!.seat)
+  if (acts.length) {
+    showBanner({ title: 'หมดเวลา', sub: 'ตอบ "ไม่ใช้" ให้อัตโนมัติ', tone: 'game' })
+    for (const a of acts) dispatch(a)
+  } else showBanner({ title: 'หมดเวลาแล้ว!', sub: `ทั้งห้องกำลังรอ — ${askWhat.value}`, tone: 'game' })
+})
 
 // ---------- terror radius ----------
 
@@ -855,7 +909,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <!-- floating at the foot of the screen: showing a bar must not move or resize the board -->
         <div class="board-bars">
           <div v-if="modeBar" class="reveal-bar card">
-            <span>{{ modeBar.text }}</span>
+            <span><BpText :text="modeBar.text" /></span>
             <button @click="modeBar.cancel()">ยกเลิก</button>
           </div>
           <div v-if="oppressing" class="reveal-bar card">
@@ -935,8 +989,13 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <div v-if="yourTurn" class="your-turn" role="status" aria-live="polite">
       <span class="bell" aria-hidden="true">🔔</span>
       <b>ถึงตาคุณ</b>
-      <span>{{ askWhat }}</span>
+      <span><BpText :text="askWhat" /></span>
       <small v-if="othersWaiting">· เพื่อนกำลังรอ</small>
+      <b v-if="timeLeft !== null" class="clock" :class="{ low: timeLeft <= 10 }">⏱ {{ timeLeft ? `${timeLeft} วิ` : 'หมดเวลา' }}</b>
+    </div>
+    <!-- online with a turn timer: everyone else sees whom the room waits on, and their time -->
+    <div v-else-if="timeLeft !== null && waitingNames.length" class="wait-clock" :class="{ over: timeLeft === 0 }" role="status">
+      ⏱ {{ timeLeft ? `${timeLeft} วิ` : 'หมดเวลา' }} · รอ {{ waitingNames.join(', ') }}
     </div>
     <div v-if="terror" class="terror" :class="{ close: terror === 2 }" :style="{ '--beat': `${60 / terrorBpm}s` }" />
     <div v-if="fx.flash" :key="fx.flash.id" class="flash" :class="fx.flash.tone" @animationend="fx.flash = null" />
@@ -1105,6 +1164,40 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 }
 /* online: while the game waits on this device, a pill at the top and a gold glow round the
    screen (under modals and the hand, over the map) */
+.clock {
+  margin-left: 0.3rem;
+  padding: 0 0.45rem;
+  border-radius: 99px;
+  background: rgb(255 214 106 / 0.2);
+  font-variant-numeric: tabular-nums;
+}
+.clock.low {
+  background: var(--blood);
+  color: #fff;
+}
+.wait-clock {
+  position: fixed;
+  z-index: 18;
+  top: 0.6rem;
+  left: 50%;
+  translate: -50%;
+  max-width: calc(100vw - 2rem);
+  padding: 0.25rem 0.8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  background: rgb(10 12 18 / 0.9);
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.wait-clock.over {
+  border-color: var(--blood-bright);
+  color: #ffb3b3;
+}
 .your-turn {
   position: fixed;
   z-index: 18;

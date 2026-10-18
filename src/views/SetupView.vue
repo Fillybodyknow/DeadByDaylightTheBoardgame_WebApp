@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { components, killerById, mapById, perkOption, printedPerks, survivorById } from '../data'
 import { asset } from '../i18n'
 import { SURVIVOR_COUNT, useLobbyStore } from '../stores/lobby'
+import BpIcon from '../components/BpIcon.vue'
 
 const lobby = useLobbyStore()
 const router = useRouter()
@@ -188,8 +189,8 @@ function start() {
         <div>
           <h3><img class="tok" :src="asset(components.bloodpoint.image)" alt="" /> แจก Bloodpoint เริ่มต้น</h3>
           <ul>
-            <li>{{ killer?.name }}: <b>{{ killer?.bloodpoints.start }} ▲</b> (สูงสุด {{ killer?.bloodpoints.max }})</li>
-            <li>Survivor ตัวละ <b>{{ team[0]?.bloodpoints.start }} ▲</b> (สูงสุด {{ team[0]?.bloodpoints.max }})</li>
+            <li>{{ killer?.name }}: <b>{{ killer?.bloodpoints.start }} <BpIcon /></b> (สูงสุด {{ killer?.bloodpoints.max }})</li>
+            <li>Survivor ตัวละ <b>{{ team[0]?.bloodpoints.start }} <BpIcon /></b> (สูงสุด {{ team[0]?.bloodpoints.max }})</li>
           </ul>
         </div>
       </li>

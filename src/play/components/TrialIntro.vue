@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// The companion's game-start sequence for the full game: a loading screen, then each mini's
-// start-room roll (p.6 step 11). The engine has already rolled; the faces are read back from the
-// rooms the minis start in. Shown once per game, while it is still in setup.
+// The companion's game-start sequence for the full game: a loading screen as the game opens,
+// then — once every survivor has revealed a prop — each mini's start-room roll (p.6 step 11).
+// The engine has already rolled; the faces are read back from the rooms the minis start in.
+// Each plays once per game.
 import { computed, ref, watch } from 'vue'
 import StartRollIntro from '../../components/StartRollIntro.vue'
 import { mapById, survivorById, killerById } from '../../data'
@@ -12,18 +13,22 @@ import type { GameState } from '../engine/types'
 const props = defineProps<{ st: GameState }>()
 
 const SEEN = 'dbdl-play-intro-seen'
+const SEEN_LOADING = 'dbdl-play-loading-seen'
 
-/** Same for every device in the same game, different between games. */
+/** Same for every device in the same game, different between games (the minis' rooms aside). */
 function gameKey(st: GameState): string {
-  return [st.board, st.killer.characterId, st.killer.room, ...st.survivors.map((s) => `${s.characterId}@${s.room}`), st.props.map((p) => p.kind).join('')].join('|')
+  return [st.board, st.killer.characterId, st.firstPlayer, ...st.survivors.map((s) => s.characterId), st.props.map((p) => p.kind).join('')].join('|')
 }
 
-function seen(key: string): boolean {
+/** Marks `key` as seen under `name`; false when it already was. */
+function firstTime(name: string, key: string): boolean {
   try {
-    return sessionStorage.getItem(SEEN) === key
+    if (sessionStorage.getItem(name) === key) return false
+    sessionStorage.setItem(name, key)
   } catch {
-    return false
+    // storage blocked: it may play again after a reload
   }
+  return true
 }
 
 const intro = ref<{ key: string; st: GameState } | null>(null)
@@ -31,16 +36,14 @@ const intro = ref<{ key: string; st: GameState } | null>(null)
 watch(
   () => props.st,
   (st) => {
-    if (intro.value || st.phase !== 'setup' || st.round !== 1) return
+    if (intro.value || st.round !== 1) return
     const key = gameKey(st)
-    if (seen(key)) return
-    try {
-      sessionStorage.setItem(SEEN, key)
-    } catch {
-      // storage blocked: the intro may play again after a reload
-    }
-    intro.value = { key, st }
-    showLoading('กำลังเข้าสู่ Trial…', quoteOrTip(st.survivors.map((s) => s.characterId)))
+    // the game opens: the loading screen, while the survivors reveal their props
+    if (st.phase === 'setup' && firstTime(SEEN_LOADING, key)) showLoading('กำลังเข้าสู่ Trial…', quoteOrTip(st.survivors.map((s) => s.characterId)))
+    // the minis have rolled their rooms (after the reveals; a game saved before that change
+    // rolled at the start): the dice, one mini at a time
+    const rolled = !st.startPending && (st.phase === 'setup' || (st.phase === 'planning' && st.log.some((e) => /เริ่มที่/.test(e.text))))
+    if (rolled && firstTime(SEEN, key)) intro.value = { key, st }
   },
   { immediate: true },
 )

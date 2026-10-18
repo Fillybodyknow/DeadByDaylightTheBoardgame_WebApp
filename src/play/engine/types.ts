@@ -98,6 +98,8 @@ export interface SurvivorState {
   perks: PerkId[]
   /** The Trickster's Knives (0–3); missing in games saved before him. */
   knives?: number
+  /** The Plague's Vile Purges: the perks they cover (one each, at most 2; a third clears them). */
+  purged?: PerkId[]
 }
 
 export interface KillerState {
@@ -220,6 +222,8 @@ export type KillerInteraction =
   | { k: 'frenzy' }
   /** The Trickster: a Knife for every survivor in his room and the connected ones. */
   | { k: 'showstopper' }
+  /** The Plague: a Vile Purge in his room and in connected room `room`. */
+  | { k: 'purge'; room: string }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
   | { k: 'wrath' }
   /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */
@@ -277,6 +281,8 @@ export type PerkWindow =
   | { k: 'rollFail'; s: number; fails: number }
   /** A survivor rolled a great success (Lucky Break); `ctx`: what the roll was for (Poised). */
   | { k: 'greatRoll'; s: number; ctx?: RollContext['k'] }
+  /** The killer chose `n` dice for survivor `s` to struggle free (Boil Over). */
+  | { k: 'carryRoll'; s: number; n: number }
   /** Buttons rather than questions: start of a survivor's turn, their interact step, a roll. */
   | { k: 'turnStart'; s: number }
   | { k: 'interact'; s: number }
@@ -390,6 +396,9 @@ export type Step =
    */
   | { t: 'crowdPay'; s: number; pledge?: (number | null)[] }
   | { t: 'crowdPick'; s: number }
+  /** The Plague's passive: survivor `s` covers one of their perks with a Vile Purge (`cover`), or
+   * takes one off in a locker (`uncover`). */
+  | { t: 'purgeChoice'; s: number; mode: 'cover' | 'uncover' }
   | { t: 'gameOver'; winner: 'survivors' | 'killer' }
 
 /** Queued work that runs once the current step has its input. */
@@ -436,6 +445,8 @@ export type Task =
   | { k: 'activeBack'; s: number | null }
   /** A survivor's interaction, after No Way Out had its chance to stop it. */
   | { k: 'survivorDo'; s: number; i: SurvivorInteraction }
+  /** A survivor entered `room` with a Vile Purge in it (after its reveal). */
+  | { k: 'purgeTake'; s: number; room: string }
 
 export type Action =
   | { t: 'setupReveal'; prop: string }
@@ -466,6 +477,8 @@ export type Action =
   /** Crowd Control online: survivor `s` puts in `n` of their own ▲ (0: nothing). */
   | { t: 'crowdPledge'; s: number; n: number }
   | { t: 'crowdPick'; card: MoveCard }
+  /** The perk a Vile Purge covers or comes off. */
+  | { t: 'purgeChoice'; perk: PerkId }
   | { t: 'keepItem'; keep: 'new' | 'old' }
   | { t: 'carryDice'; n: number }
   | { t: 'reroll'; s: number; die: number }
@@ -515,6 +528,8 @@ export type GameEvent =
   | { k: 'wound'; s: number; by: 'attack' | 'trap' | 'power' | 'perk' }
   /** The Trickster's Knife: `n` is how many they hold now (4: a sacrifice progress instead). */
   | { k: 'knife'; s: number; n: number }
+  /** The Plague's Vile Purge: `n` is how many they hold now (3: cleared, and wounded). */
+  | { k: 'purge'; s: number; n: number }
   | { k: 'perk'; who: PerkOwner; perk: PerkId }
   | { k: 'heal'; s: number; by: number }
   | { k: 'pickUp'; s: number }
@@ -573,10 +588,16 @@ export interface GameState {
   rollMods: { danger: boolean; keep: boolean; retribution?: boolean }
   /** Stridor: this survivor's planned card is played face up. */
   stridor: number | null
+  /** Setup: the minis' start rooms are rolled once every survivor has revealed a prop (p.6). */
+  startPending?: boolean
   /** Survivors wounded or hung during the turn being played (Fast Track, Self-Preservation). */
   turnHurt?: number[]
   /** Rooms with one of The Hag's Phantasm Traps (7 tokens, one per room). */
   phantasm: string[]
+  /** The survivor whose turn began in a locker (Dance With Me). */
+  lockerTurn?: number | null
+  /** Rooms with one of The Plague's Vile Purges (10 tokens, one per room, the rest on survivors). */
+  purge?: string[]
   /** The Third Seal: survivors' cards of this kind don't move them this round. */
   sealedCard: PathKind | null
   /** Urban Evasion: this wall is out of play until the current survivor turn ends. */

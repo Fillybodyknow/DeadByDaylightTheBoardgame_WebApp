@@ -6,8 +6,8 @@ import { PERKS, PRINTED_PERKS, type PerkId } from './perks'
 import type { Action, GameState, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
-const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane']
-const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster']
+const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate']
+const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague']
 
 function game(killer = 'trapper', seed = 1): GameState {
   let st = createGame({ board: 'macmillan', survivors: SURVIVORS.map((id) => ({ id, name: id })), killer: { id: killer, name: killer }, players: 5, seed })
@@ -49,7 +49,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(84)
+    expect(Object.keys(PERKS)).toHaveLength(90)
   })
 })
 
@@ -135,7 +135,8 @@ describe('The Doctor, The Hag, The Wraith', () => {
     expect(st.phantasm).toEqual([])
     const face = (st.step as Extract<GameState['step'], { t: 'phantasmChoice' }>).face
     // House rule: not teleporting gains ▲ equal to the die.
-    expect(apply(st, { t: 'phantasm', teleport: false }).killer.bp).toBe(Math.min(12, st.killer.bp + face))
+    // not teleporting: 1 ▲, whatever the die shows
+    expect(apply(st, { t: 'phantasm', teleport: false }).killer.bp).toBe(Math.min(12, st.killer.bp + 1))
     let tp = apply(st, { t: 'phantasm', teleport: true, i: { k: 'attack', target: 0 } })
     while (tp.step.t === 'revealProp') tp = apply(tp, legalActions(tp)[0])
     expect(tp.killer.room).toBe('scrapyard')
@@ -371,7 +372,7 @@ describe('perks', () => {
         const eager = options.filter(
           (a: Action) =>
             (a.t === 'perk' && a.use) ||
-            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage'].includes(a.i.k)) ||
+            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp'].includes(a.i.k)) ||
             (a.t === 'useItem'),
         )
         rng = (rng * 1103515245 + 12345) >>> 0
@@ -1421,5 +1422,200 @@ describe('The Trickster', () => {
     expect(g.killer.room).toBe(to)
     expect(g.survivors[2].status).toBe('carried')
     expect(g.survivors[0].status).toBe('board')
+  })
+})
+
+describe('The Plague', () => {
+  /** The Plague with only these perks, about to interact; everyone else in the shack. */
+  function plague(...perks: PerkId[]) {
+    const st = game('plague')
+    only(st, ...perks)
+    killerInteracting(st)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true }))
+    // perks for a Vile Purge to cover: ones used by button, never asked about on a move
+    st.survivors[0].perks = ['empathy', 'self_care', 'botany_knowledge']
+    return st
+  }
+  /** A move survivor 0 can make from the shack with a card: where it leads. */
+  const next = (st: GameState) => {
+    const m = (['sneak', 'sprint', 'crouch', 'vault'] as const).flatMap((card) => survivorMoves(st, 0, card).map((x) => ({ ...x, card })))[0]
+    return { path: { id: m.path.id, kind: m.card }, to: m.to }
+  }
+  /** Survivor 0 walks from the shack into `to` along `path` on their turn. */
+  function walkIn(st: GameState, path: { id: string; kind: string }, to: string) {
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.props.forEach((p) => p.room === to && (p.revealed = true))
+    st.step = { t: 'survivorMove', s: 0, card: path.kind as 'sneak' }
+    st.queue = [{ k: 'survivorInteract', s: 0 }, { k: 'endSurvivorTurn', s: 0 }]
+    let g = apply(st, { t: 'move', path: path.id })
+    for (let n = 0; n < 4 && g.step.t !== 'purgeChoice' && g.step.t !== 'survivorInteract'; n++) g = apply(g, legalActions(g)[0])
+    return g
+  }
+
+  it('Vile Purge: one in his room and one in a connected room', () => {
+    const st = plague()
+    st.killer.room = 'shack'
+    const { to } = next(st)
+    const after = apply(st, { t: 'interact', i: { k: 'purge', room: to } })
+    expect([...after.purge!].sort()).toEqual(['shack', to].sort())
+    expect(after.killer.powerUsed).toBe(true)
+  })
+
+  it('walking into a Vile Purge covers a perk of their choice, which can then not be used', () => {
+    const st = plague()
+    const { path, to } = next(st)
+    st.purge = [to]
+    const g = walkIn(st, path, to)
+    expect(g.step).toEqual({ t: 'purgeChoice', s: 0, mode: 'cover' })
+    expect(g.purge).toEqual([])
+    const perk = g.survivors[0].perks[0]
+    const covered = apply(g, { t: 'purgeChoice', perk })
+    expect(covered.survivors[0].purged).toEqual([perk])
+    expect(perkChoices({ ...covered, survivors: covered.survivors.map((sv) => ({ ...sv, bp: 6 })) }, perk, 0, { k: 'turnStart', s: 0 })).toEqual([])
+  })
+
+  it('the third Vile Purge clears them and wounds; already wounded, a sacrifice progress', () => {
+    const st = plague()
+    const { path, to } = next(st)
+    st.purge = [to]
+    st.survivors[0].purged = st.survivors[0].perks.slice(0, 2)
+    const g = walkIn(st, path, to)
+    expect(g.survivors[0]).toMatchObject({ purged: [], wounded: true })
+    const st2 = plague()
+    st2.purge = [to]
+    st2.survivors[0].purged = st2.survivors[0].perks.slice(0, 2)
+    st2.survivors[0].wounded = true
+    const sac = st2.sacrifice
+    expect(walkIn(st2, path, to).sacrifice).toBe(sac + 1)
+  })
+
+  it('a locker takes one off: back in the room, or to the box when the room has one', () => {
+    const st = plague()
+    const locker = placeProp(st, 'locker', 'shack')
+    st.survivors[0].purged = [st.survivors[0].perks[1]]
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const after = apply(st, { t: 'interact', i: { k: 'hide', prop: locker.id } })
+    expect(after.survivors[0].purged).toEqual([])
+    expect(after.purge).toEqual(['shack'])
+    // two: they choose which perk to free
+    st.survivors[0].purged = st.survivors[0].perks.slice(0, 2)
+    const ask = apply(st, { t: 'interact', i: { k: 'hide', prop: locker.id } })
+    expect(ask.step).toEqual({ t: 'purgeChoice', s: 0, mode: 'uncover' })
+    const freed = apply(ask, { t: 'purgeChoice', perk: st.survivors[0].perks[1] })
+    expect(freed.survivors[0].purged).toEqual([st.survivors[0].perks[0]])
+  })
+
+  it('Corrupt Intervention: the Entity on a generator nobody can interact with', () => {
+    const st = plague('corrupt_intervention')
+    const gen = placeProp(st, 'generator', 'shack')
+    const used = apply({ ...st, step: { t: 'offer', perk: 'corrupt_intervention', owner: 'killer', w: { k: 'planningStart' }, done: [] }, queue: [{ k: 'plan' }] }, { t: 'perk', perk: 'corrupt_intervention', use: true, choice: { prop: gen.id } })
+    expect(used.entity).toEqual({ prop: gen.id })
+    expect(survivorInteractions({ ...used, step: { t: 'survivorInteract', s: 0, canInteract: true } }, 0)).not.toContainEqual({ k: 'repair', prop: gen.id })
+    expect(killerInteractions({ ...used, step: { t: 'killerInteract', turn: 0, canInteract: true } })).not.toContainEqual({ k: 'damage', prop: gen.id })
+  })
+
+  it('Infectious Fright: after attacking a healthy survivor, one in a connected room moves', () => {
+    const st = plague('infectious_fright')
+    st.killer.room = 'shack'
+    const { to } = next(st)
+    st.survivors[2].room = to
+    const offered = apply(st, { t: 'interact', i: { k: 'attack', target: 0 } })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'infectious_fright' })
+    const c = perkChoices(offered, 'infectious_fright', 'killer', { k: 'afterAttack', target: 0 })[0]
+    expect(c.target).toBe(2)
+    let g = apply(offered, { t: 'perk', perk: 'infectious_fright', use: true, choice: c })
+    while (g.step.t === 'revealProp') g = apply(g, legalActions(g)[0])
+    expect(g.survivors[2].room).not.toBe(to)
+  })
+
+  it('Dark Devotion: at the start of cleanup, a survivor near him moves', () => {
+    const st = plague('dark_devotion')
+    st.killer.room = 'shack'
+    const choices = perkChoices(st, 'dark_devotion', 'killer', { k: 'cleanupStart' })
+    expect(new Set(choices.map((c) => c.target))).toEqual(new Set([0, 1, 2, 3]))
+  })
+})
+
+describe('Kate Denson', () => {
+  /** Kate as survivor 0 with only these perks; everyone in the shack. */
+  function kate(...perks: PerkId[]) {
+    let st = createGame({ board: 'macmillan', survivors: ['kate', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    only(st, ...perks)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true, acted: true }))
+    return st
+  }
+  const next = (st: GameState) => {
+    const p = touchingPaths(st, 'shack')[0]
+    return p.a === 'shack' ? p.b : p.a
+  }
+  function interacting(st: GameState) {
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.canInteract = true
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+  }
+
+  it('Windows of Opportunity: a chest in a connected room, in place of her interaction', () => {
+    const st = kate('windows_of_opportunity')
+    const chest = placeProp(st, 'chest', next(st))
+    interacting(st)
+    expect(perkButtons(st).find((b) => b.perk === 'windows_of_opportunity')!.choices).toContainEqual({ prop: chest.id })
+    const g = apply(st, { t: 'perk', perk: 'windows_of_opportunity', use: true, choice: { prop: chest.id } })
+    expect(g.props.find((p) => p.id === chest.id)!.removed).toBe(true)
+    expect(g.survivors[0].room).toBe('shack')
+    expect(g.survivors[0].bp).toBe(5)
+  })
+
+  it('Windows of Opportunity: a locker, and she moves into that room to hide in it', () => {
+    const st = kate('windows_of_opportunity')
+    const to = next(st)
+    const locker = placeProp(st, 'locker', to)
+    st.props.forEach((p) => p.room === to && (p.revealed = true))
+    interacting(st)
+    let g = apply(st, { t: 'perk', perk: 'windows_of_opportunity', use: true, choice: { prop: locker.id } })
+    while (g.step.t === 'revealProp') g = apply(g, legalActions(g)[0])
+    expect(g.survivors[0]).toMatchObject({ room: to, status: 'locker' })
+    expect(g.props.find((p) => p.id === locker.id)!.occupant).toBe(0)
+  })
+
+  it('Boil Over: whoever is picked up in her room rolls 4 dice to struggle', () => {
+    const st = kate('boil_over')
+    killerInteracting(st)
+    st.killer.room = 'shack'
+    Object.assign(st.survivors[1], { wounded: true, woundedThisRound: false })
+    let g = apply(st, { t: 'interact', i: { k: 'pickUp', target: 1 } })
+    expect(g.step.t).toBe('carryDice')
+    g = apply(g, { t: 'carryDice', n: 1 })
+    expect(g.step).toMatchObject({ t: 'offer', perk: 'boil_over', w: { k: 'carryRoll', s: 1, n: 1 } })
+    const used = apply(g, { t: 'perk', perk: 'boil_over', use: true, choice: {} })
+    const roll = used.log.findLast((e) => e.dice)
+    expect(roll?.dice).toHaveLength(4)
+  })
+
+  it('Dance With Me: begun in a locker, she moves again after her card move', () => {
+    const st = kate('dance_with_me')
+    const locker = placeProp(st, 'locker', 'shack')
+    locker.occupant = 0
+    st.survivors[0].status = 'locker'
+    const m = (['sneak', 'sprint', 'crouch', 'vault'] as const).flatMap((card) => survivorMoves({ ...st, survivors: st.survivors.map((sv, i) => (i ? sv : { ...sv, status: 'board' })) }, 0, card).map((x) => ({ ...x, card })))[0]
+    st.props.forEach((p) => (p.revealed = true))
+    st.survivors[0].planned = m.card
+    st.phase = 'survivors'
+    st.step = { t: 'idle' }
+    st.queue = [{ k: 'survivorTurn', s: 0 }]
+    let g = apply({ ...st, step: { t: 'turnStart', s: 0 } }, { t: 'continue' })
+    for (let n = 0; n < 6 && g.step.t !== 'survivorMove'; n++) g = apply(g, legalActions(g)[0])
+    expect(g.lockerTurn).toBe(0)
+    g = apply(g, { t: 'move', path: m.path.id })
+    for (let n = 0; n < 4 && !(g.step.t === 'offer' && g.step.perk === 'dance_with_me'); n++) g = apply(g, legalActions(g)[0])
+    expect(g.step).toMatchObject({ t: 'offer', perk: 'dance_with_me' })
+    const c = perkChoices(g, 'dance_with_me', 0, (g.step as Extract<GameState['step'], { t: 'offer' }>).w)[0]
+    expect(c.path).not.toBe(m.path.id)
   })
 })

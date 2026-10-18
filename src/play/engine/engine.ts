@@ -54,6 +54,7 @@ export const GENERATORS_TO_POWER = 4
 export const PROGRESS_MAX = 3
 export const KILLER_BONUS_COST = 4
 export const PHANTASM_TRAPS = 7
+export const VILE_PURGES = 10
 
 /** The killer's bonus turn costs 4 ▲; The Doctor's passive takes 1 off per survivor with Madness. */
 export function bonusCost(st: GameState): number {
@@ -146,6 +147,8 @@ export interface GameConfig {
   /** 3–5 players: with fewer than 5, one player controls two survivors sharing a hand (p.19). */
   players: 3 | 4 | 5
   seed: number
+  /** Starting ▲ when the table changes them (online room settings); else the rulebook's (p.6). */
+  startBp?: { survivor: number; killer: number }
 }
 
 /** Survivor hand index for each of the 4 survivors, by player count (p.6, p.19). */
@@ -177,7 +180,7 @@ export function createGame(config: GameConfig): GameState {
         wounded: false,
         woundedThisRound: false,
         status: 'board',
-        bp: SURVIVOR_BP.start,
+        bp: config.startBp?.survivor ?? SURVIVOR_BP.start,
         item: null,
         sacrificeToken: true,
         hand: hands[i],
@@ -194,7 +197,7 @@ export function createGame(config: GameConfig): GameState {
       characterId: config.killer.id,
       name: config.killer.name,
       room: board.rooms[0].id,
-      bp: KILLER_BP.start,
+      bp: config.startBp?.killer ?? KILLER_BP.start,
       hand: killerDeck(config.killer.id),
       planned: [],
       revealedCount: 0,
@@ -249,20 +252,28 @@ export function createGame(config: GameConfig): GameState {
   // Step 2: first player marker.
   st.firstPlayer = Math.floor(random(st) * 4)
 
-  // Step 11: every mini rolls a skill check die for its start room.
+  // Step 5 (cont.): each survivor, in turn order, reveals one prop anywhere. The minis come onto
+  // the board after that (step 11), so nobody reveals knowing where anyone starts.
+  st.startPending = true
+  st.step = { t: 'setupReveal', s: st.firstPlayer }
+  return st
+}
+
+/** Setup step 11 (p.6): every mini rolls a skill check die for its start room. */
+function rollStartRooms(st: GameState) {
+  // a game saved mid-setup before this order came in has its minis placed already
+  if (!st.startPending) return
+  delete st.startPending
+  const board = boardOf(st)
   const startRoom = (face: number) => board.rooms.find((r) => r.startFace === face)!.id
-  st.survivors.forEach((sv) => {
+  st.survivors.forEach((sv, i) => {
     const face = rollFace(st)
     sv.room = startRoom(face)
-    log(st, `${sv.name} ทอยได้ ${face} เริ่มที่ ${roomName(st, sv.room)}`, st.survivors.indexOf(sv))
+    log(st, `${sv.name} ทอยได้ ${face} เริ่มที่ ${roomName(st, sv.room)}`, i)
   })
   const kf = rollFace(st)
   st.killer.room = startRoom(kf)
   log(st, `${st.killer.name} ทอยได้ ${kf} เริ่มที่ ${roomName(st, st.killer.room)}`, 'killer')
-
-  // Step 5 (cont.): each survivor, in turn order, reveals one prop anywhere.
-  st.step = { t: 'setupReveal', s: st.firstPlayer }
-  return st
 }
 
 // ---------- RNG (mulberry32, kept in the state so games replay exactly) ----------
@@ -430,7 +441,8 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
   const sv = st.survivors[s]
   const out: SurvivorInteraction[] = []
   for (const p of propsIn(st, sv.room)) {
-    if (!p.revealed) continue
+    // the Entity on it (Corrupt Intervention): nobody interacts with it (a hook's own case below)
+    if (!p.revealed || (p.kind !== 'hook' && entityOn(st, { prop: p.id }))) continue
     switch (p.kind) {
       case 'chest':
         out.push({ k: 'rummage', prop: p.id })
@@ -476,7 +488,7 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
 function propInteractions(st: GameState, room: string): KillerInteraction[] {
   const out: KillerInteraction[] = []
   for (const p of propsIn(st, room)) {
-    if (!p.revealed) continue
+    if (!p.revealed || entityOn(st, { prop: p.id })) continue
     if (p.kind === 'locker' && p.occupant !== null) out.push({ k: 'search', prop: p.id })
     if (p.kind === 'crow') out.push({ k: 'scout', prop: p.id })
     // Damage needs no progress to remove (p.14); with none it still counts (Overcharge, Alert).
@@ -651,7 +663,10 @@ function handle(st: GameState, a: Action) {
       revealProp(st, p, step.s)
       const next = turnOrder(st).indexOf(step.s) + 1
       if (next < 4) wait(st, { t: 'setupReveal', s: turnOrder(st)[next] })
-      else startPlanning(st)
+      else {
+        rollStartRooms(st)
+        startPlanning(st)
+      }
       return
     }
     case 'planStridor': {
@@ -734,8 +749,11 @@ function handle(st: GameState, a: Action) {
       const m = survivorMoves(st, step.s, step.card).find((e) => e.path.id === a.path) ?? fail('cannot move there')
       const from = st.survivors[step.s].room
       moveSurvivor(st, step.s, m.path, m.to)
-      // After the new room's reveal: Sprint Burst, Leader.
-      trigger(st, { k: 'afterCardMove', s: step.s, from, to: m.to, path: m.path.id }, st.queue[1]?.k === 'roll' ? 2 : 1)
+      // After the new room's reveal, its Phantasm Trap and Vile Purge: Sprint Burst, Leader.
+      let at = 1
+      if (st.queue[at]?.k === 'roll') at++
+      if (st.queue[at]?.k === 'purgeTake') at++
+      trigger(st, { k: 'afterCardMove', s: step.s, from, to: m.to, path: m.path.id }, at)
       return
     }
     case 'anyMove': {
@@ -781,6 +799,14 @@ function handle(st: GameState, a: Action) {
       const who = [...new Set(a.pay)].map((p) => `${st.survivors[p].name} ${a.pay.filter((x) => x === p).length} ▲`)
       log(st, `Crowd Control: ผู้รอดชีวิตจ่าย 2 ▲ (${who.join(', ')}) — ${st.survivors[step.s].name} เลือกการ์ดเอง`, 'game')
       return
+    }
+    case 'purgeChoice': {
+      if (a.t !== 'purgeChoice') break
+      const sv = st.survivors[step.s]
+      if (!purgeOptions(st, step.s, step.mode).includes(a.perk)) fail('not a perk to choose')
+      if (step.mode === 'cover') return coverPerk(st, step.s, a.perk)
+      sv.purged = (sv.purged ?? []).filter((p) => p !== a.perk)
+      return dropPurge(st, step.s, a.perk)
     }
     case 'crowdPick': {
       if (a.t !== 'crowdPick') break
@@ -862,6 +888,11 @@ function handle(st: GameState, a: Action) {
       if (a.t !== 'carryDice') break
       if (!(a.n >= 1 && a.n <= 4)) fail('choose 1–4 dice')
       log(st, `${st.killer.name} เลือกทอย ${a.n} ลูก`, 'killer')
+      // Boil Over: the survivor may roll 4 instead, asked once the killer has chosen
+      if (perkCandidates(st, { k: 'carryRoll', s: step.s, n: a.n }, []).length) {
+        st.queue.unshift({ k: 'trigger', w: { k: 'carryRoll', s: step.s, n: a.n }, done: [] }, { k: 'roll', ctx: { k: 'carry', s: step.s }, n: a.n, kind: 'skill' })
+        return
+      }
       startRoll(st, { k: 'carry', s: step.s }, a.n, 'skill')
       return
     }
@@ -920,9 +951,9 @@ function handle(st: GameState, a: Action) {
       if (a.t !== 'phantasm') break
       const k = st.killer
       if (!a.teleport) {
-        // House rule: ▲ equal to the die (the card says "gain a ▲"); see play/README.md.
-        gainKiller(st, step.face)
-        log(st, `${k.name} รับ +${step.face} ▲ จาก Phantasm Trap`, 'killer')
+        // "gain a ▲": one, whatever the die shows; the die is only the teleport's price
+        gainKiller(st, 1)
+        log(st, `${k.name} รับ +1 ▲ จาก Phantasm Trap`, 'killer')
         return
       }
       if (k.bp < step.face) fail('not enough ▲ to teleport')
@@ -982,6 +1013,7 @@ function runTask(st: GameState, task: Task) {
     case 'survivorTurn': {
       const sv = st.survivors[task.s]
       st.activeSurvivor = task.s
+      st.lockerTurn = sv.status === 'locker' ? task.s : null
       st.turnHurt = []
       sv.plannedRevealed = true
       sv.acted = true
@@ -1081,6 +1113,13 @@ function runTask(st: GameState, task: Task) {
       return
     case 'survivorDo':
       return survivorInteract(st, task.s, task.i, true)
+    case 'purgeTake': {
+      // still there, and still on the board (a perk may have moved them on)
+      const sv = st.survivors[task.s]
+      if (!(st.purge ?? []).includes(task.room) || sv.room !== task.room || sv.status !== 'board') return
+      st.purge = st.purge!.filter((r) => r !== task.room)
+      return takePurge(st, task.s)
+    }
     case 'chainsawHit':
       chainsawHit(st, task.room)
       return
@@ -1270,6 +1309,8 @@ function moveSurvivor(st: GameState, s: number, path: PathDef, to: string) {
     st.queue.splice(1, 0, { k: 'roll', ctx: { k: 'phantasm', s, room: to }, n: 1, kind: 'skill' })
     after = 2
   }
+  // The Plague's passive: a Vile Purge here is taken, once the room is revealed.
+  if ((st.purge ?? []).includes(to) && sv.status === 'board') st.queue.splice(after++, 0, { k: 'purgeTake', s, room: to })
   // For the People, once the room is revealed.
   if (sv.status === 'board') trigger(st, { k: 'entered', s }, after)
   if (pathState(st, path.id).trap) {
@@ -1344,6 +1385,7 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       sv.status = 'locker'
       log(st, `${sv.name} ซ่อนใน Locker`, s)
       dropKnives(st, s)
+      shedPurge(st, s)
       trigger(st, { k: 'afterPalletLocker', s, prop: prop!.id })
       return
     case 'crow':
@@ -1976,7 +2018,10 @@ export function perkUsed(st: GameState, o: PerkOwner, perk: PerkId): boolean {
 export function perkReady(st: GameState, o: PerkOwner, perk: PerkId): boolean {
   if (!perksOf(st, o).includes(perk) || perkUsed(st, o, perk)) return false
   if (ownerBp(st, o) < PERKS[perk].cost) return false
-  return o === 'killer' || st.survivors[o].status === 'board'
+  // The Plague's passive: a perk under a Vile Purge can't be used
+  if (o !== 'killer' && (st.survivors[o].purged ?? []).includes(perk)) return false
+  // Boil Over is about being picked up: Kate answers it for herself while carried
+  return o === 'killer' || st.survivors[o].status === 'board' || (perk === 'boil_over' && st.survivors[o].status === 'carried')
 }
 
 /**
@@ -2299,6 +2344,19 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     }
     case 'spirit_fury':
       return w.k === 'killerBreak' && w.what === 'pallet' ? NONE : []
+    // ----- The Plague -----
+    case 'dark_devotion':
+      // at the start of cleanup: a survivor in his room or a connected one, along any path
+      if (w.k !== 'cleanupStart') return []
+      return st.survivors.flatMap((sv, i) => (sv.status === 'board' && inRange(st, k.room, sv.room) ? anyMoves(st, i).map((m) => ({ target: i, path: m.path.id })) : []))
+    case 'corrupt_intervention':
+      // the Entity on a revealed generator anywhere, until cleanup
+      if (w.k !== 'planningStart') return []
+      return st.props.flatMap((p) => (p.kind === 'generator' && p.revealed && p.room && !p.removed && !p.done ? [{ prop: p.id }] : []))
+    case 'infectious_fright':
+      // after attacking a healthy survivor (afterAttack): a survivor in a connected room moves
+      if (w.k !== 'afterAttack') return []
+      return [...connectedRooms(st, k.room)].flatMap((r) => onBoardIn(st, r).flatMap((i) => anyMoves(st, i).map((m) => ({ target: i, path: m.path.id }))))
     // ----- The Trickster -----
     case 'no_way_out':
       return w.k === 'genInteract' && st.survivors[w.s].bp < k.bp ? NONE : []
@@ -2373,6 +2431,22 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
           }
       return out
     }
+    // ----- Kate -----
+    case 'windows_of_opportunity':
+      // her interaction for the turn, with a survival or altruism prop in a connected room
+      if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract) return []
+      return [...connectedRooms(st, me!.room)].flatMap((r) => windowProps(st, r))
+    case 'boil_over': {
+      // the survivor picked up is Kate, or one who was in her room
+      if (w.k !== 'carryRoll' || w.n >= 4) return []
+      return w.s === o || me!.room === st.survivors[w.s].room ? NONE : []
+    }
+    case 'dance_with_me':
+      // after her card move, when her turn began in a locker: again, along another path
+      if (w.k !== 'afterCardMove' || w.s !== o || st.lockerTurn !== o) return []
+      return anyMoves(st, o as number)
+        .filter((m) => m.path.id !== w.path)
+        .map((m) => ({ path: m.path.id }))
     // ----- Jane -----
     case 'poised': {
       // a skill check's great success on a survivor turn: that survivor takes a bonus turn
@@ -2445,7 +2519,7 @@ export function perkButtons(st: GameState): { perk: PerkId; owner: PerkOwner; w:
     }
   }
   if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout'])
-  if (step.t === 'survivorInteract') add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity'])
+  if (step.t === 'survivorInteract') add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity'])
   if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact']))
   if (step.t === 'killerInteract' && step.canInteract && !step.powerOnly) add('killer', { k: 'killerInteract' }, ['iron_maiden'])
   return out
@@ -2608,6 +2682,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       st.props.find((p) => p.id === c.prop)!.occupant = o as number
       st.survivors[o as number].status = 'locker'
       dropKnives(st, o as number)
+      shedPurge(st, o as number)
       return
     }
     case 'iron_will': {
@@ -2912,6 +2987,37 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       st.itemLock = s
       return
     }
+    case 'windows_of_opportunity': {
+      const p = st.props.find((x) => x.id === c.prop)!
+      const i = windowInteraction(p, c.path)
+      payPerk(st, o, perk, `${PROP_NAMES[p.kind]} ที่ ${roomName(st, p.room!)}`)
+      const s = o as number
+      // a locker: she moves into that room (revealing it as any move does), then hides
+      if (p.kind === 'locker') {
+        const path = touchingPaths(st, st.survivors[s].room).find((x) => x.a === p.room || x.b === p.room)!
+        const before = st.queue.length
+        moveSurvivor(st, s, path, p.room!)
+        st.queue.splice(st.queue.length - before, 0, { k: 'survivorDo', s, i })
+        trigger(st, { k: 'afterSurvivorInteract', s }, st.queue.length - before)
+        return
+      }
+      const before = st.queue.length
+      survivorInteract(st, s, i, true)
+      trigger(st, { k: 'afterSurvivorInteract', s }, st.queue.length - before)
+      return
+    }
+    case 'boil_over': {
+      const { s, n } = w as Extract<PerkWindow, { k: 'carryRoll' }>
+      payPerk(st, o, perk, `${name(s)} ทอย 4 ลูกแทน ${n} ลูก`)
+      const roll = st.queue.find((t): t is Extract<Task, { k: 'roll' }> => t.k === 'roll' && t.ctx.k === 'carry')
+      if (roll) roll.n = 4
+      return
+    }
+    case 'dance_with_me': {
+      const m = anyMoves(st, o as number).find((x) => x.path.id === c.path)!
+      payPerk(st, o, perk, `เดินต่อไป ${roomName(st, m.to)}`)
+      return moveSurvivor(st, o as number, m.path, m.to)
+    }
     case 'solidarity': {
       payPerk(st, o, perk, `รักษา ${name(c.target!)} ในห้องติดกัน`)
       // an interaction like any other: Desperate Measures may follow it
@@ -2919,6 +3025,17 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       startCheck(st, { k: 'heal', s: o as number, target: c.target! })
       trigger(st, { k: 'afterSurvivorInteract', s: o as number }, st.queue.length - before)
       return
+    }
+    case 'dark_devotion':
+    case 'infectious_fright': {
+      const m = anyMoves(st, c.target!).find((x) => x.path.id === c.path)!
+      payPerk(st, o, perk, `ย้าย ${name(c.target!)} ไป ${roomName(st, m.to)}`)
+      return moveSurvivor(st, c.target!, m.path, m.to)
+    }
+    case 'corrupt_intervention': {
+      const p = st.props.find((x) => x.id === c.prop)!
+      payPerk(st, o, perk, `วาง Entity บน Generator ที่ ${roomName(st, p.room!)} — Interact ไม่ได้จนจบรอบ`)
+      return placeEntity(st, { prop: p.id })
     }
     case 'no_way_out': {
       const { s } = w as Extract<PerkWindow, { k: 'genInteract' }>
@@ -3009,6 +3126,8 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
   const hand = st.survivorHands[st.survivors[s].hand]
   hand.splice(hand.indexOf(card), 1)
   st.activeSurvivor = s
+  // a bonus turn is a turn of its own (Dance With Me)
+  st.lockerTurn = st.survivors[s].status === 'locker' ? s : null
   log(st, `${st.survivors[s].name} ทิ้ง ${CARD_NAMES[card]} เล่น Bonus Turn`, s)
   st.queue.unshift({ k: 'cardMove', s, card }, { k: 'survivorInteract', s })
 }
@@ -3016,7 +3135,7 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
 // ---------- killer powers ----------
 
 export function isPower(i: KillerInteraction): boolean {
-  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper'].includes(i.k)
+  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge'].includes(i.k)
 }
 
 // ---------- The Twins ----------
@@ -3108,6 +3227,12 @@ export function powerOptions(st: GameState): KillerInteraction[] {
     case 'blight':
       // Blighted Corruption: needs a card to discard.
       return k.hand.length ? [{ k: 'rush' }] : []
+    case 'plague': {
+      // Vile Purge: his room and a connected one, while a room of the two lacks one and tokens last
+      const here = st.purge ?? []
+      if (purgeSupply(st) === 0) return []
+      return [...connectedRooms(st, k.room)].filter((r) => !here.includes(k.room) || !here.includes(r)).map((room) => ({ k: 'purge' as const, room }))
+    }
     case 'trickster':
       // Showstopper: worth using only with someone to hand a Knife to
       return showstopperTargets(st).length ? [{ k: 'showstopper' }] : []
@@ -3209,6 +3334,16 @@ function usePower(st: GameState, i: KillerInteraction) {
       return
     case 'rush':
       return blightRush(st)
+    case 'purge': {
+      const placed: string[] = []
+      for (const room of [k.room, i.room]) {
+        if ((st.purge ?? []).includes(room) || purgeSupply(st) === 0) continue
+        st.purge = [...(st.purge ?? []), room]
+        placed.push(roomName(st, room))
+      }
+      log(st, `${k.name} ใช้ Vile Purge — วางที่ ${placed.join(' และ ')}`, 'killer')
+      return
+    }
     case 'showstopper': {
       log(st, `${k.name} ใช้ Showstopper`, 'killer')
       for (const s of showstopperTargets(st)) if (st.phase !== 'over') giveKnife(st, s)
@@ -3296,6 +3431,86 @@ function redeemerGuess(st: GameState, s: number, guess: MoveCard) {
   emit(st, { k: 'move', who: s, from, to: k.room, path: path?.id ?? '' }, s)
   log(st, `${k.name} ดึง ${sv.name} เข้ามาแล้วอุ้ม`, 'killer', { ev: { k: 'pickUp', s } })
   pickUp(st, s)
+}
+
+/**
+ * Windows of Opportunity: what Kate may do with the survival and altruism props of a connected
+ * room (chest, empty locker, crow, pallet — a pallet on each free path of that room).
+ */
+function windowProps(st: GameState, room: string): PerkChoice[] {
+  const out: PerkChoice[] = []
+  for (const p of propsIn(st, room)) {
+    if (!p.revealed || entityOn(st, { prop: p.id })) continue
+    if (p.kind === 'chest' || p.kind === 'crow' || (p.kind === 'locker' && p.occupant === null)) out.push({ prop: p.id })
+    if (p.kind === 'pallet') for (const path of touchingTokens(st, room)) if (pathFree(st, path)) out.push({ prop: p.id, path })
+  }
+  return out
+}
+
+/** The interaction a Windows of Opportunity choice makes with its prop. */
+function windowInteraction(p: Prop, path?: string): SurvivorInteraction {
+  if (p.kind === 'chest') return { k: 'rummage', prop: p.id }
+  if (p.kind === 'locker') return { k: 'hide', prop: p.id }
+  if (p.kind === 'crow') return { k: 'crow', prop: p.id }
+  return { k: 'dropPallet', prop: p.id, path: path! }
+}
+
+/** Vile Purges not on the board or on a survivor (10 in the box). */
+export function purgeSupply(st: GameState): number {
+  return VILE_PURGES - (st.purge ?? []).length - st.survivors.reduce((n, sv) => n + (sv.purged ?? []).length, 0)
+}
+
+/** The perks a survivor may cover with a Vile Purge (`cover`) or take one off (`uncover`). */
+export function purgeOptions(st: GameState, s: number, mode: 'cover' | 'uncover'): PerkId[] {
+  const sv = st.survivors[s]
+  const covered = sv.purged ?? []
+  return mode === 'cover' ? sv.perks.filter((p) => !covered.includes(p)) : covered
+}
+
+/**
+ * The Plague's passive: a survivor takes a Vile Purge and covers one of their perks with it (they
+ * choose which). The third clears them all and wounds; already wounded, it is a sacrifice
+ * progress instead.
+ */
+function takePurge(st: GameState, s: number) {
+  const sv = st.survivors[s]
+  if ((sv.purged ?? []).length >= 2) {
+    sv.purged = []
+    log(st, `${sv.name} ได้ Vile Purge อันที่ 3 — ทิ้งทั้งหมด`, 'killer', { ev: { k: 'purge', s, n: 3 } })
+    if (sv.wounded) {
+      log(st, `${sv.name} บาดเจ็บอยู่แล้ว — ${st.killer.name} ได้ Sacrifice Progress`, 'killer')
+      return addSacrifice(st, 1)
+    }
+    return wound(st, s, 'power', `${sv.name} ได้ Vile Purge อันที่ 3 — บาดเจ็บ`)
+  }
+  const options = purgeOptions(st, s, 'cover')
+  if (options.length > 1) return wait(st, { t: 'purgeChoice', s, mode: 'cover' })
+  if (options.length) coverPerk(st, s, options[0])
+}
+
+function coverPerk(st: GameState, s: number, perk: PerkId) {
+  const sv = st.survivors[s]
+  sv.purged = [...(sv.purged ?? []), perk]
+  log(st, `${sv.name} ได้ Vile Purge (${sv.purged.length}/3) — ปิด ${PERKS[perk].name}`, 'killer', { ev: { k: 'purge', s, n: sv.purged.length } })
+}
+
+/** In a locker: one Vile Purge comes off (they choose which perk it frees). */
+function shedPurge(st: GameState, s: number) {
+  const covered = st.survivors[s].purged ?? []
+  if (covered.length > 1) return wait(st, { t: 'purgeChoice', s, mode: 'uncover' })
+  if (covered.length) {
+    st.survivors[s].purged = []
+    dropPurge(st, s, covered[0])
+  }
+}
+
+/** The Vile Purge that came off goes to the survivor's room, or back to the box if one is there. */
+function dropPurge(st: GameState, s: number, perk: PerkId) {
+  const sv = st.survivors[s]
+  const room = sv.room
+  const here = (st.purge ?? []).includes(room)
+  if (!here) st.purge = [...(st.purge ?? []), room]
+  log(st, `${sv.name} เอา Vile Purge ออกจาก ${PERKS[perk].name} — ${here ? 'ห้องนี้มีอยู่แล้ว เก็บเข้ากอง' : `วางไว้ที่ ${roomName(st, room)}`}`, s, { ev: { k: 'purge', s, n: (sv.purged ?? []).length } })
 }
 
 /** Showstopper: survivors on the board in The Trickster's room and the rooms connected to it. */

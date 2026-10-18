@@ -207,6 +207,17 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           modes.palletMode.value = null
           go({ t: 'interact', i }, sfx.drop)()
         })
+    // Windows of Opportunity: a pallet in a connected room, then one of that room's paths
+    const woo = perkButtons(st).find((b) => b.perk === 'windows_of_opportunity')
+    for (const c of woo?.choices ?? [])
+      if (c.prop === modes.palletMode.value && c.path) {
+        const room = st.props.find((p) => p.id === c.prop)!.room!
+        add(`path:${c.path}`, `Windows of Opportunity: ทิ้ง Pallet ${iconLabel(st, c.path, room)}`, () => {
+          modes.palletMode.value = null
+          perkPicked.value = null
+          go({ t: 'perk', perk: 'windows_of_opportunity', use: true, choice: c }, sfx.drop)()
+        })
+      }
     return out
   }
 
@@ -354,6 +365,24 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       // several at once: the one picked in the panel (none yet: nothing on the board)
       const perk = perksToPick(st) ? perkPicked.value : s.perk
       if (!perk) break
+      // Dark Devotion, Infectious Fright move a survivor: who first, then the path (as Breakout)
+      if (MOVE_SOMEONE.includes(perk)) {
+        const name = PERKS[perk].name
+        const choices = perkChoices(st, perk, s.owner, s.w)
+        const who = modes.breakoutTarget.value
+        if (who === null) {
+          for (const target of new Set(choices.map((c) => c.target!)))
+            add(`s:${target}`, `${name}: ย้าย ${st.survivors[target].name} (แล้วเลือกเส้นทาง)`, () => ((modes.breakoutTarget.value = target), sfx.click()), 'act', target)
+          break
+        }
+        for (const c of choices) {
+          if (c.target !== who) continue
+          const run = go({ t: 'perk', perk, use: true, choice: c }, sfx.drop)
+          add(`path:${c.path}`, `${name}: ${perkChoiceLabel(st, perk, s.owner, s.w, c)}`, () => ((modes.breakoutTarget.value = null), run()))
+          out[out.length - 1].dest = perkDest(st, s.owner, c)
+        }
+        break
+      }
       for (const c of perkChoices(st, perk, s.owner, s.w)) {
         const label = `${PERKS[perk].name}: ${perkChoiceLabel(st, perk, s.owner, s.w, c)}`
         const run = go({ t: 'perk', perk, use: true, choice: c }, sfx.select)
@@ -430,6 +459,9 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           case 'bell':
             add(`room:${i.room}`, label, run)
             break
+          case 'purge':
+            add(`room:${i.room}`, label, run)
+            break
           case 'phantasm':
           case 'frenzy':
           case 'showstopper':
@@ -483,6 +515,9 @@ function perkDest(st: GameState, owner: PerkOwner, c: PerkChoice): string | unde
   const p = pathDef(st, c.path!)
   return p.a === from ? p.b : p.b === from ? p.a : undefined
 }
+
+/** Killer perks that move a survivor along a path: picked as Breakout is, the survivor then the path. */
+const MOVE_SOMEONE: PerkId[] = ['dark_devotion', 'infectious_fright']
 
 /** The free hook in the killer's room: click it to hang the carried survivor there. */
 function hookSpot(st: GameState, add: (key: SpotKey, label: string, run: () => void) => void) {
@@ -548,12 +583,23 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
         out.push({ key: `prop:${first}`, label: `${name}: ${then}`, style: 'act', run: () => ((modes.aceFirst.value = first), sfx.click()) })
       continue
     }
+    // Windows of Opportunity: a pallet is one spot (then its path, as a pallet in her own room is)
+    const pallets = new Set<string>()
     for (const c of b.choices) {
+      if (b.perk === 'windows_of_opportunity' && c.path) {
+        if (pallets.has(c.prop!)) continue
+        pallets.add(c.prop!)
+        const room = st.props.find((p) => p.id === c.prop)!.room!
+        out.push({ key: `prop:${c.prop}`, label: `${name}: ทิ้ง Pallet ที่ ${roomName(st, room)} (แล้วเลือกเส้นทาง)`, style: 'act', run: () => ((modes.palletMode.value = c.prop!), sfx.click()) })
+        continue
+      }
       const label = `${name}: ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)}`
       const run = go({ t: 'perk', perk: b.perk, use: true, choice: c }, sfx.select)
       const action = run.action
       if (c.path) out.push({ key: spotKey(st, `path:${c.path}`), label, style: 'act', run, action, dest: perkDest(st, b.owner, c) })
       else if (c.target !== undefined) out.push({ key: `s:${c.target}`, label, style: 'act', run, who: c.target, action })
+      // a prop (Windows of Opportunity: in a connected room)
+      else if (c.prop) out.push({ key: `prop:${c.prop}`, label, style: 'act', run, action })
       else if (b.perk === 'self_care') out.push({ key: `s:${b.owner}`, label, style: 'act', run, who: b.owner, action })
     }
   }
