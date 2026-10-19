@@ -8,7 +8,7 @@
 //   everyone has locked in, the killer starts the game.
 import { computed, ref, watch } from 'vue'
 import { killerById, survivorById } from '../../data'
-import { asset } from '../../i18n'
+import { asset, cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
 import { KILLER_PLAYER } from '../engine/seats'
 import {
@@ -110,7 +110,7 @@ const survivorMembers = computed(() => {
 const bench = computed(() => memberList.value.filter((m) => !m.side))
 const readyCount = computed(() => memberList.value.filter((m) => m.ready).length)
 /** The silhouettes on the slots: the figure on the Sprint card, the skull on a card's back. */
-const artVars = { '--sprint': `url(${asset('assets/movement/sprint.webp')})`, '--skull': `url(${asset('assets/movement/back-skull.webp')})` }
+const artVars = { '--sprint': cssUrl('assets/movement/sprint.webp'), '--skull': cssUrl('assets/movement/back-skull.webp') }
 
 const killerTaken = computed(() => memberList.value.some((m) => m.side === 'killer' && m.id !== session.me))
 const survivorCount = computed(() => memberList.value.filter((m) => m.side === 'survivor').length)
@@ -118,6 +118,15 @@ const survivorCount = computed(() => memberList.value.filter((m) => m.side === '
 function side(s: 'killer' | 'survivor') {
   sfx.click()
   void setSide(me.value?.side === s ? null : s)
+}
+
+/** Your own seat, while not ready yet: a click on it leaves that side. */
+const leavable = (id: string | undefined) => !!id && id === session.me && !me.value?.ready
+
+/** A click on a seat: an empty one takes that side, your own one leaves it. */
+function clickSeat(s: 'killer' | 'survivor', id: string | undefined) {
+  if (!id) return takeSlot(s)
+  if (leavable(id) && !session.busy) side(s)
 }
 
 /** A click on an empty slot: take that side (moving over from the other one). */
@@ -277,9 +286,10 @@ function start() {
           <component
             :is="killerMember ? 'div' : 'button'"
             class="seat killer"
-            :class="{ empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready }"
+            :class="{ empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready, leavable: leavable(killerMember?.id) }"
             :disabled="!killerMember && session.busy ? true : undefined"
-            @click="!killerMember && takeSlot('killer')"
+            :title="leavable(killerMember?.id) ? 'คลิกเพื่อออกจากฝั่ง Killer' : undefined"
+            @click="clickSeat('killer', killerMember?.id)"
           >
             <span class="art" aria-hidden="true" />
             <template v-if="killerMember">
@@ -290,7 +300,7 @@ function start() {
               </template>
               <span v-else class="seat-name">{{ killerMember.name }}</span>
               <span class="seat-sub">{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}</span>
-              <button v-if="killerMember.id === session.me && !me?.ready" type="button" class="seat-leave" :disabled="session.busy" @click.stop="side('killer')">ออกจากฝั่ง</button>
+              <span v-if="leavable(killerMember.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
             </template>
             <template v-else>
               <span class="plus" aria-hidden="true">+</span>
@@ -308,10 +318,11 @@ function start() {
             v-for="(m, i) in survivorMembers"
             :key="m?.id ?? `empty-${i}`"
             class="seat survivor"
-            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready, waiting: !m && me?.side === 'survivor' }"
+            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready, waiting: !m && me?.side === 'survivor', leavable: leavable(m?.id) }"
             :style="{ '--i': i }"
             :disabled="!m && (session.busy || me?.side === 'survivor') ? true : undefined"
-            @click="!m && takeSlot('survivor')"
+            :title="leavable(m?.id) ? 'คลิกเพื่อออกจากฝั่ง Survivor' : undefined"
+            @click="clickSeat('survivor', m?.id)"
           >
             <span class="art" aria-hidden="true" />
             <template v-if="m">
@@ -334,7 +345,7 @@ function start() {
               >
                 {{ doubleId === m.id ? '👥 คุม 2 ตัว' : 'ให้คุม 2 ตัว' }}
               </button>
-              <button v-if="m.id === session.me && !me?.ready" type="button" class="seat-leave" :disabled="session.busy" @click.stop="side('survivor')">ออกจากฝั่ง</button>
+              <span v-if="leavable(m.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
             </template>
             <template v-else>
               <span class="plus" aria-hidden="true">+</span>
@@ -784,11 +795,39 @@ button.seat-name.mine:hover i {
     0 0 0 1px rgb(var(--tone)) inset,
     0 0 24px rgb(var(--tone) / 0.35);
 }
-.seat-leave {
-  margin-top: 0.35rem;
-  padding: 0.15rem 0.6rem;
+/* your own seat, not ready yet: a click leaves the side, said while pointing at it */
+.seat.leavable {
+  cursor: pointer;
+}
+.leave-hint {
+  position: absolute !important;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid rgb(var(--tone) / 0.6);
+  background: rgb(0 0 0 / 0.7);
+  color: #fff;
   font-size: 0.78rem;
-  background: rgb(0 0 0 / 0.5);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+  pointer-events: none;
+}
+.seat.leavable:hover .leave-hint {
+  opacity: 1;
+  transform: none;
+}
+.seat.leavable:hover {
+  border-color: var(--blood-bright);
+}
+/* on a tablet there is no pointing: the hint stays */
+@media (hover: none) {
+  .leave-hint {
+    opacity: 1;
+    transform: none;
+  }
 }
 .double {
   margin-top: 0.35rem;

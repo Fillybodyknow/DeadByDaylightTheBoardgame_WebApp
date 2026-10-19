@@ -29,3 +29,12 @@ export function tr(text: Partial<Record<keyof Bilingual, string | null>> | null 
 export function asset(path: string | undefined): string {
   return path ? `${import.meta.env.BASE_URL}${path}` : ''
 }
+
+/**
+ * A public asset as a CSS url() to pass in a custom property (--art: …). The built base is
+ * relative ('./'), and a relative url() given through a custom property resolves against the
+ * stylesheet that uses it — the bundled CSS in assets/ — not the page: so it is made absolute here.
+ */
+export function cssUrl(path: string): string {
+  return `url("${new URL(asset(path), document.baseURI).href}")`
+}

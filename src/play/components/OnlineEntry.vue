@@ -4,7 +4,7 @@
 // name, a random one on offer, and an optional password) or joining one with its 4-letter code.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { asset } from '../../i18n'
+import { cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
 import { BOARD_STALE_MS, backend, createRoom, joinRoom, lastRoom, randomRoomName, savedName, session } from '../online/session'
 import type { RoomListing } from '../online/transport'
@@ -144,7 +144,7 @@ onMounted(() => {
 <template>
   <div class="hub">
     <!-- the title strip, and the player's own card -->
-    <header class="hub-head" :style="{ '--art': `url(${asset('assets/app/background-img/background_dbd.webp')})` }">
+    <header class="hub-head" :style="{ '--art': cssUrl('assets/app/background-img/background_dbd.webp') }">
       <div class="title">
         <p class="eyebrow">Online · Trials</p>
         <h1>เล่นออนไลน์</h1>
