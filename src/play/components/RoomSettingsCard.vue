@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // The room's settings, in the lobby: the host changes them, everyone else sees them (and what
-// differs from the defaults, at a glance). A change makes everyone say "ready" again. Only the host
-// changes them, so for everyone else the card starts folded to its summary chips.
-import { computed, ref } from 'vue'
+// differs from the defaults, at a glance). Only the host changes them, so for everyone else the
+// card starts folded to its summary chips, and a change shows on it for a moment (what changed);
+// nobody's ready is reset by it.
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { isHost, roomSettings, session, setSettings } from '../online/session'
@@ -39,6 +40,44 @@ function toggleDupes() {
   set({ dupes: !s.value.dupes })
 }
 
+// ---------- telling the others what the host changed ----------
+
+/** A setting as words, for the notice. */
+function describe(key: keyof RoomSettings, v: RoomSettings): string {
+  switch (key) {
+    case 'mode':
+      return `โหมดเกม → ${{ adept: 'Adept', bloodweb: 'Bloodweb', devout: 'Devout' }[v.mode]}`
+    case 'timer':
+      return `เวลาต่อตา → ${v.timer ? `${v.timer} วิ` : 'ไม่จำกัด'}`
+    case 'map':
+      return `แผนที่ → ${MAP_CHOICES.find((m) => m.id === v.map)?.label ?? v.map}`
+    case 'random':
+      return v.random ? 'ตัวละคร → สุ่มให้ทุกคน' : 'ตัวละคร → เลือกเอง'
+    case 'dupes':
+      return v.dupes ? 'Survivor ซ้ำกับเพื่อนได้' : 'Survivor ห้ามซ้ำกัน'
+    case 'showKiller':
+      return v.showKiller ? 'Survivor เห็นฆาตกรที่เลือก' : 'Survivor ไม่เห็นฆาตกรที่เลือก'
+    case 'bans':
+      return `แบนตัวละคร → ${v.bans.length} ตัว`
+    case 'survivorBp':
+      return `BP เริ่มต้น Survivor → ${v.survivorBp}`
+    case 'killerBp':
+      return `BP เริ่มต้น Killer → ${v.killerBp}`
+  }
+}
+
+const notice = ref('')
+let noticeTimer: number | null = null
+watch(s, (now, before) => {
+  if (isHost.value || !before) return
+  const changed = (Object.keys(now) as (keyof RoomSettings)[]).filter((k) => JSON.stringify(now[k]) !== JSON.stringify(before[k]))
+  if (!changed.length) return
+  notice.value = changed.map((k) => describe(k, now)).join(' · ')
+  if (noticeTimer !== null) clearTimeout(noticeTimer)
+  noticeTimer = window.setTimeout(() => (notice.value = ''), 5000)
+})
+onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
+
 // ---------- bans ----------
 
 const showBans = ref(false)
@@ -55,12 +94,15 @@ function toggleBan(id: string, kind: 'survivor' | 'killer') {
 </script>
 
 <template>
-  <section class="card settings">
+  <section class="card settings" :class="{ changed: notice }">
     <header>
       <h2>⚙ ตั้งค่าห้อง</h2>
       <span v-if="!isHost" class="muted small">หัวห้องเป็นคนตั้ง</span>
       <button type="button" class="fold" :aria-expanded="open" @click="open = !open">{{ open ? 'ซ่อน ▴' : 'ดูทั้งหมด ▾' }}</button>
     </header>
+    <Transition name="notice">
+      <p v-if="notice" :key="notice" class="notice" role="status">⚙ หัวห้องเพิ่งเปลี่ยน: {{ notice }}</p>
+    </Transition>
     <p class="chips">
       <span v-for="c in chips" :key="c" class="chip">{{ c }}</span>
       <span v-if="!chips.length" class="muted small">ค่าเริ่มต้นตามเล่มทั้งหมด</span>
@@ -180,6 +222,31 @@ function toggleBan(id: string, kind: 'survivor' | 'killer') {
 }
 .settings h2 {
   margin: 0;
+}
+/* the host just changed something: the card glows and says what */
+.settings.changed {
+  border-color: #ffd56a;
+  box-shadow: 0 0 22px rgb(255 214 106 / 0.3);
+  transition:
+    border-color 0.3s,
+    box-shadow 0.3s;
+}
+.notice {
+  margin: 0.5rem 0 0;
+  padding: 0.4rem 0.7rem;
+  border-left: 3px solid #ffd56a;
+  background: rgb(255 214 106 / 0.12);
+  color: #ffe7a6;
+  font-weight: 600;
+}
+.notice-enter-active {
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
+}
+.notice-enter-from {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 .fold {
   margin-left: auto;

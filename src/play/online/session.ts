@@ -318,8 +318,9 @@ export function setDouble(id: string) {
 export function setSettings(patch: Partial<RoomSettings>) {
   return update((cur) => {
     if (session.me !== cur.host || cur.phase !== 'lobby') return null
-    const members = Object.fromEntries(Object.entries(cur.members).map(([k, m]) => [k, { ...m, ready: false }]))
-    return { ...cur, settings: { ...settingsOf(cur.settings), ...patch }, members }
+    // everyone stays ready (the host often sets several in a row); the settings card tells the
+    // others what changed instead
+    return { ...cur, settings: { ...settingsOf(cur.settings), ...patch } }
   })
 }
 

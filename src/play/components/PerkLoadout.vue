@@ -81,7 +81,9 @@ const list = computed(() => {
   return props.choices.filter((p) => [PERKS[p].name, ownerName(p), perkText(p)].some((t) => t.toLowerCase().includes(q)))
 })
 const pages = computed(() => Math.max(1, Math.ceil(list.value.length / PAGE)))
-watch([query, () => props.choices], () => (page.value = 0))
+// back to the first page only when what may be picked really changes: online the list is built
+// anew on every room update (someone else setting a perk), with the same perks in it
+watch([query, () => props.choices.join(',')], () => (page.value = 0))
 const shown = computed(() => list.value.slice(page.value * PAGE, page.value * PAGE + PAGE))
 function go(n: number) {
   if (n === page.value || n < 0 || n >= pages.value) return

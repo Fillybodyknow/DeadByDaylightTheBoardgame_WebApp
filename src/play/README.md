@@ -71,8 +71,9 @@ and the host starts the game.
   **The database rules must be updated** (`roomIndex`) for the board to show rooms; without
   them rooms still work by code.
 - **Room settings** (`online/settings.ts`, the lobby's ⚙ card): the host sets them before
-  seating everyone, everyone sees them (with chips for what differs from the defaults), and a
-  change makes everyone say ready again. Stored in the lobby node as a partial object, so older
+  seating everyone, everyone sees them (with chips for what differs from the defaults). A change
+  doesn't reset anyone's ready (the user's call: the host sets several in a row); the others'
+  settings card glows and says what changed for a few seconds. Stored in the lobby node as a partial object, so older
   rooms play with the defaults.
   - **Turn timer** (none / 60 / 90 / 120 s): counted on each device from when a decision shows
     (after its animations). At zero the player's own device answers what can be passed over
