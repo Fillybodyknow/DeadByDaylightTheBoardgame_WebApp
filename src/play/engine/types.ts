@@ -149,6 +149,8 @@ export interface Die {
   rerolled: boolean
   /** Iron Will: this failure counts as a success (the killer still gains ▲). */
   asSuccess?: boolean
+  /** Jolt: this 1 or 2 counts as a failure (the face stays as rolled; the killer gains its ▲). */
+  asFailure?: boolean
 }
 
 // What a pending dice roll is for; resolved once nobody re-rolls any more.
@@ -180,6 +182,8 @@ export type RollContext =
   | { k: 'breakdown'; s: number }
   /** Spine Chill (danger die): a success sends them along any path. */
   | { k: 'spineChill'; s: number }
+  /** Deerstalker (danger die): leaving the killer's room wounded, a failure keeps them there. */
+  | { k: 'deerstalker'; s: number }
 
 export type SurvivorInteraction =
   | { k: 'rummage'; prop: string }
@@ -324,6 +328,12 @@ export type PerkWindow =
   | { k: 'killerInteract' }
   /** Survivor `s` is about to move into the killer's room `to` with a card (Coulrophobia). */
   | { k: 'preEnter'; s: number; to: string; path: string }
+  /** Survivor `s` rolled `dice` for a skill check, before it counts (Jolt). */
+  | { k: 'rolled'; s: number; ctx: RollContext['k']; dice: Die[] }
+  /** Survivor `s` is about to draw an item (Plunderer's Instinct). */
+  | { k: 'preDraw'; s: number }
+  /** Survivor `s` is about to move with a card out of the killer's room (Deerstalker, Thrill of the Hunt). */
+  | { k: 'survivorLeave'; s: number; to: string; path: string }
   /** Survivor `s` is about to interact with generator / exit gate `prop` (No Way Out). */
   | { k: 'genInteract'; s: number; prop: string }
   | { k: 'roll' }
@@ -385,6 +395,10 @@ export type Step =
   /** The Clown's Afterpiece Antidote: the killer walked in, and may move on along any path. */
   | { t: 'killerAnyMove' }
   | { t: 'keepItem'; s: number; drawn: string }
+  /** Plunderer's Instinct: several items drawn, one to keep. */
+  | { t: 'pickItem'; s: number; drawn: string[] }
+  /** Self-Aware: the perk cards drawn, one to take its place. */
+  | { t: 'selfAware'; s: number; cards: PerkId[] }
   /**
    * `keep`: Bond rolled two dice and one must be kept. `passed`: survivors who said they
    * won't use their key on this roll (online, each key holder decides on their own device).
@@ -488,6 +502,14 @@ export type Task =
   | { k: 'killerDo'; i: KillerInteraction; turn: number | null }
   /** A roll's result, after Off the Record had its chance at the killer's ▲. */
   | { k: 'resolveRoll'; ctx: RollContext; dice: Die[]; fails: number }
+  /** A roll held for Jolt: counted once the killer has answered (he may turn some dice into failures). */
+  | { k: 'settleRoll'; ctx: RollContext; dice: Die[]; failBp?: number }
+  /** An item drawn once Plunderer's Instinct has been answered; `from`: a chest or an item's draw. */
+  | { k: 'drawItem'; s: number; from: 'chest' | 'draw' }
+  /** A survivor's move out of the killer's room, held for Deerstalker and Thrill of the Hunt. */
+  | { k: 'survivorStep'; s: number; path: string; to: string }
+  /** Thrill of the Hunt: the killer follows survivor `s` along `path`, if they left. */
+  | { k: 'killerFollow'; s: number; path: string; to: string }
   | { k: 'killerInteract'; turn: number }
   /** `ended`: the end-of-turn perks were asked. */
   | { k: 'endKillerTurn'; turn: number; extra?: boolean; ended?: boolean }
@@ -559,6 +581,8 @@ export type Action =
   | { t: 'guardProp'; prop: string }
   | { t: 'guardRoom'; room: string }
   | { t: 'keepItem'; keep: 'new' | 'old' }
+  | { t: 'pickItem'; item: number }
+  | { t: 'selfAware'; perk: PerkId }
   | { t: 'carryDice'; n: number }
   | { t: 'reroll'; s: number; die: number }
   /** Survivor `s` won't use their key on this roll. */
@@ -707,6 +731,10 @@ export interface GameState {
   guardian?: number | null
   /** Whether the killer has changed room during the turn being played (Insidious). */
   killerMoved?: boolean
+  /** Fearmonger: this survivor can't use perks this round. */
+  fearmonger?: number | null
+  /** Plunderer's Instinct: this survivor's next draw is three items, one kept. */
+  plunder?: number | null
   /** Built to Last: this survivor's kept item can't be used again this turn. */
   itemLock?: number | null
   /** Built to Last this round: who kept which item (its offer on a later turn says why it is back). */

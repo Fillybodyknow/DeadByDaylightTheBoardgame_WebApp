@@ -137,6 +137,14 @@ export type PerkId =
   | 'iron_grasp'
   | 'insidious'
   | 'whispers'
+  | 'jolt'
+  | 'plunderers_instinct'
+  | 'fearmonger'
+  | 'slippery_meat'
+  | 'self_aware'
+  | 'deerstalker'
+  | 'thrill_of_the_hunt'
+  | 'no_one_left_behind'
 
 export interface PerkDef {
   id: PerkId
@@ -310,6 +318,14 @@ export const PERKS: Record<PerkId, PerkDef> = {
   iron_grasp: deck('iron_grasp', 'Iron Grasp', 1, 'killer', 'iron-grasp', 'ปุ่มตอนผู้รอดชีวิตทอยหนีการแบก'),
   insidious: deck('insidious', 'Insidious', 2, 'killer', 'insidious', 'ถามเมื่อคุณจะโจมตีผู้ที่ไม่บาดเจ็บ และยังไม่ได้เดินในเทิร์นนี้'),
   whispers: deck('whispers', 'Whispers', 1, 'killer', 'whispers', 'ถามตอนเริ่มเฟสวางแผน'),
+  jolt: deck('jolt', 'Jolt', 3, 'killer', 'jolt', 'ถามหลังผู้รอดชีวิตทอย Skill Check ได้ 1 หรือ 2'),
+  plunderers_instinct: deck('plunderers_instinct', "Plunderer's Instinct", 1, 'survivor', 'plunderers-instinct', 'ถามเมื่อคุณจะจั่ว item'),
+  fearmonger: deck('fearmonger', 'Fearmonger', 1, 'killer', 'fearmonger', 'ถามตอนเริ่มเฟสวางแผน'),
+  slippery_meat: deck('slippery_meat', 'Slippery Meat', 4, 'survivor', 'slippery-meat', 'ถามตอนเริ่มเฟสวางแผน ถ้าคุณถูกแขวนอยู่'),
+  self_aware: deck('self_aware', 'Self-Aware', 1, 'survivor', 'self-aware', 'ปุ่มตอนเริ่มเทิร์นของคุณ: จั่ว Perk 4 ใบ เลือกมาแทนการ์ดนี้'),
+  deerstalker: deck('deerstalker', 'Deerstalker', 2, 'killer', 'deerstalker', 'ถามเมื่อผู้รอดชีวิตที่บาดเจ็บจะเดินด้วยการ์ดออกจากห้องคุณ'),
+  thrill_of_the_hunt: deck('thrill_of_the_hunt', 'Thrill of the Hunt', 2, 'killer', 'thrill-of-the-hunt', 'ถามเมื่อผู้รอดชีวิตจะเดินด้วยการ์ดออกจากห้องคุณ'),
+  no_one_left_behind: deck('no_one_left_behind', 'No One Left Behind', 1, 'survivor', 'no-one-left-behind', 'ปุ่มแทนการ Interact ในห้องที่มีประตูทางออก: ให้ผู้รอดชีวิตคนใดก็ได้เดินไปตามเส้นทางใดก็ได้'),
 }
 
 /**

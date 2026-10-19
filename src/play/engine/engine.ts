@@ -7,7 +7,8 @@
 // listed in play/README.md.
 
 import { boards } from './boards'
-import { PERKS, PRINTED_PERKS, type PerkId } from './perks'
+import { layLoadout } from './loadout'
+import { PERKS, type PerkId } from './perks'
 import type {
   Action,
   Guard,
@@ -143,8 +144,9 @@ export const CARD_NAMES: Record<MoveCard, string> = {
 
 export interface GameConfig {
   board: string
-  survivors: { id: string; name: string }[]
-  killer: { id: string; name: string }
+  /** `perks`: the 3 perks played (Bloodweb, Devout, p.19); missing: the printed ones (Adept). */
+  survivors: { id: string; name: string; perks?: PerkId[] }[]
+  killer: { id: string; name: string; perks?: PerkId[] }
   /** 3–5 players: with fewer than 5, one player controls two survivors sharing a hand (p.19). */
   players: 3 | 4 | 5
   seed: number
@@ -189,7 +191,7 @@ export function createGame(config: GameConfig): GameState {
         plannedRevealed: false,
         acted: false,
         madness: false,
-        perks: [...(PRINTED_PERKS[c.id] ?? [])],
+        ...layLoadout(c.id, c.perks),
       }),
     ),
     survivorHands: Array.from({ length: handCount }, () => [...SURVIVOR_CARDS]),
@@ -207,7 +209,7 @@ export function createGame(config: GameConfig): GameState {
       bonusUsed: false,
       trapsInSupply: BEAR_TRAPS,
       shown: [],
-      perks: [...(PRINTED_PERKS[config.killer.id] ?? [])],
+      perks: layLoadout(config.killer.id, config.killer.perks).perks,
     },
     props: [],
     // one state per path icon (a fork's pairs share theirs)
@@ -396,7 +398,7 @@ function usableHook(st: GameState, room: string): Prop | undefined {
 }
 
 export function isFailure(d: Die): boolean {
-  return d.kind === 'skill' ? d.face === 0 : !DANGER_GREAT.includes(d.face)
+  return d.kind === 'skill' ? d.face === 0 || d.asFailure === true : !DANGER_GREAT.includes(d.face)
 }
 
 export function isGreat(d: Die): boolean {
@@ -555,7 +557,7 @@ export function mustMove(why?: 'antidote' | 'deadHard' | 'spineChill'): boolean 
 
 /** Survivor can act with items: not hidden, hooked or carried (p.12, p.15). */
 function canUseItems(st: GameState, s: number): boolean {
-  return st.survivors[s].status === 'board' && !['gameOver', 'reaction', 'keepItem', 'setupReveal', 'revealProp', 'offer', 'pickSurvivor', 'idle'].includes(st.step.t)
+  return st.survivors[s].status === 'board' && !['gameOver', 'reaction', 'keepItem', 'pickItem', 'selfAware', 'setupReveal', 'revealProp', 'offer', 'pickSurvivor', 'idle'].includes(st.step.t)
 }
 
 export function itemUses(st: GameState, s: number): ItemUse[] {
@@ -763,6 +765,11 @@ function handle(st: GameState, a: Action) {
     case 'survivorMove': {
       if (a.t !== 'move') break
       const m = survivorMoves(st, step.s, step.card).find((e) => e.path.id === a.path) ?? fail('cannot move there')
+      const leave: PerkWindow = { k: 'survivorLeave', s: step.s, to: m.to, path: m.path.id }
+      if (st.survivors[step.s].room === charlotteRoom(st) && perkCandidates(st, leave, []).length) {
+        st.queue.unshift({ k: 'trigger', w: leave, done: [] }, { k: 'survivorGo', s: step.s, path: m.path.id, to: m.to })
+        return
+      }
       if (m.to === charlotteRoom(st) && perkCandidates(st, { k: 'preEnter', s: step.s, to: m.to, path: m.path.id }, []).length) {
         st.queue.unshift({ k: 'trigger', w: { k: 'preEnter', s: step.s, to: m.to, path: m.path.id }, done: [] }, { k: 'survivorGo', s: step.s, path: m.path.id, to: m.to })
         return
@@ -863,6 +870,28 @@ function handle(st: GameState, a: Action) {
       const hand = st.survivorHands[st.survivors[step.s].hand]
       if (a.card === 'wait' || !hand.includes(a.card)) fail('card not in hand')
       startBonusMove(st, step.s, a.card)
+      return
+    }
+    case 'pickItem': {
+      if (a.t !== 'pickItem') break
+      const kept = step.drawn[a.item] ?? fail('no such item')
+      const sv = st.survivors[step.s]
+      const rest = step.drawn.filter((_, i) => i !== a.item)
+      log(st, `${sv.name} เลือก ${ITEM_NAMES[kept]} ทิ้ง ${rest.map((x) => ITEM_NAMES[x]).join(', ')} (Plunderer's Instinct)`, step.s)
+      return gotItem(st, step.s, kept, 'pick')
+    }
+    case 'selfAware': {
+      if (a.t !== 'selfAware') break
+      if (!step.cards.includes(a.perk)) fail('not one of the cards drawn')
+      const sv = st.survivors[step.s]
+      // the card drawn takes Self-Aware's place, over the same printed perk if it was laid over one
+      sv.perks = sv.perks.map((p) => (p === 'self_aware' ? a.perk : p))
+      const under = sv.covered?.self_aware
+      if (sv.covered) {
+        delete sv.covered.self_aware
+        if (under) sv.covered[a.perk] = under
+      }
+      log(st, `${sv.name} ได้ ${PERKS[a.perk].name} แทน Self-Aware — ทิ้ง Self-Aware และอีก ${step.cards.length - 1} ใบ`, step.s)
       return
     }
     case 'keepItem': {
@@ -1128,6 +1157,29 @@ function runTask(st: GameState, task: Task) {
     case 'resolveRoll':
       finishRoll(st, task.ctx, task.dice, task.fails, true)
       return
+    case 'settleRoll':
+      resolveRoll(st, task.ctx, task.dice, task.failBp, true)
+      return
+    case 'drawItem':
+      takeItems(st, task.s, task.from)
+      return
+    case 'survivorStep':
+      return moveSurvivor(st, task.s, pathDef(st, task.path), task.to, true)
+    case 'killerFollow': {
+      // Deerstalker may have kept them in the room: then there is no one to follow
+      if (st.survivors[task.s].room !== task.to) return
+      // a pallet on the path: he breaks it and stays, as on any move of his (p.14); his
+      // interaction is lost only on his own turn
+      if (palletOn(st, task.path)) {
+        palletOn(st, task.path)!.removed = true
+        trigger(st, { k: 'killerBreak', what: 'pallet' })
+        if (st.phase === 'killer') st.canInteract = false
+        log(st, `${st.killer.name} ตามไปไม่ได้ — ทำลาย Pallet แล้วอยู่ที่เดิม (Thrill of the Hunt)`, 'killer', { ev: { k: 'palletBreak', path: task.path } })
+        return
+      }
+      log(st, `${st.killer.name} เดินตาม ${st.survivors[task.s].name} ไป ${roomName(st, task.to)} (Thrill of the Hunt)`, 'killer')
+      return killerMovedBy(st, pathDef(st, task.path), task.to)
+    }
     case 'trigger':
       runTrigger(st, task.w, task.done)
       return
@@ -1231,7 +1283,7 @@ function runTask(st: GameState, task: Task) {
       return
     case 'survivorGo': {
       const p = pathDef(st, task.path)
-      return cardMoveTo(st, task.s, p, task.to)
+      return cardMoveTo(st, task.s, p, task.to, true)
     }
     case 'endSurvivorTurn': {
       st.activeSurvivor = null
@@ -1401,9 +1453,17 @@ function leaveLocker(st: GameState, s: number) {
   st.survivors[s].status = 'board'
 }
 
-function moveSurvivor(st: GameState, s: number, path: PathDef, to: string) {
+/** `asked`: the move out of the killer's room was already held for Deerstalker and Thrill of the Hunt. */
+function moveSurvivor(st: GameState, s: number, path: PathDef, to: string, asked = false) {
   const sv = st.survivors[s]
   const from = sv.room
+  if (!asked && from !== to && from === charlotteRoom(st)) {
+    const w: PerkWindow = { k: 'survivorLeave', s, to, path: path.id }
+    if (perkCandidates(st, w, []).length) {
+      st.queue.unshift({ k: 'trigger', w, done: [] }, { k: 'survivorStep', s, path: path.id, to })
+      return
+    }
+  }
   sv.room = to
   log(st, `${sv.name} → ${roomName(st, to)}`, s, { ev: { k: 'move', who: s, from, to, path: path.id } })
   // The trap springs on the path, then the survivor reveals a prop in the new room.
@@ -1485,15 +1545,7 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
     case 'rummage': {
       prop!.removed = true
       trigger(st, { k: 'afterRummage', s, prop: prop!.id })
-      const drawn = st.itemDeck.shift()
-      if (!drawn) {
-        log(st, `${sv.name} ค้น Chest แต่ไม่มี item เหลือ`, s)
-        return
-      }
-      log(st, `${sv.name} ค้น Chest ได้ ${ITEM_NAMES[drawn]}`, s, { ev: { k: 'itemGot', s } })
-      if (sv.item) wait(st, { t: 'keepItem', s, drawn })
-      else sv.item = drawn
-      return
+      return drawItems(st, s, 'chest')
     }
     case 'hide':
       prop!.occupant = s
@@ -1881,7 +1933,7 @@ function cleanup(st: GameState) {
     sv.woundedThisRound = false
   }
   Object.assign(st.killer, { hand: killerDeck(st.killer.characterId), planned: [], revealedCount: 0, plannedShown: false, powerUsed: false, bonusUsed: false, shown: [] })
-  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], guardian: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
+  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], guardian: null, fearmonger: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
   startPlanning(st)
@@ -1968,9 +2020,23 @@ const ROLL_LABEL: Record<RollContext['k'], string> = {
   assassin: 'หลบ Assassin',
   deadHard: 'Dead Hard',
   spineChill: 'Spine Chill',
+  deerstalker: 'Deerstalker',
 }
 
-function resolveRoll(st: GameState, ctx: RollContext, dice: Die[], failBp?: number) {
+/** Jolt's dice: a skill die on a skill check showing 1 or 2 (danger dice number their faces otherwise). */
+function joltDie(ctx: RollContext, d: Die): boolean {
+  return SKILL_CHECKS.includes(ctx.k) && d.kind === 'skill' && (d.face === 1 || d.face === 2) && !d.asSuccess && !d.asFailure
+}
+
+/** `jolted`: the killer has already been asked about Jolt for this roll. */
+function resolveRoll(st: GameState, ctx: RollContext, dice: Die[], failBp?: number, jolted = false) {
+  if (!jolted && dice.some((d) => joltDie(ctx, d))) {
+    const w: PerkWindow = { k: 'rolled', s: ctx.s, ctx: ctx.k, dice }
+    if (perkCandidates(st, w, []).length) {
+      st.queue.unshift({ k: 'trigger', w, done: [] }, { k: 'settleRoll', ctx, dice, failBp })
+      return
+    }
+  }
   // Failures give the killer ▲ once re-rolls are done (p.16, p.18), one per die (p.15 example),
   // even when Iron Will counts them as successes.
   const fails = failBp ?? dice.filter(isFailure).length
@@ -2075,6 +2141,17 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
     case 'assassin':
       if (!ok) wound(st, s, 'power', `${sv.name} โดน Assassin — บาดเจ็บ`)
       return
+    case 'deerstalker': {
+      // a failure: they stay in his room, and can't interact this turn
+      if (ok) return
+      const at = st.queue.findIndex((t) => (t.k === 'survivorGo' || t.k === 'survivorStep') && t.s === s)
+      if (at >= 0) st.queue.splice(at, 1)
+      // "can't interact this turn": on their own turn; on someone else's there is nothing to lose
+      const own = st.phase !== 'killer' && st.activeSurvivor === s
+      if (own) st.canInteract = false
+      log(st, `${sv.name} ออกจากห้องไม่ได้ (Deerstalker) — อยู่ที่เดิม${own ? ' Interact ไม่ได้เทิร์นนี้' : ''}`, s)
+      return
+    }
     case 'spineChill':
       // a success: away along any path, before he interacts (no staying put)
       if (!ok) return
@@ -2236,10 +2313,38 @@ function applyItem(st: GameState, s: number, use: ItemUse) {
 }
 
 function drawItem(st: GameState, s: number) {
-  const drawn = st.itemDeck.shift()
-  if (!drawn) return
-  st.survivors[s].item = drawn
-  log(st, `${st.survivors[s].name} จั่วได้ ${ITEM_NAMES[drawn]}`, s, { ev: { k: 'itemGot', s } })
+  drawItems(st, s, 'draw')
+}
+
+/** Survivor `s` draws an item (from a chest, or an item's own draw); Plunderer's Instinct is asked first. */
+function drawItems(st: GameState, s: number, from: 'chest' | 'draw') {
+  if (perkCandidates(st, { k: 'preDraw', s }, []).length) {
+    st.queue.unshift({ k: 'trigger', w: { k: 'preDraw', s }, done: [] }, { k: 'drawItem', s, from })
+    return
+  }
+  takeItems(st, s, from)
+}
+
+/** One item, or three to choose from after Plunderer's Instinct (as many as the deck still has). */
+function takeItems(st: GameState, s: number, from: 'chest' | 'draw') {
+  const sv = st.survivors[s]
+  const drawn = st.itemDeck.splice(0, st.plunder === s ? 3 : 1)
+  st.plunder = null
+  if (!drawn.length) return log(st, `${sv.name} ${from === 'chest' ? 'ค้น Chest' : 'จั่ว item'} แต่ไม่มี item เหลือ`, s)
+  if (drawn.length > 1) {
+    log(st, `${sv.name} จั่ว ${drawn.length} ใบ: ${drawn.map((x) => ITEM_NAMES[x]).join(', ')} — เลือกเก็บ 1 ใบ`, s)
+    return wait(st, { t: 'pickItem', s, drawn })
+  }
+  gotItem(st, s, drawn[0], from)
+}
+
+/** The item drawn (or picked) goes to the survivor; holding one already, they keep one of the two (p.12). */
+function gotItem(st: GameState, s: number, item: string, from: 'chest' | 'draw' | 'pick') {
+  const sv = st.survivors[s]
+  const text = from === 'chest' ? `${sv.name} ค้น Chest ได้ ${ITEM_NAMES[item]}` : `${sv.name} ${from === 'pick' ? 'เก็บ' : 'จั่วได้'} ${ITEM_NAMES[item]}`
+  log(st, text, s, { ev: { k: 'itemGot', s } })
+  if (sv.item) wait(st, { t: 'keepItem', s, drawn: item })
+  else sv.item = item
 }
 
 // ---------- perks (Adept mode: printed perks, p.16, p.19) ----------
@@ -2273,8 +2378,21 @@ export function perkReady(st: GameState, o: PerkOwner, perk: PerkId): boolean {
   if (ownerBp(st, o) < PERKS[perk].cost) return false
   // The Plague's passive: a perk under a Vile Purge can't be used
   if (o !== 'killer' && (st.survivors[o].purged ?? []).includes(perk)) return false
-  // Boil Over is about being picked up: Kate answers it for herself while carried
-  return o === 'killer' || st.survivors[o].status === 'board' || (perk === 'boil_over' && st.survivors[o].status === 'carried')
+  // Fearmonger: this survivor can't use perks for the rest of the round
+  if (o !== 'killer' && st.fearmonger === o) return false
+  // Boil Over is about being picked up: Kate answers it for herself while carried; Slippery Meat
+  // is used on the hook
+  const status = o === 'killer' ? 'board' : st.survivors[o].status
+  return status === 'board' || (perk === 'boil_over' && status === 'carried') || (perk === 'slippery_meat' && status === 'hooked')
+}
+
+/**
+ * Self-Aware's draw: the survivor perk cards (every survivor perk has a card in the edit-perks
+ * box) that no survivor has in this game, on their board or laid over it.
+ */
+function selfAwarePool(st: GameState): PerkId[] {
+  const held = new Set(st.survivors.flatMap((sv) => [...sv.perks, ...Object.values(sv.covered ?? {})]))
+  return (Object.keys(PERKS) as PerkId[]).filter((p) => PERKS[p].side === 'survivor' && p !== 'self_aware' && !held.has(p))
 }
 
 /**
@@ -2461,6 +2579,31 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
       if (w.k !== 'preKillerInteract' || w.pickUp || (task && task.i.k !== 'attack') || st.killerMoved) return []
       return !st.survivors[w.target].wounded ? NONE : []
+    }
+    case 'jolt':
+      // the dice are shown in the offer; the 1s and 2s become failures
+      return w.k === 'rolled' ? NONE : []
+    case 'plunderers_instinct':
+      return w.k === 'preDraw' && w.s === o && st.itemDeck.length > 1 ? NONE : []
+    case 'fearmonger':
+      // at the start of planning: a survivor in his room or a room joined to it
+      if (w.k !== 'planningStart' || (st.fearmonger !== null && st.fearmonger !== undefined)) return []
+      return st.survivors.flatMap((sv, i) => (sv.status === 'board' && inRange(st, k.room, sv.room) ? [{ target: i }] : []))
+    case 'slippery_meat':
+      return w.k === 'planningStart' && me!.status === 'hooked' ? NONE : []
+    case 'self_aware':
+      return w.k === 'turnStart' && w.s === o && selfAwarePool(st).length ? NONE : []
+    case 'deerstalker':
+      return w.k === 'survivorLeave' && st.survivors[w.s].wounded ? NONE : []
+    case 'thrill_of_the_hunt':
+      // he follows along the same path (a pallet there: he breaks it and stays); not while carrying someone
+      if (w.k !== 'survivorLeave' || st.survivors.some((sv) => sv.status === 'carried')) return []
+      return NONE
+    case 'no_one_left_behind': {
+      // their interaction, with an exit gate in the room (powered or not): someone moves
+      if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract) return []
+      if (!propsIn(st, me!.room).some((p) => p.kind === 'exitGate' && p.revealed)) return []
+      return st.survivors.flatMap((sv, i) => (sv.status === 'board' ? anyMoves(st, i).map((m) => ({ target: i, path: m.path.id })) : []))
     }
     case 'whispers':
       // at the start of planning: one survivor pays 1 ▲ or sets their card face up (one slot)
@@ -2960,8 +3103,9 @@ export function perkButtons(st: GameState): { perk: PerkId; owner: PerkOwner; w:
       if (choices.length) out.push({ perk, owner, w, choices })
     }
   }
-  if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout', 'inner_healing'])
-  if (step.t === 'survivorInteract') add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity', 'kinship'])
+  if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout', 'inner_healing', 'self_aware'])
+  if (step.t === 'survivorInteract')
+    add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity', 'kinship', 'no_one_left_behind'])
   if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact']))
   // Iron Grasp: his own button on the struggle roll, before it is settled
   if (step.t === 'roll' && step.ctx.k === 'carry') add('killer', { k: 'roll' }, ['iron_grasp'])
@@ -3154,6 +3298,61 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')!
       payPerk(st, o, perk, `อุ้ม ${name(target)} แทนการโจมตี`)
       task.i = { k: 'pickUp', target }
+      return
+    }
+    case 'jolt': {
+      const { dice } = w as Extract<PerkWindow, { k: 'rolled' }>
+      const task = st.queue.find((t): t is Extract<Task, { k: 'settleRoll' }> => t.k === 'settleRoll')!
+      const n = dice.filter((d) => joltDie(task.ctx, d)).length
+      payPerk(st, o, perk, `ผล 1–2 นับเป็นล้มเหลว (${n} ลูก)`)
+      // the die still shows what was rolled; it counts as a failure
+      task.dice = task.dice.map((d) => (joltDie(task.ctx, d) ? { ...d, asFailure: true } : d))
+      // a Bond roll already counted its failure ▲: these add theirs
+      if (task.failBp !== undefined) task.failBp += n
+      return
+    }
+    case 'plunderers_instinct':
+      payPerk(st, o, perk, 'จั่ว 3 ใบ เลือกเก็บ 1')
+      st.plunder = o as number
+      return
+    case 'fearmonger':
+      payPerk(st, o, perk, `${name(c.target!)} ใช้ Perk ไม่ได้รอบนี้`)
+      st.fearmonger = c.target!
+      return
+    case 'slippery_meat': {
+      const s = o as number
+      const hook = st.props.find((p) => p.kind === 'hook' && p.occupant === s)!
+      payPerk(st, o, perk, 'ทำลาย Hook ที่แขวนอยู่ — ลงจาก Hook')
+      // a sabotage of their own hook: the Entity goes on it, and they stay in the room
+      placeEntity(st, { prop: hook.id })
+      hook.occupant = null
+      st.survivors[s].status = 'board'
+      log(st, `${name(s)} ลงจาก Hook เอง — อยู่ที่เดิม (Slippery Meat)`, s, { ev: { k: 'rescue', s, by: s } })
+      return
+    }
+    case 'self_aware':
+      payPerk(st, o, perk, 'จั่ว Perk 4 ใบ')
+      return wait(st, { t: 'selfAware', s: o as number, cards: shuffle(st, selfAwarePool(st)).slice(0, 4) })
+    case 'deerstalker': {
+      const { s } = w as Extract<PerkWindow, { k: 'survivorLeave' }>
+      payPerk(st, o, perk, `${name(s)} ต้องทอย Danger Die ก่อนออกจากห้อง`)
+      return startRoll(st, { k: 'deerstalker', s }, 1, 'danger')
+    }
+    case 'thrill_of_the_hunt': {
+      const { s, path, to } = w as Extract<PerkWindow, { k: 'survivorLeave' }>
+      payPerk(st, o, perk, `เดินตาม ${name(s)} ไป ${roomName(st, to)}`)
+      // after their move (if Deerstalker doesn't keep them in the room)
+      const at = st.queue.findIndex((t) => (t.k === 'survivorGo' || t.k === 'survivorStep') && t.s === s)
+      st.queue.splice(at < 0 ? 0 : at + 1, 0, { k: 'killerFollow', s, path, to })
+      return
+    }
+    case 'no_one_left_behind': {
+      const m = anyMoves(st, c.target!).find((x) => x.path.id === c.path)!
+      payPerk(st, o, perk, `${name(c.target!)} เดินไป ${roomName(st, m.to)}`)
+      // their interaction for the turn: Desperate Measures may follow it
+      const before = st.queue.length
+      moveSurvivor(st, c.target!, m.path, m.to)
+      trigger(st, { k: 'afterSurvivorInteract', s: o as number }, st.queue.length - before)
       return
     }
     case 'whispers': {
@@ -4130,9 +4329,9 @@ export function antidoteKillerMoves(st: GameState): { path: PathDef; to: string 
 }
 
 /** A survivor's card move is made: the move, then (after the new room's reveal) Sprint Burst, Leader. */
-function cardMoveTo(st: GameState, s: number, path: PathDef, to: string) {
+function cardMoveTo(st: GameState, s: number, path: PathDef, to: string, asked = false) {
   const from = st.survivors[s].room
-  moveSurvivor(st, s, path, to)
+  moveSurvivor(st, s, path, to, asked)
   // After the new room's reveal, its Phantasm Trap, Vile Purge and Antidote: Sprint Burst, Leader.
   let at = 1
   for (const k of ['roll', 'purgeTake', 'anyMove'] as const) if (st.queue[at]?.k === k) at++

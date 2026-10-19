@@ -86,6 +86,7 @@ const ROLL_WHAT: Record<RollContext['k'], (st: GameState, ctx: RollContext) => s
   breakdown: () => 'Breakdown — สำเร็จ = ฆาตกรเสีย Sacrifice Progress 1 แต้ม',
   deadHard: (st, c) => `Dead Hard — สำเร็จ = ${c.k === 'deadHard' ? st.survivors[c.target].name : ''} หนีแทนถูกแขวน`,
   spineChill: () => 'Spine Chill — สำเร็จ = เดินหนีไปตามเส้นทางใดก็ได้',
+  deerstalker: () => 'Deerstalker — ล้มเหลว = ออกจากห้องไม่ได้ และ Interact ไม่ได้เทิร์นนี้',
 }
 
 function progress(st: GameState, c: RollContext): string {
@@ -244,6 +245,25 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
         f.rooms.push(w.room)
         facts.push({ who: w.s, icon: '🔍', text: `${st.survivors[w.s].name} เข้า ${roomName(st, w.room)} — ไม่ใช้ = เปิด prop ในห้องนี้` })
         for (const c of choices) if (c.prop) f.dests.push(st.props.find((p) => p.id === c.prop)!.room!)
+        break
+      case 'rolled':
+        f.survivors.push(w.s)
+        facts.push({
+          who: w.s,
+          icon: '🎲',
+          text: `${st.survivors[w.s].name} ทอยได้ ${w.dice.map((d) => (d.face === 0 ? 'กะโหลก' : d.face)).join(', ')} — ใช้ = ลูกที่ได้ 1–2 กลายเป็นล้มเหลว (+1 ▲ ต่อลูก)`,
+        })
+        facts.push(killerFact(st, w.s))
+        break
+      case 'survivorLeave':
+        f.survivors.push(w.s)
+        f.paths.push(w.path)
+        f.dests.push(w.to)
+        facts.push({ who: w.s, icon: '🚪', text: `${where(st, w.s)} → กำลังเดินไป ${roomName(st, w.to)}` })
+        break
+      case 'preDraw':
+        f.survivors.push(w.s)
+        facts.push({ who: w.s, icon: '🎒', text: `${st.survivors[w.s].name} กำลังจะจั่ว item — เหลือในกอง ${st.itemDeck.length} ใบ` })
         break
       case 'genInteract':
       case 'afterHang':

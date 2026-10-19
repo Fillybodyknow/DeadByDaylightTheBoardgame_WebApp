@@ -69,6 +69,12 @@ export function legalActions(st: GameState): Action[] {
     case 'keepItem':
       out.push({ t: 'keepItem', keep: 'new' }, { t: 'keepItem', keep: 'old' })
       break
+    case 'pickItem':
+      step.drawn.forEach((_, item) => out.push({ t: 'pickItem', item }))
+      break
+    case 'selfAware':
+      for (const perk of step.cards) out.push({ t: 'selfAware', perk })
+      break
     case 'roll':
       if (step.keep) step.dice.forEach((_, die) => out.push({ t: 'acceptRoll', die }))
       else out.push({ t: 'acceptRoll' })

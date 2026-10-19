@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Offline: the full game on one device passed around the table (hot-seat). Before a game, the
-// companion's lobby flow — players, survivors pick first, then the killer, then the map.
+// companion's lobby flow — players and game mode, survivors pick first, then the killer, then
+// (Bloodweb, Devout) each player's perks in turn behind a hand-off curtain, then the map.
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { killerById, survivorById } from '../../data'
@@ -12,18 +13,30 @@ import GameScreen from '../components/GameScreen.vue'
 import TrialIntro from '../components/TrialIntro.vue'
 import { macmillan } from '../engine/boards'
 import { handLayout } from '../engine/engine'
+import { bloodwebHands, cardChoices, loadoutProblem, printedOf, takenBy, type GameMode, type LoadoutCharacter } from '../engine/loadout'
+import { PERKS, type PerkId } from '../engine/perks'
+import PerkLoadout from '../components/PerkLoadout.vue'
 import { game, newGame } from '../game'
 import { leaveRoom, session } from '../online/session'
 
 const router = useRouter()
 
-type Step = 'players' | 'survivors' | 'killer' | 'start'
-const STEPS: { id: Step; label: string }[] = [
+type Step = 'players' | 'survivors' | 'killer' | 'perks' | 'start'
+const STEPS = computed<{ id: Step; label: string }[]>(() => [
   { id: 'players', label: 'ผู้เล่น' },
   { id: 'survivors', label: 'Survivor เลือกตัว' },
   { id: 'killer', label: 'Killer เลือกตัว' },
+  ...(mode.value === 'adept' ? [] : [{ id: 'perks' as const, label: 'แต่ง Perk' }]),
   { id: 'start', label: 'เข้าสู่ Trial' },
+])
+
+/** p.19: Adept plays the printed perks; Bloodweb and Devout lay perk cards over them. */
+const MODES: { id: GameMode; label: string; note: string }[] = [
+  { id: 'adept', label: 'Adept', note: 'ใช้ Perk ที่พิมพ์บนกระดานตัวละคร (เกมมาตรฐาน)' },
+  { id: 'bloodweb', label: 'Bloodweb', note: 'จั่วการ์ด Perk ฝ่ายตัวเองคนละ 5 ใบ เลือกวางทับ Perk บนกระดานได้สูงสุด 3 ใบ' },
+  { id: 'devout', label: 'Devout', note: 'เลือก Perk เองได้สูงสุด 3 ใบ แล้วเปิดพร้อมกัน — 1 Perk อยู่ในเกมได้ครั้งเดียว' },
 ]
+const mode = ref<GameMode>('adept')
 
 const players = ref<3 | 4 | 5>(5)
 const confirmed = ref(false)
@@ -38,9 +51,10 @@ const step = computed<Step>(() => {
   if (!confirmed.value) return 'players'
   if (currentSeat.value !== null) return 'survivors'
   if (!killer.value) return 'killer'
+  if (mode.value !== 'adept' && perkTurn.value < perkChars.value.length) return 'perks'
   return 'start'
 })
-const stepIndex = computed(() => STEPS.findIndex((x) => x.id === step.value))
+const stepIndex = computed(() => STEPS.value.findIndex((x) => x.id === step.value))
 
 /** Player (2..) controlling each survivor seat, for the chosen player count (p.19). */
 const seatPlayer = computed(() => handLayout(players.value).map((hand) => hand + 2))
@@ -57,6 +71,11 @@ const chooser = computed(() => {
   if (step.value === 'killer') return 'ผู้เล่น 1 (Killer) เลือกฆาตกร'
   return ''
 })
+
+function setMode(m: GameMode) {
+  sfx.click()
+  mode.value = m
+}
 
 function setPlayers(n: 3 | 4 | 5) {
   sfx.click()
@@ -90,9 +109,57 @@ function goToStep(i: number) {
     confirmed.value = false
     return
   }
-  if (!confirm(`ย้อนไปขั้น "${STEPS[i].label}"? ตัวเลือกหลังจากขั้นนี้จะถูกล้าง`)) return
+  if (!confirm(`ย้อนไปขั้น "${STEPS.value[i].label}"? ตัวเลือกหลังจากขั้นนี้จะถูกล้าง`)) return
+  clearPerks()
+  if (STEPS.value[i].id === 'perks') return
   if (i <= 1) picks.value = [null, null, null, null]
   killer.value = null
+}
+
+// ---------- perks (Bloodweb, Devout): each player in turn, the device handed over ----------
+
+/** Every character, survivors in seat order then the killer: the order the perks are set in. */
+const perkChars = computed<(LoadoutCharacter & { who: string })[]>(() => [
+  ...picks.value.map((id, seat) => ({ key: String(seat), side: 'survivor' as const, id: id ?? '', who: `ผู้เล่น ${seatPlayer.value[seat]}` })),
+  { key: 'killer', side: 'killer' as const, id: killer.value ?? '', who: 'ผู้เล่น 1 (Killer)' },
+])
+const perkTurn = ref(0)
+/** The curtain is up between two players. */
+const handedOver = ref(false)
+const loadouts = ref<Record<string, PerkId[]>>({})
+/** Bloodweb's shuffle, drawn once the characters are known. */
+const perkSeed = ref((Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0)
+const hands = computed(() => (mode.value === 'bloodweb' && killer.value ? bloodwebHands(perkSeed.value, perkChars.value) : {}))
+
+const perkChar = computed(() => perkChars.value[perkTurn.value])
+const draft = ref<PerkId[]>([])
+const perkTaken = computed(() => (perkChar.value ? [...takenBy(perkChars.value, loadouts.value, perkChar.value.key)] : []))
+const perkProblem = computed(() =>
+  perkChar.value ? loadoutProblem(mode.value, perkChar.value, draft.value, hands.value[perkChar.value.key], new Set(perkTaken.value)) : '',
+)
+
+function beginPerks() {
+  sfx.select()
+  draft.value = [...(loadouts.value[perkChar.value.key] ?? printedOf(perkChar.value.id))]
+  handedOver.value = true
+}
+
+function confirmPerks(on: boolean) {
+  if (!on || perkProblem.value) return
+  sfx.select()
+  loadouts.value = { ...loadouts.value, [perkChar.value.key]: [...draft.value] }
+  handedOver.value = false
+  perkTurn.value++
+}
+
+/** The perks a character plays, by name. */
+const perkNames = (c: LoadoutCharacter) => (loadouts.value[c.key] ?? printedOf(c.id)).map((p) => PERKS[p].name).join(' · ')
+
+function clearPerks() {
+  loadouts.value = {}
+  perkTurn.value = 0
+  handedOver.value = false
+  perkSeed.value = (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0
 }
 
 const board = ref(macmillan.id)
@@ -103,8 +170,8 @@ function start() {
   sfx.entity()
   newGame({
     board: board.value,
-    survivors: ids.map((id) => ({ id: id!, name: survivorById.get(id!)!.name })),
-    killer: { id: killer.value, name: killerById.get(killer.value)!.name },
+    survivors: ids.map((id, seat) => ({ id: id!, name: survivorById.get(id!)!.name, perks: mode.value === 'adept' ? undefined : loadouts.value[String(seat)] })),
+    killer: { id: killer.value, name: killerById.get(killer.value)!.name, perks: mode.value === 'adept' ? undefined : loadouts.value.killer },
     players: players.value,
     seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
   })
@@ -174,7 +241,13 @@ function start() {
           <button v-for="n in [3, 4, 5] as const" :key="n" type="button" :class="{ active: players === n }" @click="setPlayers(n)">{{ n }} คน</button>
         </div>
         <p class="muted">ผู้เล่น 1 = Killer · {{ seatingNote }}</p>
-        <p class="muted small">โหมด Adept (Perk บนกระดานตัวละคร) · แผนที่ MacMillan Estate</p>
+        <h2>โหมดเกม</h2>
+        <div class="modes">
+          <button v-for="m in MODES" :key="m.id" type="button" class="mode" :class="{ active: mode === m.id }" @click="setMode(m.id)">
+            <b>{{ m.label }}</b>
+            <small>{{ m.note }}</small>
+          </button>
+        </div>
         <div class="actions">
           <button type="button" class="primary big" @click="confirmPlayers">เริ่มเลือกตัวละคร →</button>
         </div>
@@ -196,8 +269,41 @@ function start() {
     <!-- 3. then the killer -->
     <CharacterPicker v-else-if="step === 'killer'" kind="killer" :selected="killer ? [killer] : []" @pick="killer = $event" @unpick="killer = null" />
 
-    <!-- 4. the map, and in -->
+    <!-- 4. perks: each player in turn, the device handed over first -->
+    <template v-else-if="step === 'perks' && perkChar">
+      <section v-if="!handedOver" class="card handoff">
+        <img :src="asset((perkChar.side === 'killer' ? killerById.get(perkChar.id) : survivorById.get(perkChar.id))?.images.mini)" alt="" />
+        <h2>ส่งเครื่องให้{{ perkChar.who }}</h2>
+        <p class="muted">แต่ง Perk ของ {{ (perkChar.side === 'killer' ? killerById.get(perkChar.id) : survivorById.get(perkChar.id))?.name }} — คนอื่นห้ามดูจอ ({{ perkTurn + 1 }}/{{ perkChars.length }})</p>
+        <button type="button" class="primary big" @click="beginPerks">👁 ฉันคือ{{ perkChar.who }} — เริ่มแต่ง Perk</button>
+      </section>
+      <PerkLoadout
+        v-else
+        v-model="draft"
+        :side="perkChar.side"
+        :character-id="perkChar.id"
+        :mode="mode"
+        :who="perkChar.who"
+        :choices="cardChoices(mode, perkChar, hands[perkChar.key])"
+        :taken="perkTaken"
+        :problem="perkProblem"
+        :confirmed="false"
+        @confirm="confirmPerks"
+      />
+    </template>
+
+    <!-- 5. the map, and in -->
     <template v-else>
+      <!-- the perks set, revealed together (p.19) -->
+      <section v-if="mode !== 'adept'" class="card reveal">
+        <h2>Perk ของทุกคน</h2>
+        <div class="reveal-grid">
+          <div v-for="c in perkChars" :key="c.key" class="reveal-row">
+            <strong>{{ (c.side === 'killer' ? killerById.get(c.id) : survivorById.get(c.id))?.name }}</strong>
+            <span class="muted">{{ perkNames(c) }}</span>
+          </div>
+        </div>
+      </section>
       <MapPicker v-model="board" />
       <div class="actions">
         <button type="button" class="primary big" @click="start">เข้าสู่ Trial →</button>
@@ -207,6 +313,55 @@ function start() {
 </template>
 
 <style scoped>
+.modes {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 0.75rem;
+}
+.mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+}
+.mode b {
+  font-size: 1.1rem;
+}
+.mode small {
+  color: var(--muted);
+}
+.mode.active {
+  border-color: var(--blood);
+  box-shadow: 0 0 0 2px var(--blood) inset;
+}
+.handoff {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+.handoff img {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+}
+.handoff h2 {
+  margin: 0;
+}
+.reveal-grid {
+  display: grid;
+  gap: 0.4rem;
+}
+.reveal-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: baseline;
+}
 .lobby {
   display: flex;
   flex-direction: column;

@@ -65,6 +65,22 @@ function toggleBan(id: string, kind: 'survivor' | 'killer') {
 
     <div class="rows">
       <div class="row">
+        <span class="label">🃏 โหมดเกม</span>
+        <div class="seg">
+          <button type="button" :class="{ on: s.mode === 'adept' }" :disabled="busy" @click="set({ mode: 'adept' })">Adept</button>
+          <button type="button" :class="{ on: s.mode === 'bloodweb' }" :disabled="busy" @click="set({ mode: 'bloodweb' })">Bloodweb</button>
+          <button type="button" :class="{ on: s.mode === 'devout' }" :disabled="busy" @click="set({ mode: 'devout' })">Devout</button>
+        </div>
+        <small class="muted hint">{{
+          s.mode === 'adept'
+            ? 'ใช้ Perk ที่พิมพ์บนกระดานตัวละคร'
+            : s.mode === 'bloodweb'
+              ? 'จั่วการ์ด Perk คนละ 5 ใบ เลือกวางทับ Perk บนกระดานได้สูงสุด 3 ใบ — แต่งหลังทุกคนเลือกตัวละครแล้ว'
+              : 'เลือก Perk เองได้สูงสุด 3 ใบ เปิดพร้อมกันตอนเริ่มเกม — แต่งหลังทุกคนเลือกตัวละครแล้ว'
+        }} · 1 Perk อยู่ในเกมได้ครั้งเดียว</small>
+      </div>
+
+      <div class="row">
         <span class="label">⏱ เวลาต่อตา</span>
         <div class="seg">
           <button v-for="t in TIMER_CHOICES" :key="t" type="button" :class="{ on: s.timer === t }" :disabled="busy" @click="set({ timer: t })">

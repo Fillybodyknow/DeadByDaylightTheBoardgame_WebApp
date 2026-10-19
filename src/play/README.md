@@ -134,12 +134,15 @@ and the host starts the game.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
 - Mode **Adept**: each character plays the 3 perks printed on their board (102 perks).
 - The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
-  the printed ones; 35 are on no board. 27 of those are in the engine (`DECK_PERKS` in
-  `engine/perks.ts`), the rest are next. A card-only perk has no character and no index: its
+  the printed ones; 35 are on no board. All 35 are in the engine (`DECK_PERKS` in
+  `engine/perks.ts`). A card-only perk has no character and no index: its
   name, cost, text and art come from the card data (`perkCard` in `labels.ts`). A card is laid
   over one of the character's printed perk slots: `perks` holds the card and `covered` the perk
-  under it (`SurvivorState`), and the four cards that discard themselves free it again. Picking
-  the cards before a trial is still to come: nothing deals them yet.
+  under it (`SurvivorState`), and the four cards that discard themselves free it again.
+- Modes **Bloodweb** and **Devout** (p.19), online (room setting `mode`) and offline (the players
+  step): once every character is picked, each player sets their 3 perks on a loadout screen in the
+  PC game's style (`PerkLoadout.vue`; offline one player at a time behind a hand-off card). The
+  rules live in `engine/loadout.ts`; `createGame` takes each character's `perks`.
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -536,3 +539,49 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   sets their card face up. The face-up card uses Stridor's own flow (that survivor plays first,
   everyone else plans knowing it), and there is one such slot, so Whispers is not offered when
   Stridor already took it. With no ▲ there is nothing to decide: the card goes face up.
+- Jolt: asked when a skill check (repair, exit gate, cleanse, heal, search) settles with a skill
+  die showing 1 or 2 — after re-rolls, Iron Will and Bond are done, before the roll counts. Using
+  it, each such die keeps its face but counts as a failure: the roll fails, and he gains 1 ▲ per
+  die as for any failure. Danger dice don't count (their faces aren't numbers 1–5), nor do the struggle and the
+  Phantasm roll, which aren't skill checks.
+- Plunderer's Instinct: asked whenever its owner would draw one item — a chest, the Map's draw,
+  the Commodious Toolbox. They draw three (as many as the deck has left), keep one and discard
+  the rest; holding an item already, the one kept then goes against it as usual (p.12).
+- Fearmonger: at the start of planning, a survivor on the board in his room or a room joined to
+  it. Until cleanup that survivor's perks can't be used: not asked, no buttons, nothing automatic.
+  Survivors are asked before the killer at that moment (p.16), so their own start-of-planning
+  perks come first.
+- Slippery Meat: asked at the start of planning of a survivor on a hook (its only perk that works
+  on the hook). It is the sabotage of their own hook: the Entity goes on the hook and they are off
+  it, in the same room — no move along a path, no ▲ for a rescue, no rescue perks. They then set a
+  card and play their turn as usual.
+- Self-Aware: a button at the start of its owner's turn. There is no perk deck in the game, so the
+  four cards are drawn from every survivor perk that no survivor has (on a board or laid over
+  one); the card picked takes Self-Aware's place (over the same printed perk, if it was laid over
+  one) and can be used from this round on; the rest go back out of the game.
+- Deerstalker and Thrill of the Hunt: "leaves your space" is any move of a survivor out of his
+  room — a movement card, a perk (Sprint Burst, Dead Hard, Spine Chill…), the move after a rescue,
+  a teammate's No One Left Behind, and his own pushes and drags too (Brutal Strength, Dark
+  Devotion, Infectious Fright: they still leave his room). Deerstalker: a wounded survivor rolls
+  the danger die before moving; a failure keeps them in the room, and on their own turn they can't
+  interact for the rest of it (on someone else's turn there is no interaction of theirs to lose).
+  Thrill of the Hunt: after they move he moves along the same path into the same room (which may
+  wake perks that watch him enter), not while carrying someone. A pallet on that path stops him as
+  on any move of his (p.14): he breaks it and stays, losing his interaction only if it is his own
+  turn. With both, the die comes first if he wants: if it keeps them in the room, he stays too.
+- Bloodweb and Devout (p.19): two kinds of perk (the user's ruling). The perks printed on the
+  character boards — purple (the character's own) and green (shareable) — are every board's own
+  and block nobody. The perk cards in the box (gold) are one of each: every green perk and the 35
+  on no board (a purple perk has no card). Only cards are laid over a board, and a card is in one
+  character's hands at most; so two characters may play the same perk, one from their board and
+  the other from its card (Zarina keeps Off the Record, Meg takes the Off the Record card). Devout
+  picks from the side's cards, but the ones of the character's own board; Bloodweb deals 5 each
+  from one shuffled deck per side, a card of a perk on the drawer's own board discarded and
+  another drawn. Either way a loadout is 3 different perks, the cards laid over the printed perks
+  dropped (in slot order). Perks are set after every character is locked in (Bloodweb deals from
+  all of them); reopening a character clears every loadout. A card someone sets shows as taken to
+  the rest of their side at once (first come); Devout's picks are otherwise hidden until the game
+  starts.
+- No One Left Behind: its owner's interaction, in a room with a revealed exit gate (powered or
+  not). One survivor of their choice — themselves included — moves along any one path, as after a
+  rescue: any colour, one way on a vault, never through a wall or the Entity.

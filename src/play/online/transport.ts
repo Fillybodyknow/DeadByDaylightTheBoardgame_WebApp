@@ -62,6 +62,14 @@ export interface RoomData {
   picks: Record<string, string>
   /** Player number → picks confirmed. */
   locked: Record<string, boolean>
+  /**
+   * Bloodweb / Devout (settings `mode`): each character's 3 perks, by the same keys as `picks`
+   * ("a,b,c", see engine/loadout.ts), and whether that loadout is confirmed.
+   */
+  loadouts?: Record<string, string>
+  perksDone?: Record<string, boolean>
+  /** Bloodweb's shuffle, drawn when the picks open: every device deals the same cards. */
+  perkSeed?: number
   game: GameState | null
   /** Moves played so far (the checkpoint's own count plus the ones replayed on top). */
   rev: number

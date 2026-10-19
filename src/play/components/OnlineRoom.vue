@@ -11,7 +11,17 @@ import { sfx } from '../../sound'
 import { KILLER_PLAYER } from '../engine/seats'
 import {
   allLocked,
+  allReady,
   backToLobby,
+  confirmPerks,
+  myPerkKeys,
+  perkChars,
+  perkHands,
+  perkProblem,
+  perkStage,
+  perksWaiting,
+  roomLoadouts,
+  setLoadout,
   doubleId,
   isHost,
   leaveRoom,
@@ -34,7 +44,10 @@ import {
   slotsOf,
   startOnlineGame,
 } from '../online/session'
+import { cardChoices, printedOf, takenBy } from '../engine/loadout'
+import type { PerkId } from '../engine/perks'
 import CharacterPicker from './CharacterPicker.vue'
+import PerkLoadout from './PerkLoadout.vue'
 import MapPicker from './MapPicker.vue'
 import Mini from './Mini.vue'
 import RoomSettingsCard from './RoomSettingsCard.vue'
@@ -168,7 +181,25 @@ const myPicksComplete = computed(() =>
   amKiller.value ? !!data.value.picks.killer : mySlots.value.length > 0 && mySlots.value.every((s) => data.value.picks[String(s)]),
 )
 
+// ---------- perks (Bloodweb, Devout): this device's characters, once everyone is locked in ----------
+
+/** This player's characters with their loadouts (their own only: Devout's picks are revealed together). */
+const myLoadouts = computed(() =>
+  myPerkKeys.value.flatMap((key) => {
+    const c = perkChars.value.find((x) => x.key === key)
+    return c ? [{ ...c, perks: roomLoadouts.value[key] ?? printedOf(c.id) }] : []
+  }),
+)
+const perkTaken = (key: string) => [...takenBy(perkChars.value, roomLoadouts.value, key)]
+const perkDone = (key: string) => !!data.value.perksDone?.[key]
+function confirmLoadout(key: string, on: boolean) {
+  sfx.select()
+  void confirmPerks(key, on)
+}
+
 function toggleLock() {
+  // a character changing deals the perks again: everyone sets theirs anew
+  if (locked.value && perkStage.value && !confirm('เปลี่ยนตัวละครจะล้าง Perk ที่ทุกคนแต่งไว้ ให้แต่งใหม่ทั้งหมด — ต่อไหม?')) return
   sfx.select()
   void lockPicks(!locked.value)
 }
@@ -350,6 +381,30 @@ function start() {
         />
       </section>
 
+      <!-- perks: once every character is locked in, each player sets theirs (Bloodweb, Devout) -->
+      <section v-if="perkStage && myLoadouts.length" class="perks-stage">
+        <h2>🃏 แต่ง Perk — {{ roomSettings.mode === 'devout' ? 'Devout' : 'Bloodweb' }}</h2>
+        <p class="muted small">
+          {{ roomSettings.mode === 'devout' ? 'เลือก Perk ได้สูงสุด 3 ใบ — คนอื่นไม่เห็นจนกว่าเกมจะเริ่ม' : 'การ์ดที่จั่วได้ 5 ใบ เลือกวางทับ Perk บนกระดานได้สูงสุด 3 ใบ' }}
+          · การ์ดมีใบเดียว: Perk ที่มีคนใช้แล้วจะมืดลง
+        </p>
+        <PerkLoadout
+          v-for="c in myLoadouts"
+          :key="c.key"
+          :model-value="c.perks"
+          :side="c.side"
+          :character-id="c.id"
+          :mode="roomSettings.mode"
+          :who="c.side === 'killer' ? 'Killer' : `Survivor ${Number(c.key) + 1}`"
+          :choices="cardChoices(roomSettings.mode, c, perkHands[c.key])"
+          :taken="perkTaken(c.key)"
+          :problem="perkProblem(c.key, c.perks)"
+          :confirmed="perkDone(c.key)"
+          @update:model-value="(p: PerkId[]) => setLoadout(c.key, p)"
+          @confirm="(on: boolean) => confirmLoadout(c.key, on)"
+        />
+      </section>
+
       <!-- whoever picks the board (the killer, or the host); everyone else's copy of it is above -->
       <MapPicker v-if="mayPickBoard" :model-value="data.board ?? 'macmillan'" @update:model-value="setBoard" />
 
@@ -358,12 +413,24 @@ function start() {
           {{ locked ? '🔒 ล็อกแล้ว (กดเพื่อแก้)' : myPicksComplete ? 'ยืนยันตัวละคร' : 'เลือกตัวละครให้ครบ' }}
         </button>
         <template v-if="amKiller">
-          <button class="primary big" :disabled="!allLocked || session.busy" @click="start">
-            {{ allLocked ? 'ดำเนินเกม — เริ่ม Trial' : `รอผู้เล่นยืนยัน (${pickWaiting.length} คน)` }}
+          <button class="primary big" :disabled="!allReady || session.busy" @click="start">
+            {{
+              !allLocked
+                ? `รอผู้เล่นยืนยัน (${pickWaiting.length} คน)`
+                : perksWaiting.length
+                  ? `รอแต่ง Perk (${perksWaiting.length} ตัว)`
+                  : 'ดำเนินเกม — เริ่ม Trial'
+            }}
           </button>
         </template>
         <p v-else class="muted center">
-          {{ survivorsWaiting.length ? `รอ Survivor ยืนยัน (${survivorsWaiting.length} คน)` : 'ทีม Survivor พร้อมแล้ว — รอ Killer ดำเนินเกม' }}
+          {{
+            survivorsWaiting.length
+              ? `รอ Survivor ยืนยัน (${survivorsWaiting.length} คน)`
+              : perkStage && perksWaiting.length
+                ? `รอทุกคนแต่ง Perk (${perksWaiting.length} ตัว)`
+                : 'ทีม Survivor พร้อมแล้ว — รอ Killer ดำเนินเกม'
+          }}
         </p>
       </section>
       <section v-else class="card">
@@ -378,6 +445,14 @@ function start() {
 </template>
 
 <style scoped>
+.perks-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.perks-stage h2 {
+  margin: 0;
+}
 .room {
   display: flex;
   flex-direction: column;

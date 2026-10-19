@@ -5,8 +5,11 @@
 import { killers, survivors } from '../../data'
 import { PLAYABLE_KILLERS, PRINTED_PERKS } from '../engine/perks'
 import { KILLER_BP, SURVIVOR_BP } from '../engine/engine'
+import type { GameMode } from '../engine/loadout'
 
 export interface RoomSettings {
+  /** p.19: Adept (printed perks), Bloodweb (5 cards drawn, up to 3 laid over), Devout (3 picked). */
+  mode: GameMode
   /** Seconds a player has for a decision; 0 for no limit. */
   timer: number
   /**
@@ -28,6 +31,7 @@ export interface RoomSettings {
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
+  mode: 'adept',
   timer: 0,
   map: 'killer',
   showKiller: false,
@@ -54,6 +58,8 @@ export const playableKillers = () => killers.filter((c) => PLAYABLE_KILLERS.incl
 /** What differs from the defaults, as short chips for the lobby ("⏱ 90 วิ"). */
 export function settingsChips(s: RoomSettings): string[] {
   const out: string[] = []
+  if (s.mode === 'bloodweb') out.push('🕸 Bloodweb')
+  if (s.mode === 'devout') out.push('🙏 Devout')
   if (s.timer) out.push(`⏱ ${s.timer} วิ/ตา`)
   if (s.map === 'secret') out.push('🗺 แผนที่ลับ')
   if (s.map === 'host') out.push('🗺 หัวห้องเลือกแผนที่')

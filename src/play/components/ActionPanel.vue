@@ -110,6 +110,7 @@ const actor = computed<number | 'killer' | null>(() => {
     case 'bonusOffer':
     case 'anyMove':
     case 'keepItem':
+    case 'pickItem':
       return s.s
     case 'revealProp':
       return s.who
@@ -531,8 +532,10 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <template v-if="perkPicked === b.perk">
           <!-- a swap (Ace in the Hole, Iron Maiden) is two props, one click each on the board -->
           <span v-if="SWAPS.includes(b.perk)" class="muted small">🎯 {{ b.perk === 'iron_maiden' ? 'คลิก Locker ว่างบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย' }}</span>
-          <button v-for="(c, i) in SWAPS.includes(b.perk) ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)) && !boardPallet(b.perk, c))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
-          <span v-if="!SWAPS.includes(b.perk) && b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
+          <!-- No One Left Behind: whoever moves, then the path, both on the board (as Breakout) -->
+          <span v-if="b.perk === 'no_one_left_behind'" class="muted small">🎯 คลิกผู้รอดชีวิตบนแผนที่ แล้วเลือกเส้นทางที่จะให้เดิน</span>
+          <button v-for="(c, i) in SWAPS.includes(b.perk) || b.perk === 'no_one_left_behind' ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)) && !boardPallet(b.perk, c))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+          <span v-if="!SWAPS.includes(b.perk) && b.perk !== 'no_one_left_behind' && b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
         </template>
       </div>
       <button class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
@@ -553,6 +556,16 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         @pick="pickBonus"
         @hover="hoverBonus"
       />
+    </template>
+
+    <!-- Plunderer's Instinct: three items drawn, one kept (the other two are discarded) -->
+    <template v-else-if="step.t === 'pickItem'">
+      <p>Plunderer's Instinct — เลือกเก็บ 1 ใบ อีก {{ step.drawn.length - 1 }} ใบทิ้ง</p>
+      <div class="buttons">
+        <button v-for="(item, i) in step.drawn" :key="i" class="itembtn" @click="act({ t: 'pickItem', item: i })">
+          <img :src="asset(itemImage(item))" alt="" />{{ ITEM_NAMES[item] }}
+        </button>
+      </div>
     </template>
 
     <template v-else-if="step.t === 'keepItem'">

@@ -104,9 +104,10 @@ const offerList = computed(() => {
 })
 
 /** What is being decided now, if anything worth the panel. */
-const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | 'guess' | 'crowd' | 'purge' | null>(() => {
+const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | 'guess' | 'crowd' | 'purge' | 'aware' | null>(() => {
   const s = step.value
   if (s.t === 'offer') return 'offer'
+  if (s.t === 'selfAware') return 'aware'
   if (s.t === 'purgeChoice') return 'purge'
   if (s.t === 'crowdPay' || s.t === 'crowdPick') return 'crowd'
   if (s.t === 'sparkChoice') return 'spark'
@@ -125,7 +126,7 @@ const decider = computed<PerkOwner | null>(() => {
   if (s.t === 'turnStart') return s.s
   // online, a helper's device names the helper: it's their key or perk being asked about
   if (s.t === 'roll') return buttons.value[0]?.owner ?? (rollMine.value ? s.ctx.s : (passers.value[0] ?? s.ctx.s))
-  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess' || s.t === 'crowdPay' || s.t === 'purgeChoice') return s.s
+  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess' || s.t === 'crowdPay' || s.t === 'purgeChoice' || s.t === 'selfAware') return s.s
   if (s.t === 'phantasmChoice' || s.t === 'crowdPick') return 'killer'
   return null
 })
@@ -161,6 +162,13 @@ function pledgeLabel(s: number): string {
   if (p === 0) return props.st.survivors[s].bp ? 'ไม่ลง' : 'ไม่มี ▲'
   return `ลง ${p} ▲`
 }
+
+/** Self-Aware: the card picked from the four drawn, waiting for the confirm. */
+const awarePick = ref<PerkId | null>(null)
+watch(
+  () => JSON.stringify(step.value),
+  () => (awarePick.value = null),
+)
 
 /** Vile Purge: the perk opened big, waiting for the confirm. */
 const purgePick = ref<PerkId | null>(null)
@@ -744,6 +752,25 @@ const boardCount = computed(() => {
         </div>
       </template>
 
+      <!-- Self-Aware: four survivor perk cards drawn, one takes its place -->
+      <template v-else-if="step.t === 'selfAware'">
+        <p class="lead"><b>Self-Aware</b> — เลือก 1 ใบมาแทนการ์ดนี้ ที่เหลือทิ้ง (ใช้ใบใหม่ได้ตั้งแต่รอบนี้)</p>
+        <div class="purge-perks">
+          <button v-for="p in step.cards" :key="p" type="button" class="purge-perk" :class="{ on: awarePick === p }" @click="(awarePick = p), fxSound.flip()">
+            <img v-if="perkImage(p)" :src="asset(perkImage(p))" :alt="PERKS[p].name" />
+            <strong>{{ PERKS[p].name }}</strong>
+            <small><BpText :text="PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี'" /></small>
+          </button>
+        </div>
+        <template v-if="awarePick">
+          <p class="text small"><BpText :text="perkText(awarePick)" /></p>
+          <p class="muted small"><BpText :text="PERKS[awarePick].when" /></p>
+        </template>
+        <button class="primary" :disabled="!awarePick" @click="awarePick && act({ t: 'selfAware', perk: awarePick })">
+          {{ awarePick ? `ยืนยัน: เลือก ${PERKS[awarePick].name}` : 'แตะการ์ดเพื่อดูก่อนเลือก' }}
+        </button>
+      </template>
+
       <!-- Crowd Control: the survivors buy it off together, or the killer sets the card -->
       <template v-else-if="step.t === 'crowdPay'">
         <p class="lead">
@@ -1213,6 +1240,11 @@ h3 {
 }
 .purge-perk:hover {
   box-shadow: 0 0 0 2px #b6e36a, 0 0 14px rgb(182 227 106 / 0.6);
+}
+/* Self-Aware: the card picked, before the confirm */
+.purge-perk.on {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 2px var(--warn) inset, 0 0 14px rgb(217 162 39 / 0.4);
 }
 .purge-perk small {
   color: #b6e36a;

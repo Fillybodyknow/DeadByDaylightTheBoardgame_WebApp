@@ -66,6 +66,9 @@ function lobbyOf(r: RoomData): Lobby {
     ...(r.settings ? { settings: r.settings } : {}),
     ...(r.name ? { name: r.name } : {}),
     ...(r.passwordHash ? { passwordHash: r.passwordHash } : {}),
+    ...(r.loadouts ? { loadouts: r.loadouts } : {}),
+    ...(r.perksDone ? { perksDone: r.perksDone } : {}),
+    ...(r.perkSeed ? { perkSeed: r.perkSeed } : {}),
   }
 }
 interface GameNode {

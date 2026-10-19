@@ -29,6 +29,8 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'bonusOffer':
     case 'anyMove':
     case 'keepItem':
+    case 'pickItem':
+    case 'selfAware':
     case 'turnStart':
     case 'sparkChoice':
     case 'replaceCard':

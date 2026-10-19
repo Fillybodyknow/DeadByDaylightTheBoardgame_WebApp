@@ -584,7 +584,9 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
     const name = PERKS[b.perk].name
     // Breakout moves one wounded survivor: pick who first, then where, so a board full of
     // wounded friends isn't one long list of person-and-path pairs.
-    if (b.perk === 'breakout') {
+    // No One Left Behind moves any survivor along any path: the same two clicks
+    if (b.perk === 'breakout' || b.perk === 'no_one_left_behind') {
+      const perk = b.perk
       const who = modes.breakoutTarget.value
       if (who === null) {
         for (const target of new Set(b.choices.map((c) => c.target!)))
@@ -601,7 +603,7 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
         if (c.target !== who) continue
         const run = () => {
           modes.breakoutTarget.value = null
-          go({ t: 'perk', perk: 'breakout', use: true, choice: c }, sfx.drop)()
+          go({ t: 'perk', perk, use: true, choice: c }, sfx.drop)()
         }
         const p = pathDef(st, c.path!)
         const from = st.survivors[who].room

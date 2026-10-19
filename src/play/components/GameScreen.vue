@@ -491,6 +491,8 @@ function diceResult(ctx: RollContext['k'], dice: Die[]): Pick<DiceShow, 'outcome
       return fail ? { outcome: 'ไม่สำเร็จ — ถูกแขวน', tone: 'bad' } : { outcome: 'หลุดรอดจากตะขอ!', tone: 'great' }
     case 'spineChill':
       return fail ? { outcome: 'ไม่สำเร็จ', tone: 'bad' } : { outcome: 'เดินหนีได้!', tone: 'great' }
+    case 'deerstalker':
+      return fail ? { outcome: 'ออกจากห้องไม่ได้!', tone: 'bad' } : { outcome: 'หลุดออกไปได้', tone: 'great' }
   }
 }
 

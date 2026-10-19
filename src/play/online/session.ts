@@ -10,6 +10,8 @@ import { killerById, survivorById } from '../../data'
 import { createGame, handLayout } from '../engine/engine'
 import { boards, macmillan } from '../engine/boards'
 import { KILLER_PLAYER } from '../engine/seats'
+import { bloodwebHands, choicesFor, loadoutProblem, packLoadout, takenBy, unpackLoadout, type LoadoutCharacter } from '../engine/loadout'
+import type { PerkId } from '../engine/perks'
 import { game, online, receive, restoreLocal } from '../game'
 import { firebaseBackend, firebaseConfigured } from './firebase'
 import { localBackend } from './local'
@@ -354,7 +356,8 @@ export function proceedToPick() {
       const ks = free(playableKillers())
       if (ks.length) picks.killer = draw(ks)
     }
-    return { ...cur, phase: 'pick', seats, players: survivors.length + 1, picks, locked: {}, ...(board ? { board } : {}) }
+    const perkSeed = Math.floor(Math.random() * 0x7fffffff) + 1
+    return { ...cur, phase: 'pick', seats, players: survivors.length + 1, picks, locked: {}, loadouts: {}, perksDone: {}, perkSeed, ...(board ? { board } : {}) }
   })
 }
 
@@ -393,7 +396,8 @@ export function lockPicks(locked: boolean) {
     const next = { ...cur.locked }
     if (locked) next[seat] = true
     else delete next[seat]
-    return { ...cur, locked: next }
+    // a character may change: the perks (Bloodweb's cards, who plays what) are set again
+    return locked ? { ...cur, locked: next } : { ...cur, locked: next, loadouts: {}, perksDone: {} }
   })
 }
 
@@ -401,6 +405,93 @@ export const allLocked = computed(() => {
   const d = session.data
   return !!d && d.phase === 'pick' && pickWaiting.value.length === 0
 })
+
+// ---------- perks (Bloodweb, Devout — p.19) ----------
+
+/** The characters of a room, for their loadouts: survivor slots in order, then the killer. */
+function charsOf(d: RoomData): LoadoutCharacter[] {
+  const out: LoadoutCharacter[] = [0, 1, 2, 3].flatMap((i) => (d.picks[String(i)] ? [{ key: String(i), side: 'survivor' as const, id: d.picks[String(i)] }] : []))
+  return d.picks.killer ? [...out, { key: 'killer', side: 'killer', id: d.picks.killer }] : out
+}
+
+function loadoutsOf(d: RoomData): Record<string, PerkId[] | undefined> {
+  return Object.fromEntries(Object.entries(d.loadouts ?? {}).map(([k, v]) => [k, unpackLoadout(v)]))
+}
+
+/** The loadout keys of a seat: the killer's, or the survivor slots that player plays. */
+function keysOf(d: RoomData, seat: string): string[] {
+  const player = Number(seat)
+  return player === KILLER_PLAYER ? ['killer'] : slotsOf(player, d.players).map(String)
+}
+
+const everyoneLocked = (d: RoomData) => Array.from({ length: d.players }, (_, i) => String(i + 1)).every((p) => d.locked[p])
+
+/** Perks are set once every character is locked in: Bloodweb deals from all of them at once. */
+export const perkStage = computed(() => roomSettings.value.mode !== 'adept' && allLocked.value)
+export const perkChars = computed(() => (session.data ? charsOf(session.data) : []))
+export const roomLoadouts = computed(() => (session.data ? loadoutsOf(session.data) : {}))
+export const perkHands = computed(() => {
+  const d = session.data
+  return d && roomSettings.value.mode === 'bloodweb' && perkStage.value ? bloodwebHands(d.perkSeed ?? 1, perkChars.value) : {}
+})
+/** This device's loadout keys. */
+export const myPerkKeys = computed(() => {
+  const d = session.data
+  const seat = mySeat.value
+  return d && seat ? keysOf(d, String(seat)) : []
+})
+/** Characters whose perks aren't confirmed yet. */
+export const perksWaiting = computed(() => (perkStage.value ? perkChars.value.filter((c) => !session.data?.perksDone?.[c.key]) : []))
+/** Everyone is in: characters locked and, in Bloodweb or Devout, every loadout confirmed. */
+export const allReady = computed(() => allLocked.value && (roomSettings.value.mode === 'adept' || perksWaiting.value.length === 0))
+
+/** Why this loadout can't be confirmed ('' when it can): the room's rules, as of now. */
+export function perkProblem(key: string, perks: PerkId[]): string {
+  const d = session.data
+  const c = perkChars.value.find((x) => x.key === key)
+  if (!d || !c) return ''
+  return loadoutProblem(roomSettings.value.mode, c, perks, perkHands.value[key], takenBy(perkChars.value, roomLoadouts.value, key))
+}
+
+/**
+ * Set one of this player's loadouts (it shows at once as taken for the others: one card each).
+ * Checked against the room as it is when written, so two players can't take the same perk.
+ */
+export function setLoadout(key: string, perks: PerkId[]) {
+  return update((cur) => {
+    const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
+    const s = settingsOf(cur.settings)
+    if (cur.phase !== 'pick' || !seat || s.mode === 'adept' || !everyoneLocked(cur)) return null
+    if (!keysOf(cur, seat).includes(key) || cur.perksDone?.[key]) return null
+    const chars = charsOf(cur)
+    const c = chars.find((x) => x.key === key)
+    if (!c) return null
+    // the rules of engine/loadout.ts, against the room as it is now (a card taken meanwhile fails)
+    const hand = s.mode === 'bloodweb' ? bloodwebHands(cur.perkSeed ?? 1, chars)[key] : undefined
+    if (loadoutProblem(s.mode, c, perks, hand, takenBy(chars, loadoutsOf(cur), key))) return null
+    return { ...cur, loadouts: { ...(cur.loadouts ?? {}), [key]: packLoadout(perks) } }
+  })
+}
+
+/** Confirm (or reopen) one of this player's loadouts; confirming needs it to be playable. */
+export function confirmPerks(key: string, on: boolean) {
+  return update((cur) => {
+    const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
+    const s = settingsOf(cur.settings)
+    if (cur.phase !== 'pick' || !seat || s.mode === 'adept' || !everyoneLocked(cur) || !keysOf(cur, seat).includes(key)) return null
+    const done = { ...(cur.perksDone ?? {}) }
+    if (on) {
+      const chars = charsOf(cur)
+      const c = chars.find((x) => x.key === key)
+      const mine = loadoutsOf(cur)[key]
+      if (!c) return null
+      const hand = s.mode === 'bloodweb' ? bloodwebHands(cur.perkSeed ?? 1, chars)[key] : undefined
+      if (loadoutProblem(s.mode, c, mine ?? choicesFor('adept', c, undefined), hand, takenBy(chars, loadoutsOf(cur), key))) return null
+      done[key] = true
+    } else delete done[key]
+    return { ...cur, perksDone: done }
+  })
+}
 
 /** Who picks the board under the room's settings: the killer's seat, the host, or nobody (drawn). */
 export const mayPickBoard = computed(() => {
@@ -424,7 +515,8 @@ export function setBoard(id: string) {
 /** The killer starts the game once everyone has locked in. The seed is drawn here, once. */
 export function startOnlineGame() {
   const d = session.data
-  if (!d || !allLocked.value || mySeat.value !== KILLER_PLAYER) return
+  if (!d || !allReady.value || mySeat.value !== KILLER_PLAYER) return
+  const perks = roomSettings.value.mode === 'adept' ? {} : loadoutsOf(d)
   const survivors = [0, 1, 2, 3].map((i) => d.picks[String(i)])
   const killer = d.picks.killer
   if (!killer || survivors.some((s) => !s)) return
@@ -436,9 +528,9 @@ export function startOnlineGame() {
         survivors: survivors.map((id, i) => {
           const name = survivorById.get(id)!.name
           const n = survivors.slice(0, i).filter((x) => x === id).length
-          return { id, name: n ? `${name} ${n + 1}` : name }
+          return { id, name: n ? `${name} ${n + 1}` : name, perks: perks[String(i)] }
         }),
-        killer: { id: killer, name: killerById.get(killer)!.name },
+        killer: { id: killer, name: killerById.get(killer)!.name, perks: perks.killer },
         players: d.players as 3 | 4 | 5,
         startBp: { survivor: roomSettings.value.survivorBp, killer: roomSettings.value.killerBp },
         seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
@@ -450,7 +542,7 @@ export function startOnlineGame() {
 /** Host: back to the lobby from the character picks. */
 export function backToLobby() {
   if (!isHost.value) return
-  return update((cur) => ({ ...cur, phase: 'lobby', seats: {}, players: 0, picks: {}, locked: {} }))
+  return update((cur) => ({ ...cur, phase: 'lobby', seats: {}, players: 0, picks: {}, locked: {}, loadouts: {}, perksDone: {} }))
 }
 
 /** Seated players still on the game's summary (not back in the lobby yet). */
@@ -486,6 +578,8 @@ export function closeOnlineGame() {
       players: 0,
       picks: {},
       locked: {},
+      loadouts: {},
+      perksDone: {},
       // everyone un-ready, and no one left waiting (the database takes no undefined: `back` is dropped)
       members: Object.fromEntries(Object.entries(cur.members).map(([id, { back, ...m }]) => (void back, [id, { ...m, ready: false }]))),
     }))

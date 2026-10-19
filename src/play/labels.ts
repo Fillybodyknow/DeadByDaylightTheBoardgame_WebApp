@@ -3,7 +3,7 @@
 import { editPerkById, killerById, survivorById } from '../data'
 import { CARD_NAMES, GUARD_NAMES, ITEM_NAMES, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
-import type { GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
+import type { Die, GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
 import type { Perk } from '../types'
 
 export const CARD_TH: Record<MoveCard, string> = {
@@ -228,6 +228,7 @@ export const ROLL_TITLE: Record<RollContext['k'], string> = {
   assassin: 'หลบ Assassin',
   deadHard: 'Dead Hard',
   spineChill: 'Spine Chill',
+  deerstalker: 'Deerstalker',
 }
 
 /** The survivor an interaction is about (heal, attack, pick up, hatchet, a rescue), if any. */
@@ -541,6 +542,22 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `ให้ ${name(c.target!)} เล่น Bonus Turn ท้ายเทิร์นนี้`
     case 'guardian':
       return `บังคับ ${st.killer.name} ให้ Interact กับคุณเท่านั้นเทิร์นนี้`
+    case 'jolt':
+      return 'ให้ลูกที่ได้ 1–2 เป็นล้มเหลว (+1 ▲ ต่อลูก)'
+    case 'plunderers_instinct':
+      return 'จั่ว 3 ใบ เลือกเก็บ 1'
+    case 'fearmonger':
+      return `${name(c.target!)} ใช้ Perk ไม่ได้รอบนี้`
+    case 'slippery_meat':
+      return 'ลงจาก Hook เอง (อยู่ห้องเดิม)'
+    case 'self_aware':
+      return 'จั่ว Perk 4 ใบ เลือก 1 ใบมาแทนการ์ดนี้'
+    case 'deerstalker':
+      return `ให้ ${name((w as { s: number }).s)} ทอย Danger Die — ล้มเหลว = อยู่ที่เดิม`
+    case 'thrill_of_the_hunt':
+      return `เดินตาม ${name((w as { s: number }).s)} ไป ${roomName(st, (w as { to: string }).to)}`
+    case 'no_one_left_behind':
+      return `ย้าย ${name(c.target!)} ไปทาง ${pathLabel(st, c.path!, st.survivors[c.target!].room)}`
     default:
       return 'ใช้'
   }
@@ -600,6 +617,11 @@ export function windowWho(w: PerkWindow): PerkOwner | null {
 }
 
 /** What an offer is about, for its heading. */
+/** Skill dice faces in words: "1, กะโหลก". */
+export function diceFaces(dice: Die[]): string {
+  return dice.map((d) => (d.kind === 'skill' && d.face === 0 ? 'กะโหลก' : String(d.face))).join(', ')
+}
+
 export function windowLabel(st: GameState, w: PerkWindow): string {
   switch (w.k) {
     case 'afterAttack':
@@ -686,6 +708,12 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return `${st.survivors[w.s].name} Interact แล้ว`
     case 'beforeReveal':
       return `${st.survivors[w.s].name} เข้า ${roomName(st, w.room)} — กำลังจะเปิด prop`
+    case 'rolled':
+      return `${st.survivors[w.s].name} ทอย ${ROLL_TITLE[w.ctx]} ได้ ${diceFaces(w.dice)}`
+    case 'preDraw':
+      return `${st.survivors[w.s].name} กำลังจะจั่ว item`
+    case 'survivorLeave':
+      return `${st.survivors[w.s].name} กำลังจะเดินออกจากห้องของคุณไป ${roomName(st, w.to)}`
     default:
       return ''
   }
