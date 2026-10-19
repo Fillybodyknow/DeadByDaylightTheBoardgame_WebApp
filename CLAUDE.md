@@ -27,6 +27,15 @@ npx vue-tsc -b     # type-check only
 Node 22 (as in CI). On Windows, if vitest says "no tests", the shell's working directory has a
 lowercase drive letter (`d:` vs `D:`); run `npx vitest run src/play` from PowerShell.
 
+Online play in dev needs `.env.local` at the root (git-ignored; the deploy reads the same two
+values from the repo's Actions variables). Without it, online rooms use the local backend, which
+only syncs tabs of one browser:
+
+```
+VITE_FIREBASE_DATABASE_URL=https://dbd-engine-default-rtdb.asia-southeast1.firebasedatabase.app
+VITE_FIREBASE_PROJECT_ID=dbd-engine
+```
+
 Before saying work is done: type-check, tests and build must all pass. Report failures as they are.
 
 ## Layout
@@ -35,6 +44,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 |---|---|
 | `src/play/engine/` | Rules engine: `engine.ts` (pure reducer), `types.ts`, `perks.ts`, `legal.ts`, `seats.ts`, `boards.ts` (board graphs, read from the map art; `boards.test.ts` checks them), tests |
 | `src/play/components/` | Game UI: `GameScreen` (layout), `Board`, `ActionPanel`, `PerkPrompt`, `Planning`, `CardHand`, `StatusPanel` (player tiles), `ObjectiveHud` (both sides' goals, under the tiles), modals |
+| `src/play/engine/loadout.ts` | Game modes Adept / Bloodweb / Devout (p.19): the perk-card deck, Bloodweb's draws, what a loadout may hold; `createGame` takes each character's `perks` |
+| `src/play/components/PerkLoadout.vue` | The perk loadout screen (PC game style): 3 slots, a honeycomb of perk cards with cost badges, a details box (`PerkRichText` lights key words) |
 | `src/play/boardActions.ts` | Everything clickable on the board right now |
 | `src/play/focus.ts` | Board highlights and the facts listed for a decision |
 | `src/play/labels.ts` | Thai labels for actions, perk choices, windows |
@@ -67,6 +78,28 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   optional (`field?:`), or bump the version together with the check in `src/play/game.ts`.
 - When the rulebook is unclear, pick a ruling, write it in `src/play/README.md` (Rulings), and
   tell the user. House rules (the user's own changes to the rules) go under House rules there.
+
+### Perks on boards, perk cards, and the game modes
+
+- Two kinds of perk (the user's ruling, details in `src/play/README.md` → Rulings):
+  - **Printed on a board:** purple = a board's first perk, the character's own, with no card;
+    green = perks 2–3. Every board has its own, so they block nobody.
+  - **Perk cards (gold), one of each:** every green perk, plus the 35 perks on no board
+    (`deck(...)` in `perks.ts`, `DECK_PERKS`). A card is with one character at most. So two
+    characters may play the same perk: one printed on their board, the other from its card.
+- A card is laid over a printed slot. `covered` (card → the printed perk under it) frees that
+  perk again when the card discards itself (`discardPerkCard`).
+- Modes are the room setting `mode` online, or the players step offline. Adept is the printed
+  perks. In Bloodweb and Devout, once every character is locked in, each player sets 3 perks:
+  - online, on their own screen;
+  - offline, one player at a time behind a hand-off card.
+
+  Bloodweb deals from the seed `perkSeed`, so every device draws the same cards.
+- Online, the lobby node holds `loadouts` ("a,b,c" per character key), `perksDone` and
+  `perkSeed`. `lobbyOf` in `online/firebase.ts` writes only the fields it lists: a new lobby
+  field must be added there, or it is silently dropped.
+- A new character's green perks join the card deck by themselves once their perks are in
+  `perks.ts`. Their purple perk stays theirs alone.
 
 ### Adding a character
 
