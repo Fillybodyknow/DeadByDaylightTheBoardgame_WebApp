@@ -271,7 +271,7 @@ watch(
 )
 
 /** Perks whose card is then played to move: hovering it shows where it goes. */
-const MOVE_PERKS: PerkId[] = ['adrenaline', 'saboteur', 'up_the_ante', 'any_means_necessary', 'devour_hope', 'shadowborn']
+const MOVE_PERKS: PerkId[] = ['adrenaline', 'saboteur', 'up_the_ante', 'any_means_necessary', 'devour_hope', 'shadowborn', 'resilience', 'renewal', 'situational_awareness', 'lightweight']
 
 /** The cards to choose from: an offer's card choices (Tinkerer / Zanshin: for the planned card picked), or Predator's new card. */
 const handChoices = computed<PerkChoice[]>(() => {
@@ -665,6 +665,16 @@ const boardCount = computed(() => {
           </div>
         </div>
         <button class="primary wide" @click="act({ t: 'continue' })">ไม่ใช้ perk — เปิดการ์ดแล้วเดิน</button>
+      </template>
+
+      <!-- Whispers: pay or set the card face up -->
+      <template v-else-if="step.t === 'sparkChoice' && step.whispers">
+        <p class="lead"><b>Whispers!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือวางการ์ดเคลื่อนที่หงายหน้า</p>
+        <p class="text small">วางหงายหน้า = ทุกคน (รวมฆาตกร) เห็นการ์ดของคุณก่อนวางแผนของตัวเอง</p>
+        <div class="choices">
+          <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 <BpIcon /> (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
+          <button @click="act({ t: 'spark', pay: false })">ไม่จ่าย — วางการ์ดหงายหน้า</button>
+        </div>
       </template>
 
       <!-- Carter's Spark: pay or take it -->

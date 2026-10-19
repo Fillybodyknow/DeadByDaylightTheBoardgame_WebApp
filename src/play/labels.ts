@@ -1,6 +1,6 @@
 // Thai labels for actions, steps and pieces.
 
-import { killerById, survivorById } from '../data'
+import { editPerkById, killerById, survivorById } from '../data'
 import { CARD_NAMES, GUARD_NAMES, ITEM_NAMES, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import type { GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
@@ -227,6 +227,7 @@ export const ROLL_TITLE: Record<RollContext['k'], string> = {
   breakdown: 'Breakdown',
   assassin: 'หลบ Assassin',
   deadHard: 'Dead Hard',
+  spineChill: 'Spine Chill',
 }
 
 /** The survivor an interaction is about (heal, attack, pick up, hatchet, a rescue), if any. */
@@ -243,9 +244,10 @@ export function powerName(st: GameState): string {
 
 // ---------- perks ----------
 
-/** The printed perk card (name, cost, Thai text, image) from the character data. */
+/** The perk card (name, cost, Thai text, image): from the character board, or from the deck. */
 export function perkCard(perk: PerkId): Perk | undefined {
   const d = PERKS[perk]
+  if (d.card) return editPerkById.get(d.card)
   const c = d.side === 'killer' ? killerById.get(d.character) : survivorById.get(d.character)
   return c?.perks[d.index]
 }
@@ -497,6 +499,48 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `นำ Locker ออก — ${st.killer.name} Interact ไม่ได้เทิร์นนี้`
     case 'built_to_last':
       return `เก็บ ${ITEM_NAMES[(w as { item: string }).item]} ไว้`
+    // ----- cards only (the edit-perks mode) -----
+    case 'small_game':
+      return `${st.killer.name} −2 ▲`
+    case 'this_is_not_happening':
+    case 'sloppy_butcher':
+      return 'ทอย Danger Die แทน'
+    case 'resilience':
+    case 'renewal':
+    case 'situational_awareness':
+    case 'no_one_escapes_death':
+      return `Bonus Turn ด้วย ${CARD_NAMES[c.card!]}`
+    case 'well_make_it':
+      return `ให้ ${name((w as { s: number }).s)} เล่น Bonus Turn ด้วย ${CARD_NAMES[c.card!]}`
+    case 'inner_healing':
+      return 'หายบาดเจ็บ (ทิ้งการ์ดนี้)'
+    case 'dark_sense':
+    case 'bitter_murmur':
+      return `เดินต่อทาง ${pathLabel(st, c.path!, o === 'killer' ? st.killer.room : st.survivors[o].room)}`
+    case 'deja_vu':
+      return `ซ่อม Generator ที่ ${roomName(st, prop(st, c.prop!).room!)}`
+    case 'premonition':
+      return 'ไล่ Crow ในห้องนี้'
+    case 'spine_chill':
+      return 'ทอย Danger Die — สำเร็จ = เดินหนี'
+    case 'lightweight':
+      return `ทิ้ง ${CARD_NAMES[c.card!]} แล้วเดินก่อนเริ่มเทิร์น`
+    case 'claustrophobia':
+      return `Entity บนเส้นทาง ${pathName(st, c.path!)} — ผู้รอดชีวิตผ่านไม่ได้`
+    case 'distressing':
+      return `${name(c.target!)} ต้องซ่อนใน Locker`
+    case 'unrelenting':
+      return `${st.survivors[c.target!].wounded ? 'อุ้ม' : 'โจมตี'} ${name(c.target!)} ต่อ`
+    case 'iron_grasp':
+      return 'ทอยเต๋า Skill Check ใหม่ทั้งหมด'
+    case 'insidious':
+      return `อุ้ม ${name((w as { target: number }).target)} แทนการโจมตี`
+    case 'whispers':
+      return `เลือก ${name(c.target!)} — จ่าย 1 ▲ หรือวางการ์ดหงายหน้า`
+    case 'kinship':
+      return `ให้ ${name(c.target!)} เล่น Bonus Turn ท้ายเทิร์นนี้`
+    case 'guardian':
+      return `บังคับ ${st.killer.name} ให้ Interact กับคุณเท่านั้นเทิร์นนี้`
     default:
       return 'ใช้'
   }
@@ -539,7 +583,7 @@ export function cardCaption(perk: PerkId, c: PerkChoice): string {
 /** Whom an offer's moment is about, for their mini beside its heading (null: nobody in particular). */
 export function windowWho(w: PerkWindow): PerkOwner | null {
   if ('s' in w) return w.s
-  if ('target' in w) return w.target
+  if ('target' in w && w.target !== undefined) return w.target
   if (w.k === 'preRoll') return w.ctx.s
   switch (w.k) {
     case 'killerEntered':
@@ -618,6 +662,10 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return `${st.survivors[w.s].name} ทอยล้มเหลว (${st.killer.name} จะได้ +${w.fails} ▲)`
     case 'healed':
       return `${st.survivors[w.s].name} หายบาดเจ็บ`
+    case 'cleansed':
+      return `${st.survivors[w.s].name} ชำระ Hex Totem สำเร็จ`
+    case 'repaired':
+      return `${st.survivors[w.s].name} ซ่อม Generator สำเร็จ`
     case 'preHang':
       return `${st.survivors[w.s].name} กำลังจะถูกแขวนบน Hook`
     case 'preLeave':

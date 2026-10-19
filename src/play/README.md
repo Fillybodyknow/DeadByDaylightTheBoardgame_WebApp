@@ -133,6 +133,13 @@ and the host starts the game.
   Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
 - Mode **Adept**: each character plays the 3 perks printed on their board (102 perks).
+- The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
+  the printed ones; 35 are on no board. 27 of those are in the engine (`DECK_PERKS` in
+  `engine/perks.ts`), the rest are next. A card-only perk has no character and no index: its
+  name, cost, text and art come from the card data (`perkCard` in `labels.ts`). A card is laid
+  over one of the character's printed perk slots: `perks` holds the card and `covered` the perk
+  under it (`SurvivorState`), and the four cards that discard themselves free it again. Picking
+  the cards before a trial is still to come: nothing deals them yet.
 - 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   The 2-player deck rule is not in yet.
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
@@ -453,3 +460,79 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   "Not again this turn" is the turn it was used in only: each of the killer's cards is a turn of
   its own (p.10), so a Flashlight kept on his first turn stops him again on his second. The offer
   says so then, as the user asked (it read as a bug).
+
+Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
+
+- Hope: works by itself when a generator is finished (the fifth one too), for every survivor who
+  owns it. It is free but still once a round, so only the first generator finished each round pays.
+- Kindred: works by itself after a sabotage. The rescuer and the rescued survivor each gain 1 ▲,
+  paid by whichever of the two owns the card ("both of you and the other Survivor"). Putting the
+  Entity on an empty hook pays the one who did it alone.
+- Small Game: asked after cleansing a Hex Totem succeeds; the killer loses 2 ▲ (to a minimum
+  of 0, as perks never take him below it).
+- This Is Not Happening: asked before any single-die skill check of the owner's (repair, gate,
+  cleanse, heal, locker search) — the danger die instead, as Thanatophobia does. Not offered when
+  the roll is already on the danger die.
+- Resilience: asked at the start of cleanup when the owner was wounded this round, for a bonus
+  turn with a card from their own hand (as Adrenaline's).
+- We'll Make It: asked after the owner's heal of another survivor succeeds; that survivor takes
+  the bonus turn, with a card from their own hand, and the owner pays.
+- Renewal: asked at the end of a turn when the owner healed someone or was healed this round
+  (`healedWith`, cleared at cleanup); a bonus turn with a card from their hand.
+- Monstrous Shrine: works by itself when the killer hangs a survivor with nobody else on the
+  board in that room (a survivor in a locker isn't there, p.12); +2 ▲.
+- Spies from the Shadows: works by itself when a crow tile is turned over, whoever turned it
+  (a survivor entering, the killer, a Map); not during setup, where perks aren't in play yet.
+- Sloppy Butcher: asked before a heal roll of a survivor in the killer's space — the danger die.
+- No One Escapes Death: asked at the end of a killer turn once the exit gates are powered, and
+  not with the round's bonus turn used: a card from his hand goes onto his planned cards and is
+  played as that bonus turn.
+- A card laid over a printed perk covers it: the printed perk can't be used while the card is
+  there (`covered`), and the moment the card is discarded from play it can be, that same round
+  (it has used nothing). A card under one of The Plague's Vile Purges can't be used, so it can't
+  discard itself either.
+- Inner Healing: a button at the start of the owner's turn while wounded (not with three Knives).
+  It heals them with no roll and no help, so it counts as healing themselves: Renewal and
+  We'll Make It don't answer it, A Nurse's Calling does (any heal).
+- Situational Awareness: asked at the end of the owner's own turn; the bonus turn is taken with
+  a card from their hand, as every survivor bonus turn is.
+- Kinship: a button in place of the owner's interaction for the turn, on another survivor on the
+  board in their room or a connected one who still has a card in hand. "After this one" is the
+  end of this turn, after its end-of-turn perks; the friend picks their own card (or lets it go),
+  and the turn ends after them.
+- Guardian: asked when the killer enters the owner's room on his turn and still has his
+  interaction (not while carrying someone, and not a second time in the same turn). For the rest
+  of that turn his only options are attacking or picking up that survivor: no power, no prop, no
+  walking on with the Blight's rush. Wounded this round (so no pick-up) or already wounded (so no
+  attack), he is left with nothing to do that turn — which is the point of the card.
+- Dark Sense: "a space with no props" is a room with nothing left to interact with (`propsIn`:
+  every prop there removed or finished), entered by any move on their own turn; then one more move
+  along any path but the one they came by, before interacting — as Distortion's.
+- Déjà Vu: when he damages a generator in another room, she repairs one in her own room at once,
+  an ordinary skill check out of her turn (as Fast Track's interaction is).
+- Premonition: when he walks in, before his interaction, she chases a revealed crow in her room:
+  the usual crow interaction, so the killer gains 1 ▲ and she gets a bonus turn from it.
+- Spine Chill: when he walks in (not a teleport of hers; any entry of his), the danger die. On a
+  success she must move along any path — no staying put, as with Dead Hard.
+- Lightweight: at the end of planning, before the first turn, a card (not Wait) is discarded and
+  played as a move of its own. Only the move: no interaction, and it is not the round's bonus turn.
+- Bitter Murmur: after he moves along a vault path (the one-way ones) or through a wall that broke
+  as he passed, one more move along any path without a pallet, before he interacts.
+- Claustrophobia: after a repair roll succeeds, the Entity goes onto any path's icon and survivors
+  can't pass it, exactly as Bamboozle's does (he passes freely, and it goes at cleanup). There is
+  one Entity token, so it moves if it was somewhere else.
+- Distressing: after a survivor moves into a room with a revealed empty locker, they hide in it —
+  the killer chooses which locker when there are several. A survivor in a locker is off the board
+  (p.12), so this takes them out of their own turn.
+- Unrelenting: after he attacks or picks up a survivor, the same again on another survivor on the
+  board in his room: an attack if they are healthy, a pick-up if they are wounded (not one wounded
+  this round, p.15).
+- Iron Grasp: his button on the struggle roll, before it settles: every skill-check die of that
+  roll is rolled again (once a round, so once per struggle).
+- Insidious: when he would attack a healthy survivor and has not changed room this turn
+  (`killerMoved`, which every move of his sets, teleports included), he picks them up instead —
+  healthy, and whether or not they were wounded this round.
+- Whispers: at the start of planning, one survivor who still has a card to set either pays 1 ▲ or
+  sets their card face up. The face-up card uses Stridor's own flow (that survivor plays first,
+  everyone else plans knowing it), and there is one such slot, so Whispers is not offered when
+  Stridor already took it. With no ▲ there is nothing to decide: the card goes face up.

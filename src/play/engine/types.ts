@@ -100,6 +100,12 @@ export interface SurvivorState {
   knives?: number
   /** The Plague's Vile Purges: the perks they cover (one each, at most 2; a third clears them). */
   purged?: PerkId[]
+  /**
+   * The edit-perks mode: a perk card laid over a printed perk slot. `perks` holds the card, this
+   * holds the printed perk under it; discarding the card from play puts that perk back (Guardian,
+   * Inner Healing, Kinship, Situational Awareness).
+   */
+  covered?: Partial<Record<PerkId, PerkId>>
 }
 
 export interface KillerState {
@@ -172,6 +178,8 @@ export type RollContext =
   | { k: 'assassin'; s: number }
   /** Breakdown (danger die): a success takes a sacrifice progress from the killer. */
   | { k: 'breakdown'; s: number }
+  /** Spine Chill (danger die): a success sends them along any path. */
+  | { k: 'spineChill'; s: number }
 
 export type SurvivorInteraction =
   | { k: 'rummage'; prop: string }
@@ -248,13 +256,17 @@ export type PerkWindow =
   | { k: 'planningStart' }
   | { k: 'planningEnd' }
   | { k: 'cardMove'; s: number; card: PathKind }
-  | { k: 'afterKillerInteract'; turn: number }
+  /** `target`: the survivor he attacked or picked up, when it was one (Unrelenting). */
+  | { k: 'afterKillerInteract'; turn: number; target?: number }
   | { k: 'palletBlock'; path: string; to: string }
   | { k: 'genDone' }
   | { k: 'afterCardMove'; s: number; from: string; to: string; path: string }
   | { k: 'cleanupStart' }
-  /** `from`: where he came from (Rancor brings a wounded survivor along). Empty for a teleport. */
-  | { k: 'killerEntered'; room: string; from?: string; path?: string; carrying?: boolean }
+  /**
+   * `from`: where he came from (Rancor brings a wounded survivor along). Empty for a teleport.
+   * `broke`: the wall on the path he took broke as he passed (Bitter Murmur).
+   */
+  | { k: 'killerEntered'; room: string; from?: string; path?: string; carrying?: boolean; broke?: boolean }
   /** Survivor `s` revealed `prop` (Haunted Ground). */
   | { k: 'afterReveal'; s: number; prop: string }
   /** `rescued`: the survivor taken off the hook, when there was one (Deliverance). */
@@ -276,6 +288,8 @@ export type PerkWindow =
   | { k: 'beforeReveal'; s: number; room: string }
   /** A repair roll failed (Technician). */
   | { k: 'repairFail'; s: number; prop: string }
+  /** A repair roll succeeded (Claustrophobia). */
+  | { k: 'repaired'; s: number; prop: string }
   | { k: 'afterRummage'; s: number; prop: string }
   /** A survivor is about to use an item (Overwhelming Presence). */
   | { k: 'preItem'; s: number }
@@ -297,8 +311,10 @@ export type PerkWindow =
   | { k: 'carryRoll'; s: number; n: number }
   /** Survivor `s` is about to be hung (Dead Hard). */
   | { k: 'preHang'; s: number }
-  /** Survivor `s` became healthy (Aftercare). */
-  | { k: 'healed'; s: number }
+  /** Survivor `s` became healthy; `by` healed them (Aftercare, We'll Make It, Renewal). */
+  | { k: 'healed'; s: number; by?: number }
+  /** Survivor `s` cleansed a Hex Totem (Small Game). */
+  | { k: 'cleansed'; s: number }
   /** The killer is about to move with a card from his room along `path` (We're Gonna Live Forever). */
   | { k: 'preLeave'; to: string }
   /** Buttons rather than questions: start of a survivor's turn, their interact step, a roll. */
@@ -364,8 +380,8 @@ export type Step =
   | { t: 'survivorInteract'; s: number; canInteract: boolean; exclude?: string; survivalOnly?: boolean }
   | { t: 'bonusOffer'; s: number }
   /** Move along any path (after a rescue, p.13). */
-  /** `why`: The Clown's Afterpiece Antidote, or Dead Hard (a move they must make); else a rescue (p.13). */
-  | { t: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' }
+  /** `why`: The Clown's Afterpiece Antidote, or Dead Hard / Spine Chill (a move they must make); else a rescue (p.13). */
+  | { t: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' | 'spineChill' }
   /** The Clown's Afterpiece Antidote: the killer walked in, and may move on along any path. */
   | { t: 'killerAnyMove' }
   | { t: 'keepItem'; s: number; drawn: string }
@@ -412,8 +428,9 @@ export type Step =
   /**
    * Carter's Spark: this survivor pays 1 ▲ or takes the shock; `rest` are next.
    * `grip`: Dragon's Grip instead — pay 1 ▲ or be wounded.
+   * `whispers`: Whispers instead — pay 1 ▲ or set their movement card face up.
    */
-  | { t: 'sparkChoice'; s: number; rest: number[]; grip?: boolean }
+  | { t: 'sparkChoice'; s: number; rest: number[]; grip?: boolean; whispers?: boolean }
   /** A survivor walked into a Phantasm Trap: The Hag takes ▲ or teleports for `face` ▲. */
   | { t: 'phantasmChoice'; s: number; room: string; face: number }
   /** Predator: this survivor sets a new movement card. */
@@ -443,7 +460,7 @@ export type Task =
   | { k: 'survivorTurn'; s: number }
   | { k: 'survivorInteract'; s: number }
   | { k: 'endSurvivorTurn'; s: number }
-  | { k: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' }
+  | { k: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' | 'spineChill' }
   /** The killer entered the room with the Afterpiece Antidote. */
   | { k: 'killerAntidote' }
   /** A survivor's card move, after Coulrophobia had its chance to stop it. */
@@ -641,6 +658,8 @@ export interface GameState {
   canInteract: boolean
   /** Perks used this round, as "<owner>:<perk>" (owner "k" or the survivor index). */
   perksUsed: string[]
+  /** Survivors who healed or were healed this round, either way round (Renewal). */
+  healedWith?: number[]
   /** Perks whose owner said "don't ask again this round". */
   perksMuted: string[]
   /** Huntress Lullaby stopped the next card move. */
@@ -684,6 +703,10 @@ export interface GameState {
   struggle?: boolean
   /** Deception: the active survivor stays put this turn and can't interact. */
   deception?: boolean
+  /** Guardian: this survivor is the killer's only interaction for the turn he walked in on them. */
+  guardian?: number | null
+  /** Whether the killer has changed room during the turn being played (Insidious). */
+  killerMoved?: boolean
   /** Built to Last: this survivor's kept item can't be used again this turn. */
   itemLock?: number | null
   /** Built to Last this round: who kept which item (its offer on a later turn says why it is back). */

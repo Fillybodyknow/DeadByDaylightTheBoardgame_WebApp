@@ -85,6 +85,7 @@ const ROLL_WHAT: Record<RollContext['k'], (st: GameState, ctx: RollContext) => s
   assassin: () => 'หลบ Assassin — ล้มเหลว = บาดเจ็บ',
   breakdown: () => 'Breakdown — สำเร็จ = ฆาตกรเสีย Sacrifice Progress 1 แต้ม',
   deadHard: (st, c) => `Dead Hard — สำเร็จ = ${c.k === 'deadHard' ? st.survivors[c.target].name : ''} หนีแทนถูกแขวน`,
+  spineChill: () => 'Spine Chill — สำเร็จ = เดินหนีไปตามเส้นทางใดก็ได้',
 }
 
 function progress(st: GameState, c: RollContext): string {

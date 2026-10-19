@@ -15,6 +15,7 @@ import {
   hookHere,
   isPower,
   KILLER_CARDS,
+  mustMove,
   offeredPerks,
   perkButtons,
   perkChoices,
@@ -54,8 +55,8 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'anyMove':
       for (const m of anyMoves(st, step.s)) out.push({ t: 'move', path: m.path.id })
-      // Dead Hard's move is a must
-      if (step.why !== 'deadHard') out.push({ t: 'stop' })
+      // Dead Hard's and Spine Chill's moves are a must
+      if (!mustMove(step.why)) out.push({ t: 'stop' })
       break
     case 'survivorInteract':
       if (step.canInteract) for (const i of survivorInteractions(st, step.s)) out.push({ t: 'interact', i })

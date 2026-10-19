@@ -1,5 +1,6 @@
 import type { Item, Killer, Perk, Survivor } from '../types'
 import componentsJson from './components.json'
+import editPerksJson from './editPerks.json'
 import itemsJson from './items.json'
 import killersJson from './killers.json'
 import survivorsJson from './survivors.json'
@@ -12,6 +13,13 @@ export const components = componentsJson
 
 export const survivorById = new Map(survivors.map((s) => [s.id, s]))
 export const killerById = new Map(killers.map((k) => [k.id, k]))
+
+/**
+ * Every perk card in the box, for the edit-perks mode. Most are printed on a character board as
+ * well; 35 of them are only cards, and those are the ones the engine can't find on a board.
+ */
+export const editPerkCards = editPerksJson as (Perk & { id: string; side: PerkKind })[]
+export const editPerkById = new Map(editPerkCards.map((p) => [p.id, p]))
 
 export { mapById, maps } from './maps'
 

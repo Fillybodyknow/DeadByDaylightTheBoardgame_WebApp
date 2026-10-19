@@ -19,6 +19,7 @@ import {
   itemUses,
   killerInteractions,
   killerMoves,
+  mustMove,
   offeredPerks,
   perkButtons,
   perkChoices,
@@ -287,7 +288,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     case 'anyMove':
       moves(anyMoves(st, s.s), st.survivors[s.s].room)
       // after a rescue (house rule) or the Afterpiece Antidote they may stay put: their own room says so
-      if (s.why !== 'deadHard') add(`room:${st.survivors[s.s].room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
+      if (!mustMove(s.why)) add(`room:${st.survivors[s.s].room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
       break
     case 'killerMove':
       moves(killerMoves(st, s.card), st.killer.room)
@@ -631,7 +632,8 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
       else if (c.target !== undefined) out.push({ key: `s:${c.target}`, label, style: 'act', run, who: c.target, action })
       // a prop (Windows of Opportunity: in a connected room)
       else if (c.prop) out.push({ key: `prop:${c.prop}`, label, style: 'act', run, action })
-      else if (b.perk === 'self_care') out.push({ key: `s:${b.owner}`, label, style: 'act', run, who: b.owner, action })
+      // Self-Care and Inner Healing heal the owner: their own mini is the spot
+      else if (b.perk === 'self_care' || b.perk === 'inner_healing') out.push({ key: `s:${b.owner}`, label, style: 'act', run, who: b.owner, action })
     }
   }
 }

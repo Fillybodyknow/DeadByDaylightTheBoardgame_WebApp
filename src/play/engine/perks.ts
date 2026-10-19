@@ -109,6 +109,34 @@ export type PerkId =
   | 'breakdown'
   | 'aftercare'
   | 'distortion'
+  // cards only, on no character's board (the edit-perks mode)
+  | 'hope'
+  | 'kindred'
+  | 'small_game'
+  | 'this_is_not_happening'
+  | 'resilience'
+  | 'well_make_it'
+  | 'renewal'
+  | 'monstrous_shrine'
+  | 'spies_from_the_shadows'
+  | 'sloppy_butcher'
+  | 'no_one_escapes_death'
+  | 'inner_healing'
+  | 'situational_awareness'
+  | 'kinship'
+  | 'guardian'
+  | 'dark_sense'
+  | 'deja_vu'
+  | 'premonition'
+  | 'spine_chill'
+  | 'lightweight'
+  | 'bitter_murmur'
+  | 'claustrophobia'
+  | 'distressing'
+  | 'unrelenting'
+  | 'iron_grasp'
+  | 'insidious'
+  | 'whispers'
 
 export interface PerkDef {
   id: PerkId
@@ -120,6 +148,11 @@ export interface PerkDef {
   index: number
   /** Thai: when the game asks / where the button is. */
   when: string
+  /**
+   * Perks that are only cards, printed on no character board (the edit-perks mode): the card's
+   * id in `src/data/editPerks.json`, where its name, cost and text come from instead.
+   */
+  card?: string
 }
 
 const def = (id: PerkId, name: string, cost: number, side: PerkDef['side'], character: string, index: number, when: string): PerkDef => ({
@@ -130,6 +163,18 @@ const def = (id: PerkId, name: string, cost: number, side: PerkDef['side'], char
   character,
   index,
   when,
+})
+
+/** A perk that is only a card in the box (the edit-perks mode), on no character's board. */
+const deck = (id: PerkId, name: string, cost: number, side: PerkDef['side'], card: string, when: string): PerkDef => ({
+  id,
+  name,
+  cost,
+  side,
+  character: '',
+  index: -1,
+  when,
+  card,
 })
 
 export const PERKS: Record<PerkId, PerkDef> = {
@@ -235,13 +280,52 @@ export const PERKS: Record<PerkId, PerkDef> = {
   distortion: def('distortion', 'Distortion', 1, 'survivor', 'jeff', 2, 'ถามหลังคุณเดินเข้าห้องฆาตกรในเทิร์นตัวเอง (เดินด้วยวิธีใดก็ได้)'),
   wgl_forever: def('wgl_forever', "We're Gonna Live Forever", 1, 'survivor', 'david', 2, 'ถามเมื่อฆาตกรจะเดินด้วยการ์ดออกจากห้องคุณ'),
   head_on: def('head_on', 'Head On', 1, 'survivor', 'jane', 2, 'ถามเมื่อฆาตกรเข้าห้องของคุณในเทิร์นฆาตกร'),
+
+  // ----- cards only, on no character's board (the edit-perks mode) -----
+  hope: deck('hope', 'Hope', 0, 'survivor', 'hope', 'ทำงานเองเมื่อซ่อม Generator เสร็จ'),
+  kindred: deck('kindred', 'Kindred', 0, 'survivor', 'kindred', 'ทำงานเองหลัง Sabotage Hook (ของคุณหรือ Hook ที่คุณอยู่)'),
+  small_game: deck('small_game', 'Small Game', 1, 'survivor', 'small-game', 'ถามหลังคุณชำระ Hex Totem สำเร็จ'),
+  this_is_not_happening: deck('this_is_not_happening', 'This Is Not Happening', 1, 'survivor', 'this-is-not-happening', 'ถามก่อนคุณทอย Skill Check'),
+  resilience: deck('resilience', 'Resilience', 2, 'survivor', 'resilience', 'ถามตอนเริ่มเก็บกวาด ถ้าคุณบาดเจ็บในรอบนี้'),
+  well_make_it: deck('well_make_it', "We'll Make It", 2, 'survivor', 'well-make-it', 'ถามหลังคุณรักษาผู้รอดชีวิตคนอื่นสำเร็จ'),
+  renewal: deck('renewal', 'Renewal', 2, 'survivor', 'renewal', 'ถามตอนจบเทิร์น ถ้ารอบนี้คุณรักษาคนอื่นหรือถูกรักษา'),
+  monstrous_shrine: deck('monstrous_shrine', 'Monstrous Shrine', 0, 'killer', 'monstrous-shrine', 'ทำงานเองหลังแขวนผู้รอดชีวิต ถ้าไม่มีใครอื่นในห้อง'),
+  spies_from_the_shadows: deck('spies_from_the_shadows', 'Spies from the Shadows', 0, 'killer', 'spies-from-the-shadows', 'ทำงานเองเมื่อมีการเปิด Crow'),
+  sloppy_butcher: deck('sloppy_butcher', 'Sloppy Butcher', 1, 'killer', 'sloppy-butcher', 'ถามก่อนผู้รอดชีวิตทอยรักษา'),
+  no_one_escapes_death: deck('no_one_escapes_death', 'No One Escapes Death', 0, 'killer', 'no-one-escapes-death', 'ถามตอนจบเทิร์นฆาตกร ถ้าประตูมีไฟแล้ว'),
+  // these four are discarded when used, freeing the printed perk they were laid over
+  inner_healing: deck('inner_healing', 'Inner Healing', 2, 'survivor', 'inner-healing', 'ปุ่มตอนเริ่มเทิร์นของคุณ ถ้าบาดเจ็บ (ใช้แล้วทิ้งการ์ด)'),
+  situational_awareness: deck('situational_awareness', 'Situational Awareness', 1, 'survivor', 'situational-awareness', 'ถามตอนจบเทิร์นของคุณ (ใช้แล้วทิ้งการ์ด)'),
+  kinship: deck('kinship', 'Kinship', 1, 'survivor', 'kinship', 'ปุ่มแทนการ Interact: ให้ผู้รอดชีวิตอีกคนเล่น Bonus Turn (ใช้แล้วทิ้งการ์ด)'),
+  guardian: deck('guardian', 'Guardian', 1, 'survivor', 'guardian', 'ถามเมื่อฆาตกรเข้าห้องของคุณ (ใช้แล้วทิ้งการ์ด)'),
+  dark_sense: deck('dark_sense', 'Dark Sense', 1, 'survivor', 'dark-sense', 'ถามเมื่อคุณเข้าห้องที่ไม่มี prop ในเทิร์นของคุณ'),
+  deja_vu: deck('deja_vu', 'Déjà Vu', 2, 'survivor', 'deja-vu', 'ถามเมื่อฆาตกรทำลาย Generator ในห้องอื่น'),
+  premonition: deck('premonition', 'Premonition', 1, 'survivor', 'premonition', 'ถามเมื่อฆาตกรเข้าห้องของคุณ ก่อนเขา Interact'),
+  spine_chill: deck('spine_chill', 'Spine Chill', 1, 'survivor', 'spine-chill', 'ถามเมื่อฆาตกรเข้าห้องของคุณ'),
+  lightweight: deck('lightweight', 'Lightweight', 1, 'survivor', 'lightweight', 'ถามตอนจบเฟสวางแผน'),
+  bitter_murmur: deck('bitter_murmur', 'Bitter Murmur', 1, 'killer', 'bitter-murmur', 'ถามหลังเดินผ่านทางเดินทางเดียว (Vault) หรือทุบกำแพง'),
+  claustrophobia: deck('claustrophobia', 'Claustrophobia', 1, 'killer', 'claustrophobia', 'ถามหลังผู้รอดชีวิตซ่อม Generator สำเร็จ'),
+  distressing: deck('distressing', 'Distressing', 2, 'killer', 'distressing', 'ถามหลังผู้รอดชีวิตเดินเข้าห้องที่มี Locker'),
+  unrelenting: deck('unrelenting', 'Unrelenting', 2, 'killer', 'unrelenting', 'ถามหลัง Interact กับผู้รอดชีวิตในห้องของคุณ'),
+  iron_grasp: deck('iron_grasp', 'Iron Grasp', 1, 'killer', 'iron-grasp', 'ปุ่มตอนผู้รอดชีวิตทอยหนีการแบก'),
+  insidious: deck('insidious', 'Insidious', 2, 'killer', 'insidious', 'ถามเมื่อคุณจะโจมตีผู้ที่ไม่บาดเจ็บ และยังไม่ได้เดินในเทิร์นนี้'),
+  whispers: deck('whispers', 'Whispers', 1, 'killer', 'whispers', 'ถามตอนเริ่มเฟสวางแผน'),
 }
 
-/** Printed perks by character (Adept mode). Characters not listed play without perks for now. */
+/**
+ * Printed perks by character (Adept mode). Characters not listed play without perks for now;
+ * the cards that are on no board at all are left out.
+ */
 export const PRINTED_PERKS: Record<string, PerkId[]> = Object.values(PERKS).reduce<Record<string, PerkId[]>>((out, p) => {
+  if (!p.character) return out
   ;(out[p.character] ??= [])[p.index] = p.id
   return out
 }, {})
+
+/** The perks that are only cards: what the edit-perks mode can deal out. */
+export const DECK_PERKS: PerkId[] = Object.values(PERKS)
+  .filter((p) => p.card)
+  .map((p) => p.id)
 
 /** Killers the full game can play (their power is implemented). */
 export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight']
