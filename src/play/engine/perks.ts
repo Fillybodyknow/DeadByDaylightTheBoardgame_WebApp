@@ -92,6 +92,9 @@ export type PerkId =
   | 'diversion'
   | 'autodidact'
   | 'deliverance'
+  | 'exponential'
+  | 'overcome'
+  | 'corrective_action'
   | 'appraisal'
   | 'deception'
   | 'desperate_measures'
@@ -266,6 +269,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   spirit_fury: def('spirit_fury', 'Spirit Fury', 0, 'killer', 'spirit', 2, 'ถามหลังคุณทำลาย Pallet'),
   diversion: def('diversion', 'Diversion', 2, 'survivor', 'adam', 0, 'เป็น Interaction กับฆาตกรในห้องเดียวกัน'),
   autodidact: def('autodidact', 'Autodidact', 2, 'survivor', 'adam', 1, 'ปุ่มตอนคนในห้อง/ห้องติดกันทอยได้สำเร็จ'),
+  exponential: def('exponential', 'Exponential', 0, 'survivor', 'jonah', 0, 'ถามหลังคุณชำระ Hex Totem สำเร็จ ถ้ามีคนถูกแขวนอยู่'),
+  overcome: def('overcome', 'Overcome', 0, 'survivor', 'jonah', 1, 'ทำงานเองตอนจบเทิร์นของคุณ ถ้าคุณบาดเจ็บ'),
+  corrective_action: def('corrective_action', 'Corrective Action', 2, 'survivor', 'jonah', 2, 'ปุ่มตอนคนในห้อง/ห้องติดกันทอยได้ "4"'),
   deliverance: def('deliverance', 'Deliverance', 1, 'survivor', 'adam', 2, 'ถามหลังคุณช่วยคนลงจาก Hook หรือถูกช่วยลง'),
   fast_track: def('fast_track', 'Fast Track', 1, 'survivor', 'yunjin', 0, 'ถามตอนจบเทิร์นที่คนอื่นบาดเจ็บ / ถูกแขวน'),
   smash_hit: def('smash_hit', 'Smash Hit', 0, 'survivor', 'yunjin', 1, 'ถามเมื่อฆาตกรทุบ Pallet / กำแพง หรือทำลาย Generator'),

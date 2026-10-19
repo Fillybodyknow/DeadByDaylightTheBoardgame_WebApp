@@ -1286,6 +1286,11 @@ function runTask(st: GameState, task: Task) {
       return cardMoveTo(st, task.s, p, task.to, true)
     }
     case 'endSurvivorTurn': {
+      // Overcome pays its owner by itself, wounded at the end of their turn
+      if (st.survivors[task.s].wounded && perkReady(st, task.s, 'overcome')) {
+        payPerk(st, task.s, 'overcome', '+1 ▲')
+        gainSurvivor(st, task.s, 1)
+      }
       st.activeSurvivor = null
       st.itemLock = null
       st.deception = false
@@ -2106,13 +2111,14 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
     case 'cleanse': {
       if (!ok) return
       st.props.find((p) => p.id === ctx.prop)!.removed = true
+      const before = sv.bp
       gainSurvivor(st, s, 2)
       log(st, `${sv.name} ชำระ Hex Totem สำเร็จ (+2 ▲)`, s, { ev: { k: 'cleanse', s } })
       if (ctx.retribution) {
         gainKiller(st, 2)
         log(st, `${st.killer.name} +2 ▲ (Retribution)`, 'killer')
       }
-      trigger(st, { k: 'cleansed', s })
+      trigger(st, { k: 'cleansed', s, gained: sv.bp - before })
       return
     }
     case 'heal': {
@@ -2575,10 +2581,12 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return step.dice.some((d) => d.kind === 'skill' && !d.rerolled) ? NONE : []
     }
     case 'insidious': {
-      // about to attack someone healthy without having moved this turn: pick them up instead
+      // about to attack someone healthy without having moved this turn: pick them up instead. Only
+      // in his own room: a pick-up carries them, so Yamaoka's Haunting's attack over a path can't be one
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
       if (w.k !== 'preKillerInteract' || w.pickUp || (task && task.i.k !== 'attack') || st.killerMoved) return []
-      return !st.survivors[w.target].wounded ? NONE : []
+      const sv = st.survivors[w.target]
+      return !sv.wounded && sv.room === st.killer.room ? NONE : []
     }
     case 'jolt':
       // the dice are shown in the offer; the 1s and 2s become failures
@@ -2950,6 +2958,22 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     case 'power_struggle':
     case 'diversion':
       return [] // an interaction, see survivorInteractions
+    // ----- Jonah -----
+    case 'exponential': {
+      // after his own cleanse: a sacrificed survivor off the hook along any path, for its ▲
+      if (w.k !== 'cleansed' || w.s !== o) return []
+      return st.survivors.flatMap((sv, i) => (sv.status === 'hooked' ? anyMoves(st, i).map((m) => ({ target: i, path: m.path.id })) : []))
+    }
+    case 'overcome':
+      return [] // automatic, see endSurvivorTurn
+    case 'corrective_action': {
+      // a skill die showing "4" becomes a great success, for a survivor in Jonah's room or a
+      // connected one (as Autodidact, which turns any success)
+      const step = st.step
+      if (w.k !== 'roll' || step.t !== 'roll' || step.ctx.k === 'phantasm') return []
+      if (!inRange(st, me!.room, st.survivors[step.ctx.s].room)) return []
+      return step.dice.flatMap((d, index) => (d.kind === 'skill' && d.face === 4 && !d.asFailure ? [{ index }] : []))
+    }
     // ----- Adam -----
     case 'autodidact': {
       // a success (not a great one, not a failure Iron Will turned) becomes a great success, for
@@ -3106,7 +3130,7 @@ export function perkButtons(st: GameState): { perk: PerkId; owner: PerkOwner; w:
   if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout', 'inner_healing', 'self_aware'])
   if (step.t === 'survivorInteract')
     add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity', 'kinship', 'no_one_left_behind'])
-  if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact']))
+  if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact', 'corrective_action']))
   // Iron Grasp: his own button on the struggle roll, before it is settled
   if (step.t === 'roll' && step.ctx.k === 'carry') add('killer', { k: 'roll' }, ['iron_grasp'])
   if (step.t === 'killerInteract' && step.canInteract && !step.powerOnly) add('killer', { k: 'killerInteract' }, ['iron_maiden'])
@@ -3436,6 +3460,25 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, 'นับผลล้มเหลวเป็นสำเร็จ')
       const step = st.step as Extract<Step, { t: 'roll' }>
       step.dice = step.dice.map((d) => (isFailure(d) ? { ...d, asSuccess: true } : d))
+      return
+    }
+    case 'exponential': {
+      const { s, gained } = w as Extract<PerkWindow, { k: 'cleansed' }>
+      const t = st.survivors[c.target!]
+      const m = anyMoves(st, c.target!).find((x) => x.path.id === c.path)!
+      payPerk(st, o, perk, `${t.name} ลงจาก Hook แทน ▲ ที่ได้`)
+      // instead of the cleanse's ▲
+      if (gained) st.survivors[s].bp -= gained
+      // off the hook, not a sabotage: the hook stays free, no Entity on it, no rescue perks
+      st.props.find((p) => p.kind === 'hook' && p.occupant === c.target)!.occupant = null
+      t.status = 'board'
+      log(st, `${t.name} ลงจาก Hook (Exponential)`, o, { ev: { k: 'rescue', s: c.target!, by: o as number } })
+      return moveSurvivor(st, c.target!, m.path, m.to)
+    }
+    case 'corrective_action': {
+      const step = st.step as Extract<Step, { t: 'roll' }>
+      payPerk(st, o, perk, `ลูกที่ ${c.index! + 1} ได้ "4" → สำเร็จอย่างยิ่ง`)
+      step.dice[c.index!] = { ...step.dice[c.index!], face: 5 }
       return
     }
     case 'autodidact': {

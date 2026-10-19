@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // The room's settings, in the lobby: the host changes them, everyone else sees them (and what
-// differs from the defaults, at a glance). A change makes everyone say "ready" again.
+// differs from the defaults, at a glance). A change makes everyone say "ready" again. Only the host
+// changes them, so for everyone else the card starts folded to its summary chips.
 import { computed, ref } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
@@ -11,6 +12,7 @@ import BpIcon from '../../components/BpIcon.vue'
 const s = computed(() => roomSettings.value)
 const chips = computed(() => settingsChips(s.value))
 const busy = computed(() => session.busy || !isHost.value)
+const open = ref(isHost.value)
 
 function set(patch: Partial<RoomSettings>) {
   if (!isHost.value) return
@@ -57,13 +59,14 @@ function toggleBan(id: string, kind: 'survivor' | 'killer') {
     <header>
       <h2>⚙ ตั้งค่าห้อง</h2>
       <span v-if="!isHost" class="muted small">หัวห้องเป็นคนตั้ง</span>
+      <button type="button" class="fold" :aria-expanded="open" @click="open = !open">{{ open ? 'ซ่อน ▴' : 'ดูทั้งหมด ▾' }}</button>
     </header>
     <p class="chips">
       <span v-for="c in chips" :key="c" class="chip">{{ c }}</span>
       <span v-if="!chips.length" class="muted small">ค่าเริ่มต้นตามเล่มทั้งหมด</span>
     </p>
 
-    <div class="rows">
+    <div v-show="open" class="rows">
       <div class="row">
         <span class="label">🃏 โหมดเกม</span>
         <div class="seg">
@@ -177,6 +180,12 @@ function toggleBan(id: string, kind: 'survivor' | 'killer') {
 }
 .settings h2 {
   margin: 0;
+}
+.fold {
+  margin-left: auto;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.85rem;
+  background: none;
 }
 .chips {
   display: flex;

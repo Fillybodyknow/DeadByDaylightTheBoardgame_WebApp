@@ -99,7 +99,8 @@ class LocalRoom implements Room {
 
   private async write(fn: (cur: StoredRoom) => StoredRoom | null): Promise<boolean> {
     const ok = await modify(this.code, (cur) => (cur ? fn(cur) : null))
-    if (ok) {
+    // a write still finishing as the room is left (leaving writes, then closes): nobody to tell
+    if (ok && !this.closed) {
       this.channel.postMessage('changed')
       await this.notify()
     }
@@ -140,7 +141,10 @@ class LocalRoom implements Room {
     })
   }
 
+  private closed = false
+
   close() {
+    this.closed = true
     this.listeners.clear()
     this.channel.close()
   }

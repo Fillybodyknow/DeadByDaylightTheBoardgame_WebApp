@@ -318,7 +318,8 @@ export type PerkWindow =
   /** Survivor `s` became healthy; `by` healed them (Aftercare, We'll Make It, Renewal). */
   | { k: 'healed'; s: number; by?: number }
   /** Survivor `s` cleansed a Hex Totem (Small Game). */
-  | { k: 'cleansed'; s: number }
+  /** `gained`: the ▲ the cleanse paid (Exponential takes them back). */
+  | { k: 'cleansed'; s: number; gained?: number }
   /** The killer is about to move with a card from his room along `path` (We're Gonna Live Forever). */
   | { k: 'preLeave'; to: string }
   /** Buttons rather than questions: start of a survivor's turn, their interact step, a roll. */

@@ -353,6 +353,10 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     }
     case 'autodidact':
       return `ลูกที่ ${c.index! + 1} → สำเร็จอย่างยิ่ง`
+    case 'corrective_action':
+      return `ลูกที่ ${c.index! + 1} ได้ "4" → สำเร็จอย่างยิ่ง`
+    case 'exponential':
+      return `${name(c.target!)} ลงจาก Hook ไปทาง ${pathLabel(st, c.path!, st.survivors[c.target!].room)} (แทน ▲ ที่ได้)`
     case 'deliverance':
       return `${name(c.target!)} หายบาดเจ็บ`
     case 'fast_track': {

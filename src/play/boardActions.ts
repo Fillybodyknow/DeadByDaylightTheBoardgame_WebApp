@@ -376,14 +376,19 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       // several at once: the one picked in the panel (none yet: nothing on the board)
       const perk = perksToPick(st) ? perkPicked.value : s.perk
       if (!perk) break
-      // Dark Devotion, Infectious Fright move a survivor: who first, then the path (as Breakout)
+      // Dark Devotion, Infectious Fright, Exponential move a survivor: who first, then the path (as
+      // Breakout). Someone on a hook (Exponential) is clicked on their hook, where their mini is.
       if (MOVE_SOMEONE.includes(perk)) {
         const name = PERKS[perk].name
         const choices = perkChoices(st, perk, s.owner, s.w)
         const who = modes.breakoutTarget.value
         if (who === null) {
-          for (const target of new Set(choices.map((c) => c.target!)))
-            add(`s:${target}`, `${name}: ย้าย ${st.survivors[target].name} (แล้วเลือกเส้นทาง)`, () => ((modes.breakoutTarget.value = target), sfx.click()), 'act', target)
+          for (const target of new Set(choices.map((c) => c.target!))) {
+            const hook = st.props.find((p) => p.kind === 'hook' && p.occupant === target)
+            const pick = () => ((modes.breakoutTarget.value = target), sfx.click())
+            if (hook) add(`prop:${hook.id}`, `${name}: ${st.survivors[target].name} ลงจาก Hook (แล้วเลือกเส้นทาง)`, pick)
+            else add(`s:${target}`, `${name}: ย้าย ${st.survivors[target].name} (แล้วเลือกเส้นทาง)`, pick, 'act', target)
+          }
           break
         }
         for (const c of choices) {
@@ -548,8 +553,8 @@ function perkDest(st: GameState, owner: PerkOwner, c: PerkChoice): string | unde
   return p.a === from ? p.b : p.b === from ? p.a : undefined
 }
 
-/** Killer perks that move a survivor along a path: picked as Breakout is, the survivor then the path. */
-const MOVE_SOMEONE: PerkId[] = ['dark_devotion', 'infectious_fright']
+/** Perks offered that move a survivor along a path: picked as Breakout is, the survivor then the path. */
+const MOVE_SOMEONE: PerkId[] = ['dark_devotion', 'infectious_fright', 'exponential']
 
 /** The free hook in the killer's room: click it to hang the carried survivor there. */
 function hookSpot(st: GameState, add: (key: SpotKey, label: string, run: () => void) => void) {

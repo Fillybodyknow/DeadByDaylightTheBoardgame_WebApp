@@ -187,7 +187,7 @@ function confirmPurge() {
 }
 
 /** Killer perks moving a survivor along a path: the survivor first, then the path. */
-const movesSomeone = computed(() => step.value.t === 'offer' && (step.value.perk === 'dark_devotion' || step.value.perk === 'infectious_fright'))
+const movesSomeone = computed(() => step.value.t === 'offer' && ['dark_devotion', 'infectious_fright', 'exponential'].includes(step.value.perk))
 const moveTargets = computed(() => (movesSomeone.value ? [...new Set(offerChoices.value.map((c) => c.target!))] : []))
 const moveWho = ref<number | null>(null)
 watch(
@@ -592,7 +592,7 @@ const boardCount = computed(() => {
         <p v-else-if="handChoices.length" class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง{{ MOVE_PERKS.includes(step.perk) ? ' — ชี้เพื่อดูเส้นทาง' : '' }}</p>
         <!-- a survivor moved along a path (Dark Devotion, Infectious Fright): who, then where -->
         <template v-if="movesSomeone">
-          <p class="board-hint">🎯 คลิกผู้รอดชีวิตบนแผนที่ แล้วคลิกเส้นทาง — หรือเลือกด้านล่าง</p>
+          <p class="board-hint">🎯 คลิก{{ step.t === 'offer' && step.perk === 'exponential' ? ' Hook ของคนที่จะลง' : 'ผู้รอดชีวิต' }}บนแผนที่ แล้วคลิกเส้นทาง — หรือเลือกด้านล่าง</p>
           <div class="who-row">
             <button v-for="t in moveTargets" :key="t" type="button" class="who-chip" :class="{ on: moveWho === t }" @click="moveWho = moveWho === t ? null : t">
               <FaceLabel :st="st" :who="t" :text="st.survivors[t].name" />

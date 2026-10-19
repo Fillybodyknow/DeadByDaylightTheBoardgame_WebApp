@@ -3,6 +3,7 @@
 // game's: the 3 perk slots on top, the perks to choose from below as diamonds, and a details box
 // when pointing at one. A click on a slot picks which slot changes; a click on a perk below puts it
 // there. The icon is cut from the middle of the perk card (as `PerkDiamonds` does in the game).
+// A killer's Power and Passive cards sit under his name, since his perks are picked around them.
 import { computed, ref, watch } from 'vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
@@ -122,6 +123,33 @@ function point(p: PerkId, e: MouseEvent | FocusEvent) {
   const x = r.right + 440 > window.innerWidth ? r.left - 432 : r.right + 12
   tip.value = { p, x: Math.max(8, x), y: Math.min(r.top, window.innerHeight - 340) }
 }
+// ---------- the killer's Power and Passive ----------
+
+/** His Power and Passive cards (Thai, as in the game), to see while picking perks. */
+const kit = computed(() => {
+  if (props.side !== 'killer') return []
+  const k = killerById.get(props.characterId)
+  if (!k) return []
+  return [
+    { label: 'POWER', name: k.power.name, src: k.power.image?.th ?? k.power.image?.en },
+    { label: 'PASSIVE', name: 'Passive', src: k.passiveImage?.th ?? k.passiveImage?.en },
+  ].filter((c): c is { label: string; name: string; src: string } => !!c.src)
+})
+/** The card pointed at, shown big under it (the cards are kept small to leave room for the perks). */
+const kitTip = ref<{ src: string; x: number; y: number } | null>(null)
+function pointKit(src: string, e: MouseEvent | FocusEvent) {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const w = Math.min(760, window.innerWidth - 16)
+  kitTip.value = { src, x: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)), y: r.bottom + 8 }
+}
+/** A click (a tap on a tablet) shows the card full size; a click anywhere closes it. */
+const zoomed = ref<string | null>(null)
+function zoomKit(src: string) {
+  sfx.click()
+  kitTip.value = null
+  zoomed.value = src
+}
+
 const face = (p: PerkId) => {
   const img = perkImage(p)
   return img ? { backgroundImage: `url(${asset(img)})` } : {}
@@ -137,6 +165,24 @@ const face = (p: PerkId) => {
         <small class="muted">{{ who }}{{ who ? ' · ' : '' }}{{ mode === 'devout' ? 'Devout — เลือก Perk ได้ 3 ใบ' : 'Bloodweb — การ์ดที่จั่วได้ 5 ใบ' }}</small>
       </div>
     </header>
+
+    <!-- the killer's Power and Passive, under his name: his perks are picked around them -->
+    <div v-if="kit.length" class="kit">
+      <button
+        v-for="c in kit"
+        :key="c.label"
+        type="button"
+        class="kit-card"
+        :title="`${c.name} — คลิกเพื่อขยาย`"
+        @click="zoomKit(c.src)"
+        @mouseenter="pointKit(c.src, $event)"
+        @focus="pointKit(c.src, $event)"
+        @mouseleave="kitTip = null"
+        @blur="kitTip = null"
+      >
+        <img :src="asset(c.src)" :alt="c.name" draggable="false" />
+      </button>
+    </div>
 
     <!-- the three perks played: a click picks which one changes -->
     <p class="label">PERKS</p>
@@ -219,6 +265,10 @@ const face = (p: PerkId) => {
 
   <!-- the perk pointed at, as the PC game's box: name, owner, cost, text -->
   <Teleport to="body">
+    <img v-if="kitTip" class="kit-tip" :src="asset(kitTip.src)" alt="" :style="{ left: `${kitTip.x}px`, top: `${kitTip.y}px` }" />
+    <div v-if="zoomed" class="kit-zoom" role="dialog" aria-modal="true" @click="zoomed = null">
+      <img :src="asset(zoomed)" alt="" />
+    </div>
     <div v-if="tip" class="perk-tip" :class="[kind(tip.p), side]" :style="{ left: `${tip.x}px`, top: `${tip.y}px` }" role="tooltip">
       <div class="tip-title">{{ PERKS[tip.p].name }}</div>
       <div class="tip-band">
@@ -265,6 +315,35 @@ const face = (p: PerkId) => {
 .head div {
   display: flex;
   flex-direction: column;
+}
+/* the killer's Power and Passive cards: a row of their own between the header and the perks */
+.kit {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.8rem;
+  margin-top: 0.3rem;
+}
+.kit-card {
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 6px;
+  background: none;
+  overflow: hidden;
+  cursor: zoom-in;
+  transition:
+    transform 0.15s,
+    border-color 0.15s;
+}
+.kit-card:hover,
+.kit-card:focus-visible {
+  border-color: #f5c542;
+  transform: translateY(-2px);
+}
+.kit-card img {
+  display: block;
+  height: 132px;
+  width: auto;
 }
 .head strong {
   font-family: var(--font-display);
@@ -561,6 +640,32 @@ const face = (p: PerkId) => {
 }
 .loadout.done .slots .dia {
   filter: brightness(0.9);
+}
+
+/* ---------- the Power / Passive card pointed at, and one zoomed ---------- */
+.kit-tip {
+  position: fixed;
+  z-index: 80;
+  width: min(760px, calc(100vw - 16px));
+  pointer-events: none;
+  border-radius: 8px;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.75);
+}
+.kit-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 0.8);
+  cursor: zoom-out;
+}
+.kit-zoom img {
+  max-width: min(1000px, 100%);
+  max-height: 100%;
+  border-radius: 8px;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.75);
 }
 
 /* ---------- the box pointed at ---------- */

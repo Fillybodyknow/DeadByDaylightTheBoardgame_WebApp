@@ -8,7 +8,7 @@ import { perkCard, perkImage, perkText } from '../labels'
 import type { Action, GameState, PerkWindow, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
-const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff']
+const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah']
 const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight']
 
 function game(killer = 'trapper', seed = 1): GameState {
@@ -51,7 +51,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(137)
+    expect(Object.keys(PERKS)).toHaveLength(140)
     // the cards that are on no board: their name, cost and text come from the deck data instead
     for (const p of DECK_PERKS) {
       expect(PERKS[p].character, p).toBe('')
@@ -2163,6 +2163,93 @@ describe('The Knight', () => {
   })
 })
 
+describe('Jonah Vasquez', () => {
+  /** Jonah is survivor 0. */
+  function jonah(...perks: PerkId[]) {
+    let g = createGame({ board: 'macmillan', survivors: ['jonah', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (g.step.t === 'setupReveal') g = apply(g, legalActions(g)[0])
+    only(g, ...perks)
+    return g
+  }
+
+  it("Exponential: after Jonah's cleanse, a sacrificed survivor comes off the hook along a path instead of his ▲", () => {
+    const st = jonah('exponential')
+    const room = st.survivors[0].room
+    const totem = placeProp(st, 'totem', room)
+    // Meg on a hook in another room
+    const hookRoom = 'backlot' === room ? 'shack' : 'backlot'
+    const hook = placeProp(st, 'hook', hookRoom)
+    hook.occupant = 1
+    Object.assign(st.survivors[1], { status: 'hooked', room: hookRoom })
+    st.survivors[0].bp = 1
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const cleansed = findOutcome(
+      (rng) => {
+        let after = apply({ ...structuredClone(st), rng }, { t: 'interact', i: { k: 'cleanse', prop: totem.id } })
+        while (after.step.t === 'roll') after = apply(after, { t: 'acceptRoll' })
+        return after
+      },
+      (g) => g.step.t === 'offer' && g.step.perk === 'exponential',
+    )
+    expect(cleansed.survivors[0].bp).toBe(3)
+    const w = (cleansed.step as Extract<GameState['step'], { t: 'offer' }>).w
+    const choice = perkChoices(cleansed, 'exponential', 0, w)[0]
+    expect(choice.target).toBe(1)
+    let after = apply(cleansed, { t: 'perk', perk: 'exponential', use: true, choice })
+    while (after.step.t === 'revealProp') after = apply(after, legalActions(after)[0])
+    // off the hook and moved; the cleanse's ▲ given back; not a sabotage: no Entity on the hook
+    const p = touchingPaths(cleansed, hookRoom).find((x) => x.id === choice.path)!
+    expect(after.survivors[1]).toMatchObject({ status: 'board', room: p.a === hookRoom ? p.b : p.a })
+    expect(after.survivors[0].bp).toBe(1)
+    expect(after.props.find((x) => x.id === hook.id)!.occupant).toBeNull()
+    expect(after.entity).not.toEqual({ prop: hook.id })
+  })
+
+  it('Exponential: nobody on a hook, nothing to offer', () => {
+    const st = jonah('exponential')
+    expect(perkChoices(st, 'exponential', 0, { k: 'cleansed', s: 0, gained: 2 })).toEqual([])
+  })
+
+  it('Overcome: wounded at the end of his turn, Jonah gains 1 ▲ by himself', () => {
+    const st = jonah('overcome')
+    Object.assign(st.survivors[0], { wounded: true, bp: 2 })
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const after = apply(st, { t: 'endTurn' })
+    expect(after.survivors[0].bp).toBe(3)
+    expect(after.perksUsed).toContain('0:overcome')
+    // healthy: nothing
+    const healthy = structuredClone(st)
+    healthy.survivors[0].wounded = false
+    expect(apply(healthy, { t: 'endTurn' }).survivors[0].bp).toBe(2)
+  })
+
+  it('Corrective Action: a "4" in range becomes a great success', () => {
+    const st = jonah('corrective_action')
+    const room = st.survivors[0].room
+    const gen = placeProp(st, 'generator', room)
+    st.survivors[1].room = room
+    st.phase = 'survivors'
+    st.activeSurvivor = 1
+    st.step = { t: 'roll', ctx: { k: 'repair', s: 1, prop: gen.id }, dice: [{ kind: 'skill', face: 4, rerolled: false }] }
+    st.queue = [{ k: 'endSurvivorTurn', s: 1 }]
+    expect(perkChoices(st, 'corrective_action', 0, { k: 'roll' })).toEqual([{ index: 0 }])
+    const after = apply(st, { t: 'perk', perk: 'corrective_action', use: true, choice: { index: 0 } })
+    // a great success repairs 2
+    expect(after.props.find((p) => p.id === gen.id)!.progress).toBe(gen.progress + 2)
+    // any other face: nothing to change
+    for (const face of [0, 1, 2, 3, 5]) {
+      st.step = { t: 'roll', ctx: { k: 'repair', s: 1, prop: gen.id }, dice: [{ kind: 'skill', face, rerolled: false }] }
+      expect(perkChoices(st, 'corrective_action', 0, { k: 'roll' })).toEqual([])
+    }
+  })
+})
+
 describe('perk cards that are on no board (the edit-perks mode)', () => {
   /** Deal a card-only perk to a survivor or to the killer, as the edit-perks mode will. */
   function deal(st: GameState, who: number | 'killer', perk: PerkId) {
@@ -2712,6 +2799,23 @@ describe('perk cards: the rest of the deck (the edit-perks mode)', () => {
     const after = apply(st, { t: 'perk', perk: 'insidious', use: true, choice: {} })
     expect(after.survivors[0].status).toBe('carried')
     expect(after.survivors[0].wounded).toBe(false)
+  })
+
+  it("Insidious isn't offered for Yamaoka's Haunting: she can't carry someone in another room", () => {
+    let st = game('spirit')
+    deal(st, 'killer', 'insidious')
+    killerInteracting(st)
+    st.killerMoved = false
+    st.killer.hand = ['sneak', 'crouch', 'sprint', 'vault']
+    // a healthy survivor over a path of a card she holds
+    const p = touchingPaths(st, st.killer.room).find((x) => x.kind !== 'vault' || x.a === st.killer.room)!
+    const there = p.a === st.killer.room ? p.b : p.a
+    Object.assign(st.survivors[0], { room: there, wounded: false, status: 'board' })
+    const i = killerInteractions(st).find((x) => x.k === 'haunt' && x.room === there && x.i.k === 'attack' && x.i.target === 0)!
+    expect(i).toBeDefined()
+    st = apply(st, { t: 'interact', i })
+    expect(st.step.t === 'offer' && st.step.perk === 'insidious').toBe(false)
+    expect(st.survivors[0]).toMatchObject({ wounded: true, status: 'board' })
   })
 
   it('Whispers: the chosen survivor pays 1 ▲ or sets their card face up', () => {

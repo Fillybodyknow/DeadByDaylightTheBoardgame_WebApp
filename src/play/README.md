@@ -130,7 +130,7 @@ and the host starts the game.
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
   The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
 - Mode **Adept**: each character plays the 3 perks printed on their board (102 perks).
 - The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
@@ -414,6 +414,13 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Distortion: after Jeff moves into the killer's room on his own turn (a bonus turn too) by any
   move — a card, a perk (Sprint Burst, Breakout…), the rescue move; once a round, so it doesn't
   answer its own move — along any path but the one he came by, before interacting.
+- Exponential (Jonah): after a cleanse of his own succeeds, with someone on a hook. Jonah picks who
+  (their hook, on the map) and the path; the cleanse's ▲ are taken back from him. Off the hook
+  without a sabotage: no Entity goes on the hook, and Deliverance, Kindred, Breakdown aren't asked.
+- Overcome: by itself at the end of Jonah's own turn (not a bonus turn), when he is wounded; once a
+  round, as every perk.
+- Corrective Action: a button on any roll of a survivor in Jonah's room or a connected one, as
+  Autodidact: a skill die showing "4" becomes a great success (the danger die has no 4).
 - No Mither (David): asked when the killer is about to attack a healthy survivor in David's room
   (David himself too; Yamaoka's Haunting reaches into his room too). David rolls the danger die;
   on a success the attack doesn't land and the killer gains 1 ▲ (his interaction is spent).
@@ -534,7 +541,8 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   roll is rolled again (once a round, so once per struggle).
 - Insidious: when he would attack a healthy survivor and has not changed room this turn
   (`killerMoved`, which every move of his sets, teleports included), he picks them up instead —
-  healthy, and whether or not they were wounded this round.
+  healthy, and whether or not they were wounded this round. Only an attack in his own room: a
+  pick-up carries the survivor, so Yamaoka's Haunting's attack over a path isn't offered it.
 - Whispers: at the start of planning, one survivor who still has a card to set either pays 1 ▲ or
   sets their card face up. The face-up card uses Stridor's own flow (that survivor plays first,
   everyone else plans knowing it), and there is one such slot, so Whispers is not offered when

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 // An online room before the game.
-//   Lobby: pick a side, say ready; the host goes on when everyone is.
+//   Lobby: laid out as a PC game's — the killer's slot against four survivor slots (a click on an
+//   empty one takes that side), the room's settings, and a bar at the foot to say ready; the host
+//   goes on when everyone is.
 //   Picks: survivor players pick their survivors (they see each other's, no duplicates, and
 //   nothing of the killer's side); the killer picks and sees the survivors' picks; when
 //   everyone has locked in, the killer starts the game.
@@ -58,12 +60,14 @@ const code = computed(() => session.room?.code ?? '')
 
 // ---------- invite ----------
 
-const copied = ref(false)
-async function copyLink() {
+/** What was copied last, said for a moment on its button. */
+const copied = ref<'' | 'link' | 'code'>('')
+async function copy(what: 'link' | 'code') {
   try {
-    await navigator.clipboard.writeText(`${location.origin}${location.pathname}#/online?room=${code.value}`)
-    copied.value = true
-    setTimeout(() => (copied.value = false), 1500)
+    await navigator.clipboard.writeText(what === 'code' ? code.value : `${location.origin}${location.pathname}#/online?room=${code.value}`)
+    sfx.click()
+    copied.value = what
+    setTimeout(() => (copied.value = ''), 1500)
   } catch {
     // clipboard blocked: the code is on screen anyway
   }
@@ -79,14 +83,34 @@ watch(
   },
 )
 const nameFocused = ref(false)
+/** Puts the cursor in the rename field as it appears. */
+const vFocus = { mounted: (el: HTMLInputElement) => (el.focus(), el.select()) }
+
+/** Renaming on your own seat (the name is set on the Online page; this is only to change it). */
+const renaming = ref(false)
+function startRename() {
+  sfx.click()
+  name.value = me.value?.name ?? ''
+  renaming.value = true
+  nameFocused.value = true
+}
 function saveName() {
+  renaming.value = false
   nameFocused.value = false
   const n = name.value.trim()
   if (n && n !== me.value?.name) void setName(n)
 }
 
-/** Names on a side, for its card. */
-const sideNames = (s: 'killer' | 'survivor') => memberList.value.filter((m) => m.side === s).map((m) => m.name)
+/** The lineup: the killer's slot, four survivor slots (empty ones null), and who hasn't chosen. */
+const killerMember = computed(() => memberList.value.find((m) => m.side === 'killer') ?? null)
+const survivorMembers = computed(() => {
+  const on = memberList.value.filter((m) => m.side === 'survivor')
+  return [...on, ...Array<null>(Math.max(0, 4 - on.length)).fill(null)].slice(0, 4)
+})
+const bench = computed(() => memberList.value.filter((m) => !m.side))
+const readyCount = computed(() => memberList.value.filter((m) => m.ready).length)
+/** The silhouettes on the slots: the figure on the Sprint card, the skull on a card's back. */
+const artVars = { '--sprint': `url(${asset('assets/movement/sprint.webp')})`, '--skull': `url(${asset('assets/movement/back-skull.webp')})` }
 
 const killerTaken = computed(() => memberList.value.some((m) => m.side === 'killer' && m.id !== session.me))
 const survivorCount = computed(() => memberList.value.filter((m) => m.side === 'survivor').length)
@@ -94,6 +118,14 @@ const survivorCount = computed(() => memberList.value.filter((m) => m.side === '
 function side(s: 'killer' | 'survivor') {
   sfx.click()
   void setSide(me.value?.side === s ? null : s)
+}
+
+/** A click on an empty slot: take that side (moving over from the other one). */
+function takeSlot(s: 'killer' | 'survivor') {
+  if (session.busy || me.value?.side === s) return
+  if (s === 'killer' && killerTaken.value) return
+  if (s === 'survivor' && survivorCount.value >= 4) return
+  side(s)
 }
 
 function toggleReady() {
@@ -216,85 +248,129 @@ function start() {
 
 <template>
   <div class="room">
-    <header class="card head">
-      <div>
-        <p v-if="data.name" class="room-title">{{ data.passwordHash ? '🔒 ' : '' }}{{ data.name }}</p>
-        <p class="muted small">รหัสห้อง</p>
-        <strong class="code">{{ code }}</strong>
+    <!-- the room bar: its name and phase, the code (a click copies it), the invite, leaving -->
+    <header class="room-bar">
+      <div class="rb-title">
+        <p class="rb-phase">{{ data.phase === 'lobby' ? 'Lobby' : 'เลือกตัวละคร' }}</p>
+        <h1>{{ data.passwordHash ? '🔒 ' : '' }}{{ data.name || `ห้อง ${code}` }}</h1>
       </div>
-      <button @click="copyLink">{{ copied ? '✓ คัดลอกแล้ว' : '🔗 คัดลอกลิงก์เชิญ' }}</button>
+      <button type="button" class="code-chip" title="คลิกเพื่อคัดลอกรหัสห้อง" @click="copy('code')">
+        <small>รหัสห้อง</small>
+        <strong>{{ code }}</strong>
+        <span class="copied" :class="{ on: copied === 'code' }">{{ copied === 'code' ? '✓ คัดลอกแล้ว' : '📋' }}</span>
+      </button>
+      <button type="button" class="invite" @click="copy('link')">{{ copied === 'link' ? '✓ คัดลอกลิงก์แล้ว' : '🔗 ลิงก์เชิญเพื่อน' }}</button>
       <span class="spacer" />
       <SyncBadge />
-      <span class="phase-tag">{{ data.phase === 'lobby' ? 'Lobby' : 'เลือกตัวละคร' }}</span>
-      <button @click="leaveRoom">ออกจากห้อง</button>
+      <button type="button" class="leave" @click="leaveRoom">⎋ ออกจากห้อง</button>
     </header>
 
     <!-- ================= lobby ================= -->
     <template v-if="data.phase === 'lobby'">
-      <!-- the room's settings first: everyone reads them before choosing a side -->
+      <!-- the lineup: the killer against the four survivors, one slot per player -->
+      <section class="stage" :style="artVars">
+        <div class="lineup">
+          <div class="side-label killer">Killer <small>{{ killerMember ? 1 : 0 }}/1</small></div>
+          <div class="side-label survivor">Survivor <small>{{ survivorCount }}/4</small></div>
+
+          <!-- the killer's slot -->
+          <component
+            :is="killerMember ? 'div' : 'button'"
+            class="seat killer"
+            :class="{ empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready }"
+            :disabled="!killerMember && session.busy ? true : undefined"
+            @click="!killerMember && takeSlot('killer')"
+          >
+            <span class="art" aria-hidden="true" />
+            <template v-if="killerMember">
+              <span v-if="killerMember.id === data.host" class="crown" title="หัวห้อง">👑</span>
+              <template v-if="killerMember.id === session.me">
+                <input v-if="renaming" v-model="name" v-focus class="seat-rename" maxlength="16" aria-label="ชื่อของคุณ" @blur="saveName" @keyup.enter="saveName" @keyup.esc="renaming = false" @click.stop />
+                <button v-else type="button" class="seat-name mine" title="เปลี่ยนชื่อ" @click.stop="startRename">{{ killerMember.name }} <i>✎</i></button>
+              </template>
+              <span v-else class="seat-name">{{ killerMember.name }}</span>
+              <span class="seat-sub">{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}</span>
+              <button v-if="killerMember.id === session.me && !me?.ready" type="button" class="seat-leave" :disabled="session.busy" @click.stop="side('killer')">ออกจากฝั่ง</button>
+            </template>
+            <template v-else>
+              <span class="plus" aria-hidden="true">+</span>
+              <span class="seat-name">ว่าง</span>
+              <span class="seat-sub">คลิกเพื่อเป็น Killer</span>
+            </template>
+            <span class="stamp">พร้อม</span>
+          </component>
+
+          <span class="vs" aria-hidden="true">VS</span>
+
+          <!-- four survivor slots -->
+          <component
+            :is="m ? 'div' : 'button'"
+            v-for="(m, i) in survivorMembers"
+            :key="m?.id ?? `empty-${i}`"
+            class="seat survivor"
+            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready, waiting: !m && me?.side === 'survivor' }"
+            :style="{ '--i': i }"
+            :disabled="!m && (session.busy || me?.side === 'survivor') ? true : undefined"
+            @click="!m && takeSlot('survivor')"
+          >
+            <span class="art" aria-hidden="true" />
+            <template v-if="m">
+              <span v-if="m.id === data.host" class="crown" title="หัวห้อง">👑</span>
+              <template v-if="m.id === session.me">
+                <input v-if="renaming" v-model="name" v-focus class="seat-rename" maxlength="16" aria-label="ชื่อของคุณ" @blur="saveName" @keyup.enter="saveName" @keyup.esc="renaming = false" @click.stop />
+                <button v-else type="button" class="seat-name mine" title="เปลี่ยนชื่อ" @click.stop="startRename">{{ m.name }} <i>✎</i></button>
+              </template>
+              <span v-else class="seat-name">{{ m.name }}</span>
+              <span class="seat-sub">{{ m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}</span>
+              <!-- 3 survivor players: one of them plays two survivors -->
+              <button
+                v-if="doubleId"
+                type="button"
+                class="double"
+                :class="{ on: doubleId === m.id }"
+                :disabled="session.busy || doubleId === m.id || (!isHost && m.id !== session.me)"
+                :title="doubleId === m.id ? 'คนนี้คุม Survivor 2 ตัว' : 'ให้คนนี้คุม Survivor 2 ตัว'"
+                @click.stop="setDouble(m.id)"
+              >
+                {{ doubleId === m.id ? '👥 คุม 2 ตัว' : 'ให้คุม 2 ตัว' }}
+              </button>
+              <button v-if="m.id === session.me && !me?.ready" type="button" class="seat-leave" :disabled="session.busy" @click.stop="side('survivor')">ออกจากฝั่ง</button>
+            </template>
+            <template v-else>
+              <span class="plus" aria-hidden="true">+</span>
+              <span class="seat-name">ว่าง</span>
+              <span class="seat-sub">{{ me?.side === 'survivor' ? 'รอเพื่อน' : 'คลิกเพื่อเป็น Survivor' }}</span>
+            </template>
+            <span class="stamp">พร้อม</span>
+          </component>
+        </div>
+
+        <p v-if="bench.length" class="bench">
+          <span class="muted">ยังไม่เลือกฝั่ง:</span>
+          <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me }">{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}</span>
+          <span v-if="!me?.side" class="bench-hint">คลิกช่องว่างด้านบนเพื่อเลือกฝั่ง</span>
+        </p>
+        <p class="split muted">{{ splitNote }}</p>
+      </section>
+
+      <!-- the room's settings: everyone reads them before saying ready -->
       <RoomSettingsCard />
 
-      <section class="card">
-        <!-- name, then the side (the main choice, big), then ready -->
-        <label class="field">
-          ชื่อของคุณ
-          <input v-model="name" maxlength="16" placeholder="ชื่อที่เพื่อนจะเห็น" @focus="nameFocused = true" @blur="saveName" @keyup.enter="saveName" />
-        </label>
-        <p class="pick-side">เลือกฝั่ง</p>
-        <div class="sides">
-          <button class="side killer" :class="{ on: me?.side === 'killer' }" :disabled="session.busy || (killerTaken && me?.side !== 'killer')" @click="side('killer')">
-            <span class="side-icon" aria-hidden="true">🔪</span>
-            <span class="side-name">Killer</span>
-            <span class="side-count">{{ sideNames('killer').length }}/1 คน</span>
-            <span class="side-who">{{ sideNames('killer').join(', ') || 'ว่าง' }}</span>
-            <span v-if="me?.side === 'killer'" class="side-mine">✓ ฝั่งของคุณ</span>
-            <span v-else-if="killerTaken" class="side-full">เต็มแล้ว</span>
-          </button>
-          <button class="side survivor" :class="{ on: me?.side === 'survivor' }" :disabled="session.busy || (survivorCount >= 4 && me?.side !== 'survivor')" @click="side('survivor')">
-            <span class="side-icon" aria-hidden="true">🏃</span>
-            <span class="side-name">Survivor</span>
-            <span class="side-count">{{ survivorCount }}/4 คน</span>
-            <span class="side-who">{{ sideNames('survivor').join(', ') || 'ว่าง' }}</span>
-            <span v-if="me?.side === 'survivor'" class="side-mine">✓ ฝั่งของคุณ</span>
-            <span v-else-if="survivorCount >= 4" class="side-full">เต็มแล้ว</span>
-          </button>
+      <!-- the bar at the foot: how many are ready, ready, and the host's go -->
+      <footer class="ready-bar">
+        <div class="rb-status">
+          <span class="ready-line">
+            <span class="ready-pips" aria-hidden="true"><i v-for="m in memberList" :key="m.id" :class="{ on: m.ready }" /></span>
+            พร้อม {{ readyCount }}/{{ memberList.length }}
+          </span>
+          <small class="muted">{{ lobbyBlocker || (isHost ? 'ทุกคนพร้อมแล้ว — ดำเนินเกมได้เลย' : 'ทุกคนพร้อมแล้ว — รอหัวห้องดำเนินเกม') }}</small>
         </div>
-        <div class="me-row">
-          <button class="ready" :class="{ primary: !me?.ready, done: me?.ready }" :disabled="session.busy || !me?.side" @click="toggleReady">
-            {{ me?.ready ? '✓ พร้อมแล้ว (กดเพื่อยกเลิก)' : me?.side ? 'พร้อม' : 'เลือกฝั่งก่อน' }}
-          </button>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>ผู้เล่นในห้อง ({{ memberList.length }})</h2>
-        <ul class="members">
-          <li v-for="m in memberList" :key="m.id" :class="[m.side ?? 'none', { me: m.id === session.me }]">
-            <span class="icon">{{ m.side === 'killer' ? '🔪' : m.side === 'survivor' ? '🏃' : '·' }}</span>
-            <strong>{{ m.name }}</strong>
-            <span v-if="m.id === data.host" class="badge">หัวห้อง</span>
-            <span class="muted small">{{ m.side === 'killer' ? 'Killer' : m.side === 'survivor' ? 'Survivor' : 'ยังไม่เลือกฝั่ง' }}</span>
-            <!-- 3 survivor players: one of them plays two survivors -->
-            <button
-              v-if="m.side === 'survivor' && doubleId"
-              type="button"
-              class="double"
-              :class="{ on: doubleId === m.id }"
-              :disabled="session.busy || doubleId === m.id || (!isHost && m.id !== session.me)"
-              :title="doubleId === m.id ? 'คนนี้คุม Survivor 2 ตัว' : 'ให้คนนี้คุม Survivor 2 ตัว'"
-              @click="setDouble(m.id)"
-            >
-              {{ doubleId === m.id ? '👥 คุม 2 ตัว' : 'ให้คุม 2 ตัว' }}
-            </button>
-            <span class="status" :class="{ ok: m.ready }">{{ m.ready ? '✓ พร้อม' : 'ยังไม่พร้อม' }}</span>
-          </li>
-        </ul>
-        <p class="muted small">{{ splitNote }}</p>
-        <button v-if="isHost" class="primary big" :disabled="!!lobbyBlocker || session.busy" @click="proceed">
-          {{ lobbyBlocker || 'ดำเนินเกม — ไปเลือกตัวละคร' }}
+        <button class="ready-btn" :class="{ primary: !me?.ready, done: me?.ready }" :disabled="session.busy || !me?.side" @click="toggleReady">
+          <span>{{ me?.ready ? '✓ พร้อมแล้ว' : me?.side ? 'พร้อม' : 'เลือกฝั่งก่อน' }}</span>
+          <small v-if="me?.ready">กดเพื่อยกเลิก</small>
         </button>
-        <p v-else class="muted center">{{ lobbyBlocker ? lobbyBlocker : 'ทุกคนพร้อมแล้ว — รอหัวห้องดำเนินเกม' }}</p>
-      </section>
+        <button v-if="isHost" class="go-btn primary" :disabled="!!lobbyBlocker || session.busy" @click="proceed">ดำเนินเกม ➜</button>
+      </footer>
     </template>
 
     <!-- ================= character picks ================= -->
@@ -445,6 +521,528 @@ function start() {
 </template>
 
 <style scoped>
+/* ---------- the room bar ---------- */
+.room-bar {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem 1rem;
+  padding: 0.9rem 1.2rem;
+  background: linear-gradient(90deg, rgb(40 6 8 / 0.92), rgb(10 11 14 / 0.9) 55%);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--blood);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.55);
+  animation: drop-in 0.4s ease-out both;
+}
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+.rb-title {
+  min-width: 0;
+}
+.rb-phase {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  /* not the wide tracking of a Latin eyebrow: it breaks Thai apart */
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--blood-bright);
+}
+.rb-title h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 2px 10px rgb(0 0 0 / 0.8);
+}
+/* the code, big and red; a click copies it */
+.code-chip {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  column-gap: 0.6rem;
+  padding: 0.25rem 0.9rem 0.35rem;
+  background: rgb(0 0 0 / 0.55);
+  border: 1px solid rgb(255 59 48 / 0.45);
+}
+.code-chip small {
+  grid-column: 1 / -1;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: left;
+}
+.code-chip strong {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  line-height: 1.05;
+  letter-spacing: 0.3em;
+  color: var(--blood-bright);
+  text-shadow: 0 0 14px rgb(255 40 40 / 0.55);
+}
+.copied {
+  font-size: 0.85rem;
+  color: var(--muted);
+  transition: color 0.15s;
+}
+.copied.on {
+  color: var(--ok);
+}
+.invite,
+.leave {
+  padding: 0.5rem 0.9rem;
+}
+.leave {
+  background: none;
+}
+.spacer {
+  flex: 1;
+}
+
+/* ---------- the lineup ---------- */
+.stage {
+  display: grid;
+  gap: 0.7rem;
+  padding: 1.2rem 1.2rem 1rem;
+  background:
+    radial-gradient(ellipse at 50% 120%, rgb(255 110 40 / 0.16), transparent 60%),
+    linear-gradient(180deg, rgb(8 9 12 / 0.35), rgb(8 9 12 / 0.8));
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+}
+.lineup {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) 64px repeat(4, minmax(0, 1fr));
+  grid-template-rows: auto auto;
+  align-items: stretch;
+  column-gap: 0.75rem;
+  row-gap: 0.45rem;
+}
+.side-label {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.side-label small {
+  margin-left: 0.3rem;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.lineup > .seat,
+.lineup > .vs {
+  grid-row: 2;
+}
+.side-label.killer {
+  grid-column: 1;
+  color: #ff6b62;
+}
+.side-label.survivor {
+  grid-column: 3 / -1;
+  color: #ffd56a;
+}
+.vs {
+  align-self: center;
+  justify-self: center;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-style: italic;
+  color: var(--blood-bright);
+  text-shadow:
+    0 0 18px rgb(255 30 30 / 0.7),
+    0 2px 0 #000;
+  animation: throb 2.4s ease-in-out infinite;
+}
+@keyframes throb {
+  50% {
+    transform: scale(1.12);
+    text-shadow:
+      0 0 28px rgb(255 30 30 / 0.95),
+      0 2px 0 #000;
+  }
+}
+
+/* a seat: a tall card with the side's silhouette, the player's name over its foot */
+.seat {
+  --tone: 217 162 39;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.15rem;
+  min-height: 300px;
+  padding: 0.8rem 0.6rem 0.9rem;
+  border: 1px solid rgb(var(--tone) / 0.35);
+  border-radius: 0;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.03), rgb(var(--tone) / 0.12));
+  text-align: center;
+  overflow: hidden;
+  animation: seat-in 0.5s ease-out both;
+  animation-delay: calc(var(--i, 0) * 70ms + 80ms);
+  transition:
+    transform 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.seat.killer {
+  --tone: 255 59 48;
+  animation-delay: 0s;
+}
+@keyframes seat-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+/* the silhouette: white art on black, screened onto the card, fog rising over its feet */
+.seat .art {
+  position: absolute;
+  inset: 0 0 25% 0;
+  background: var(--sprint) center 46% / 210% auto no-repeat;
+  mix-blend-mode: screen;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 16px rgb(var(--tone) / 0.6)) sepia(1) saturate(2.2) hue-rotate(5deg);
+  transition:
+    opacity 0.3s,
+    filter 0.3s;
+  pointer-events: none;
+}
+.seat.killer .art {
+  background: var(--skull) center 47% / 240% auto no-repeat;
+  filter: drop-shadow(0 0 18px rgb(255 30 30 / 0.7));
+}
+.seat::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 45%;
+  background: linear-gradient(0deg, rgb(5 6 8 / 0.95), transparent);
+  pointer-events: none;
+}
+.seat > :not(.art) {
+  position: relative;
+  z-index: 1;
+}
+.seat-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 2px 6px #000;
+}
+/* your own name: a click renames */
+button.seat-name.mine {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+button.seat-name.mine i {
+  font-style: normal;
+  font-size: 0.8em;
+  color: rgb(var(--tone));
+  opacity: 0.7;
+}
+button.seat-name.mine:hover i {
+  opacity: 1;
+}
+.seat-rename {
+  width: 100%;
+  padding: 0.2rem 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  text-align: center;
+  border-color: rgb(var(--tone));
+}
+.seat-sub {
+  font-size: 0.85rem;
+  color: rgb(var(--tone));
+}
+.crown {
+  position: absolute !important;
+  top: 0.5rem;
+  left: 0.55rem;
+  font-size: 1.2rem;
+  filter: drop-shadow(0 0 6px rgb(255 214 106 / 0.8));
+}
+/* this player's seat: a bright frame */
+.seat.me {
+  border-color: rgb(var(--tone));
+  box-shadow:
+    0 0 0 1px rgb(var(--tone)) inset,
+    0 0 24px rgb(var(--tone) / 0.35);
+}
+.seat-leave {
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.78rem;
+  background: rgb(0 0 0 / 0.5);
+}
+.double {
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.8rem;
+  background: rgb(0 0 0 / 0.5);
+}
+.double.on {
+  border-color: #ffd56a;
+  color: #ffd56a;
+  background: rgb(255 214 106 / 0.12);
+  opacity: 1;
+}
+/* an empty seat: dark, a dashed frame and a +, a click takes it */
+.seat.empty {
+  border-style: dashed;
+  background: rgb(0 0 0 / 0.35);
+  cursor: pointer;
+  font: inherit;
+}
+.seat.empty .art {
+  opacity: 0.12;
+  filter: grayscale(1);
+}
+.seat.empty .seat-name {
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+.seat.empty .seat-sub {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.plus {
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  line-height: 1;
+  color: rgb(var(--tone) / 0.5);
+  margin-bottom: auto;
+  margin-top: 30%;
+  transition:
+    transform 0.2s,
+    color 0.2s;
+}
+.seat.empty:hover:not(:disabled) {
+  transform: translateY(-4px);
+  border-color: rgb(var(--tone));
+  box-shadow: 0 0 24px rgb(var(--tone) / 0.3);
+}
+.seat.empty:hover:not(:disabled) .plus {
+  transform: scale(1.2) rotate(90deg);
+  color: rgb(var(--tone));
+}
+.seat.empty:hover:not(:disabled) .art {
+  opacity: 0.35;
+}
+.seat.empty:disabled {
+  opacity: 0.55;
+  filter: none;
+  cursor: default;
+}
+.seat.waiting .plus {
+  animation: breathe 2s ease-in-out infinite;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.3;
+  }
+}
+/* ready: a green glow along the foot and a stamp that slams on */
+.stamp {
+  position: absolute !important;
+  top: 34%;
+  left: 50%;
+  padding: 0.15rem 0.9rem;
+  border: 3px solid var(--ok);
+  color: var(--ok);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: rgb(5 20 10 / 0.6);
+  box-shadow: 0 0 18px rgb(79 179 106 / 0.45);
+  transform: translate(-50%, -50%) rotate(-12deg) scale(2.2);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 0.22s cubic-bezier(0.3, 1.6, 0.5, 1),
+    opacity 0.15s;
+}
+.seat.ready .stamp {
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(-12deg) scale(1);
+}
+.seat.ready {
+  border-color: rgb(79 179 106 / 0.75);
+  box-shadow:
+    inset 0 -40px 40px -20px rgb(79 179 106 / 0.45),
+    0 0 18px rgb(79 179 106 / 0.25);
+}
+
+.bench {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.2rem 0 0;
+}
+.bench-chip {
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--line-strong);
+  background: rgb(0 0 0 / 0.4);
+  font-size: 0.9rem;
+}
+.bench-chip.me {
+  border-color: var(--text);
+}
+.bench-hint {
+  color: var(--warn);
+  font-size: 0.88rem;
+  animation: breathe 2s ease-in-out infinite;
+}
+.split {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+/* ---------- the ready bar, held at the foot of the screen ---------- */
+.ready-bar {
+  position: sticky;
+  bottom: 0.6rem;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem 1.2rem;
+  padding: 0.75rem 1rem;
+  background: rgb(8 9 12 / 0.94);
+  border: 1px solid var(--line-strong);
+  border-top: 2px solid var(--blood);
+  box-shadow: 0 -6px 30px rgb(0 0 0 / 0.7);
+  backdrop-filter: blur(6px);
+}
+.rb-status {
+  flex: 1;
+  display: grid;
+  min-width: 14rem;
+}
+.ready-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+}
+.ready-pips {
+  display: inline-flex;
+  gap: 4px;
+}
+.ready-pips i {
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+  border: 1px solid var(--line-strong);
+  background: rgb(255 255 255 / 0.05);
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
+}
+.ready-pips i.on {
+  border-color: var(--ok);
+  background: var(--ok);
+  box-shadow: 0 0 8px rgb(79 179 106 / 0.7);
+}
+/* READY: the big one, breathing while not pressed yet */
+.ready-btn {
+  display: grid;
+  justify-items: center;
+  min-width: 13rem;
+  padding: 0.75rem 1.6rem;
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+.ready-btn small {
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.8;
+}
+.ready-btn.primary:not(:disabled) {
+  animation: call 1.8s ease-in-out infinite;
+}
+@keyframes call {
+  50% {
+    filter: drop-shadow(0 0 14px rgb(255 40 40 / 0.75));
+  }
+}
+.ready-btn.done {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: rgb(79 179 106 / 0.12);
+  box-shadow: 0 0 16px rgb(79 179 106 / 0.3);
+}
+.go-btn {
+  padding: 0.85rem 1.6rem;
+  font-size: 1.2rem;
+}
+.go-btn:not(:disabled) {
+  animation: call 1.2s ease-in-out infinite;
+}
+
+@media (max-width: 1000px) {
+  .lineup {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .side-label.killer,
+  .side-label.survivor,
+  .lineup > .seat.killer {
+    grid-column: 1 / -1;
+  }
+  .side-label.killer {
+    grid-row: 1;
+  }
+  .lineup > .seat.killer {
+    grid-row: 2;
+  }
+  .side-label.survivor {
+    grid-row: 3;
+  }
+  .lineup > .seat.survivor {
+    grid-row: 4;
+  }
+  .vs {
+    display: none;
+  }
+  .seat.killer {
+    min-height: 200px;
+  }
+  .seat {
+    min-height: 240px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-bar,
+  .seat,
+  .vs,
+  .bench-hint,
+  .seat.waiting .plus,
+  .ready-btn.primary:not(:disabled),
+  .go-btn:not(:disabled) {
+    animation: none;
+  }
+}
 .perks-stage {
   display: flex;
   flex-direction: column;
@@ -461,35 +1059,8 @@ function start() {
   margin: 0 auto;
   padding: 1rem;
 }
-.room-title {
-  margin: 0 0 0.2rem;
-  font-weight: 700;
-  font-size: 1.05rem;
-}
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-}
-.head p {
-  margin: 0;
-}
-.code {
-  font-family: var(--font-display);
-  font-size: 2.2rem;
-  letter-spacing: 0.25em;
-  color: var(--blood-bright);
-  text-shadow: 0 0 14px rgb(255 40 40 / 0.45);
-}
 .spacer {
   flex: 1;
-}
-.phase-tag {
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--warn);
 }
 .small {
   font-size: 0.85rem;
@@ -500,23 +1071,6 @@ function start() {
 h2 {
   margin-top: 0;
 }
-.me-row {
-  display: flex;
-  margin-top: 0.9rem;
-}
-.me-row .ready {
-  flex: 1;
-}
-.pick-side {
-  margin: 0.9rem 0 0.4rem;
-  font-weight: 600;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  max-width: 22rem;
-}
 input {
   font: inherit;
   color: var(--text);
@@ -526,74 +1080,6 @@ input {
   padding: 0.5rem 0.7rem;
 }
 /* the two sides as big cards, side by side: the room's main choice */
-.sides {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-.side {
-  display: grid;
-  justify-items: center;
-  gap: 0.15rem;
-  padding: 1rem 0.8rem 0.9rem;
-  border-radius: 12px;
-  text-align: center;
-}
-.side.killer {
-  background: linear-gradient(180deg, rgb(120 10 10 / 0.35), rgb(0 0 0 / 0.25));
-}
-.side.survivor {
-  background: linear-gradient(180deg, rgb(140 100 20 / 0.3), rgb(0 0 0 / 0.25));
-}
-.side-icon {
-  font-size: 2.2rem;
-  line-height: 1;
-}
-.side-name {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  letter-spacing: 0.04em;
-}
-.side-count {
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-.side-who {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.85rem;
-}
-.side-mine {
-  margin-top: 0.2rem;
-  padding: 0.05rem 0.6rem;
-  border-radius: 99px;
-  background: rgb(255 255 255 / 0.12);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-.side-full {
-  margin-top: 0.2rem;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.side.killer.on {
-  border-color: var(--blood);
-  box-shadow: 0 0 0 2px var(--blood) inset, 0 0 16px rgb(255 30 30 / 0.3);
-}
-.side.survivor.on {
-  border-color: var(--warn);
-  box-shadow: 0 0 0 2px var(--warn) inset, 0 0 16px rgb(217 162 39 / 0.3);
-}
-.ready {
-  min-width: 11rem;
-  padding: 0.7rem 1rem;
-}
-.ready.done {
-  border-color: var(--ok);
-  color: var(--ok);
-}
 .drawn {
   display: flex;
   align-items: center;
@@ -607,44 +1093,6 @@ input {
   display: block;
   font-size: 1.15rem;
 }
-.members {
-  list-style: none;
-  margin: 0 0 0.75rem;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.members li {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgb(0 0 0 / 0.25);
-}
-.members li.killer {
-  border-color: var(--blood-dim);
-}
-.members li.survivor {
-  border-color: rgb(217 162 39 / 0.4);
-}
-.members li.me {
-  box-shadow: 0 0 0 1px var(--text) inset;
-}
-.badge {
-  font-size: 0.7rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 3px;
-  background: var(--blood);
-  color: #fff;
-}
-.status {
-  margin-left: auto;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
 .double {
   padding: 0.15rem 0.55rem;
   font-size: 0.8rem;
@@ -655,9 +1103,6 @@ input {
   color: #ffd56a;
   background: rgb(255 214 106 / 0.1);
   opacity: 1;
-}
-.status.ok {
-  color: var(--ok);
 }
 .big {
   width: 100%;
@@ -710,39 +1155,6 @@ input {
 }
 .lock {
   margin-left: auto;
-}
-.grid {
-  display: grid;
-  gap: 0.6rem;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-}
-.tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.6rem 0.4rem;
-  text-align: center;
-}
-.tile .mini {
-  width: 80px;
-  height: 80px;
-}
-.tile small {
-  font-size: 0.72rem;
-  line-height: 1.3;
-}
-.tile:disabled {
-  opacity: 0.3;
-}
-.tile.surv.on,
-.tile.surv.mine {
-  border-color: var(--warn);
-  box-shadow: 0 0 0 2px var(--warn) inset, 0 0 18px rgb(217 162 39 / 0.3);
-}
-.tile.kill.on {
-  border-color: var(--blood);
-  box-shadow: 0 0 0 2px var(--blood) inset, 0 0 18px rgb(255 30 30 / 0.35);
 }
 .killer-card {
   border-color: var(--blood-dim);
