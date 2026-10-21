@@ -10,6 +10,7 @@ import { computed, ref, watch } from 'vue'
 import { killerById, survivorById } from '../../data'
 import { asset, cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
+import { fxSound } from '../fx/audio'
 import { KILLER_PLAYER } from '../engine/seats'
 import {
   backToLobby,
@@ -81,6 +82,16 @@ async function copy(what: 'link' | 'code') {
 }
 
 // ---------- lobby ----------
+
+// someone joins or leaves the lobby: a sound (not for the room as you open it)
+watch(
+  () => memberList.value.length,
+  (n, was) => {
+    if (data.value.phase !== 'lobby') return
+    if (n > was) fxSound.lobbyJoin()
+    else if (n < was) fxSound.lobbyLeave()
+  },
+)
 
 const name = ref(me.value?.name ?? '')
 watch(
@@ -217,9 +228,19 @@ const boardChooser = computed(() => ({ killer: 'ฆาตกร', secret: 'ฆ�
 /** The killer's pick, for the survivors when the room shows it. */
 const shownKiller = computed(() => (roomSettings.value.showKiller && data.value.picks.killer ? killerById.get(data.value.picks.killer) : undefined))
 
+function pickKiller(id: string) {
+  fxSound.charPick()
+  void pickCharacter('killer', id)
+}
+function unpickKiller() {
+  fxSound.charUnconfirm()
+  void pickCharacter('killer', null)
+}
+
 /** Put a survivor in the slot being filled, then move on to the next empty one. */
 function pickSurvivor(id: string) {
   if (locked.value || takenByOthers.value.has(id) || activeSlot.value === null) return
+  fxSound.charPick()
   const slot = activeSlot.value
   void pickCharacter(slot, id)
   activeSlot.value = mySlots.value.find((s) => s !== slot && !data.value.picks[String(s)]) ?? slot
@@ -228,6 +249,7 @@ function pickSurvivor(id: string) {
 function unpickSurvivor(id: string) {
   const slot = mySlots.value.find((s) => data.value.picks[String(s)] === id)
   if (slot === undefined || locked.value) return
+  fxSound.charUnconfirm()
   void pickCharacter(slot, null)
   activeSlot.value = slot
 }
@@ -257,7 +279,8 @@ function confirmLoadout(key: string, on: boolean) {
 function toggleLock() {
   // a character changing deals the perks again: everyone sets theirs anew
   if (locked.value && perkStage.value && !confirm('เปลี่ยนตัวละครจะล้าง Perk ที่ทุกคนแต่งไว้ ให้แต่งใหม่ทั้งหมด — ต่อไหม?')) return
-  sfx.select()
+  if (locked.value) fxSound.charUnconfirm()
+  else fxSound.charConfirm()
   void lockPicks(!locked.value)
 }
 
@@ -283,7 +306,8 @@ const picksMissing = computed(() => (amKiller.value ? (data.value.picks.killer ?
 const myBansLocked = computed(() => !!mySeat.value && !!data.value.bansLocked?.[String(mySeat.value)])
 const banWaiting = computed(() => Array.from({ length: data.value.players }, (_, i) => String(i + 1)).filter((p) => !data.value.bansLocked?.[p]).length)
 function toggleBans() {
-  sfx.select()
+  if (myBansLocked.value) fxSound.charUnconfirm()
+  else fxSound.charConfirm()
   void lockBans(!myBansLocked.value)
 }
 
@@ -584,8 +608,8 @@ const seatStatus = computed(() =>
                 :banned="revealedBans"
                 :remaining="data.picks.killer ? 0 : 1"
                 :locked="locked"
-                @pick="pickCharacter('killer', $event)"
-                @unpick="pickCharacter('killer', null)"
+                @pick="pickKiller"
+                @unpick="unpickKiller"
               />
             </section>
 
@@ -641,7 +665,6 @@ const seatStatus = computed(() =>
         </section>
         <section v-if="mySeat" class="card actions">
           <p class="muted center">{{ perksWaiting.length ? `รอทุกคนแต่ง Perk (${perksWaiting.length} ตัว)` : '' }}</p>
-          <button class="back-chars" :disabled="session.busy" @click="toggleLock">← แก้ตัวละคร (ล้าง Perk ที่แต่งไว้ทั้งหมด)</button>
         </section>
       </template>
 
@@ -669,7 +692,6 @@ const seatStatus = computed(() =>
                 : 'ทุกอย่างพร้อมแล้ว — รอ Killer ดำเนินเกม'
           }}
           <template #actions>
-            <button class="back-chars" :disabled="session.busy" @click="toggleLock">← แก้ตัวละคร{{ perkStage ? ' (ล้าง Perk)' : '' }}</button>
             <button v-if="amKiller" class="primary big-go" :disabled="!startable || session.busy" @click="start">
               {{ startable ? 'ดำเนินเกม — เริ่ม Trial' : 'เลือกแผนที่ก่อน' }}
             </button>
@@ -1384,13 +1406,6 @@ button.seat-name.mine:hover i {
 }
 .big-go {
   font-weight: 700;
-}
-.back-chars {
-  align-self: center;
-  background: none;
-  border: none;
-  color: var(--muted);
-  text-decoration: underline;
 }
 .perks-stage {
   display: flex;

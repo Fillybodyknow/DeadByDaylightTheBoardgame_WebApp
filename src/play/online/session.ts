@@ -528,6 +528,8 @@ export function lockPicks(locked: boolean) {
   return update((cur) => {
     const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
     if (cur.phase !== 'pick' || !seat || (settingsOf(cur.settings).banlist && !bansDoneOf(cur))) return null
+    // once everyone has confirmed the characters the stage is over: there is no way back to it
+    if (!locked && everyoneLocked(cur)) return null
     const player = Number(seat)
     const mine = player === KILLER_PLAYER ? ['killer'] : slotsOf(player, cur.players).map(String)
     if (locked && mine.some((k) => !cur.picks[k])) return null

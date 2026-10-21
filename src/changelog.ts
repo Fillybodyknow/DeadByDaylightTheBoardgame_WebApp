@@ -12,6 +12,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.5.0',
+    date: '2026-10-21',
+    items: [
+      'เสียงใหม่ในเกม: วิ่งผ่านเส้นทาง Pallet และ Vault, เข้า/ออก/ค้น Locker, ไล่ Crow, Sabotage Hook และ Killer บูชา Hex Totem',
+      'เสียงใน Lobby: มีคนเข้า/ออกห้อง, เลือกตัวละคร, ยืนยัน และยกเลิกยืนยัน (รวมขั้นแบน), ใส่/ถอด Perk ตอนแต่ง Perk',
+      'พอทุกคนพร้อมและ Killer เริ่มเกม จะมีหน้า "เข้าสู่ Trial" พร้อมเสียงสัญญาณเตือน 4–5 วินาทีก่อนเข้าเกม แสดงรูปตัวละครจากบอร์ดเรียงใหญ่ๆ Killer VS Survivor ทั้งออนไลน์และออฟไลน์',
+    ],
+  },
+  {
     version: '1.4.2',
     date: '2026-10-21',
     items: ['แก้บั๊ก: The Doctor ใช้ Overwhelming Presence ตอนผู้รอดชีวิตใช้ item เปิด prop (เช่น Rainbow Map) แล้วกดตอบไม่ได้ทั้งสองปุ่ม เกมค้าง'],

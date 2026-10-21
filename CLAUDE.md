@@ -201,6 +201,19 @@ local backend syncs browser tabs.
 
 - Game sounds: `src/play/fx/audio.ts`. Recorded clips in `public/assets/app/sound/game/`, with the
   synthesised sound as fallback. They follow the mute toggle in `src/sound.ts`.
+- The clips cut from the "Common Sound Effects — Dead by Daylight" video (vault, pallet-run, equip,
+  unequip, lobby-join / -leave, char-pick / -confirm / -unconfirm, match-ready, locker-open / -close /
+  -search, sabotage, crow-touch / -destroy, totem-touch) are named in `CLIPS` (`fx/audio.ts`). The
+  board's sounds come from the `touch` game event (a prop handled: Board's `play`) and from the
+  path a mini walks (`pathSound`); the room's from OnlineRoom. A game starting: `MatchBeat` plays
+  match-ready over the page as it was (laid out as that page: `introStage` in `intro.ts` keeps App
+  from the game's layout), with a heartbeat (`fxSound.heartbeat`) and the screen throbbing red on it, for its
+  4.6 s; then `TrialLoading` is the loading page (bw-refresh, a quote or rules tip, a loading bar),
+  then the game. The loading page's portraits fill the screen: the strip on the left of each character's board
+  (`boardTh`, 0.255 of its width: 0.334 high-to-wide for a killer's 2400×1833 board, 0.421 for a
+  survivor's 2400×1615 with the "ITEM CARD" label under it cropped off), the killer, a gap with
+  VS in it, then the four survivors, each scaled to cover its share of the screen. The video has no sound of its own for unequip, sabotage, or
+  the killer at a totem, so those borrow the nearest one (unequip is Equip reversed).
 - Volume: `volumes` in `src/sound.ts` (master, music, sfx; 0–1, remembered per device), set from
   the sound button's panel (`src/components/SoundSettings.vue`, in the top bar and the game's
   rail). Music (ambient and chase) scales by master × music, every effect (both `sound.ts` and

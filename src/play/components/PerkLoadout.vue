@@ -10,6 +10,7 @@ import BpText from '../../components/BpText.vue'
 import { killerById, survivorById } from '../../data'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
+import { fxSound } from '../fx/audio'
 import { ownPerk, printedOf, type GameMode, type Side } from '../engine/loadout'
 import { PERKS, type PerkId } from '../engine/perks'
 import { perkImage, perkText } from '../labels'
@@ -54,7 +55,7 @@ function put(p: PerkId) {
   const at = loadout.value.indexOf(p)
   // already in the loadout: that slot is the one to change next
   if (at >= 0) return void (slot.value = at)
-  sfx.select()
+  fxSound.equip()
   const next = [...loadout.value]
   next[slot.value] = p
   loadout.value = next
@@ -65,7 +66,7 @@ function put(p: PerkId) {
 
 function reset() {
   if (props.confirmed) return
-  sfx.click()
+  fxSound.unequip()
   loadout.value = [...printed.value]
   slot.value = 0
 }

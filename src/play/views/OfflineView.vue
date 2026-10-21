@@ -2,7 +2,7 @@
 // Offline: the full game on one device passed around the table (hot-seat). Before a game, the
 // companion's lobby flow — players and game mode, survivors pick first, then the killer, then
 // (Bloodweb, Devout) each player's perks in turn behind a hand-off curtain, then the map.
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { killerById, survivorById } from '../../data'
 import { asset } from '../../i18n'
@@ -10,7 +10,9 @@ import { sfx } from '../../sound'
 import CharacterPicker from '../components/CharacterPicker.vue'
 import MapPicker from '../components/MapPicker.vue'
 import GameScreen from '../components/GameScreen.vue'
-import TrialIntro from '../components/TrialIntro.vue'
+import TrialLoading from '../components/TrialLoading.vue'
+import { introStage } from '../intro'
+import MatchBeat from '../components/MatchBeat.vue'
 import { macmillan } from '../engine/boards'
 import { handLayout } from '../engine/engine'
 import { bloodwebHands, cardChoices, loadoutProblem, printedOf, takenBy, type GameMode, type LoadoutCharacter } from '../engine/loadout'
@@ -20,6 +22,24 @@ import { game, newGame } from '../game'
 import { leaveRoom, session } from '../online/session'
 
 const router = useRouter()
+
+/**
+ * Everyone is ready and the killer started: first the beat — the alarm and the heartbeat over the
+ * page as it was (`MatchBeat`) — then the loading page (`TrialLoading`), then the game. Only for a
+ * game that starts while this view is open, not one joined or reloaded.
+ */
+const intro = introStage
+const introAt = ref(0)
+watch(
+  () => !!game.value,
+  (on, was) => {
+    if (on && !was) {
+      introAt.value = Date.now()
+      intro.value = 'beat'
+    }
+    if (!on) intro.value = null
+  },
+)
 
 type Step = 'players' | 'survivors' | 'killer' | 'perks' | 'start'
 const STEPS = computed<{ id: Step; label: string }[]>(() => [
@@ -180,139 +200,150 @@ function start() {
 </script>
 
 <template>
-  <!-- in an online room the game in memory is the room's: leave it before playing offline -->
-  <section v-if="session.room" class="card notice">
-    <h2>คุณยังอยู่ในห้องออนไลน์ {{ session.room.code }}</h2>
-    <p class="muted">ออกจากห้องก่อนเพื่อเล่นแบบเครื่องเดียว หรือกลับเข้าห้อง</p>
-    <div class="row">
-      <button type="button" class="primary" @click="router.push('/online')">กลับเข้าห้อง</button>
-      <button type="button" @click="leaveRoom">ออกจากห้อง</button>
-    </div>
-  </section>
-
-  <template v-else-if="game">
-    <GameScreen :st="game" />
-    <TrialIntro :st="game" />
-  </template>
-
-  <div v-else class="lobby">
-    <ol class="stepper">
-      <li v-for="(st, i) in STEPS" :key="st.id" :class="{ done: i < stepIndex, now: i === stepIndex }" @click="goToStep(i)">
-        <span class="num">{{ i < stepIndex ? '✓' : i + 1 }}</span>
-        {{ st.label }}
-      </li>
-    </ol>
-
-    <!-- team summary: who controls what, and what has been picked -->
-    <section v-if="step !== 'players'" class="team card">
-      <div class="seat killer" :class="{ active: step === 'killer' }">
-        <img v-if="killer" class="aura-killer" :src="asset(killerById.get(killer)?.images.mini)" alt="" />
-        <span v-else class="empty">🔪</span>
-        <div>
-          <small class="muted">Killer · ผู้เล่น 1</small>
-          <strong>{{ killer ? killerById.get(killer)?.name : '—' }}</strong>
-        </div>
-      </div>
-      <div v-for="(id, seat) in picks" :key="seat" class="seat" :class="{ active: currentSeat === seat }">
-        <img v-if="id" class="aura-survivor" :src="asset(survivorById.get(id)?.images.mini)" alt="" />
-        <span v-else class="empty">{{ seat + 1 }}</span>
-        <div>
-          <small class="muted">Survivor {{ seat + 1 }} · ผู้เล่น {{ seatPlayer[seat] }}</small>
-          <strong>{{ id ? survivorById.get(id)?.name : '—' }}</strong>
-        </div>
-        <button v-if="id && step === 'survivors'" type="button" class="x" title="เลือกใหม่" @click="clearSeat(seat)">✕</button>
+  <!-- one root that stays: the app's page transition animates it once, not each swap inside (a
+       swapping root is left stuck in its entering state, invisible). display: contents keeps the
+       layout as if it weren't there. -->
+  <div class="offline-view">
+    <!-- in an online room the game in memory is the room's: leave it before playing offline -->
+    <section v-if="session.room" class="card notice">
+      <h2>คุณยังอยู่ในห้องออนไลน์ {{ session.room.code }}</h2>
+      <p class="muted">ออกจากห้องก่อนเพื่อเล่นแบบเครื่องเดียว หรือกลับเข้าห้อง</p>
+      <div class="row">
+        <button type="button" class="primary" @click="router.push('/online')">กลับเข้าห้อง</button>
+        <button type="button" @click="leaveRoom">ออกจากห้อง</button>
       </div>
     </section>
 
-    <h2 v-if="chooser" class="chooser">ตาของ {{ chooser }}</h2>
+    <TrialLoading v-else-if="game && intro === 'loading'" :st="game" @done="intro = null" />
 
-    <!-- 1. players -->
-    <template v-if="step === 'players'">
-      <section class="hero" :style="{ backgroundImage: `url(${asset('assets/app/background-img/background_dbd.webp')})` }">
-        <div class="hero-text">
-          <h1>เล่นแบบเครื่องเดียว</h1>
-          <p>ส่งเครื่องต่อกันทั้งโต๊ะ (hot-seat) · ระบบคุมกติกา ทอยเต๋า และ Perk ให้ทั้งหมด</p>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>ผู้เล่นกี่คน?</h2>
-        <div class="counts">
-          <button v-for="n in [3, 4, 5] as const" :key="n" type="button" :class="{ active: players === n }" @click="setPlayers(n)">{{ n }} คน</button>
-        </div>
-        <p class="muted">ผู้เล่น 1 = Killer · {{ seatingNote }}</p>
-        <h2>โหมดเกม</h2>
-        <div class="modes">
-          <button v-for="m in MODES" :key="m.id" type="button" class="mode" :class="{ active: mode === m.id }" @click="setMode(m.id)">
-            <b>{{ m.label }}</b>
-            <small>{{ m.note }}</small>
-          </button>
-        </div>
-        <div class="actions">
-          <button type="button" class="primary big" @click="confirmPlayers">เริ่มเลือกตัวละคร →</button>
-        </div>
-      </section>
+    <!-- during the beat the setup stays on screen, under it -->
+    <template v-else-if="game && intro !== 'beat'">
+      <GameScreen :st="game" />
     </template>
 
-    <!-- 2. survivors pick first, in seat order -->
-    <CharacterPicker
-      v-else-if="step === 'survivors'"
-      kind="survivor"
-      :taken="picks.filter((p): p is string => !!p)"
-      :remaining="picks.filter((p) => !p).length"
-      taken-label="เลือกแล้ว"
-      :roll-title="currentSeat !== null ? `สุ่ม Survivor ตัวที่ ${currentSeat + 1} ให้ผู้เล่น ${seatPlayer[currentSeat]}` : ''"
-      @pick="pickSurvivor"
-      @unpick="unpickSurvivor"
-    />
+    <div v-else class="lobby">
+      <ol class="stepper">
+        <li v-for="(st, i) in STEPS" :key="st.id" :class="{ done: i < stepIndex, now: i === stepIndex }" @click="goToStep(i)">
+          <span class="num">{{ i < stepIndex ? '✓' : i + 1 }}</span>
+          {{ st.label }}
+        </li>
+      </ol>
 
-    <!-- 3. then the killer -->
-    <CharacterPicker v-else-if="step === 'killer'" kind="killer" :selected="killer ? [killer] : []" @pick="killer = $event" @unpick="killer = null" />
-
-    <!-- 4. perks: each player in turn, the device handed over first -->
-    <template v-else-if="step === 'perks' && perkChar">
-      <section v-if="!handedOver" class="card handoff">
-        <img :src="asset((perkChar.side === 'killer' ? killerById.get(perkChar.id) : survivorById.get(perkChar.id))?.images.mini)" alt="" />
-        <h2>ส่งเครื่องให้{{ perkChar.who }}</h2>
-        <p class="muted">แต่ง Perk ของ {{ (perkChar.side === 'killer' ? killerById.get(perkChar.id) : survivorById.get(perkChar.id))?.name }} — คนอื่นห้ามดูจอ ({{ perkTurn + 1 }}/{{ perkChars.length }})</p>
-        <button type="button" class="primary big" @click="beginPerks">👁 ฉันคือ{{ perkChar.who }} — เริ่มแต่ง Perk</button>
-      </section>
-      <PerkLoadout
-        v-else
-        v-model="draft"
-        :side="perkChar.side"
-        :character-id="perkChar.id"
-        :mode="mode"
-        :who="perkChar.who"
-        :choices="cardChoices(mode, perkChar, hands[perkChar.key])"
-        :taken="perkTaken"
-        :problem="perkProblem"
-        :confirmed="false"
-        @confirm="confirmPerks"
-      />
-    </template>
-
-    <!-- 5. the map, and in -->
-    <template v-else>
-      <!-- the perks set, revealed together (p.19) -->
-      <section v-if="mode !== 'adept'" class="card reveal">
-        <h2>Perk ของทุกคน</h2>
-        <div class="reveal-grid">
-          <div v-for="c in perkChars" :key="c.key" class="reveal-row">
-            <strong>{{ (c.side === 'killer' ? killerById.get(c.id) : survivorById.get(c.id))?.name }}</strong>
-            <span class="muted">{{ perkNames(c) }}</span>
+      <!-- team summary: who controls what, and what has been picked -->
+      <section v-if="step !== 'players'" class="team card">
+        <div class="seat killer" :class="{ active: step === 'killer' }">
+          <img v-if="killer" class="aura-killer" :src="asset(killerById.get(killer)?.images.mini)" alt="" />
+          <span v-else class="empty">🔪</span>
+          <div>
+            <small class="muted">Killer · ผู้เล่น 1</small>
+            <strong>{{ killer ? killerById.get(killer)?.name : '—' }}</strong>
           </div>
         </div>
+        <div v-for="(id, seat) in picks" :key="seat" class="seat" :class="{ active: currentSeat === seat }">
+          <img v-if="id" class="aura-survivor" :src="asset(survivorById.get(id)?.images.mini)" alt="" />
+          <span v-else class="empty">{{ seat + 1 }}</span>
+          <div>
+            <small class="muted">Survivor {{ seat + 1 }} · ผู้เล่น {{ seatPlayer[seat] }}</small>
+            <strong>{{ id ? survivorById.get(id)?.name : '—' }}</strong>
+          </div>
+          <button v-if="id && step === 'survivors'" type="button" class="x" title="เลือกใหม่" @click="clearSeat(seat)">✕</button>
+        </div>
       </section>
-      <MapPicker v-model="board" />
-      <div class="actions">
-        <button type="button" class="primary big" @click="start">เข้าสู่ Trial →</button>
-      </div>
-    </template>
+
+      <h2 v-if="chooser" class="chooser">ตาของ {{ chooser }}</h2>
+
+      <!-- 1. players -->
+      <template v-if="step === 'players'">
+        <section class="hero" :style="{ backgroundImage: `url(${asset('assets/app/background-img/background_dbd.webp')})` }">
+          <div class="hero-text">
+            <h1>เล่นแบบเครื่องเดียว</h1>
+            <p>ส่งเครื่องต่อกันทั้งโต๊ะ (hot-seat) · ระบบคุมกติกา ทอยเต๋า และ Perk ให้ทั้งหมด</p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>ผู้เล่นกี่คน?</h2>
+          <div class="counts">
+            <button v-for="n in [3, 4, 5] as const" :key="n" type="button" :class="{ active: players === n }" @click="setPlayers(n)">{{ n }} คน</button>
+          </div>
+          <p class="muted">ผู้เล่น 1 = Killer · {{ seatingNote }}</p>
+          <h2>โหมดเกม</h2>
+          <div class="modes">
+            <button v-for="m in MODES" :key="m.id" type="button" class="mode" :class="{ active: mode === m.id }" @click="setMode(m.id)">
+              <b>{{ m.label }}</b>
+              <small>{{ m.note }}</small>
+            </button>
+          </div>
+          <div class="actions">
+            <button type="button" class="primary big" @click="confirmPlayers">เริ่มเลือกตัวละคร →</button>
+          </div>
+        </section>
+      </template>
+
+      <!-- 2. survivors pick first, in seat order -->
+      <CharacterPicker
+        v-else-if="step === 'survivors'"
+        kind="survivor"
+        :taken="picks.filter((p): p is string => !!p)"
+        :remaining="picks.filter((p) => !p).length"
+        taken-label="เลือกแล้ว"
+        :roll-title="currentSeat !== null ? `สุ่ม Survivor ตัวที่ ${currentSeat + 1} ให้ผู้เล่น ${seatPlayer[currentSeat]}` : ''"
+        @pick="pickSurvivor"
+        @unpick="unpickSurvivor"
+      />
+
+      <!-- 3. then the killer -->
+      <CharacterPicker v-else-if="step === 'killer'" kind="killer" :selected="killer ? [killer] : []" @pick="killer = $event" @unpick="killer = null" />
+
+      <!-- 4. perks: each player in turn, the device handed over first -->
+      <template v-else-if="step === 'perks' && perkChar">
+        <section v-if="!handedOver" class="card handoff">
+          <img :src="asset((perkChar.side === 'killer' ? killerById.get(perkChar.id) : survivorById.get(perkChar.id))?.images.mini)" alt="" />
+          <h2>ส่งเครื่องให้{{ perkChar.who }}</h2>
+          <p class="muted">แต่ง Perk ของ {{ (perkChar.side === 'killer' ? killerById.get(perkChar.id) : survivorById.get(perkChar.id))?.name }} — คนอื่นห้ามดูจอ ({{ perkTurn + 1 }}/{{ perkChars.length }})</p>
+          <button type="button" class="primary big" @click="beginPerks">👁 ฉันคือ{{ perkChar.who }} — เริ่มแต่ง Perk</button>
+        </section>
+        <PerkLoadout
+          v-else
+          v-model="draft"
+          :side="perkChar.side"
+          :character-id="perkChar.id"
+          :mode="mode"
+          :who="perkChar.who"
+          :choices="cardChoices(mode, perkChar, hands[perkChar.key])"
+          :taken="perkTaken"
+          :problem="perkProblem"
+          :confirmed="false"
+          @confirm="confirmPerks"
+        />
+      </template>
+
+      <!-- 5. the map, and in -->
+      <template v-else>
+        <!-- the perks set, revealed together (p.19) -->
+        <section v-if="mode !== 'adept'" class="card reveal">
+          <h2>Perk ของทุกคน</h2>
+          <div class="reveal-grid">
+            <div v-for="c in perkChars" :key="c.key" class="reveal-row">
+              <strong>{{ (c.side === 'killer' ? killerById.get(c.id) : survivorById.get(c.id))?.name }}</strong>
+              <span class="muted">{{ perkNames(c) }}</span>
+            </div>
+          </div>
+        </section>
+        <MapPicker v-model="board" />
+        <div class="actions">
+          <button type="button" class="primary big" @click="start">เข้าสู่ Trial →</button>
+        </div>
+      </template>
+    </div>
+    <MatchBeat v-if="intro === 'beat'" :since="introAt" @done="intro = 'loading'" />
   </div>
 </template>
 
 <style scoped>
+.offline-view {
+  display: contents;
+}
 .modes {
   display: grid;
   gap: 0.5rem;

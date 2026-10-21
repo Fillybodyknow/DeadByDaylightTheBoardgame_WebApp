@@ -1468,6 +1468,7 @@ function leaveLocker(st: GameState, s: number) {
   const locker = st.props.find((p) => p.kind === 'locker' && p.occupant === s)
   if (locker) locker.occupant = null
   st.survivors[s].status = 'board'
+  emit(st, { k: 'touch', who: s, what: 'lockerOut' }, s)
 }
 
 /** `asked`: the move out of the killer's room was already held for Deerstalker and Thrill of the Hunt. */
@@ -1568,6 +1569,7 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       prop!.occupant = s
       sv.status = 'locker'
       log(st, `${sv.name} ซ่อนใน Locker`, s)
+      emit(st, { k: 'touch', who: s, what: 'lockerIn' }, s)
       dropKnives(st, s)
       shedPurge(st, s)
       trigger(st, { k: 'afterPalletLocker', s, prop: prop!.id })
@@ -1575,6 +1577,7 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
     case 'crow':
       gainKiller(st, 1)
       log(st, `${sv.name} ไล่ Crow — ${st.killer.name} +1 ▲`, s)
+      emit(st, { k: 'touch', who: s, what: 'crow' }, s)
       if (st.survivorHands[sv.hand].length > 0) wait(st, { t: 'bonusOffer', s })
       return
     case 'calmSpirit':
@@ -1596,6 +1599,7 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
     case 'heal':
       return startCheck(st, { k: 'heal', s, target: i.target })
     case 'sabotage': {
+      emit(st, { k: 'touch', who: s, what: 'sabotage' }, s)
       placeEntity(st, { prop: prop!.id })
       const hooked = prop!.occupant
       if (hooked === null) {
@@ -1761,12 +1765,14 @@ function doKillerInteraction(st: GameState, i: KillerInteraction) {
     case 'search': {
       const s = prop!.occupant!
       log(st, `${actorName(st)} ค้น Locker — ${st.survivors[s].name} ทอย Skill Check`, 'killer')
+      emit(st, { k: 'touch', who: 'killer', what: 'lockerSearch' }, 'killer')
       return startCheck(st, { k: 'search', s, prop: prop!.id })
     }
     case 'scout':
       prop!.removed = true
       gainKiller(st, 1)
       log(st, `${k.name} ไล่ Crow (+1 ▲)`, 'killer')
+      emit(st, { k: 'touch', who: 'killer', what: 'crowDestroy' }, 'killer')
       return
     case 'damage':
       trigger(st, { k: 'killerBreak', what: 'damage', prop: prop!.id })
@@ -1776,6 +1782,7 @@ function doKillerInteraction(st: GameState, i: KillerInteraction) {
     case 'venerate':
       gainKiller(st, 2)
       log(st, `${k.name} บูชา Hex Totem (+2 ▲)`, 'killer')
+      emit(st, { k: 'touch', who: 'killer', what: 'totem' }, 'killer')
       return
     case 'attack':
       wound(st, i.target, 'attack', `${actorName(st)} โจมตี ${st.survivors[i.target].name} — บาดเจ็บ`)

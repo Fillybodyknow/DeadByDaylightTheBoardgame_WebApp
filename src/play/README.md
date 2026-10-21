@@ -48,8 +48,10 @@ and the host starts the game.
   (everyone confirms; a **Banlist** stage comes before it when the room sets one) → **perks** (only when the room's mode is Bloodweb or Devout) → **map**
   (picked by whoever the setting says; drawn maps are settled at once — `boardSet`, so a map is
   never "default MacMillan" by omission). The start button waits for the map. A step bar shows
-  where the room is and chips show who is done; "แก้ตัวละคร" on the perks or map stage reopens the
-  player's characters, which takes everyone back to the characters stage and clears the loadouts.
+  where the room is and chips show who is done. A stage only goes forward: a player may take back
+  their own confirmation while others are still to confirm (the same stage), but once everyone has
+  confirmed the characters (or the bans) there is no way back — the UI has no button for it and
+  `lockPicks` / `lockBans` refuse.
   The foot of the bans, characters and map stages is a sticky `StageBar` (progress dots, a line of
   words, the confirm / start button), so the button is never lost under a long grid; the
   characters stage keeps the team in a side panel (`.team-panel`) beside the pickers.

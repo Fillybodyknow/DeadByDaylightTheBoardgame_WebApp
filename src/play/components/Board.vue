@@ -356,10 +356,18 @@ function walk(events: GameEvent[], from: Map<string, Rect>): number {
     })
     const frames = [was, ...via, now].map((r) => ({ left: pct(r.x), top: pct(r.y) }))
     el.animate(frames, { duration: 380 * (frames.length - 1), easing: 'ease-in-out' })
-    via.forEach((_, i) => window.setTimeout(() => fxSound.step(), 380 * (i + 1)))
+    // a footstep per path — or the vault's, or going over a pallet
+    ;(moved.get(k) ?? []).filter(Boolean).forEach((p, i) => window.setTimeout(() => pathSound(p), 380 * (i + 1)))
     longest = Math.max(longest, 380 * (frames.length - 1))
   }
   return longest
+}
+
+/** The sound of going along a path: over a pallet, over a vault, or a plain step. */
+function pathSound(path: string) {
+  if (palletOn(props.st, path)) fxSound.palletRun()
+  else if (pathDef(props.st, path).kind === 'vault') fxSound.vault()
+  else fxSound.step()
 }
 
 const key = (who: number | 'killer' | 'victor') => (who === 'killer' ? 'k' : who === 'victor' ? 'v' : `s${who}`)
@@ -437,6 +445,31 @@ function play(ev: GameEvent, delay: number): number {
       return delay
     case 'pickUp':
       fxSound.pickUp()
+      return delay
+    case 'touch':
+      switch (ev.what) {
+        case 'lockerIn':
+          fxSound.lockerIn()
+          break
+        case 'lockerOut':
+          fxSound.lockerOut()
+          break
+        case 'lockerSearch':
+          fxSound.lockerSearch()
+          break
+        case 'crow':
+          fxSound.crowTouch()
+          break
+        case 'crowDestroy':
+          fxSound.crowDestroy()
+          break
+        case 'sabotage':
+          fxSound.sabotage()
+          break
+        case 'totem':
+          fxSound.totemTouch()
+          break
+      }
       return delay
     case 'cleanse':
       fxSound.cleanse()

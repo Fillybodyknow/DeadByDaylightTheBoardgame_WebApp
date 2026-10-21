@@ -10,6 +10,7 @@ import { quoteOrTip, showLoading } from './loading'
 import { asset, lang } from './i18n'
 import { game } from './play/game'
 import { isPhone } from './play/device'
+import { introStage } from './play/intro'
 import { session } from './play/online/session'
 import PhoneBlock from './play/views/PhoneBlock.vue'
 import { setAmbient, type AmbientTrack } from './sound'
@@ -21,8 +22,8 @@ const route = useRoute()
 startUpdateWatch()
 
 // Loading screen when entering the companion's table setup and when its trial starts: half the
-// time a quote from a survivor in this game, otherwise a rules tip. (The full game shows its own,
-// see play/components/TrialIntro.vue.)
+// time a quote from a survivor in this game, otherwise a rules tip. (The full game has its own:
+// play/components/TrialLoading.vue.)
 useRouter().afterEach((to, from) => {
   const slide = () => quoteOrTip(lobby.state.survivorPicks)
   if (to.name === 'setup' && from.name === 'lobby') showLoading('กำลังเตรียมโต๊ะ…', slide())
@@ -45,6 +46,8 @@ const phoneBlocked = computed(() => phone && (route.name === 'offline' || route.
 const inGame = computed(
   () =>
     !phoneBlocked.value &&
+    // the alarm before a game plays over the page it started from, laid out as that page
+    introStage.value !== 'beat' &&
     ((route.name === 'offline' && !!game.value && !session.room) || (route.name === 'online' && !!session.data?.game && !!game.value)),
 )
 

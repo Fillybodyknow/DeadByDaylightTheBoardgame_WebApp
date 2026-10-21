@@ -35,6 +35,9 @@ function audio(): AudioContext | null {
 const CLIPS = [
   'crow-caw', 'item', 'skill-warn', 'skill-good', 'skill-great', 'skill-fail', 'damage', 'gen-done',
   'cleanse', 'pallet-drop', 'pallet-break', 'pick-up', 'hook', 'lever', 'gate-open', 'gates-powered',
+  'vault', 'pallet-run', 'equip', 'unequip', 'lobby-join', 'lobby-leave', 'char-pick', 'char-confirm',
+  'char-unconfirm', 'match-ready', 'locker-open', 'locker-close', 'locker-search', 'sabotage',
+  'crow-touch', 'crow-destroy', 'totem-touch', 'bw-refresh',
 ] as const
 type Clip = (typeof CLIPS)[number]
 
@@ -240,4 +243,52 @@ export const fxSound = {
   lever: () => clip('lever'),
   /** An exit gate fully open. */
   gateOpen: () => clip('gate-open', undefined, 0.6),
+  // ----- moving about the board -----
+  /** A survivor or the killer going through a vault path. */
+  vault: () => clip('vault', synth.step),
+  /** A survivor going over a path with a pallet on it. */
+  palletRun: () => clip('pallet-run', synth.step),
+  // ----- props handled -----
+  /** A survivor gets into a locker: the door opens, then shuts. */
+  lockerIn() {
+    clip('locker-open')
+    window.setTimeout(() => clip('locker-close'), 450)
+  },
+  /** A survivor comes out of a locker (or is dragged out). */
+  lockerOut: () => clip('locker-open'),
+  /** The killer searches a locker. */
+  lockerSearch: () => clip('locker-search'),
+  /** A survivor shoos a crow. */
+  crowTouch: () => clip('crow-touch', undefined, 0.8),
+  /** The killer scares a crow off. */
+  crowDestroy: () => clip('crow-destroy'),
+  /** A survivor sabotages a hook. */
+  sabotage: () => clip('sabotage'),
+  /** The killer venerates a hex totem. */
+  totemTouch: () => clip('totem-touch', undefined, 0.6),
+  // ----- before the game: the room -----
+  /** Perk cards (and anything else) put on / taken off in the loadout. */
+  equip: () => clip('equip'),
+  unequip: () => clip('unequip'),
+  /** Someone joins / leaves the lobby. */
+  lobbyJoin: () => clip('lobby-join', undefined, 0.6),
+  lobbyLeave: () => clip('lobby-leave', undefined, 0.6),
+  /** A character picked; confirmed; taken back. */
+  charPick: () => clip('char-pick', undefined, 0.6),
+  charConfirm: () => clip('char-confirm', undefined, 0.7),
+  charUnconfirm: () => clip('char-unconfirm', undefined, 0.6),
+  /** The loading page opens (the Bloodweb's refresh). */
+  bwRefresh: () => clip('bw-refresh', undefined, 0.7),
+  /** Everyone is ready: the match is about to start. */
+  matchReady: () => clip('match-ready', undefined, 0.8),
+  /**
+   * One half of a heartbeat ("lub", or the softer "dub"): a thump that falls in pitch, with a
+   * knock in the low mids so laptop and tablet speakers, which barely play under 100 Hz, carry it.
+   */
+  heartbeat(strong = true) {
+    const g = strong ? 1 : 0.6
+    tone(150, 0.18, { gain: 0.7 * g, slideTo: 55 })
+    tone(90, 0.22, { type: 'triangle', gain: 0.35 * g, slideTo: 45 })
+    noise(0.09, { type: 'lowpass', freq: 420, gain: 0.55 * g })
+  },
 }

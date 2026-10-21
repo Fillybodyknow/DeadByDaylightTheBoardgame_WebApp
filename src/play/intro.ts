@@ -1,13 +1,19 @@
-// What the game's opening plays once per game: the loading screen and the minis' start-room rolls.
+// What the game's opening plays once per game: the minis' start-room rolls.
 // "Once" is per browser session and per game, so a reload or a second device doesn't replay it.
 
+import { ref } from 'vue'
 import { killerById, survivorById } from '../data'
 import { boards } from './engine/boards'
 import type { GameState } from './engine/types'
 import type { StartMini } from './fx/bus'
 
 export const SEEN = 'dbdl-play-intro-seen'
-export const SEEN_LOADING = 'dbdl-play-loading-seen'
+
+/**
+ * A game just started: 'beat' while the alarm plays over the page as it was (the page keeps its
+ * own layout, not the game's), then 'loading', then null. Set by the views.
+ */
+export const introStage = ref<null | 'beat' | 'loading'>(null)
 
 /** Same for every device in the same game, different between games (the minis' rooms aside). */
 export function gameKey(st: GameState): string {

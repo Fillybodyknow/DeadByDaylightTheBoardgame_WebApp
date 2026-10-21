@@ -660,6 +660,8 @@ export type GameEvent =
   | { k: 'itemGot'; s: number }
   | { k: 'bp'; who: number | 'killer'; n: number }
   | { k: 'gameOver'; winner: 'survivors' | 'killer' }
+  /** A prop handled, for the sound: a survivor or the killer (`who`) at a locker, crow, hook or totem. */
+  | { k: 'touch'; who: number | 'killer'; what: 'lockerIn' | 'lockerOut' | 'lockerSearch' | 'crow' | 'crowDestroy' | 'sabotage' | 'totem' }
 
 export interface GameState {
   version: 3

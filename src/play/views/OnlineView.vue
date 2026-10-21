@@ -1,12 +1,33 @@
 <script setup lang="ts">
 // Online: each player on their own device. No room yet → create or join one; in a room → its
 // lobby and character picks, then the shared game.
+import { ref, watch } from 'vue'
 import GameScreen from '../components/GameScreen.vue'
+import TrialLoading from '../components/TrialLoading.vue'
+import { introStage } from '../intro'
+import MatchBeat from '../components/MatchBeat.vue'
 import OnlineEntry from '../components/OnlineEntry.vue'
 import OnlineRoom from '../components/OnlineRoom.vue'
-import TrialIntro from '../components/TrialIntro.vue'
 import { game } from '../game'
 import { closeOnlineGame, isHost, leaveRoom, returnToLobby, session, stillInGame } from '../online/session'
+
+/**
+ * Everyone is ready and the killer started: first the beat — the alarm and the heartbeat over the
+ * page as it was (`MatchBeat`) — then the loading page (`TrialLoading`), then the game. Only for a
+ * game that starts while this view is open, not one joined or reloaded.
+ */
+const intro = introStage
+const introAt = ref(0)
+watch(
+  () => !!session.data?.game,
+  (on, was) => {
+    if (on && !was) {
+      introAt.value = Date.now()
+      intro.value = 'beat'
+    }
+    if (!on) intro.value = null
+  },
+)
 </script>
 
 <template>
@@ -26,13 +47,15 @@ import { closeOnlineGame, isHost, leaveRoom, returnToLobby, session, stillInGame
           <button @click="leaveRoom()">ออกจากห้อง</button>
         </div>
       </section>
-      <template v-else-if="session.data.game && game">
+      <TrialLoading v-else-if="session.data.game && game && intro === 'loading'" :st="game" @done="intro = null" />
+      <!-- during the beat the room stays on screen, under it -->
+      <template v-else-if="session.data.game && game && intro !== 'beat'">
         <GameScreen :st="game" />
-        <TrialIntro :st="game" />
       </template>
       <OnlineRoom v-else />
     </template>
     <OnlineEntry v-else />
+    <MatchBeat v-if="intro === 'beat'" :since="introAt" @done="intro = 'loading'" />
   </div>
 </template>
 
