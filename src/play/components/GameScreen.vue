@@ -459,6 +459,7 @@ function rollIcon(st: GameState, ctx: RollContext['k'], s: number, target: numbe
     case 'botany':
       return { src: survivorMini(st, target ?? s), round: true }
     case 'selfCare':
+    case 'innerFocus':
       return { src: survivorMini(st, s), round: true }
     case 'noMither':
       return { src: survivorMini(st, target ?? s), round: true }
@@ -529,6 +530,10 @@ function diceResult(ctx: RollContext['k'], dice: Die[]): Pick<DiceShow, 'outcome
       return fail ? { outcome: 'ไม่สำเร็จ', tone: 'bad' } : { outcome: 'เดินหนีได้!', tone: 'great' }
     case 'deerstalker':
       return fail ? { outcome: 'ออกจากห้องไม่ได้!', tone: 'bad' } : { outcome: 'หลุดออกไปได้', tone: 'great' }
+    case 'innerFocus': {
+      const f = (f: number) => (f === 0 ? '💀' : String(f))
+      return { outcome: `ได้ ${dice.map((d) => f(d.face)).join(' กับ ')} — เลือกห้องเริ่มต้น 1 ห้อง`, tone: 'good' }
+    }
   }
 }
 
@@ -637,6 +642,14 @@ const askWhat = computed(() => {
       return `Crowd Control: ${st.survivors[s.s].name} — ลง ▲ ช่วยจ่ายไหม?`
     case 'crowdPick':
       return `Crowd Control: เลือกการ์ดให้ ${st.survivors[s.s].name}`
+    case 'reignCard':
+      return `Reign of Darkness: เลือกการ์ดของ ${st.survivors[s.s].name}`
+    case 'reignPath':
+      return `Reign of Darkness: เลือกเส้นทางของ ${st.survivors[s.s].name}`
+    case 'innerFocus':
+      return 'Inner Focus: เลือกห้องเริ่มต้นที่จะไป'
+    case 'empathyAsk':
+      return `Empathy: ${st.survivors[s.from].name} ขอ${s.mode === 'take' ? 'รับ ▲ จากคุณ' : 'ให้ ▲ คุณ'} — ยอมไหม?`
     default:
       return st.phase === 'killer' ? `ตาของ ${st.killer.name}` : st.activeSurvivor !== null ? `ตาของ ${st.survivors[st.activeSurvivor].name}` : 'ถึงตาคุณ'
   }

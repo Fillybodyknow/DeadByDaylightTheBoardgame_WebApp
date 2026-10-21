@@ -33,7 +33,7 @@ import {
 import { PERKS, type PerkId } from './engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { ANTIDOTE_IMAGE, GUARD_IMAGE, TONIC_IMAGE, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -293,8 +293,20 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     case 'killerMove':
       moves(killerMoves(st, s.card), st.killer.room)
       break
+    case 'innerFocus':
+      // Inner Focus: each face rolled is a start room to click
+      for (const face of s.faces) {
+        const room = boardOf(st).rooms.find((r) => r.startFace === face)!.id
+        add(`room:${room}`, `Inner Focus: ${face === 0 ? '💀' : face} → ${roomName(st, room)}`, go({ t: 'innerFocus', face }, sfx.drop))
+        out[out.length - 1].dest = room
+      }
+      break
+    case 'reignPath':
+      // Reign of Darkness: the survivor's path of the card discarded
+      moves(survivorMoves(st, s.s, s.card), st.survivors[s.s].room)
+      break
     case 'killerAnyMove':
-      // the Afterpiece Antidote: on along any path, or stay (his own room says so)
+      // the Afterpiece Antidote or Darkness Revealed: on along any path, or stay (his own room says so)
       moves(antidoteKillerMoves(st), st.killer.room)
       add(`room:${st.killer.room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
       break
@@ -474,6 +486,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             break
           }
           case 'hatchet':
+          case 'reign':
             add(`s:${i.target}`, label, run, 'act', i.target)
             break
           case 'spark':
@@ -487,6 +500,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             // a room offers every Guard: the chooser shows each one's picture
             add(`room:${i.room}`, label, run)
             out[out.length - 1].icon = GUARD_IMAGE[i.guard]
+            break
+          case 'birds':
+            // a room offers a Crow and a Dire Crow, when he has both: each with its picture
+            add(`room:${i.room}`, label, run)
+            out[out.length - 1].icon = i.dire ? DIRE_CROW_IMAGE : PROP_IMAGE.crow
             break
           case 'afterpiece':
             // a room offers both tokens: the chooser shows each one's picture
@@ -620,6 +638,14 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
       const then = b.perk === 'iron_maiden' ? 'สลับ Locker นี้ (แล้วเลือก Hook)' : 'สลับ prop นี้ (แล้วเลือกอีกอันในห้องติดกัน)'
       for (const first of new Set(b.choices.map((c) => c.prop!)))
         out.push({ key: `prop:${first}`, label: `${name}: ${then}`, style: 'act', run: () => ((modes.aceFirst.value = first), sfx.click()) })
+      continue
+    }
+    // Fogwise: the path with the wall or pallet; where it goes, chosen from a menu there
+    if (b.perk === 'fogwise') {
+      for (const c of b.choices) {
+        const run = go({ t: 'perk', perk: b.perk, use: true, choice: c }, sfx.drop)
+        out.push({ key: spotKey(st, `path:${c.path}`), label: `${name}: ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)}`, style: 'act', run, action: run.action })
+      }
       continue
     }
     // Windows of Opportunity: a pallet is one spot (then its path, as a pallet in her own room is)

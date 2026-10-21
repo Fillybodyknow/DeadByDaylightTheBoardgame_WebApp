@@ -9,6 +9,8 @@ import {
   crowdPledges,
   purgeOptions,
   antidoteKillerMoves,
+  darkMoves,
+  reignCards,
   itemUses,
   killerInteractions,
   killerMoves,
@@ -127,6 +129,18 @@ export function legalActions(st: GameState): Action[] {
         })
       }
       break
+    case 'empathyAsk':
+      out.push({ t: 'empathyAnswer', yes: true }, { t: 'empathyAnswer', yes: false })
+      break
+    case 'innerFocus':
+      for (const face of step.faces) out.push({ t: 'innerFocus', face })
+      break
+    case 'reignCard':
+      for (const card of reignCards(st, step.s)) out.push({ t: 'reignCard', card })
+      break
+    case 'reignPath':
+      for (const m of survivorMoves(st, step.s, step.card)) out.push({ t: 'move', path: m.path.id })
+      break
     case 'crowdPick':
       for (const card of new Set(st.survivorHands[st.survivors[step.s].hand])) out.push({ t: 'crowdPick', card })
       break
@@ -140,7 +154,7 @@ export function legalActions(st: GameState): Action[] {
       for (const m of killerMoves(st, step.card)) out.push({ t: 'move', path: m.path.id })
       break
     case 'killerAnyMove':
-      for (const m of antidoteKillerMoves(st)) out.push({ t: 'move', path: m.path.id })
+      for (const m of step.why === 'darkness' ? darkMoves(st) : antidoteKillerMoves(st)) out.push({ t: 'move', path: m.path.id })
       out.push({ t: 'stop' })
       break
     case 'killerInteract':

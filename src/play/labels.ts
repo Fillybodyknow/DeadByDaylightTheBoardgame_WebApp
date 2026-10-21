@@ -1,7 +1,7 @@
 // Thai labels for actions, steps and pieces.
 
 import { editPerkById, killerById, survivorById } from '../data'
-import { CARD_NAMES, GUARD_NAMES, ITEM_NAMES, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, wrathGain } from './engine/engine'
+import { CARD_NAMES, GUARD_NAMES, palletOn, ITEM_NAMES, isDirect, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import type { Die, GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
 import type { Perk } from '../types'
@@ -12,9 +12,20 @@ export const CARD_TH: Record<MoveCard, string> = {
   crouch: 'หมอบ',
   vault: 'กระโดดข้าม',
   wait: 'รอ',
+  skull: 'ตรงไปห้อง 💀',
+  one: 'ตรงไปห้อง 1',
+  two: 'ตรงไปห้อง 2',
+  three: 'ตรงไปห้อง 3',
+  four: 'ตรงไปห้อง 4',
+  five: 'ตรงไปห้อง 5',
 }
 
 export const cardLabel = (c: MoveCard) => `${CARD_NAMES[c]} (${CARD_TH[c]})`
+
+/** The Artist's Dire Crow (a crow, drawn in his colours). */
+export const DIRE_CROW_IMAGE = 'assets/killers/tokens/artist-dire-crow.webp'
+/** A prop's picture face up (a Dire Crow has its own). */
+export const propPicture = (p: { kind: PropKind; dire?: boolean }) => (p.dire ? DIRE_CROW_IMAGE : PROP_IMAGE[p.kind])
 
 export const PROP_IMAGE: Record<PropKind, string> = {
   generator: 'assets/props/generator.webp',
@@ -30,7 +41,7 @@ export const PROP_IMAGE: Record<PropKind, string> = {
 /** The Sacrifice Progress token (a red disc with the hook): the HUD's icon and the reveal's. */
 export const SACRIFICE_IMAGE = 'assets/tokens/sacrifice-progress.webp'
 
-export const cardImage = (c: MoveCard) => `assets/movement/${c}.webp`
+export const cardImage = (c: MoveCard) => (isDirect(c) ? `assets/movement/back-${c}.webp` : `assets/movement/${c}.webp`)
 /**
  * A survivor's face-down movement card: the deck's own back. (The numbered backs, back-one to
  * back-five, mark one player's hand at the table; a single one for every survivor misled.)
@@ -169,6 +180,8 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
     }
     case 'hatchet':
       return `Hatchet → ${st.survivors[i.target].name}`
+    case 'reign':
+      return `Reign of Darkness → ${st.survivors[i.target].name}`
     case 'chainsaw':
       return `Chainsaw: ทิ้ง ${CARD_NAMES[i.card]} → ${pathLabel(st, i.path, st.killer.room)}`
     case 'spark':
@@ -187,6 +200,10 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Blighted Corruption: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
     case 'hoard':
       return 'Hoarder: นำ Chest ออก (+2 ▲)'
+    case 'painResonance':
+      return `Pain Resonance: Interact กับ Hook — ${st.survivors[i.target].name} บาดเจ็บ (${PERKS.pain_resonance.cost} ▲)`
+    case 'birds':
+      return `${i.dire ? 'Dire Crow' : 'Crow'} → ${roomName(st, i.room)}`
     case 'guard':
       return `${GUARD_NAMES[i.guard]} → ${roomName(st, i.room)}${st.guards?.[i.guard] ? ' (ย้าย)' : ''}`
     case 'afterpiece':
@@ -232,6 +249,7 @@ export const ROLL_TITLE: Record<RollContext['k'], string> = {
   deadHard: 'Dead Hard',
   spineChill: 'Spine Chill',
   deerstalker: 'Deerstalker',
+  innerFocus: 'Inner Focus',
 }
 
 /** The survivor an interaction is about (heal, attack, pick up, hatchet, a rescue), if any. */
@@ -358,6 +376,25 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `ลูกที่ ${c.index! + 1} → สำเร็จอย่างยิ่ง`
     case 'corrective_action':
       return `ลูกที่ ${c.index! + 1} ได้ "4" → สำเร็จอย่างยิ่ง`
+    case 'potential_energy': {
+      const a = prop(st, c.prop!)
+      const b = prop(st, c.prop2!)
+      return `Generator ที่ ${roomName(st, a.room!)} (${a.progress}/${PROGRESS_MAX}) −1 → ${roomName(st, b.room!)} (${b.progress}/${PROGRESS_MAX}) +1`
+    }
+    case 'fogwise': {
+      const to = pathDef(st, c.path2!)
+      return `ย้าย${palletOn(st, c.path!) ? ' Pallet' : 'กำแพง'} ไปทาง ${roomName(st, to.a)} ↔ ${roomName(st, to.b)}`
+    }
+    case 'quick_gambit':
+      return `${st.killer.name} ต้องเดินตามไปด้วย`
+    case 'circle_of_healing':
+      return `${name(c.target!)} หายบาดเจ็บ (แทน ▲ ที่ได้)`
+    case 'shadow_step':
+      return 'วาง Entity บนเส้นทางที่เพิ่งเดินมา — ไม่มีใครเดินผ่านได้ จนจบรอบ'
+    case 'clairvoyance': {
+      const p = prop(st, c.prop!)
+      return `เปิด prop สี${({ objective: 'เหลือง', survival: 'ฟ้า', altruism: 'เขียว', boldness: 'แดง' } as const)[p.category]} ที่ ${roomName(st, p.room!)}`
+    }
     case 'exponential':
       return `${name(c.target!)} ลงจาก Hook ไปทาง ${pathLabel(st, c.path!, st.survivors[c.target!].room)} (แทน ▲ ที่ได้)`
     case 'deliverance':
@@ -482,6 +519,20 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       const p = pathDef(st, c.path!)
       return `Entity บนทาง ${roomName(st, p.a)} ↔ ${roomName(st, p.b)}`
     }
+    case 'grim_embrace': {
+      const sv = st.survivors[(w as { s: number }).s]
+      return `วาง ▲ บนบอร์ดของ ${sv.name} — ถ้าเขาถูกแขวน: Sacrifice Progress +${(sv.embrace ?? 0) + 1}`
+    }
+    case 'darkness_revealed':
+      return 'คว่ำ Locker แทนการเปิด prop แล้วเดินต่อ 1 ทาง'
+    case 'dissolution': {
+      const p = pathDef(st, c.path!)
+      return `▲ บนทาง ${roomName(st, p.a)} ↔ ${roomName(st, p.b)} — เดินผ่าน = บาดเจ็บ`
+    }
+    case 'septic_touch': {
+      const p = prop(st, (w as { prop: string }).prop)
+      return `นำ ${PROP_NAMES_TH[p.kind]} ที่ ${roomName(st, p.room!)} ออกจากกระดาน`
+    }
     case 'pop_goes_the_weasel': {
       const p = prop(st, c.prop!)
       return `นำ ${PROP_NAMES_TH[p.kind]} ที่ ${roomName(st, p.room!)} ออก`
@@ -507,6 +558,10 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `นำ Locker ออก — ${st.killer.name} Interact ไม่ได้เทิร์นนี้`
     case 'built_to_last':
       return `เก็บ ${ITEM_NAMES[(w as { item: string }).item]} ไว้`
+    case 'residual_manifest':
+      return `ทิ้ง ${ITEM_NAMES[st.survivors[o as number].item ?? ''] ?? 'item'} — กัน Interaction นี้ของ ${st.killer.name}`
+    case 'inner_focus':
+      return 'ทอยเต๋า Skill Check 2 ลูก เลือก 1 แล้วไปห้องเริ่มต้นของเลขนั้น'
     // ----- cards only (the edit-perks mode) -----
     case 'small_game':
       return `${st.killer.name} −2 ▲`
@@ -653,6 +708,10 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return 'เริ่มเก็บกวาด'
     case 'killerEntered':
       return `${st.killer.name} เข้ามาใน ${roomName(st, w.room)}`
+    case 'killerArrived':
+      return `${st.killer.name} เข้า ${roomName(st, w.room)} (ก่อนเปิด prop)`
+    case 'killerWouldInteract':
+      return `${st.killer.name} จะ Interact ใน ${roomName(st, w.room)}`
     case 'killerInteract':
       return 'ก่อน Interact'
     case 'genInteract': {

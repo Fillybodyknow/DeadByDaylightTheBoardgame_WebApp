@@ -7,7 +7,7 @@
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
-import { CARD_NAMES, killerMoves, roomName, turnOrder } from '../engine/engine'
+import { CARD_NAMES, directRoom, isDirect, isPathCard, killerMoves, roomName, turnOrder } from '../engine/engine'
 import { KILLER_PLAYER, handsToPlan } from '../engine/seats'
 import type { GameState, MoveCard } from '../engine/types'
 import { choicePreview, preview } from '../focus'
@@ -33,15 +33,14 @@ const tonicNames = computed(() => {
   return room ? props.st.survivors.filter((sv) => sv.room === room && sv.status === 'board').map((sv) => sv.name) : []
 })
 
-/** Stridor: that survivor sets their card first, face up, before anyone else plans. */
+/** Stridor (or a Dire Crow in their room): that survivor sets their card first, face up, before anyone else plans. */
 const stridorStep = computed(() => (props.st.step.t === 'planStridor' ? props.st.step.s : null))
-/** The card Stridor has already turned face up, for everyone who plans after it. */
-const stridorCard = computed(() => {
-  const s = props.st.stridor
-  if (s === null || props.st.step.t === 'planStridor') return null
-  const sv = props.st.survivors[s]
-  return sv.plannedRevealed && sv.planned ? { name: sv.name, card: sv.planned } : null
-})
+/** Why they plan first: Stridor's survivor, or the Artist's Dire Crow in their room. */
+const firstWhy = computed(() => (stridorStep.value !== null && stridorStep.value !== props.st.stridor ? 'Dire Crow' : 'Stridor'))
+/** The cards already set face up first (Stridor, Dire Crows), for everyone who plans after them. */
+const faceUpFirst = computed(() =>
+  props.st.step.t === 'planStridor' ? [] : props.st.survivors.flatMap((sv) => (sv.plannedRevealed && sv.planned ? [{ name: sv.name, card: sv.planned }] : [])),
+)
 
 const stridorPick = ref<MoveCard | null>(null)
 watch(
@@ -207,10 +206,16 @@ function swapKiller() {
  * rooms the left card can take him to (all of them when there are several — only the colour is
  * planned, the path is picked in play). A Wait, or a card with no way out, leaves him where he is.
  */
+/** The Dredge: his hand is direct cards (no paths, no Wait), which the hints say differently. */
+const directHand = computed(() => props.st.killer.hand.some(isDirect) || killerPicks.value.some((c) => !!c && isDirect(c)))
+
 const killerFrom = computed(() => {
   const st = props.st
   const first = killerPicks.value[0]
   if (killerSlots.value.indexOf(null) !== 1 || !first || first === 'wait') return [st.killer.room]
+  // the Dredge's direct card: its start room (or nowhere new if he is there already)
+  if (isDirect(first)) return [directRoom(st, first)]
+  if (!isPathCard(first)) return [st.killer.room]
   const rooms = [...new Set(killerMoves(st, first).map((m) => m.to))]
   return rooms.length ? rooms : [st.killer.room]
 })
@@ -245,7 +250,7 @@ function confirmKiller() {
       <!-- hand-off curtain -->
       <button class="curtain" @click="(curtainOpen = true), sfx.click()">
         <template v-if="stridorStep !== null">
-          <span class="eyebrow">รอบ {{ st.round }} · Stridor</span>
+          <span class="eyebrow">รอบ {{ st.round }} · {{ firstWhy }}</span>
           <strong>ส่งเครื่องให้ {{ st.survivors[stridorStep].name }}</strong>
           <span class="muted">ต้องเปิดการ์ดหงายก่อนใคร — แตะเพื่อเริ่ม</span>
         </template>
@@ -265,9 +270,9 @@ function confirmKiller() {
 
   <!-- Stridor: this survivor commits first, face up (the card: "before you or any other Survivor") -->
   <section v-else-if="stridorStep !== null" class="card panel">
-    <h2>Stridor: {{ st.survivors[stridorStep].name }} ต้องเปิดการ์ดก่อน</h2>
+    <h2>{{ firstWhy }}: {{ st.survivors[stridorStep].name }} ต้องเปิดการ์ดก่อน</h2>
     <p class="muted">
-      ฆาตกรใช้ Stridor กับ {{ st.survivors[stridorStep].name }} — เลือกการ์ด 1 ใบแล้ว<b>หงายหน้า</b>ให้ทุกคนเห็น ก่อนที่ผู้รอดชีวิตคนอื่นและฆาตกรจะวางแผน
+      {{ firstWhy === 'Stridor' ? `ฆาตกรใช้ Stridor กับ ${st.survivors[stridorStep].name}` : `${st.survivors[stridorStep].name} อยู่ห้องเดียวกับ Dire Crow` }} — เลือกการ์ด 1 ใบแล้ว<b>หงายหน้า</b>ให้ทุกคนเห็น ก่อนที่ผู้รอดชีวิตคนอื่นและฆาตกรจะวางแผน
     </p>
     <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทางบนแผนที่ · คลิกเพื่อเลือก</p>
     <button class="primary" :disabled="!stridorPick" @click="confirmStridor">
@@ -276,7 +281,7 @@ function confirmKiller() {
     <CardHand
       :cards="stridorHand"
       :label="`มือของ ${st.survivors[stridorStep].name}`"
-      prompt="Stridor — เปิดการ์ดหงายก่อนใคร"
+      :prompt="`${firstWhy} — เปิดการ์ดหงายก่อนใคร`"
       @pick="pickStridor"
       @hover="hover($event, stridorStep)"
     />
@@ -286,7 +291,7 @@ function confirmKiller() {
   <section v-else-if="!planningKiller" class="card panel">
     <h2>วางแผน: เลือกการ์ดเคลื่อนที่คนละ 1 ใบ</h2>
     <p class="muted">คุยกันได้ แต่ต้องพูดให้ฆาตกรได้ยิน (หน้า 8) — การ์ดจะคว่ำไว้จนถึงเทิร์นของแต่ละคน</p>
-    <p v-if="stridorCard" class="stridor-note">👁 Stridor: {{ stridorCard.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[stridorCard.card] }}</b></p>
+    <p v-for="c in faceUpFirst" :key="c.name" class="stridor-note">👁 {{ c.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[c.card] }}</b></p>
     <!-- The Clown's Afterpiece Tonic: who in its room will set their card face up -->
     <p v-if="tonicNames.length" class="stridor-note">🧪 Afterpiece Tonic: {{ tonicNames.join(', ') }} อยู่ห้องเดียวกับ Tonic — การ์ดจะวาง<b>หงาย</b></p>
 
@@ -329,9 +334,10 @@ function confirmKiller() {
   <!-- killer -->
   <section v-else class="card panel">
     <h2>{{ st.killer.name }}: เลือกการ์ด 2 ใบ</h2>
-    <p class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
+    <p v-if="directHand" class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · การ์ดตรงพาไปห้องเริ่มต้นที่มีเลขเดียวกับการ์ด (ไอคอนมุมซ้ายบนของห้อง) — อยู่ห้องนั้นแล้ว = เคลื่อนที่ไม่ได้และเสียการ Interact</p>
+    <p v-else class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
     <p v-if="st.step.t === 'planSurvivors'" class="muted small">วางแผนพร้อมกับผู้รอดชีวิต — การ์ดของพวกเขาคว่ำอยู่ รอบจะเริ่มเมื่อทุกคนยืนยันครบ</p>
-    <p v-if="stridorCard" class="stridor-note">👁 Stridor: {{ stridorCard.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[stridorCard.card] }}</b></p>
+    <p v-for="c in faceUpFirst" :key="c.name" class="stridor-note">👁 {{ c.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[c.card] }}</b></p>
     <div class="slots">
       <button v-for="i in [0, 1]" :key="i" type="button" class="slot" :class="{ filled: killerPicks[i] }" :disabled="!killerPicks[i]" :title="killerPicks[i] ? 'คลิกเพื่อเอาใบนี้ออก' : ''" @click="clearSlot(i)">
         <span class="muted small">{{ i === 0 ? 'เทิร์น 1 (ซ้าย)' : 'เทิร์น 2 (ขวา)' }}</span>
@@ -341,7 +347,8 @@ function confirmKiller() {
       </button>
       <button type="button" class="swap" :disabled="!killerReady" title="สลับซ้าย / ขวา" @click="swapKiller">⇄ สลับ</button>
     </div>
-    <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดู · คลิกเพื่อเลือก (ใบแรก = ซ้าย) — หรือคลิกเส้นทางบนแผนที่: ใบซ้ายจากห้องตอนนี้, ใบขวาจากห้องที่ใบซ้ายพาไป (คลิกที่ห้อง = Wait)</p>
+    <p v-if="directHand" class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูว่าพาไปห้องไหน (ห้องจะกระพริบบนแผนที่) · คลิกเพื่อเลือก (ใบแรก = ซ้าย)</p>
+    <p v-else class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดู · คลิกเพื่อเลือก (ใบแรก = ซ้าย) — หรือคลิกเส้นทางบนแผนที่: ใบซ้ายจากห้องตอนนี้, ใบขวาจากห้องที่ใบซ้ายพาไป (คลิกที่ห้อง = Wait)</p>
     <p class="muted small">คลิกการ์ดในช่องเพื่อเอาใบนั้นออก</p>
     <button class="primary" :disabled="!killerReady" @click="confirmKiller">
       {{ st.step.t === 'planSurvivors' ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน — เริ่มรอบ' }}

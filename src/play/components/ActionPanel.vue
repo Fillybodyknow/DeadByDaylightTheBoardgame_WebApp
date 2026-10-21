@@ -4,7 +4,7 @@
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
-import {
+import { boardOf,
   CARD_NAMES,
   ITEM_NAMES,
   antidoteKillerMoves,
@@ -106,6 +106,8 @@ const actor = computed<number | 'killer' | null>(() => {
   switch (s.t) {
     case 'setupReveal':
     case 'survivorMove':
+    case 'innerFocus':
+    case 'empathyAsk':
     case 'survivorInteract':
     case 'bonusOffer':
     case 'anyMove':
@@ -121,6 +123,7 @@ const actor = computed<number | 'killer' | null>(() => {
     case 'pickSurvivor':
     case 'carnifexProp':
     case 'carnifexMove':
+    case 'reignPath':
       return 'killer'
     case 'roll':
       return s.ctx.s
@@ -144,6 +147,7 @@ const moves = computed(() => {
   if (s.t === 'survivorMove') return survivorMoves(st, s.s, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.survivors[s.s].room) }))
   if (s.t === 'anyMove') return anyMoves(st, s.s).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.survivors[s.s].room) }))
   if (s.t === 'killerMove') return killerMoves(st, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
+  if (s.t === 'reignPath') return survivorMoves(st, s.s, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.survivors[s.s].room) }))
   if (s.t === 'killerAnyMove') return antidoteKillerMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   if (s.t === 'carryMove') return carryMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   return []
@@ -210,6 +214,8 @@ const POWER_HINT: Record<string, string> = {
   spirit: 'ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น — คลิกเป้าหมายบนแผนที่',
   legion: 'ผู้รอดชีวิตทุกคนในห้องนี้บาดเจ็บ — ถ้ามีคนบาดเจ็บอยู่แล้วอย่างน้อย 1 คน ได้ +1 ▲',
   plague: 'วาง Vile Purge ในห้องนี้และห้องที่เชื่อมกันที่เลือก — ผู้รอดชีวิตที่เดินเข้าไปต้องเก็บไปปิด Perk 1 อัน (อันที่ 3 = บาดเจ็บ)',
+  artist: 'วาง Crow หรือ Dire Crow จากบอร์ดของคุณลงห้องใดก็ได้ — ถ้ามี Crow อยู่ในห้องคุณ +1 ▲ — คลิกห้องบนแผนที่ แล้วเลือกตัว',
+  dredge: 'เลือกผู้รอดชีวิตในห้องนี้หรือห้องที่เชื่อมกัน (คลิกบนแผนที่) แล้วทิ้งการ์ดจากมือของเขาให้เขาเดินตามการ์ดนั้น — เข้ามาห้องคุณ = Interact กับเขาได้',
   knight: 'วาง Guard (Carnifex / Assassin / Jailer) ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกตัว',
   clown: 'วาง Afterpiece Tonic หรือ Antidote ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกว่าอันไหน',
   trickster: 'ผู้รอดชีวิตในห้องนี้และห้องที่เชื่อมกันได้ Knife คนละ 1 เล่ม — เล่มที่ 3 บาดเจ็บ, เกิน 3 = Sacrifice +1',
@@ -481,8 +487,40 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </div>
     </template>
 
+    <!-- Reign of Darkness: the path of the card discarded, when it has several -->
+    <!-- Inner Focus: one of the two faces rolled, as a start room (picked on the map) -->
+    <!-- Empathy: the other survivor agrees, or not -->
+    <template v-else-if="step.t === 'empathyAsk'">
+      <p>
+        <b>Empathy</b> —
+        <BpText :text="`${st.survivors[step.from].name} ขอ${step.mode === 'take' ? 'รับ 1 ▲ จากคุณ' : 'ให้ 1 ▲ แก่คุณ'} (${st.survivors[step.s].name} มี ${st.survivors[step.s].bp} ▲ · ${st.survivors[step.from].name} มี ${st.survivors[step.from].bp} ▲)`" />
+      </p>
+      <div class="buttons">
+        <button class="primary" @click="act({ t: 'empathyAnswer', yes: true })"><BpText :text="step.mode === 'take' ? 'ยอมให้ 1 ▲' : 'รับ 1 ▲'" /></button>
+        <button @click="act({ t: 'empathyAnswer', yes: false })">ไม่ยอม</button>
+      </div>
+    </template>
+
+    <template v-else-if="step.t === 'innerFocus'">
+      <p><b>Inner Focus</b> — {{ st.survivors[step.s].name }} เลือกผลเต๋า 1 ลูก แล้วไปห้องเริ่มต้นของเลขนั้น จากนั้น Interact ตามปกติ</p>
+      <ul class="focus-faces">
+        <li v-for="f in step.faces" :key="f">
+          <b>{{ f === 0 ? '💀' : f }}</b> → {{ roomName(st, boardOf(st).rooms.find((r) => r.startFace === f)!.id) }}{{ boardOf(st).rooms.find((r) => r.startFace === f)!.id === st.survivors[step.s].room ? ' (ห้องนี้ — อยู่ที่เดิม)' : '' }}
+        </li>
+      </ul>
+      <p class="board-hint">🎯 คลิกห้องที่กระพริบบนแผนที่</p>
+    </template>
+
+    <template v-else-if="step.t === 'reignPath'">
+      <p><b>Reign of Darkness</b> — เลือกเส้นทาง {{ CARD_NAMES[step.card] }} ที่ {{ st.survivors[step.s].name }} ต้องเดิน</p>
+      <p class="board-hint">🎯 คลิกเส้นทางที่กระพริบบนแผนที่</p>
+    </template>
+
     <template v-else-if="step.t === 'anyMove' || step.t === 'killerAnyMove'">
-      <p v-if="step.t === 'killerAnyMove'">
+      <p v-if="step.t === 'killerAnyMove' && step.why === 'darkness'">
+        <b>Darkness Revealed</b> — Locker ถูกคว่ำแล้ว {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact (หรืออยู่ห้องเดิม)
+      </p>
+      <p v-else-if="step.t === 'killerAnyMove'">
         <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>Afterpiece Antidote</b> — {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
       </p>
       <p v-else-if="step.why === 'antidote'">
@@ -737,8 +775,14 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </p>
         <div class="buttons col">
           <button v-for="(i, n) in perkPicked ? [] : kInteractions.plain.filter((i) => here({ t: 'interact', i }))" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
-          <button v-if="kInteractions.undying.length" class="undying" @click="emit('undyingOn', true), sfx.click()">
-            🃏 Undying (<BpText :text="PERKS.undying.cost" /> <BpIcon />): ทิ้งการ์ด แล้ว Interact ในห้องข้าง ๆ
+          <!-- Undying: its card, as the other perks of his turn show theirs -->
+          <button v-if="kInteractions.undying.length" type="button" class="undying perk-name perk-card" @click="emit('undyingOn', true), sfx.click()">
+            <img v-if="perkImage('undying')" :src="asset(perkImage('undying'))" alt="" />
+            <span class="perk-card-body">
+              <span class="perk-card-title">Undying <span class="cost"><BpText :text="`${PERKS.undying.cost} ▲`" /></span></span>
+              <span class="perk-card-text">ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</span>
+              <span class="perk-card-hint">👆 คลิกเพื่อใช้</span>
+            </span>
           </button>
           <button v-if="kInteractions.powers.length" class="power" @click="emit('powerOn', true), sfx.click()">⚡ ใช้พลัง: {{ powerName(st) }}</button>
           <span v-else-if="st.killer.powerUsed" class="muted small">ใช้พลังไปแล้วรอบนี้</span>
@@ -855,6 +899,14 @@ p {
 }
 .undying-target {
   font-size: 0.88rem;
+}
+.focus-faces {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.focus-faces b {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
 }
 .board-hint {
   margin: 0;

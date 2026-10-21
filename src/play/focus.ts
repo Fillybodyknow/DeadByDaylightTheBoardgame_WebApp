@@ -2,7 +2,7 @@
 // to decide with: who is involved, where they are, where they would go, how far the killer is.
 
 import { ref } from 'vue'
-import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, killerInteractions, killerMoves, isPower, pathDef, perkChoices, propsIn, roomName, showstopperTargets, survivorMoves, touchingPaths } from './engine/engine'
+import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, directRoom, isDirect, isPathCard, killerInteractions, killerMoves, isPower, pathDef, perkChoices, propsIn, roomName, showstopperTargets, survivorMoves, touchingPaths } from './engine/engine'
 import { PERKS } from './engine/perks'
 import type { GameState, KillerInteraction, PerkChoice, PerkOwner, RollContext } from './engine/types'
 
@@ -87,6 +87,7 @@ const ROLL_WHAT: Record<RollContext['k'], (st: GameState, ctx: RollContext) => s
   deadHard: (st, c) => `Dead Hard — สำเร็จ = ${c.k === 'deadHard' ? st.survivors[c.target].name : ''} หนีแทนถูกแขวน`,
   spineChill: () => 'Spine Chill — สำเร็จ = เดินหนีไปตามเส้นทางใดก็ได้',
   deerstalker: () => 'Deerstalker — ล้มเหลว = ออกจากห้องไม่ได้ และ Interact ไม่ได้เทิร์นนี้',
+  innerFocus: () => 'Inner Focus — เลือก 1 ลูก: ไปห้องเริ่มต้นของเลขนั้น',
 }
 
 function progress(st: GameState, c: RollContext): string {
@@ -350,7 +351,9 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
     facts.push(killerFact(st))
     for (const s of new Set(powers.flatMap((i) => (i.k === 'hatchet' ? [i.target] : []))))
       facts.push({ who: s, icon: '🎯', text: `${where(st, s)} · ห่าง ${roomDistance(st, st.killer.room, st.survivors[s].room)} ห้อง` })
-    for (const r of new Set(f.dests)) {
+    // a power that reaches every room (Birds of Torment, Wailing Bell): the map says it, a line per
+    // room would only make the panel long
+    for (const r of new Set(f.dests).size > 6 ? [] : new Set(f.dests)) {
       const here = st.survivors.flatMap((sv) => (sv.status === 'board' && sv.room === r ? [sv.name] : []))
       const gens = propsIn(st, r).filter((p) => p.kind === 'generator' && p.revealed && p.progress > 0)
       const bits = [here.length ? `มี ${here.join(', ')}` : 'ไม่มีใคร', gens.length ? `Generator ${gens.map((g) => `${g.progress}/3`).join(', ')}` : '']
@@ -364,7 +367,7 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
 /** Where one power use points, for the board. */
 export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   const room = st.killer.room
-  if (i.k === 'hatchet') f.survivors.push(i.target)
+  if (i.k === 'hatchet' || i.k === 'reign') f.survivors.push(i.target)
   if (i.k === 'spark' || i.k === 'bell') f.dests.push(i.room)
   if (i.k === 'phantasm') f.rooms.push(room)
   // Showstopper: his room, the connected ones, and who gets a Knife
@@ -376,7 +379,7 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   // Vile Purge: his room and the one picked
   if (i.k === 'purge') f.rooms.push(room, i.room)
   // an Afterpiece token: the room it goes to
-  if (i.k === 'afterpiece' || i.k === 'guard') f.dests.push(i.room)
+  if (i.k === 'afterpiece' || i.k === 'guard' || i.k === 'birds') f.dests.push(i.room)
   if (i.k === 'frenzy') {
     f.rooms.push(room)
     st.survivors.forEach((sv, s) => sv.status === 'board' && sv.room === room && f.survivors.push(s))
@@ -399,7 +402,9 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
 export function choicePreview(st: GameState, c: PerkChoice, from: string, owner?: PerkOwner): Partial<Focus> {
   const out: Partial<Focus> = {}
   // A movement card: where it could take its player from here.
-  if (c.card && c.card !== 'wait' && owner !== undefined) {
+  // The Dredge's direct card: straight to its start room, no path.
+  if (c.card && isDirect(c.card)) out.dests = [directRoom(st, c.card)]
+  else if (c.card && isPathCard(c.card) && owner !== undefined) {
     const moves = owner === 'killer' ? killerMoves(st, c.card) : survivorMoves(st, owner, c.card)
     out.paths = moves.map((m) => m.path.id)
     out.dests = moves.map((m) => m.to)

@@ -57,6 +57,12 @@ export type PerkId =
   | 'face_the_darkness'
   | 'nowhere_to_hide'
   | 'hubris'
+  | 'grim_embrace'
+  | 'pain_resonance'
+  | 'pentimento'
+  | 'darkness_revealed'
+  | 'dissolution'
+  | 'septic_touch'
   // survivors
   | 'prove_thyself'
   | 'leader'
@@ -93,6 +99,9 @@ export type PerkId =
   | 'autodidact'
   | 'deliverance'
   | 'exponential'
+  | 'circle_of_healing'
+  | 'shadow_step'
+  | 'clairvoyance'
   | 'overcome'
   | 'corrective_action'
   | 'appraisal'
@@ -100,6 +109,12 @@ export type PerkId =
   | 'desperate_measures'
   | 'visionary'
   | 'built_to_last'
+  | 'potential_energy'
+  | 'fogwise'
+  | 'quick_gambit'
+  | 'overzealous'
+  | 'residual_manifest'
+  | 'inner_focus'
   | 'poised'
   | 'solidarity'
   | 'head_on'
@@ -263,12 +278,21 @@ export const PERKS: Record<PerkId, PerkDef> = {
   pop_goes_the_weasel: def('pop_goes_the_weasel', 'Pop Goes the Weasel', 0, 'killer', 'clown', 2, 'ถามหลังทำให้ผู้รอดชีวิตบาดเจ็บ หรือแขวนบน Hook'),
   face_the_darkness: def('face_the_darkness', 'Face the Darkness', 1, 'killer', 'knight', 0, 'ถามตอนเริ่มเทิร์นฆาตกร ก่อนเปิดการ์ด'),
   nowhere_to_hide: def('nowhere_to_hide', 'Nowhere to Hide', 1, 'killer', 'knight', 1, 'ถามเมื่อคุณค้น Locker ที่มีคนซ่อน'),
+  grim_embrace: def('grim_embrace', 'Grim Embrace', 3, 'killer', 'artist', 0, 'ถามหลังผู้รอดชีวิตช่วยคนลงจาก Hook: วาง ▲ บนบอร์ดของผู้ช่วย'),
+  pain_resonance: def('pain_resonance', 'Pain Resonance', 3, 'killer', 'artist', 1, 'Interact กับ Hook ว่างในห้องคุณ: ผู้รอดชีวิตในห้องที่เชื่อมกันบาดเจ็บ'),
+  pentimento: def('pentimento', 'Pentimento', 0, 'killer', 'artist', 2, 'ทำงานเองหลังผู้รอดชีวิตชำระ Hex Totem สำเร็จ'),
+  darkness_revealed: def('darkness_revealed', 'Darkness Revealed', 1, 'killer', 'dredge', 0, 'ถามเมื่อคุณเข้าห้องที่มี Locker ว่าง (แทนการเปิด prop)'),
+  dissolution: def('dissolution', 'Dissolution', 1, 'killer', 'dredge', 1, 'ถามตอนเริ่มเฟสวางแผน: วาง ▲ บนเส้นทางที่ว่าง'),
+  septic_touch: def('septic_touch', 'Septic Touch', 1, 'killer', 'dredge', 2, 'ถามหลังผู้รอดชีวิตเปิด prop ที่ไม่ใช่สีเหลือง ในห้องคุณหรือห้องที่เชื่อมกัน'),
   hubris: def('hubris', 'Hubris', 1, 'killer', 'knight', 2, 'ถามเมื่อผู้รอดชีวิตเข้าห้องของคุณ'),
   rancor: def('rancor', 'Rancor', 2, 'killer', 'spirit', 0, 'ถามเมื่อคุณเดินออกจากห้องที่มีผู้รอดชีวิตบาดเจ็บ'),
   haunted_ground: def('haunted_ground', 'Haunted Ground', 1, 'killer', 'spirit', 1, 'ถามหลังผู้รอดชีวิตเปิด prop'),
   spirit_fury: def('spirit_fury', 'Spirit Fury', 0, 'killer', 'spirit', 2, 'ถามหลังคุณทำลาย Pallet'),
   diversion: def('diversion', 'Diversion', 2, 'survivor', 'adam', 0, 'เป็น Interaction กับฆาตกรในห้องเดียวกัน'),
   autodidact: def('autodidact', 'Autodidact', 2, 'survivor', 'adam', 1, 'ปุ่มตอนคนในห้อง/ห้องติดกันทอยได้สำเร็จ'),
+  circle_of_healing: def('circle_of_healing', 'Circle of Healing', 0, 'survivor', 'mikaela', 0, 'ถามหลังคุณชำระ Hex Totem สำเร็จ ถ้ามีคนบาดเจ็บ'),
+  shadow_step: def('shadow_step', 'Shadow Step', 1, 'survivor', 'mikaela', 1, 'ถามหลังคุณเดินตามเส้นทางเข้าห้องใหม่'),
+  clairvoyance: def('clairvoyance', 'Clairvoyance', 1, 'survivor', 'mikaela', 2, 'ถามตอนเริ่มเฟสวางแผน: เปิด prop ที่ใดก็ได้'),
   exponential: def('exponential', 'Exponential', 0, 'survivor', 'jonah', 0, 'ถามหลังคุณชำระ Hex Totem สำเร็จ ถ้ามีคนถูกแขวนอยู่'),
   overcome: def('overcome', 'Overcome', 0, 'survivor', 'jonah', 1, 'ทำงานเองตอนจบเทิร์นของคุณ ถ้าคุณบาดเจ็บ'),
   corrective_action: def('corrective_action', 'Corrective Action', 2, 'survivor', 'jonah', 2, 'ปุ่มตอนคนในห้อง/ห้องติดกันทอยได้ "4"'),
@@ -281,6 +305,12 @@ export const PERKS: Record<PerkId, PerkDef> = {
   deception: def('deception', 'Deception', 0, 'survivor', 'elodie', 2, 'ถามก่อนเดินในเทิร์นตัวเอง'),
   desperate_measures: def('desperate_measures', 'Desperate Measures', 1, 'survivor', 'felix', 0, 'ถามหลัง Interact ครั้งแรกในเทิร์นตัวเอง'),
   visionary: def('visionary', 'Visionary', 0, 'survivor', 'felix', 1, 'ถามเมื่อจะเปิด prop ตอนเข้าห้อง'),
+  potential_energy: def('potential_energy', 'Potential Energy', 1, 'survivor', 'vittorio', 0, 'ปุ่มตอนเริ่มเทิร์นของคุณ: ย้ายความคืบหน้า 1 แต้มจาก Generator ห้องข้าง ๆ มาห้องคุณ'),
+  fogwise: def('fogwise', 'Fogwise', 1, 'survivor', 'vittorio', 1, 'ปุ่มตอนเริ่มเทิร์นของคุณ: ย้ายกำแพงหรือ Pallet จากเส้นทางที่เชื่อมห้องคุณ'),
+  quick_gambit: def('quick_gambit', 'Quick Gambit', 2, 'survivor', 'vittorio', 2, 'ถามเมื่อคุณจะออกจากห้องของฆาตกร'),
+  overzealous: def('overzealous', 'Overzealous', 0, 'survivor', 'haddie', 0, 'ทำงานเองเมื่อคุณเข้าห้องของฆาตกร'),
+  residual_manifest: def('residual_manifest', 'Residual Manifest', 2, 'survivor', 'haddie', 1, 'ถามเมื่อฆาตกรจะ Interact ในห้องของคุณ (ทิ้ง item กันไว้)'),
+  inner_focus: def('inner_focus', 'Inner Focus', 1, 'survivor', 'haddie', 2, 'ถามเมื่อคุณจะเดินด้วยการ์ด: ทอยเต๋า 2 ลูก เลือก 1 แล้วไปห้องเริ่มต้นนั้น'),
   built_to_last: def('built_to_last', 'Built to Last', 2, 'survivor', 'felix', 2, 'ถามเมื่อจะทิ้ง item หลังใช้'),
   poised: def('poised', 'Poised', 1, 'survivor', 'jane', 0, 'ถามเมื่อผู้รอดชีวิตทอย Skill Check ได้สำเร็จอย่างยิ่งในเทิร์นผู้รอดชีวิต'),
   solidarity: def('solidarity', 'Solidarity', 1, 'survivor', 'jane', 1, 'ปุ่มแทนการ Interact: รักษาผู้รอดชีวิตในห้องที่เชื่อมกัน'),
@@ -350,4 +380,4 @@ export const DECK_PERKS: PerkId[] = Object.values(PERKS)
   .map((p) => p.id)
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist']

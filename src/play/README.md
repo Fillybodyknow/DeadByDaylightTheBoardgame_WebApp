@@ -156,9 +156,9 @@ and the host starts the game.
   above their character picker (which is long enough to hide anything under it).
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
 - Mode **Adept**: each character plays the 3 perks printed on their board (102 perks).
 - The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
@@ -390,6 +390,39 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Nowhere to Hide: asked before the search roll; it is on the danger die.
 - Hubris: a survivor entering his room by any move pays 1 ▲; with none, they can't interact this
   turn if it is their turn (on someone else's turn there is no interaction to lose).
+- The Artist's passive: three Dire Crows start on his board (props of their own, a crow in every
+  way: survivors and he interact with them as crows, Calm Spirit moves them). A crow he removes from
+  play (scouting it, Pop Goes the Weasel, Septic Touch) goes onto his board; one a survivor's perk
+  removes doesn't. At the start of planning, every survivor on the board in a room with a Dire Crow
+  sets their card face up first (as Stridor's, one after another; Stridor's survivor first); in a
+  locker they are off the board (p.12) and plan as usual.
+- Birds of Torment (his power): a crow or a Dire Crow from his board into any room, face up. Then,
+  with a crow of any kind face up in his room (the one just placed too), he gains 1 ▲. With nothing
+  on his board, the power can't be used.
+- Grim Embrace: asked after a survivor takes someone off a hook (once a round, 3 ▲, as any perk).
+  The ▲ stay on the rescuer's board until they are hung: each is then a sacrifice progress.
+- Pain Resonance: his interaction, with an empty revealed hook in his room (no Entity on it); a
+  healthy survivor on the board in a connected room is wounded (clicked on the map). Paid 3 ▲.
+- Pentimento: by itself, +2 ▲ after any successful cleanse; once a round.
+- The Dredge's passive: his hand is six direct movement cards (skull, 1–5: the numbered cards of
+  the box), one per start-room face, and no Wait. A card takes him straight to the room with that
+  start face (no path: walls, pallets and traps don't matter), then he interacts. The card of the
+  room he is in already can't move him, so, as any card but Wait that can't move, he loses the
+  interaction (p.10). We're Gonna Live Forever and a Firecracker in the room ahead stop it, as his
+  other moves. His bonus turn plays one of them too.
+- Reign of Darkness (his power): a survivor on the board in his room or a connected one, holding a
+  card that can move them. He sees their whole hand (said in the panel) and discards one of the
+  cards that move them; they move along its path (he picks the path when it has several), as a
+  move of theirs: Dissolution, traps and the reveal there all apply. Brought into his room, he may
+  then attack or pick up that survivor only (not a prop, not the power again).
+- Darkness Revealed: asked as he enters a room with an empty, revealed locker, before his reveal
+  there. The locker is turned face down (it is a face-down prop again), he reveals nothing, and
+  moves along any path (not over a pallet), or stays, before interacting.
+- Dissolution: at the start of planning, on a path's icon with nothing else on it (no wall, pallet,
+  trap or Entity); the Bloodpoint token shows there. Any survivor moving along it is wounded (any
+  move: a card, a perk, the rescue move, Reign of Darkness). It goes at the end of cleanup.
+- Septic Touch: after a survivor reveals a prop that isn't yellow (not a generator or exit gate) in
+  his room or a connected one; not an occupied hook or locker. The prop leaves the board.
 - Afterpiece (The Clown): one Tonic and one Antidote; the power puts either into his room or a
   connected one, moving it if it is out already. On the board a room offers both, as a small menu.
   Tonic: survivors on the board in its room when the cards are set (planning, Predator) set theirs
@@ -448,6 +481,27 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Distortion: after Jeff moves into the killer's room on his own turn (a bonus turn too) by any
   move — a card, a perk (Sprint Burst, Breakout…), the rescue move; once a round, so it doesn't
   answer its own move — along any path but the one he came by, before interacting.
+- Potential Energy (Vittorio): a button at the start of his turn. A revealed generator in a
+  connected room with progress loses 1; one in his room (not repaired, no Entity on it) gains 1,
+  and may be repaired by it (Hope, Adrenaline… answer as any repair). Clicked on the map: the
+  generator next door (a menu when his room has two).
+- Fogwise: a button at the start of his turn. A wall or a pallet on a path (icon) of his room goes
+  to another path of his room with nothing on it. Clicked on the map: the path it leaves, then the
+  path it goes to, from a menu.
+- Quick Gambit: asked when he would leave the killer's room by any move along a path; the killer
+  follows along it after him, as Thrill of the Hunt (a pallet there: he breaks it and stays). Not
+  while carrying someone, and only once per move (with Thrill of the Hunt too).
+- Empathy: "a willing Survivor": the other survivor is asked (on their own device online) and
+  answers yes or no. Only a yes uses the perk; after a no, Claudette may ask someone else, but
+  not the same survivor again that round.
+- Circle of Healing (Mikaela): after a cleanse of her own succeeds, a wounded survivor on the board (not
+  in a locker, hung or carried: off the board, p.12) becomes healthy, picked on the map; the cleanse's ▲ are
+  taken back from her.
+- Shadow Step: after a move of hers along a path (any move with a path; Inner Focus has none), the
+  Entity goes onto that path's icon (taken from wherever it was: there is one). "Players cannot move
+  along that path": the killer neither, unlike Bamboozle's. It goes at cleanup, as the Entity does.
+- Clairvoyance: at the start of planning, any face-down prop on the board, clicked on the map; it
+  is her reveal (Haunted Ground, Septic Touch may answer it).
 - Exponential (Jonah): after a cleanse of his own succeeds, with someone on a hook. Jonah picks who
   (their hook, on the map) and the path; the cleanse's ▲ are taken back from him. Off the hook
   without a sabotage: no Entity goes on the hook, and Deliverance, Kindred, Breakdown aren't asked.
@@ -455,6 +509,18 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   round, as every perk.
 - Corrective Action: a button on any roll of a survivor in Jonah's room or a connected one, as
   Autodidact: a skill die showing "4" becomes a great success (the danger die has no 4).
+- Overzealous (Haddie): by itself, whenever she walks into the killer's room by any move of hers
+  (a card, a perk, Inner Focus); once a round, as every perk.
+- Residual Manifest: asked before any interaction of the killer in her room (a prop or a survivor),
+  before a Flashlight is; also Yamaoka's Haunting's, which interacts in her room from the next one
+  (the user's ruling; the power is spent all the same). Not a power of his that isn't an interaction. Her item is
+  discarded (Appraisal may take it) and the interaction is lost, as a Flashlight's.
+- Inner Focus: asked as she would move with her card (not once another perk has changed the move,
+  so Deception and Huntress Lullaby aren't asked after it). Two skill dice, read only as start
+  rooms: not a skill check, so a skull pays the killer nothing and no perk changes them. She goes
+  straight to the start room picked (no path: Dissolution and traps don't apply, and Deerstalker
+  and Thrill of the Hunt aren't asked), then interacts as normal; the room she is in already: she
+  stays and still interacts.
 - No Mither (David): asked when the killer is about to attack a healthy survivor in David's room
   (David himself too; Yamaoka's Haunting reaches into his room too). David rolls the danger die;
   on a success the attack doesn't land and the killer gains 1 ▲ (his interaction is spent).

@@ -25,6 +25,8 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'setupReveal':
     case 'planStridor':
     case 'survivorMove':
+    case 'innerFocus':
+    case 'empathyAsk':
     case 'survivorInteract':
     case 'bonusOffer':
     case 'anyMove':
@@ -55,6 +57,8 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'phantasmChoice':
     case 'twinChoice':
     case 'crowdPick':
+    case 'reignCard':
+    case 'reignPath':
     case 'carnifexProp':
     case 'carnifexMove':
       return 'killer'

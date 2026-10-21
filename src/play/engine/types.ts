@@ -4,7 +4,9 @@ import type { PerkId } from './perks'
 // no functions) so a state can be cloned, saved to localStorage and replayed.
 
 export type PathKind = 'sneak' | 'sprint' | 'crouch' | 'vault'
-export type MoveCard = PathKind | 'wait'
+/** The Dredge's direct movement cards: one per face of the skill check die, so per start room. */
+export type DirectCard = 'skull' | 'one' | 'two' | 'three' | 'four' | 'five'
+export type MoveCard = PathKind | 'wait' | DirectCard
 
 export type PropCategory = 'objective' | 'survival' | 'altruism' | 'boldness'
 export type PropKind = 'generator' | 'exitGate' | 'chest' | 'locker' | 'crow' | 'pallet' | 'hook' | 'totem'
@@ -68,6 +70,10 @@ export interface Prop {
   done: boolean
   /** Survivor index hiding in this locker or hanging on this hook. */
   occupant: number | null
+  /** The Artist's Dire Crow: a crow in every way, and survivors in its room plan face up first. */
+  dire?: boolean
+  /** A crow on The Artist's board (removed from play by him, or a Dire Crow not placed yet). */
+  artist?: boolean
 }
 
 export type SurvivorStatus = 'board' | 'locker' | 'carried' | 'hooked'
@@ -85,6 +91,8 @@ export interface SurvivorState {
   item: string | null
   /** Sacrifice progress token still on the identity board (p.6, p.15). */
   sacrificeToken: boolean
+  /** Grim Embrace: ▲ on this board, each a sacrifice progress when they are hung. */
+  embrace?: number
   /** Index into `survivorHands` (players controlling 2 survivors share one hand, p.19). */
   hand: number
   /** Card placed face down in Planning. */
@@ -140,7 +148,8 @@ export interface PathState {
   trap: boolean
 }
 
-export type EntityPlace = { prop: string } | { path: string } | null
+/** `shadow`: Shadow Step put it there: nobody, the killer included, moves along that path. */
+export type EntityPlace = { prop: string } | { path: string; shadow?: boolean } | null
 
 export interface Die {
   kind: 'skill' | 'danger'
@@ -178,6 +187,8 @@ export type RollContext =
   | { k: 'deadHard'; s: number; target: number }
   /** The Knight's Assassin (danger die): walking into its room, a failure wounds. */
   | { k: 'assassin'; s: number }
+  /** Inner Focus: two skill dice, one of them picked as a start room (not a skill check). */
+  | { k: 'innerFocus'; s: number }
   /** Breakdown (danger die): a success takes a sacrifice progress from the killer. */
   | { k: 'breakdown'; s: number }
   /** Spine Chill (danger die): a success sends them along any path. */
@@ -218,6 +229,8 @@ export type KillerInteraction =
   | { k: 'blink'; path: string }
   /** The Huntress: a survivor in a connected room rolls the danger die. */
   | { k: 'hatchet'; target: number }
+  /** The Dredge's Reign of Darkness: a survivor here or next door, moved by a card of their hand. */
+  | { k: 'reign'; target: number }
   /** The Hillbilly: discard a card to move along a free path of its colour. */
   | { k: 'chainsaw'; card: MoveCard; path: string }
   /** The Doctor: shock every survivor in this room or a connected one. */
@@ -247,6 +260,10 @@ export type KillerInteraction =
   | { k: 'purge'; room: string }
   /** The Clown: his Afterpiece Tonic or Antidote into `room` (his or a connected one), moved if out. */
   | { k: 'afterpiece'; which: 'tonic' | 'antidote'; room: string }
+  /** The Artist's Birds of Torment: a crow (or a Dire Crow) from his board into any room. */
+  | { k: 'birds'; dire: boolean; room: string }
+  /** Pain Resonance: an empty hook in his room, and a survivor next door is wounded. */
+  | { k: 'painResonance'; target: number }
   /** The Knight: a Guard into his room or a connected one (moved if it is out already). */
   | { k: 'guard'; guard: Guard; room: string }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
@@ -274,6 +291,8 @@ export type PerkWindow =
   | { k: 'killerEntered'; room: string; from?: string; path?: string; carrying?: boolean; broke?: boolean }
   /** Survivor `s` revealed `prop` (Haunted Ground). */
   | { k: 'afterReveal'; s: number; prop: string }
+  /** The killer has entered `room`, before his reveal there (Darkness Revealed). */
+  | { k: 'killerArrived'; room: string }
   /** `rescued`: the survivor taken off the hook, when there was one (Deliverance). */
   | { k: 'afterSabotage'; s: number; rescued?: number }
   /** Start / end of any survivor's turn (Open-Handed, Urban Evasion, Up the Ante). */
@@ -308,6 +327,8 @@ export type PerkWindow =
   | { k: 'afterPalletLocker'; s: number; prop: string }
   /** A survivor entered a room (For the People). */
   | { k: 'entered'; s: number; path?: string }
+  /** The killer is about to interact in `room` (not a power): Residual Manifest. */
+  | { k: 'killerWouldInteract'; room: string }
   /** A roll had `fails` failures; the killer gains them unless Off the Record takes one. */
   | { k: 'rollFail'; s: number; fails: number }
   /** A survivor rolled a great success (Lucky Break); `ctx`: what the roll was for (Poised). */
@@ -349,6 +370,8 @@ export interface PerkChoice {
   prop?: string
   /** Ace in the Hole: the prop to swap with. Oppression: the second generator. */
   prop2?: string
+  /** Fogwise: the path the wall or pallet goes to. */
+  path2?: string
   /** Dragon's Grip: the second card discarded. */
   card2?: MoveCard
   /** Appraisal: keep the item gained (`keepNew`) or the one already held (`keepOld`). */
@@ -385,6 +408,10 @@ export type Step =
   | { t: 'planSurvivors' }
   | { t: 'planKiller' }
   | { t: 'survivorMove'; s: number; card: PathKind }
+  /** Inner Focus: survivor `s` picks one of the two faces rolled, the start room to go to. */
+  | { t: 'innerFocus'; s: number; faces: number[] }
+  /** Empathy: survivor `s` is asked to take (`give`) or hand over (`take`) a ▲ of `from`'s. */
+  | { t: 'empathyAsk'; s: number; from: number; mode: 'take' | 'give' }
   /**
    * `exclude`: Technician's second interaction can't target this prop again.
    * `survivalOnly`: Desperate Measures' second interaction targets a chest or a locker.
@@ -395,7 +422,8 @@ export type Step =
   /** `why`: The Clown's Afterpiece Antidote, or Dead Hard / Spine Chill (a move they must make); else a rescue (p.13). */
   | { t: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' | 'spineChill' }
   /** The Clown's Afterpiece Antidote: the killer walked in, and may move on along any path. */
-  | { t: 'killerAnyMove' }
+  /** `why`: Darkness Revealed's move (otherwise the Afterpiece Antidote's). */
+  | { t: 'killerAnyMove'; why?: 'darkness' }
   | { t: 'keepItem'; s: number; drawn: string }
   /** Plunderer's Instinct: several items drawn, one to keep. */
   | { t: 'pickItem'; s: number; drawn: string[] }
@@ -412,7 +440,8 @@ export type Step =
    * `powerOnly`: Territorial Imperative's extra power use. `rush`: The Blight entered a room with
    * his power: interact there, or use it again.
    */
-  | { t: 'killerInteract'; turn: number; canInteract: boolean; powerOnly?: boolean; rush?: boolean }
+  /** `only`: an interaction with that survivor alone (Reign of Darkness brought them in). */
+  | { t: 'killerInteract'; turn: number; canInteract: boolean; powerOnly?: boolean; rush?: boolean; only?: number }
   /** The Twins: take this turn with Charlotte or with Victor. */
   | { t: 'twinChoice'; turn: number }
   | { t: 'killerBonusOffer' }
@@ -425,7 +454,7 @@ export type Step =
    * comes from a perk (Starstruck, Diversion) — with nobody reacting these tasks make it, instead
    * of `pending` being replayed.
    */
-  | { t: 'reaction'; item: 'flashlight' | 'firecracker'; holders: number[]; pending: Action; carry?: { s: number; steps: number }; antidote?: boolean; then?: Task[] }
+  | { t: 'reaction'; item: 'flashlight' | 'firecracker'; holders: number[]; pending: Action; carry?: { s: number; steps: number }; antidote?: boolean; why?: 'darkness'; then?: Task[] }
   /** Use this perk now? `done` is set when the offer comes from a trigger with more to ask. */
   | {
       t: 'offer'
@@ -463,6 +492,9 @@ export type Step =
    */
   | { t: 'crowdPay'; s: number; pledge?: (number | null)[] }
   | { t: 'crowdPick'; s: number }
+  /** Reign of Darkness: the killer picks a card of survivor `s`'s hand, then (if several) its path. */
+  | { t: 'reignCard'; s: number }
+  | { t: 'reignPath'; s: number; card: PathKind }
   /** The Plague's passive: survivor `s` covers one of their perks with a Vile Purge (`cover`), or
    * takes one off in a locker (`uncover`). */
   | { t: 'purgeChoice'; s: number; mode: 'cover' | 'uncover' }
@@ -495,6 +527,16 @@ export type Task =
   | { k: 'replay'; step: Step; action: Action }
   /** The killer moved by a perk (Starstruck, Diversion, Beast of Prey, Agitation). */
   | { k: 'killerMoved'; path: string; to: string }
+  /** The Dredge's direct card: straight to a start room (We're Gonna Live Forever, a Firecracker may stop it). */
+  | { k: 'killerDirect'; to: string; asked?: boolean }
+  | { k: 'killerArrive'; to: string }
+  /** The killer's interaction, once Residual Manifest has had its chance at it. */
+  /** `over`: Yamaoka's Haunting's interaction in another room (no turn of its own, no Flashlight). */
+  | { k: 'killerAct'; i: KillerInteraction; turn: number; over?: boolean }
+  /** Darkness Revealed: the move along any path, once the room has answered his entering. */
+  | { k: 'darkMove' }
+  /** Reign of Darkness: the survivor moved into his room may be interacted with. */
+  | { k: 'reignHit'; s: number }
   /**
    * `extra`: a turn from Devour Hope at the start of cleanup (cleanup is already queued).
    * `begun`: the start-of-turn perks were asked. `chosen`: The Twins picked who takes it.
@@ -567,6 +609,8 @@ export type Action =
   | { t: 'unplanKiller' }
   /** `left`: We're Gonna Live Forever was asked already (a replayed move). */
   | { t: 'move'; path: string; reacted?: boolean; left?: boolean }
+  | { t: 'innerFocus'; face: number }
+  | { t: 'empathyAnswer'; yes: boolean }
   | { t: 'stop' }
   /** Hang the carried survivor on the free hook in this room. */
   | { t: 'hang' }
@@ -579,6 +623,7 @@ export type Action =
   /** Crowd Control online: survivor `s` puts in `n` of their own ▲ (0: nothing). */
   | { t: 'crowdPledge'; s: number; n: number }
   | { t: 'crowdPick'; card: MoveCard }
+  | { t: 'reignCard'; card: MoveCard }
   /** The perk a Vile Purge covers or comes off. */
   | { t: 'purgeChoice'; perk: PerkId }
   /** The Carnifex's prop / room. */
@@ -735,6 +780,10 @@ export interface GameState {
   deception?: boolean
   /** Guardian: this survivor is the killer's only interaction for the turn he walked in on them. */
   guardian?: number | null
+  /** Empathy this round: who said no to whom (`from:to`), so they aren't asked again. */
+  empathyNo?: string[]
+  /** Dissolution: the path (its icon) with the ▲ on it, until the end of cleanup. */
+  dissolution?: string | null
   /** Whether the killer has changed room during the turn being played (Insidious). */
   killerMoved?: boolean
   /** Fearmonger: this survivor can't use perks this round. */

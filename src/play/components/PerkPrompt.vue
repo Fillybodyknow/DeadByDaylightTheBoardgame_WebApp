@@ -5,7 +5,7 @@
 // and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
-import { CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
+import { reignCards, CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
 import { actionKey, perkPicked, perksToPick } from '../boardActions'
@@ -109,7 +109,7 @@ const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'r
   if (s.t === 'offer') return 'offer'
   if (s.t === 'selfAware') return 'aware'
   if (s.t === 'purgeChoice') return 'purge'
-  if (s.t === 'crowdPay' || s.t === 'crowdPick') return 'crowd'
+  if (s.t === 'crowdPay' || s.t === 'crowdPick' || s.t === 'reignCard') return 'crowd'
   if (s.t === 'sparkChoice') return 'spark'
   if (s.t === 'phantasmChoice') return 'phantasm'
   if (s.t === 'replaceCard') return 'replace'
@@ -127,7 +127,7 @@ const decider = computed<PerkOwner | null>(() => {
   // online, a helper's device names the helper: it's their key or perk being asked about
   if (s.t === 'roll') return buttons.value[0]?.owner ?? (rollMine.value ? s.ctx.s : (passers.value[0] ?? s.ctx.s))
   if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess' || s.t === 'crowdPay' || s.t === 'purgeChoice' || s.t === 'selfAware') return s.s
-  if (s.t === 'phantasmChoice' || s.t === 'crowdPick') return 'killer'
+  if (s.t === 'phantasmChoice' || s.t === 'crowdPick' || s.t === 'reignCard') return 'killer'
   return null
 })
 
@@ -206,6 +206,8 @@ function hoverHag(i: KillerInteraction | null, room: string) {
 
 const handCards = computed(() => {
   const s = step.value
+  // Reign of Darkness: only the cards that move them somewhere
+  if (s.t === 'reignCard') return reignCards(props.st, s.s)
   return s.t === 'replaceCard' || s.t === 'crowdPick' ? [...new Set(props.st.survivorHands[props.st.survivors[s.s].hand])] : []
 })
 
@@ -284,7 +286,7 @@ const MOVE_PERKS: PerkId[] = ['adrenaline', 'saboteur', 'up_the_ante', 'any_mean
 /** The cards to choose from: an offer's card choices (Tinkerer / Zanshin: for the planned card picked), or Predator's new card. */
 const handChoices = computed<PerkChoice[]>(() => {
   const s = step.value
-  if (s.t === 'replaceCard' || s.t === 'crowdPick') return handCards.value.map((card) => ({ card }))
+  if (s.t === 'replaceCard' || s.t === 'crowdPick' || s.t === 'reignCard') return handCards.value.map((card) => ({ card }))
   if (s.t === 'redeemerGuess') return KILLER_CARDS.map((card) => ({ card }))
   if (s.t !== 'offer' || !activePerk.value) return []
   // Dragon's Grip discards one or two cards: its choices stay buttons
@@ -304,6 +306,7 @@ const handLabel = computed(() => {
   const s = step.value
   if (s.t === 'replaceCard') return `Predator — มือของ ${props.st.survivors[s.s].name}`
   if (s.t === 'crowdPick') return `Crowd Control — มือของ ${props.st.survivors[s.s].name}`
+  if (s.t === 'reignCard') return `Reign of Darkness — มือของ ${props.st.survivors[s.s].name}`
   if (s.t === 'redeemerGuess') return `ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
   return s.t === 'offer' && activePerk.value ? `${PERKS[activePerk.value].name} — เลือกการ์ดจากมือ` : ''
 })
@@ -313,6 +316,7 @@ const handPrompt = computed(() => {
   const s = step.value
   if (s.t === 'replaceCard') return 'Predator — เลือกการ์ดใบใหม่'
   if (s.t === 'crowdPick') return `Crowd Control — เลือกการ์ดให้ ${props.st.survivors[s.s].name}`
+  if (s.t === 'reignCard') return `Reign of Darkness — เลือกการ์ดที่จะทิ้ง`
   if (s.t === 'redeemerGuess') return `Redeemer — ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
   return s.t === 'offer' && activePerk.value ? `${PERKS[activePerk.value].name} — เลือกการ์ด` : ''
 })
@@ -324,7 +328,7 @@ function pickHandCard(card: MoveCard) {
 
 function hoverHandCard(card: MoveCard | null) {
   const s = step.value
-  const owner = s.t === 'replaceCard' || s.t === 'crowdPick' ? s.s : s.t === 'offer' && activePerk.value && MOVE_PERKS.includes(activePerk.value) ? s.owner : null
+  const owner = s.t === 'replaceCard' || s.t === 'crowdPick' || s.t === 'reignCard' ? s.s : s.t === 'offer' && activePerk.value && MOVE_PERKS.includes(activePerk.value) ? s.owner : null
   // Shadowborn's card is played third, from where the first two lead: the map can't say yet
   if (!card || owner === null || activePerk.value === 'shadowborn') return (preview.value = null)
   preview.value = choicePreview(props.st, { card }, owner === 'killer' ? props.st.killer.room : props.st.survivors[owner].room, owner)
@@ -345,12 +349,20 @@ function onZoomKey(e: KeyboardEvent) {
 watch(zoomed, (z) => (z ? window.addEventListener('keydown', onZoomKey, true) : window.removeEventListener('keydown', onZoomKey, true)))
 onBeforeUnmount(() => window.removeEventListener('keydown', onZoomKey, true))
 
+/** Reign of Darkness: the whole hand the killer looks at, in words (only the cards that move them are in the hand below). */
+const reignHand = computed(() => {
+  const s = step.value
+  if (s.t !== 'reignCard') return ''
+  return props.st.survivorHands[props.st.survivors[s.s].hand].map((c) => CARD_NAMES[c]).join(', ') || '—'
+})
+
 function confirmCard() {
   const s = step.value
   const c = cardPick.value
   if (!c) return
   if (s.t === 'replaceCard') act({ t: 'replace', card: c.card! })
   else if (s.t === 'crowdPick') act({ t: 'crowdPick', card: c.card! })
+  else if (s.t === 'reignCard') act({ t: 'reignCard', card: c.card! })
   else if (s.t === 'redeemerGuess') act({ t: 'guess', card: c.card! })
   else if (s.t === 'offer' && activePerk.value) act({ t: 'perk', perk: activePerk.value, use: true, choice: c })
 }
@@ -843,6 +855,14 @@ const boardCount = computed(() => {
         <p class="text small">การ์ดจะวางแบบเปิดหน้า ผู้รอดชีวิตคนนี้ไม่ต้องวางแผนเอง</p>
         <p class="hand-hint">👇 เลือกจากมือของ {{ st.survivors[step.s].name }} ด้านล่าง — ชี้เพื่อดูเส้นทาง</p>
         <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: ให้วาง ${CARD_NAMES[cardPick.card!]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
+      </template>
+
+      <!-- The Dredge's Reign of Darkness: a card of their hand, discarded, moves them -->
+      <template v-else-if="step.t === 'reignCard'">
+        <p class="lead"><b>Reign of Darkness</b> — ทิ้งการ์ด 1 ใบจากมือของ {{ st.survivors[step.s].name }} แล้วเขาต้องเดินตามเส้นทางของการ์ดนั้น</p>
+        <p class="text small">มือของเขา: {{ reignHand }} · ถ้าเขาเดินเข้าห้องของคุณ คุณ Interact กับเขาได้</p>
+        <p class="hand-hint">👇 เลือกจากมือของ {{ st.survivors[step.s].name }} ด้านล่าง — ชี้เพื่อดูว่าจะไปทางไหน</p>
+        <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: ทิ้ง ${CARD_NAMES[cardPick.card!]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
       </template>
 
       <!-- The Deathslinger's Redeemer: guess the card he discarded face down -->

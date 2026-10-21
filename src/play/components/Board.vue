@@ -15,7 +15,7 @@ import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, survivorMini } from '../labels'
+import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import BpText from '../../components/BpText.vue'
@@ -145,7 +145,7 @@ function centre(r: Rect): [number, number] {
 }
 
 function propImage(p: Prop): string {
-  return p.revealed ? PROP_IMAGE[p.kind] : `assets/props/back-${p.category}.webp`
+  return p.revealed ? propPicture(p) : `assets/props/back-${p.category}.webp`
 }
 
 // During setup's reveals the minis aren't on the board yet: their start rooms are rolled after.
@@ -186,6 +186,9 @@ const rects = computed(() => {
 })
 
 // One per path icon: a fork's other pairs share the first one's icon (and its state).
+/** Dissolution's ▲ on a path (the Bloodpoint token). */
+const DISSOLUTION_IMAGE = 'assets/tokens/bloodpoint.webp'
+
 const paths = computed(() =>
   board.value.paths.filter((p) => tokenOf(board.value, p.id) === p.id).map((p) => {
     const ps = props.st.paths[p.id]
@@ -198,7 +201,9 @@ const paths = computed(() =>
           ? BEAR_TRAP_IMAGE
           : e && 'path' in e && e.path === p.id
             ? components.entity.image
-            : null
+            : props.st.dissolution === p.id
+              ? DISSOLUTION_IMAGE
+              : null
     return { ...p, token, target: p.id in props.pathTargets }
   }),
 )
@@ -559,12 +564,14 @@ function guard(e: MouseEvent) {
       <span v-if="roomTarget(r.id)" class="pick-tag">{{ r.name }}{{ stayTag(roomTargets?.[r.id]) }}</span>
     </component>
 
-    <template v-if="litRooms">
+    <!-- a decision lights its rooms; outside one (planning), a card pointed at that goes straight to a
+         room (the Dredge's) lights that room alone -->
+    <template v-if="litRooms || hotDests.size">
       <div
         v-for="r in rooms"
         :key="`f-${r.id}`"
         class="room-focus"
-        :class="{ dim: !litRooms.has(r.id), dest: focus!.dests.includes(r.id), hot: hotDests.has(r.id) }"
+        :class="{ dim: !!litRooms && !litRooms.has(r.id), dest: !!focus && focus.dests.includes(r.id), hot: hotDests.has(r.id) }"
         :style="{ left: pct(r.box[0]), top: pct(r.box[1]), width: pct(r.box[2]), height: pct(r.box[3]) }"
       />
     </template>

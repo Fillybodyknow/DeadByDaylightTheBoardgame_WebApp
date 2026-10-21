@@ -7,7 +7,7 @@ import { ITEM_NAMES, PROP_NAMES, KILLER_BP, roomName, survivorMax } from '../eng
 import type { GameState, PerkOwner } from '../engine/types'
 import { CATEGORY_TH, PROP_RULES, type InspectTarget } from '../inspect'
 import { PERKS } from '../engine/perks'
-import { BEAR_TRAP_IMAGE, PROP_IMAGE, itemImage, ownerLabel, perkImage, perkText, playerOf } from '../labels'
+import { BEAR_TRAP_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf } from '../labels'
 import { perkUsed } from '../engine/engine'
 import { itemHidden } from '../game'
 import Mini from './Mini.vue'
@@ -133,7 +133,7 @@ const item = computed(() => {
       <!-- prop -->
       <template v-if="prop">
         <header>
-          <img class="prop-img" :src="asset(PROP_IMAGE[prop.kind])" alt="" />
+          <img class="prop-img" :src="asset(propPicture(prop))" alt="" />
           <div>
             <h2>{{ PROP_NAMES[prop.kind] }}</h2>
             <p class="muted">{{ CATEGORY_TH[prop.category] }}{{ prop.room ? ` · ${roomName(st, prop.room)}` : '' }}</p>
