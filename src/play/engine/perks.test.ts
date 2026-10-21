@@ -1,3 +1,4 @@
+import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { apply, anyMoves, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
@@ -108,6 +109,30 @@ describe('killer powers', () => {
 })
 
 describe('The Doctor, The Hag, The Wraith', () => {
+  it('Overwhelming Presence on a Rainbow Map reveal: both answers work, also with props picked in the UI (a Vue proxy)', () => {
+    for (const use of [true, false]) {
+      const st = game('doctor')
+      only(st, 'overwhelming_presence')
+      st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board' }))
+      st.survivors[1].item = 'rainbow_map'
+      st.killer.room = 'shack'
+      st.phase = 'survivors'
+      st.activeSurvivor = 1
+      st.step = { t: 'survivorInteract', s: 1, canInteract: true }
+      st.queue = [{ k: 'endSurvivorTurn', s: 1 }]
+      const prop = st.props.find((p) => !p.revealed && p.room !== null)!
+      // what the game screen sends: the picked props are a reactive array
+      const picked = reactive([prop.id])
+      const offered = apply(st, { t: 'useItem', s: 1, use: { k: 'reveal', props: picked } })
+      expect(offered.step).toMatchObject({ t: 'offer', perk: 'overwhelming_presence' })
+      const answered = apply(offered, { t: 'perk', perk: 'overwhelming_presence', use, ...(use ? { choice: {} } : {}) })
+      expect(answered.step).toMatchObject({ t: 'survivorInteract', s: 1 })
+      // used: the item is wasted; not used: it reveals the prop
+      expect(answered.props.find((p) => p.id === prop.id)!.revealed).toBe(!use)
+      expect(answered.survivors[1].item).toBeNull()
+    }
+  })
+
   it("Carter's Spark: pay 1 ▲ or take Madness; Madness makes skill checks use the danger die", () => {
     const st = game('doctor')
     only(st)

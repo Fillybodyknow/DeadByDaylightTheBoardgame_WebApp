@@ -615,7 +615,10 @@ class IllegalAction extends Error {}
 export function apply(prev: GameState, action: Action): GameState {
   const st: GameState = structuredClone(prev)
   if (st.phase === 'over') throw new IllegalAction('game over')
-  handle(st, action)
+  // The state never keeps a reference to the caller's action: one may hold a Vue proxy (the props
+  // picked on the map), which a queued task would carry into the state, and the next structuredClone
+  // of it would throw — every later action refused.
+  handle(st, JSON.parse(JSON.stringify(action)) as Action)
   run(st)
   return st
 }

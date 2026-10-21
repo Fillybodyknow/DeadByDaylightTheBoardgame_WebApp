@@ -12,6 +12,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.4.2',
+    date: '2026-10-21',
+    items: ['แก้บั๊ก: The Doctor ใช้ Overwhelming Presence ตอนผู้รอดชีวิตใช้ item เปิด prop (เช่น Rainbow Map) แล้วกดตอบไม่ได้ทั้งสองปุ่ม เกมค้าง'],
+  },
+  {
     version: '1.4.1',
     date: '2026-10-21',
     items: ['กฎ Pick Up: ถ้าห้องที่ Killer อุ้ม Survivor มี Hook ว่างอยู่ จะแขวนและ Sacrifice ในห้องนั้นทันที (ไม่ต้องทอยลูกเต๋าดิ้น ไม่เลือกแบกไปห้องอื่นแล้ว)'],
