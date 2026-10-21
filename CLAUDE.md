@@ -36,6 +36,10 @@ VITE_FIREBASE_DATABASE_URL=https://dbd-engine-default-rtdb.asia-southeast1.fireb
 VITE_FIREBASE_PROJECT_ID=dbd-engine
 ```
 
+The app's version is `package.json`'s `version` (major.minor.patch: patch for fixes, minor for
+features, major for changes that break saved games or rooms). The build adds the commit and date
+(`vite.config.ts`), and `src/version.ts` shows them on the menu. Bump it with a release.
+
 Before saying work is done: type-check, tests and build must all pass. Report failures as they are.
 
 ## Layout

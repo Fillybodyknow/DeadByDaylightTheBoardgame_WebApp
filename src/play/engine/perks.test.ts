@@ -2801,7 +2801,7 @@ describe('perk cards: the rest of the deck (the edit-perks mode)', () => {
     expect(after.survivors[0].wounded).toBe(false)
   })
 
-  it("Insidious isn't offered for Yamaoka's Haunting: she can't carry someone in another room", () => {
+  it("Insidious works with Yamaoka's Haunting: she hasn't moved, and the survivor is brought in", () => {
     let st = game('spirit')
     deal(st, 'killer', 'insidious')
     killerInteracting(st)
@@ -2814,8 +2814,15 @@ describe('perk cards: the rest of the deck (the edit-perks mode)', () => {
     const i = killerInteractions(st).find((x) => x.k === 'haunt' && x.room === there && x.i.k === 'attack' && x.i.target === 0)!
     expect(i).toBeDefined()
     st = apply(st, { t: 'interact', i })
-    expect(st.step.t === 'offer' && st.step.perk === 'insidious').toBe(false)
-    expect(st.survivors[0]).toMatchObject({ wounded: true, status: 'board' })
+    expect(st.step).toMatchObject({ t: 'offer', perk: 'insidious', owner: 'killer' })
+    const room = st.killer.room
+    // used: she picks them up, they come into her room, and she is the one who carries
+    const used = apply(st, { t: 'perk', perk: 'insidious', use: true, choice: {} })
+    expect(used.survivors[0]).toMatchObject({ wounded: false, status: 'carried', room })
+    expect(used.killer.room).toBe(room)
+    // not used: the Haunting's attack goes ahead over the path
+    const passed = apply(st, { t: 'perk', perk: 'insidious', use: false })
+    expect(passed.survivors[0]).toMatchObject({ wounded: true, status: 'board', room: there })
   })
 
   it('Whispers: the chosen survivor pays 1 ▲ or sets their card face up', () => {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 // Online play, laid out as a PC game's server browser: the player's card on top, the open rooms
 // as a table on the left (filter, search, a dot per player), and on the right creating a room (a
-// name, a random one on offer, and an optional password) or joining one with its 4-letter code.
+// name, a random one on offer, and an optional password, in a dialog of its own) or joining one
+// with its 4-letter code. A room with a password asks for it in a dialog too.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
+import ModalShell from './ModalShell.vue'
 import { BOARD_STALE_MS, backend, createRoom, joinRoom, lastRoom, randomRoomName, savedName, session } from '../online/session'
 import type { RoomListing } from '../online/transport'
 
@@ -18,8 +20,16 @@ const initial = computed(() => name.value.trim().charAt(0).toUpperCase() || '?')
 
 // ---------- creating a room ----------
 
+const creating = ref(false)
 const roomName = ref(randomRoomName())
 const password = ref('')
+function openCreate() {
+  sfx.click()
+  session.error = ''
+  roomName.value = randomRoomName()
+  password.value = ''
+  creating.value = true
+}
 /** The dice spin a moment when rolled. */
 const rolling = ref(false)
 function reroll() {
@@ -32,6 +42,9 @@ function reroll() {
 async function create() {
   sfx.select()
   await createRoom(name.value.trim(), roomName.value, password.value)
+  // in the room the page is replaced; if it failed the dialog stays, with the error
+  if (!session.room) return
+  creating.value = false
 }
 
 // ---------- joining ----------
@@ -50,23 +63,35 @@ async function join(c = code.value, pw = '') {
   if (!c.trim()) return
   sfx.select()
   await joinRoom(c, name.value.trim(), pw)
+  if (session.room) askFor.value = null
 }
 
 function joinListed(r: RoomListing) {
-  if (r.locked) {
-    sfx.click()
-    session.error = ''
-    askFor.value = askFor.value === r.code ? null : r.code
-    joinPassword.value = ''
-    return
-  }
+  if (r.locked) return void askPassword(r.code)
   void join(r.code)
+}
+
+function askPassword(c: string) {
+  sfx.click()
+  session.error = ''
+  joinPassword.value = ''
+  askFor.value = c
+}
+
+function closePassword() {
+  askFor.value = null
+  joinPassword.value = ''
+  session.needPassword = null
+  session.error = ''
 }
 
 function joinWithPassword() {
   if (!askFor.value || !joinPassword.value.trim()) return
   void join(askFor.value, joinPassword.value)
 }
+
+/** The room being asked about, as it is on the board (for its name in the dialog). */
+const askedRoom = computed(() => rooms.value.find((r) => r.code === askFor.value))
 
 /** The code as four boxes: one letter each, the next one to type lit. */
 const codeBoxes = computed(() => Array.from({ length: 4 }, (_, i) => code.value.toUpperCase()[i] ?? ''))
@@ -168,13 +193,8 @@ onMounted(() => {
     <p v-if="backend.name === 'local'" class="notice warn">
       ยังไม่ได้ตั้งค่า Firebase: ห้องจะใช้ได้เฉพาะแท็บในเบราว์เซอร์นี้ (ไว้ทดสอบ — เปิดหลายแท็บแทนผู้เล่นแต่ละคน)
     </p>
-    <p v-if="session.error" class="notice error">{{ session.error }}</p>
-    <!-- a password asked for a room joined by its code or an invite link (the table asks in its row) -->
-    <div v-if="askFor && !board.some((r) => r.code === askFor)" class="notice pw-ask">
-      <span>🔒 ห้อง <b>{{ askFor }}</b> ต้องใช้รหัสผ่าน</span>
-      <input v-model="joinPassword" type="password" maxlength="20" placeholder="รหัสผ่านห้อง" @keyup.enter="joinWithPassword" />
-      <button class="primary" :disabled="session.busy || !joinPassword.trim()" @click="joinWithPassword">เข้าห้อง</button>
-    </div>
+    <!-- an error that is not about a dialog open now (no such room, a full one) -->
+    <p v-if="session.error && !askFor && !creating" class="notice error">{{ session.error }}</p>
 
     <div class="hub-grid">
       <!-- the room browser -->
@@ -233,10 +253,6 @@ onMounted(() => {
                   {{ r.phase === 'game' ? 'เข้าไปดู' : 'เข้าร่วม' }}
                 </button>
               </span>
-              <div v-if="askFor === r.code" class="pw-row">
-                <input v-model="joinPassword" type="password" maxlength="20" placeholder="รหัสผ่านห้อง" @keyup.enter="joinWithPassword" />
-                <button class="primary" :disabled="session.busy || !joinPassword.trim()" @click="joinWithPassword">ยืนยัน</button>
-              </div>
             </li>
           </TransitionGroup>
         </div>
@@ -244,23 +260,11 @@ onMounted(() => {
       </section>
 
       <div class="side-col">
-        <!-- a new room -->
+        <!-- a new room: the form is a dialog -->
         <section class="panel create">
           <header class="panel-head"><h2>สร้างห้องใหม่</h2></header>
-          <label class="field">
-            <small>ชื่อห้อง</small>
-            <span class="with-roll">
-              <input v-model="roomName" maxlength="40" placeholder="ชื่อห้อง" />
-              <button type="button" class="roll" :class="{ spin: rolling }" title="สุ่มชื่อห้อง" @click="reroll" @animationend="rolling = false">🎲</button>
-            </span>
-          </label>
-          <label class="field">
-            <small>รหัสผ่าน (ไม่บังคับ)</small>
-            <input v-model="password" type="password" maxlength="20" placeholder="ว่างไว้ = ใครก็เข้าได้" />
-          </label>
-          <button class="primary cta" :disabled="session.busy" @click="create">
-            <span>{{ password ? '🔒 ' : '' }}สร้างห้อง</span>
-          </button>
+          <p class="muted small">ตั้งชื่อห้อง ใส่รหัสผ่านถ้าต้องการ แล้วส่งรหัสห้องให้เพื่อน</p>
+          <button class="primary cta" :disabled="session.busy" @click="openCreate"><span>＋ สร้างห้อง</span></button>
         </section>
 
         <!-- by code: four boxes over one input -->
@@ -287,6 +291,40 @@ onMounted(() => {
         </section>
       </div>
     </div>
+
+    <!-- creating a room -->
+    <ModalShell :open="creating" title="สร้างห้องใหม่" @close="creating = false">
+      <label class="field">
+        <small>ชื่อห้อง</small>
+        <span class="with-roll">
+          <input v-model="roomName" maxlength="40" placeholder="ชื่อห้อง" @keyup.enter="create" />
+          <button type="button" class="roll" :class="{ spin: rolling }" title="สุ่มชื่อห้อง" @click="reroll" @animationend="rolling = false">🎲</button>
+        </span>
+      </label>
+      <label class="field">
+        <small>รหัสผ่าน (ไม่บังคับ)</small>
+        <input v-model="password" type="password" maxlength="20" placeholder="ว่างไว้ = ใครก็เข้าได้" autocomplete="new-password" @keyup.enter="create" />
+      </label>
+      <p v-if="session.error" class="notice error">{{ session.error }}</p>
+      <template #footer>
+        <button type="button" @click="creating = false">ยกเลิก</button>
+        <button type="button" class="primary" :disabled="session.busy" @click="create">{{ password ? '🔒 ' : '' }}สร้างห้อง</button>
+      </template>
+    </ModalShell>
+
+    <!-- a room with a password: from the table, a code or an invite link -->
+    <ModalShell :open="!!askFor" title="🔒 ห้องนี้ต้องใช้รหัสผ่าน" width="400px" @close="closePassword">
+      <p class="ask-room">
+        <b>{{ askedRoom?.name || 'ห้อง' }}</b>
+        <small class="muted">รหัสห้อง {{ askFor }}</small>
+      </p>
+      <input v-model="joinPassword" type="password" maxlength="20" placeholder="รหัสผ่านห้อง" autocomplete="off" @keyup.enter="joinWithPassword" />
+      <p v-if="session.error" class="notice error">{{ session.error }}</p>
+      <template #footer>
+        <button type="button" @click="closePassword">ยกเลิก</button>
+        <button type="button" class="primary" :disabled="session.busy || !joinPassword.trim()" @click="joinWithPassword">เข้าห้อง</button>
+      </template>
+    </ModalShell>
   </div>
 </template>
 
@@ -477,12 +515,16 @@ onMounted(() => {
   border-color: var(--blood);
   color: var(--blood-bright);
 }
-.pw-ask {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  border-color: var(--warn);
+.ask-room {
+  display: grid;
+  margin: 0;
+}
+.ask-room b {
+  font-size: 1.1rem;
+}
+.small {
+  font-size: 0.85rem;
+  margin: 0;
 }
 
 /* ---------- panels ---------- */
@@ -726,14 +768,6 @@ input:focus {
 .go button {
   width: 100%;
   padding: 0.4rem 0.6rem;
-}
-.pw-row {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 0.5rem;
-}
-.pw-row input {
-  flex: 1;
 }
 .tip {
   margin: 0;

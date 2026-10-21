@@ -41,7 +41,8 @@ const killer = computed(() => props.owner === 'killer')
 <style scoped>
 /* top, then bottom-left and bottom-right, the three diamonds touching at their corners */
 .diamonds {
-  --d: 31px;
+  /* the tile sets --perk-d: bigger where the column has room, the old size on narrow screens */
+  --d: var(--perk-d, 40px);
   position: relative;
   flex: none;
   width: calc(var(--d) * 2);

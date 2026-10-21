@@ -210,7 +210,8 @@ export type KillerInteraction =
   | { k: 'damage'; prop: string }
   | { k: 'venerate'; prop: string }
   | { k: 'attack'; target: number }
-  | { k: 'pickUp'; target: number }
+  /** `over`: from a connected room, the survivor brought in (Insidious on Yamaoka's Haunting). */
+  | { k: 'pickUp'; target: number; over?: boolean }
   /** The Trapper's power: place a bear trap, optionally taking one back from `remove`. */
   | { k: 'power'; path: string; remove?: string }
   /** The Nurse: move to a connected room through anything, even against a vault. */

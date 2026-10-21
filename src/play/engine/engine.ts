@@ -1771,7 +1771,7 @@ function doKillerInteraction(st: GameState, i: KillerInteraction) {
       return
     case 'pickUp':
       // Starstruck's new target may have slipped into a locker as he came in (Quick & Quiet)
-      if (st.survivors[i.target].status !== 'board' || st.survivors[i.target].room !== k.room) {
+      if (st.survivors[i.target].status !== 'board' || (st.survivors[i.target].room !== k.room && !i.over)) {
         log(st, `${actorName(st)} อุ้ม ${st.survivors[i.target].name} ไม่ได้ — ไม่อยู่ให้อุ้มแล้ว`, 'killer')
         return
       }
@@ -2581,12 +2581,13 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return step.dice.some((d) => d.kind === 'skill' && !d.rerolled) ? NONE : []
     }
     case 'insidious': {
-      // about to attack someone healthy without having moved this turn: pick them up instead. Only
-      // in his own room: a pick-up carries them, so Yamaoka's Haunting's attack over a path can't be one
+      // about to attack someone healthy without having moved this turn: pick them up instead.
+      // Yamaoka's Haunting's attack over a path counts: she doesn't go there (she hasn't moved),
+      // the survivor is brought into her room, as every pick-up does
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
       if (w.k !== 'preKillerInteract' || w.pickUp || (task && task.i.k !== 'attack') || st.killerMoved) return []
       const sv = st.survivors[w.target]
-      return !sv.wounded && sv.room === st.killer.room ? NONE : []
+      return !sv.wounded && sv.status === 'board' && (sv.room === st.killer.room || connectedRooms(st, st.killer.room).has(sv.room)) ? NONE : []
     }
     case 'jolt':
       // the dice are shown in the offer; the 1s and 2s become failures
@@ -3321,7 +3322,8 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       const { target } = w as Extract<PerkWindow, { k: 'preKillerInteract' }>
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')!
       payPerk(st, o, perk, `อุ้ม ${name(target)} แทนการโจมตี`)
-      task.i = { k: 'pickUp', target }
+      // over a path (Haunting): the survivor is in another room, and comes in with the pick-up
+      task.i = { k: 'pickUp', target, ...(st.survivors[target].room !== st.killer.room ? { over: true } : {}) }
       return
     }
     case 'jolt': {

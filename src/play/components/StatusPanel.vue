@@ -366,7 +366,8 @@ function onPowerSlot() {
 /* a column on the left of the map (a row under it on narrow screens) */
 .players {
   flex: none;
-  width: 190px;
+  /* room for a killer's three planned cards and his perks in one row */
+  width: 230px;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -764,6 +765,9 @@ button.slot:hover .slot-crop {
 .pcard {
   display: block;
   width: 50px;
+  /* the cards give way when the row is full (the killer's third), the perks never do */
+  flex: 0 1 auto;
+  min-width: 0;
   aspect-ratio: 0.72;
   object-fit: cover;
   border-radius: 4px;
@@ -989,6 +993,9 @@ button.item img {
 }
 /* narrow screens: the map takes the width, the tiles go back to a row under it */
 @media (max-width: 980px) {
+  .tile {
+    --perk-d: 31px;
+  }
   .players {
     width: auto;
     flex-direction: row;

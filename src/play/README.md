@@ -542,8 +542,9 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   roll is rolled again (once a round, so once per struggle).
 - Insidious: when he would attack a healthy survivor and has not changed room this turn
   (`killerMoved`, which every move of his sets, teleports included), he picks them up instead —
-  healthy, and whether or not they were wounded this round. Only an attack in his own room: a
-  pick-up carries the survivor, so Yamaoka's Haunting's attack over a path isn't offered it.
+  healthy, and whether or not they were wounded this round. It works with Yamaoka's Haunting too:
+  she hasn't moved, so the attack over a path becomes a pick-up, and the survivor is brought into
+  her room, as every pick-up brings them into the killer's.
 - Whispers: at the start of planning, one survivor who still has a card to set either pays 1 ▲ or
   sets their card face up. The face-up card uses Stridor's own flow (that survivor plays first,
   everyone else plans knowing it), and there is one such slot, so Whispers is not offered when
