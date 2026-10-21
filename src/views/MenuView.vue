@@ -8,6 +8,7 @@ import { sfx } from '../sound'
 import { game, online } from '../play/game'
 import { session } from '../play/online/session'
 import { canInstall, install, iosHint } from '../install'
+import { openChangelog } from '../update'
 import { APP_BUILT, versionLabel } from '../version'
 
 const router = useRouter()
@@ -79,7 +80,10 @@ function go(to: string) {
       <RouterLink to="/rules">📖 กติกา</RouterLink>
       <button v-if="canInstall" type="button" class="install" @click="install">📲 ติดตั้งเป็นแอป</button>
     </nav>
-    <p class="version" :title="`build ${APP_BUILT}`">{{ versionLabel() }}</p>
+    <p class="version" :title="`build ${APP_BUILT}`">
+      {{ versionLabel() }} ·
+      <button type="button" class="whats-new" @click="openChangelog">มีอะไรใหม่</button>
+    </p>
     <p v-if="!canInstall && iosHint" class="ios-hint">📲 ติดตั้งเป็นแอป: กด <b>แชร์</b> ใน Safari แล้วเลือก <b>เพิ่มไปยังหน้าจอโฮม</b></p>
   </div>
 </template>
@@ -220,6 +224,15 @@ function go(to: string) {
   font-size: 0.78rem;
   color: var(--muted);
   opacity: 0.75;
+}
+.whats-new {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .refs a {
   color: var(--muted);

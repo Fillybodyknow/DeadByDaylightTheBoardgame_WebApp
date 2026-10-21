@@ -40,6 +40,8 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
   // Audio and video ask for byte ranges; a partial response can't be cached.
   if (req.headers.has('range')) return
+  // version.json says whether a newer build is out: always from the network, never cached.
+  if (url.pathname.endsWith('/version.json')) return
 
   if (req.mode === 'navigate') {
     event.respondWith(

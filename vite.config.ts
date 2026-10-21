@@ -1,7 +1,7 @@
 import vue from '@vitejs/plugin-vue'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 
 // The app's version, shown on the menu: package.json's version, the commit it was built from
 // and the build date (src/version.ts reads them).
@@ -14,15 +14,26 @@ function commit(): string {
   }
 }
 
+const built = new Date().toISOString()
+
+// version.json beside the app: open tabs fetch it to find out a newer build is published
+// (src/update.ts). Same values as the define below.
+const versionFile = (): Plugin => ({
+  name: 'dbdl-version-file',
+  generateBundle() {
+    this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: pkg.version, commit: commit(), built }) })
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), versionFile()],
   // Relative base: the build works from any sub-path (GitHub Pages serves it at
   // /<repo>/) as well as the root. Routing uses the URL hash, so no server rewrites are needed.
   base: './',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(commit()),
-    __APP_BUILT__: JSON.stringify(new Date().toISOString()),
+    __APP_BUILT__: JSON.stringify(built),
   },
 })

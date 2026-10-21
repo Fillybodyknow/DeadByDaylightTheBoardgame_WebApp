@@ -33,6 +33,10 @@ const props = defineProps<{
   picked?: string[]
   /** A perk / power decision is open: what to point at. */
   focus?: Focus | null
+  /** The start-room rolls are playing: the minis ("s0", "k"…) not on the map yet. */
+  hideMinis?: string[]
+  /** The mini that has just dropped onto the map. */
+  arrive?: string
 }>()
 const emit = defineEmits<{ path: [id: string]; prop: [id: string]; interact: [key: string]; room: [id: string]; inspect: [target: InspectTarget] }>()
 
@@ -145,17 +149,18 @@ function propImage(p: Prop): string {
 }
 
 // During setup's reveals the minis aren't on the board yet: their start rooms are rolled after.
-const rooms = computed(() =>
-  board.value.rooms.map((r) => ({
+const rooms = computed(() => {
+  const hidden = new Set(props.hideMinis)
+  return board.value.rooms.map((r) => ({
     ...r,
     props: propsIn(props.st, r.id),
-    survivors: props.st.startPending ? [] : props.st.survivors.flatMap((sv, i) => (sv.room === r.id && (sv.status === 'board' || sv.status === 'carried') ? [i] : [])),
+    survivors: props.st.startPending ? [] : props.st.survivors.flatMap((sv, i) => (sv.room === r.id && (sv.status === 'board' || sv.status === 'carried') && !hidden.has(`s${i}`) ? [i] : [])),
     // The Twins: Charlotte is the killer's mini; Victor is a second, smaller one
-    killer: !props.st.startPending && charlotteRoom(props.st) === r.id,
-    victor: !props.st.startPending && victorRoom(props.st) === r.id,
+    killer: !props.st.startPending && !hidden.has('k') && charlotteRoom(props.st) === r.id,
+    victor: !props.st.startPending && !hidden.has('k') && victorRoom(props.st) === r.id,
     guards: (Object.entries(props.st.guards ?? {}) as [Guard, string | undefined][]).flatMap(([g, room]) => (room === r.id ? [g] : [])),
-  })),
-)
+  }))
+})
 
 /** Where every piece is now: minis by key ("k", "s0"…) and prop tiles by id. */
 const rects = computed(() => {
@@ -585,6 +590,7 @@ function guard(e: MouseEvent) {
           act: canAct(`s:${s}`),
           focus: isFocused(s),
           hot: isHot(s),
+          arrive: arrive === `s${s}`,
         }"
         :style="rectStyle(rects.minis.get(`s${s}`)!)"
         :title="st.survivors[s].status === 'carried' ? `${st.survivors[s].name} — ถูก${st.killer.name}แบก` : (interactTargets[`s:${s}`] ?? st.survivors[s].name)"
@@ -608,7 +614,7 @@ function guard(e: MouseEvent) {
         v-if="r.killer"
         data-mini="k"
         class="mini killer"
-        :class="{ act: canAct('killer'), focus: focus?.killer, carrying: r.survivors.some((s) => st.survivors[s].status === 'carried') }"
+        :class="{ act: canAct('killer'), focus: focus?.killer, arrive: arrive === 'k', carrying: r.survivors.some((s) => st.survivors[s].status === 'carried') }"
         :style="rectStyle(miniRect(r.box, 0, true))"
         :title="interactTargets.killer ?? st.killer.name"
         @click="clickPiece('killer', r.id)"
@@ -943,6 +949,16 @@ button.tile.picked::after {
     top 0.45s ease;
   filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.9));
 }
+/* a mini placed by its start-room roll drops onto the map from above */
+.mini.arrive {
+  animation: arrive 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes arrive {
+  from {
+    scale: 2.4;
+    opacity: 0;
+  }
+}
 /* every survivor wears a light ring (red when wounded), so minis stand out from the room art */
 .mini.survivor {
   box-shadow:
@@ -1068,7 +1084,10 @@ button.tile.act {
   border: 3px solid #ffe9b0;
   background: rgb(255 214 140 / 0.15);
   box-shadow: 0 0 20px rgb(255 190 90 / 0.7);
-  animation: pulse 1.2s ease-in-out infinite;
+  /* beating as well as fading: a path to take stays easy to see on a busy map */
+  animation:
+    pulse 1.2s ease-in-out infinite,
+    beat 1.2s ease-in-out infinite;
 }
 .path-target:hover:not(:disabled) {
   background: rgb(255 214 140 / 0.35);
@@ -1409,6 +1428,11 @@ button.tile.act {
 @keyframes pulse {
   50% {
     opacity: 0.55;
+  }
+}
+@keyframes beat {
+  50% {
+    scale: 1.22;
   }
 }
 @media (prefers-reduced-motion: reduce) {

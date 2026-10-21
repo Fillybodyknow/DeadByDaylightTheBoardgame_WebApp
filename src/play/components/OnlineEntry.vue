@@ -8,7 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
 import ModalShell from './ModalShell.vue'
-import { BOARD_STALE_MS, backend, createRoom, joinRoom, lastRoom, randomRoomName, savedName, session } from '../online/session'
+import { BOARD_STALE_MS, backend, createRoom, joinRoom, lastRoom, randomRoomName, savedName, session, sweepRooms } from '../online/session'
 import type { RoomListing } from '../online/transport'
 
 const name = ref(savedName())
@@ -119,7 +119,10 @@ let unlist: (() => void) | null = null
 const clock = ref(Date.now())
 let tick: number | null = null
 onMounted(() => {
-  unlist = backend.listRooms((list) => (rooms.value = list))
+  unlist = backend.listRooms((list) => {
+    rooms.value = list
+    sweepRooms(list)
+  })
   tick = window.setInterval(() => (clock.value = Date.now()), 30000)
 })
 onBeforeUnmount(() => {
@@ -202,6 +205,11 @@ onMounted(() => {
 
     <p v-if="backend.name === 'local'" class="notice warn">
       ยังไม่ได้ตั้งค่า Firebase: ห้องจะใช้ได้เฉพาะแท็บในเบราว์เซอร์นี้ (ไว้ทดสอบ — เปิดหลายแท็บแทนผู้เล่นแต่ละคน)
+    </p>
+    <!-- the host kicked this device out of a room -->
+    <p v-if="session.kicked" class="notice error kicked">
+      🚫 หัวห้องเตะคุณออกจากห้อง <b>{{ session.kicked }}</b> — เข้าห้องนั้นไม่ได้อีก
+      <button type="button" @click="session.kicked = null">ปิด</button>
     </p>
     <!-- an error that is not about a dialog open now (no such room, a full one) -->
     <p v-if="session.error && !askFor && !creating" class="notice error">{{ session.error }}</p>
@@ -524,6 +532,14 @@ onMounted(() => {
 .notice.error {
   border-color: var(--blood);
   color: var(--blood-bright);
+}
+.kicked {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.kicked button {
+  margin-left: auto;
 }
 .ask-room {
   display: grid;

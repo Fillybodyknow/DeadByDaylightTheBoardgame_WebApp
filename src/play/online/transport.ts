@@ -58,6 +58,8 @@ export interface RoomData {
   name?: string
   /** A password to join (hashed with the code, see session.ts); unset: open to anyone. */
   passwordHash?: string
+  /** Players the host kicked from the lobby (client id → when): they can't come back in. */
+  kicked?: Record<string, number>
   /** Character picks: 'killer' → killer id, survivor slot '0'..'3' → survivor id. */
   picks: Record<string, string>
   /** Player number → picks confirmed. */
@@ -126,10 +128,14 @@ export interface Backend {
   listRooms(cb: (rooms: RoomListing[]) => void): () => void
   /** Put a room on the board (or update it); the host's device keeps it current. */
   publishRoom(listing: RoomListing): Promise<void>
-  /** Take a room off the board. */
-  unlistRoom(code: string): Promise<void>
+  /** A room is still in use: refresh its listing's time (a listing that is gone stays gone). */
+  touchRoom(code: string): Promise<void>
+  /** Delete a room and its listing, now. */
+  deleteRoom(code: string): Promise<void>
+  /** Delete a room and its listing if the listing was last touched before `olderThan`; whether it was. */
+  reapRoom(code: string, olderThan: number): Promise<boolean>
   /** Before joining: the room's password hash (if any) and whether `member` is in it already. */
-  lockOf(code: string, member: string): Promise<{ hash?: string; member: boolean }>
+  lockOf(code: string, member: string): Promise<{ hash?: string; member: boolean; kicked?: boolean }>
 }
 
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no 0/O, 1/I/L

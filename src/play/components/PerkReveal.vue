@@ -20,8 +20,8 @@ const props = defineProps<{ st: GameState }>()
 const current = computed(() => {
   const perk = fx.perks[0]
   const dice = fx.dice[0]
-  // a player's action in the same queue is ActionReveal's
-  return perk && !perk.action && (!dice || perk.id < dice.id) ? perk : null
+  // a player's action in the same queue is ActionReveal's, the Sacrifice track SacrificeReveal's
+  return perk && !perk.action && !perk.sacrifice && (!dice || perk.id < dice.id) ? perk : null
 })
 const killer = computed(() => current.value?.owner === 'killer')
 const isItem = computed(() => !!current.value?.item)

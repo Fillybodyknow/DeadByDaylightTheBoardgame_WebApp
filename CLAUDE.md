@@ -38,7 +38,10 @@ VITE_FIREBASE_PROJECT_ID=dbd-engine
 
 The app's version is `package.json`'s `version` (major.minor.patch: patch for fixes, minor for
 features, major for changes that break saved games or rooms). The build adds the commit and date
-(`vite.config.ts`), and `src/version.ts` shows them on the menu. Bump it with a release.
+(`vite.config.ts`), and `src/version.ts` shows them on the menu. Bump it with a release, and add
+its entry to `src/changelog.ts` (Thai, one line per change a player would notice): the "มีอะไรใหม่"
+panel opens once on a device that last ran an older version, and the build publishes `version.json`
+so open tabs offer a reload when a newer build is out (`src/update.ts`).
 
 Before saying work is done: type-check, tests and build must all pass. Report failures as they are.
 
@@ -124,6 +127,14 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 
 - **Results never run ahead of animations.** `GameScreen` holds the view on the old state while
   dice, perk cards and board animations play. Pending rolls show their dice first.
+- **Every rise of the Sacrifice track shows** (`SacrificeReveal`, in the perk cards' queue, from the `sacrifice` event when the total goes up; Breakdown lowering it shows nothing). The eighth is the finale's instead.
+- **The game's last beat shows before the summary:** Sacrifice filling up or the exit gate
+  opening (`FinaleReveal`, `fx.finale`, queued on the `gameOver` event after the cards and rolls
+  before it); the screen holds the old state until it is done.
+- **The start-room rolls are on the map, not in a modal** (`StartPlacement`, `fx.starts`): after the
+  last prop reveal each mini's die tumbles in a strip at the panel's place and the mini drops onto
+  its room (`Board`'s `hideMinis`); nobody is asked anything until all are placed. Once per game
+  (`intro.ts`).
 - **Every action shows before its result.** A player's action (a move with its card, an attack,
   a pallet, a locker, the killer's power, a passive) gets a short card in the middle of the
   screen first (`casts.ts` builds them from the log, `ActionReveal` shows them in the perk

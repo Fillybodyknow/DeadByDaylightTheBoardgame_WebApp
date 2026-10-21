@@ -63,13 +63,21 @@ and the host starts the game.
   and the device then goes to the killer, behind the hand-off curtain.
 - **The room board** (`#/online`): open rooms are listed under `roomIndex/<code>` (name, host,
   members, phase, locked), apart from the rooms, which are still only read with their code. The
-  host's device keeps the listing current, and Firebase takes it off when that device
-  disconnects (`onDisconnect`); the last one out of a lobby takes it off too, and listings quiet
-  for 6 hours aren't shown. A room is created with a name (a random one on offer, 🎲) and an
+  host's device keeps the listing current on every change, and every device in the room touches
+  its `updatedAt` every 4 minutes (a heartbeat); listings quiet for 15 minutes aren't shown.
+  **Clearing stale rooms:** the listing is never removed when a device disconnects — it is how a
+  forgotten room is found. The last one out of a lobby deletes the whole room (data and listing),
+  and whoever opens the board deletes the rooms whose listing has been quiet for 3 days
+  (`sweepRooms`, `reapRoom` re-reads the time first). Rooms made before this, whose listing was
+  already removed, can't be found by a device: delete `rooms/<CODE>` in the Firebase console.
+  A room is created with a name (a random one on offer, 🎲) and an
   optional password: the room keeps only its SHA-256 hash with the code, and a device already in
   the room comes back without it. Friends, not strangers: the check is on the joining device.
   **The database rules must be updated** (`roomIndex`) for the board to show rooms; without
   them rooms still work by code.
+- **Kicking:** in the lobby the host has a ✕ on every other seat and bench chip. The kicked
+  device's id goes into `lobby.kicked`: it is sent back to the entry page with a notice, and
+  `join` / `joinRoom` refuse it (also with the password). Everyone un-readies, as the table changed.
 - **Room settings** (`online/settings.ts`, the lobby's ⚙ card): the host sets them before
   seating everyone, everyone sees them (with chips for what differs from the defaults). A change
   doesn't reset anyone's ready (the user's call: the host sets several in a row); the others'
@@ -218,13 +226,17 @@ The rulebook leaves these open (see the ⚠️ notes in `docs/rules-th.md`). The
 - A Firecracker stops any move of the killer into its holder's room ("prevent the Killer from
   moving into your space"): his card moves, carrying, the Afterpiece Antidote's move, the
   Hillbilly's chainsaw (asked before it runs: the card stays in his hand), Starstruck's move (no
-  pick-up then) and a Diversion (on a survivor's turn he has no interaction to lose). Not the
-  teleports (Blink, Wailing Bell, a Phantasm Trap) — and Yamaoka's Haunting doesn't move him.
+  pick-up then), a Diversion (on a survivor's turn he has no interaction to lose), walking on
+  after Enduring breaks a pallet, and the teleports: the Nurse's blink, the Wraith's Wailing Bell
+  and the Hag's teleport to a Phantasm Trap (the user's ruling: a Firecracker stops him in every
+  case). A power is stopped before it is spent — the blink or the bell stays unused, and the Hag
+  doesn't pay the ▲. Yamaoka's Haunting doesn't move him; the Twins' swap to Victor isn't a move
+  into a room (Victor is already there).
 - A survivor in a locker who must move leaves the locker first, even if the move then fails.
 
 Killer powers:
 
-- The Nurse's blink doesn't break the pallet or wall it passes, and a Firecracker can't stop it.
+- The Nurse's blink doesn't break the pallet or wall it passes. A Firecracker in the room he blinks to stops it.
 - The Huntress's hatchet reaches survivors in connected rooms only, not in her own room.
 - The Hillbilly's chainsaw wounds one healthy survivor in the room it enters; with several, the
   killer picks. Quick & Quiet happens on entering, so Meg can hide before the cut.
@@ -263,7 +275,6 @@ The Doctor, The Hag, The Wraith:
 - A Phantasm Trap roll is a skill check die: keys can re-roll it, Iron Will doesn't apply, and a
   0 still gives The Hag 1 ▲. Teleporting reveals a prop like any move; attacking or picking up
   someone there is optional.
-- The Wailing Bell and a Phantasm teleport can't be stopped by a Firecracker.
 - Overwhelming Presence covers items used from the item menu, not key re-rolls or the
   Flashlight / Firecracker reactions.
 - The Third Seal discards a path card (not Wait). Devour Hope's extra turn counts as the round's

@@ -4,6 +4,8 @@ import { RouterLink, RouterView, useRoute, useRouter, type RouteMeta } from 'vue
 import LoadingVeil from './components/LoadingVeil.vue'
 import Particles from './components/Particles.vue'
 import SoundSettings from './components/SoundSettings.vue'
+import UpdateBanner from './components/UpdateBanner.vue'
+import WhatsNew from './components/WhatsNew.vue'
 import { quoteOrTip, showLoading } from './loading'
 import { asset, lang } from './i18n'
 import { game } from './play/game'
@@ -12,9 +14,11 @@ import { session } from './play/online/session'
 import PhoneBlock from './play/views/PhoneBlock.vue'
 import { setAmbient, type AmbientTrack } from './sound'
 import { useLobbyStore } from './stores/lobby'
+import { startUpdateWatch } from './update'
 
 const lobby = useLobbyStore()
 const route = useRoute()
+startUpdateWatch()
 
 // Loading screen when entering the companion's table setup and when its trial starts: half the
 // time a quote from a survivor in this game, otherwise a rules tip. (The full game shows its own,
@@ -101,6 +105,8 @@ const scene = computed(() => {
   </div>
 
   <LoadingVeil />
+  <UpdateBanner />
+  <WhatsNew />
 
   <!-- in a full game, the game's own top bar (round, room, mute, leave) takes over -->
   <header v-if="!inGame" class="topbar">

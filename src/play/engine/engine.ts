@@ -1038,11 +1038,11 @@ function handle(st: GameState, a: Action) {
       const i = a.i ?? null
       if (i && !phantasmInteractions(st, step.room).some((o) => same(o, i))) fail('not a legal interaction there')
       if (askLeave(st, step.room, step, a)) return
-      k.bp -= step.face
-      log(st, `${k.name} จ่าย ${step.face} ▲ วาร์ปไป Phantasm Trap`, 'killer')
-      killerEnter(st, '', step.room)
-      // After the reveal and Quick & Quiet, interact with a survivor there.
-      st.queue.splice(2, 0, { k: 'phantasmHit', i })
+      // a Firecracker in the trap's room may stop the teleport, before he pays for it
+      const holders = step.room === k.room ? [] : fireHolders(st, step.room)
+      const go: Task = { k: 'phantasmGo', room: step.room, face: step.face, i }
+      if (holders.length) return wait(st, { t: 'reaction', item: 'firecracker', holders, pending: { t: 'move', path: '' }, then: [go] })
+      st.queue.unshift(go)
       return
     }
     case 'replaceCard': {
@@ -1165,6 +1165,15 @@ function runTask(st: GameState, task: Task) {
       return
     case 'survivorStep':
       return moveSurvivor(st, task.s, pathDef(st, task.path), task.to, true)
+    case 'phantasmGo': {
+      const k = st.killer
+      k.bp -= task.face
+      log(st, `${k.name} จ่าย ${task.face} ▲ วาร์ปไป Phantasm Trap`, 'killer')
+      killerEnter(st, '', task.room)
+      // After the reveal and Quick & Quiet, interact with a survivor there.
+      st.queue.splice(2, 0, { k: 'phantasmHit', i: task.i })
+      return
+    }
     case 'killerFollow': {
       // Deerstalker may have kept them in the room: then there is no one to follow
       if (st.survivors[task.s].room !== task.to) return
@@ -1705,10 +1714,11 @@ function killerEnter(st: GameState, path: string, to: string, broke = false) {
 
 function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, turn: number) {
   const k = st.killer
-  // The Hillbilly's chainsaw runs into a room: a Firecracker there may stop it, as any move of his
-  if (i.k === 'chainsaw' && !reacted) {
-    const to = exits(st, k.room, i.card as PathKind).find((e) => e.path.id === i.path)!.to
-    const holders = fireHolders(st, to)
+  // A power that takes him into a room (chainsaw, Blink, Wailing Bell): a Firecracker there may
+  // stop it, as any move of his. It is stopped before it is spent.
+  if (!reacted) {
+    const to = powerDest(st, i)
+    const holders = to && to !== k.room ? fireHolders(st, to) : []
     if (holders.length) return wait(st, { t: 'reaction', item: 'firecracker', holders, pending: { t: 'interact', i } })
   }
   if (isPower(i)) return usePower(st, i)
@@ -3416,7 +3426,8 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, 'ทำลาย Pallet แล้วเดินต่อ')
       palletOn(st, path)!.removed = true
       log(st, 'Pallet พัง', 'killer', { ev: { k: 'palletBreak', path } })
-      finishKillerMove(st, pathDef(st, path), to)
+      // walking on into the room: a Firecracker there may stop him (We're Gonna Live Forever was asked)
+      killerMovedBy(st, pathDef(st, path), to, true)
       trigger(st, { k: 'killerBreak', what: 'pallet' })
       return
     }

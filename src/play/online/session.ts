@@ -36,6 +36,8 @@ export const session = reactive({
   connected: true,
   /** A room that asked for its password (the code), for the board to ask the player. */
   needPassword: null as string | null,
+  /** The room the host kicked this device out of (shown on the entry page until closed). */
+  kicked: null as string | null,
 })
 
 let unsubscribe: (() => void) | null = null
@@ -111,8 +113,22 @@ export function lastRoom(): string | null {
   }
 }
 
+/** This device's member entry is in the room (set once joining is done): its removal is a kick. */
+let joined = false
+
+/** Every device in a room keeps its listing fresh, so a room in use never looks abandoned. */
+const HEARTBEAT_MS = 4 * 60 * 1000
+let heartbeat: number | null = null
+function stopHeartbeat() {
+  if (heartbeat !== null) clearInterval(heartbeat)
+  heartbeat = null
+}
+
 function enter(room: Room) {
+  joined = false
   session.room = room
+  stopHeartbeat()
+  heartbeat = window.setInterval(() => void backend.touchRoom(room.code).catch(() => {}), HEARTBEAT_MS)
   unwatchConnection?.()
   session.connected = true
   unwatchConnection = room.onConnection?.((up) => (session.connected = up)) ?? null
@@ -120,6 +136,13 @@ function enter(room: Room) {
   unsubscribe = room.subscribe((data) => {
     session.data = data
     if (!data) return leaveRoom()
+    // Taken out of the lobby by the host: back to the entry page, with a notice
+    if (joined && data.phase === 'lobby' && !data.game && !data.members[session.me]) {
+      const code = room.code
+      leaveRoom()
+      session.kicked = code
+      return
+    }
     if (data.host === session.me) publish(room.code, data)
     // Mirror the room's game. A device without a seat watches (seat 0 may not act).
     online.value = data.game ? { room, seat: mySeat.value ?? 0, latest: () => toRaw(session.data)?.game ?? null } : null
@@ -146,6 +169,7 @@ const update = (fn: (cur: RoomData) => RoomData | null) => guard(() => session.r
 /** Add this device to the room's members (keeping its side if it was here before). */
 function join(name: string) {
   return session.room!.updateRoom((cur) => {
+    if (cur.kicked?.[session.me]) return null
     const old = cur.members[session.me]
     return {
       ...cur,
@@ -178,6 +202,7 @@ export function createRoom(name: string, roomName = '', password = '') {
     enter(room)
     await room.updateRoom((cur) => ({ ...cur, name: roomName.trim() || randomRoomName(), ...(hash ? { passwordHash: hash } : {}) }))
     await join(name)
+    joined = true
     return code
   })
 }
@@ -188,6 +213,10 @@ export function joinRoom(code: string, name: string, password = '') {
     if (!room) throw new Error(`ไม่พบห้อง ${code.toUpperCase()}`)
     // a password, unless this device is in the room already (coming back)
     const lock = await backend.lockOf(room.code, session.me)
+    if (lock.kicked && !lock.member) {
+      room.close()
+      throw new Error('คุณถูกเตะออกจากห้องนี้ เข้าอีกไม่ได้')
+    }
     if (lock.hash && !lock.member) {
       if (!password || (await hashPassword(room.code, password.trim())) !== lock.hash) {
         room.close()
@@ -199,17 +228,20 @@ export function joinRoom(code: string, name: string, password = '') {
     remember(room.code, name)
     enter(room)
     await join(name)
+    joined = true
     return room.code
   })
 }
 
 export function leaveRoom() {
+  joined = false
+  stopHeartbeat()
   const room = session.room
-  // the last one out of a lobby takes the room off the board
   const d = session.data
-  if (room && d && d.phase === 'lobby' && !d.game && Object.keys(d.members).every((id) => id === session.me)) void backend.unlistRoom(room.code)
+  // the last one out of a lobby closes the room: its data goes with it, not left on the server
+  const lastOut = !!room && !!d && d.phase === 'lobby' && !d.game && Object.keys(d.members).every((id) => id === session.me)
   // In the lobby, leaving frees the place; once seated, the member stays so they can come back.
-  if (room && session.data?.phase === 'lobby' && !session.data.game)
+  if (room && !lastOut && d?.phase === 'lobby' && !d.game)
     void room.updateRoom((cur) => {
       const members = { ...cur.members }
       delete members[session.me]
@@ -221,6 +253,8 @@ export function leaveRoom() {
   unwatchConnection = null
   session.connected = true
   room?.close()
+  // after the listeners are off: they would see the room vanish and call this again
+  if (room && lastOut) void backend.deleteRoom(room.code).catch(() => {})
   session.room = null
   session.data = null
   remember(null)
@@ -248,8 +282,21 @@ function publish(code: string, d: RoomData) {
   })
 }
 
-/** Rooms left untouched this long are taken for abandoned (the local backend has no disconnect). */
-export const BOARD_STALE_MS = 6 * 60 * 60 * 1000
+/** A listing nobody has touched for this long (a few heartbeats) is a room with nobody in it: off the board. */
+export const BOARD_STALE_MS = 15 * 60 * 1000
+/** …and for this long, the room is abandoned: whoever opens the board deletes it from the server. */
+export const ROOM_TTL_MS = 72 * 60 * 60 * 1000
+
+const reaped = new Set<string>()
+/** Delete the rooms of the board that nobody has used for `ROOM_TTL_MS` (each tried once per page). */
+export function sweepRooms(list: RoomListing[]) {
+  const cutoff = Date.now() - ROOM_TTL_MS
+  for (const r of list) {
+    if (!r?.code || r.updatedAt >= cutoff || reaped.has(r.code)) continue
+    reaped.add(r.code)
+    void backend.reapRoom(r.code, cutoff).catch(() => {})
+  }
+}
 
 const NAME_START = ['คืนหลอนที่', 'หนีตายจาก', 'ปาร์ตี้ที่', 'ล่าท้าผีที่', 'เอาตัวรอดใน', 'หมอกดำเหนือ', 'เสียงกรีดร้องจาก', 'ทริปสยองที่']
 const NAME_END = ['MacMillan', 'Autohaven', 'Coldwind', 'Crotus Prenn', 'Haddonfield', 'Ormond', 'Red Forest', 'Backwater', 'Yamaoka', 'Silent Hill', 'Grave of Glenvale']
@@ -304,6 +351,18 @@ export const doubleId = computed(() => {
  * Choose who plays two survivors: the host for anyone, a survivor player for themselves. Everyone
  * says "ready" again, so the change is seen.
  */
+/** Host, in the lobby: take a player out of the room, and keep them out. */
+export function kickMember(id: string) {
+  return update((cur) => {
+    if (session.me !== cur.host || id === cur.host || cur.phase !== 'lobby' || cur.game || !cur.members[id]) return null
+    const members = { ...cur.members }
+    delete members[id]
+    // everyone un-readies: the table changed under them
+    const readied = Object.fromEntries(Object.entries(members).map(([k, m]) => [k, { ...m, ready: false }]))
+    return { ...cur, members: readied, kicked: { ...(cur.kicked ?? {}), [id]: Date.now() }, ...(cur.double === id ? { double: undefined } : {}) }
+  })
+}
+
 export function setDouble(id: string) {
   return update((cur) => {
     const target = cur.members[id]

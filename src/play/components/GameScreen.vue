@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
-import { anyMoves, boardOf, survivorInteractions, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, survivorInteractions, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
-import { clearFx, flash, fx, showAction, showBanner, showDice, showPerk, type DiceShow, type SkillVerdict } from '../fx/bus'
+import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showPerk, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
 import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
@@ -22,6 +22,10 @@ import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerM
 import SoundSettings from '../../components/SoundSettings.vue'
 import ActionPanel from './ActionPanel.vue'
 import ActionReveal from './ActionReveal.vue'
+import FinaleReveal from './FinaleReveal.vue'
+import SacrificeReveal from './SacrificeReveal.vue'
+import StartPlacement from './StartPlacement.vue'
+import { SEEN, firstTime, gameKey, startMinis, startsRolled } from '../intro'
 import BannerHost from './BannerHost.vue'
 import Board from './Board.vue'
 import ChoiceMenu from './ChoiceMenu.vue'
@@ -59,6 +63,8 @@ watch(
     }
     const fresh = st.log.slice(prev.log.length)
     const casts = new CastBuilder(prev, st)
+    // the track as it stood before each event: only a rise is shown (Breakdown lowers it)
+    let sacrificed = prev.sacrifice
     for (const [n, e] of fresh.entries()) {
       const ev = e.ev
       // a player's action (a card played, an attack, a pallet, the power): shown before the result
@@ -69,6 +75,12 @@ watch(
         showPerk({ item: ev.item, owner: ev.s, detail: said?.text.replace(`${st.survivors[ev.s].name} `, '') ?? '' })
       }
       // The perk's card, big: the log line after "—" says what it did.
+      if (ev?.k === 'sacrifice') {
+        // the last one is the finale's, not a card of its own
+        if (ev.total > sacrificed && ev.total < SACRIFICE_TO_WIN) showSacrifice(ev.total, ev.total - sacrificed)
+        sacrificed = ev.total
+      }
+      if (ev?.k === 'gameOver') showFinale(ev.winner)
       if (ev?.k === 'perk') showPerk({ perk: ev.perk, owner: ev.who, detail: e.text.split(' — ').slice(1).join(' — ') })
       // A roll already shown while it waited for a decision, and kept as it was, isn't shown twice.
       if (e.dice && ev?.k === 'roll' && JSON.stringify(e.dice) !== pendingShown)
@@ -99,16 +111,30 @@ watch(
         })
       }
     } else if (prev.step.t !== 'roll') pendingShown = null
-    if (!fx.perks.length && !fx.dice.length) view.value = st
+    if (!fx.perks.length && !fx.dice.length && !fx.finale) view.value = st
   },
 )
 
 watch(
-  () => fx.perks.length + fx.dice.length,
+  () => fx.perks.length + fx.dice.length + (fx.finale ? 1 : 0),
   (n) => {
     if (n === 0) view.value = props.st
   },
 )
+
+// ---------- the minis' start-room rolls, played on the map ----------
+
+watch(
+  () => props.st,
+  (st) => {
+    if (fx.starts || !startsRolled(st) || !firstTime(SEEN, gameKey(st))) return
+    showStarts(startMinis(st))
+  },
+  { immediate: true },
+)
+/** The minis the rolls have not placed yet are off the map. */
+const startHidden = computed(() => (fx.starts ? fx.starts.minis.slice(fx.starts.shown).map((m) => m.key) : undefined))
+const startArrive = computed(() => (fx.starts && fx.starts.shown > 0 ? fx.starts.minis[fx.starts.shown - 1].key : undefined))
 
 // ---------- board targets ----------
 
@@ -248,21 +274,31 @@ const boardFocus = computed(() => {
   return decisionFocus(view.value, powerMode.value)?.focus ?? null
 })
 
+/**
+ * Online: whether the screen as it is held (`view`) is waiting on this device. `view` trails the
+ * newest state while dice, perk cards and the board play, so `myTurn` can already be true (or
+ * still false) for what the panels show. Anything that picks which panel to show, or lights
+ * targets, goes by this — else, for a moment, the player who is up next sees the panel of the
+ * one who just moved. `myTurn` stays for what must react at once (the "your turn" cues).
+ */
+// (and not while the minis are still being placed on the map: nobody is asked anything yet)
+const viewTurn = computed(() => !fx.starts && (!online.value || actorsOf(view.value).includes(online.value.seat)))
+
 /** Everything clickable on the board now, and the shapes the board takes them in. */
 const actions = computed(() => boardActions(view.value, modes))
 // Online, only the player the game waits on gets clickable targets.
 const targets = computed(() => {
-  const t = myTurn.value ? boardTargets(actions.value) : boardTargets([])
+  const t = viewTurn.value ? boardTargets(actions.value) : boardTargets([])
   // a hand of cards is out (planning, a bonus turn): its paths pick a card
   const pp = pathPick.value
-  if (pp && myTurn.value) {
+  if (pp && viewTurn.value) {
     for (const [id, card] of Object.entries(pp.paths)) t.paths[id] ??= pathPickLabel(card)
     for (const [id, card] of Object.entries(pp.rooms)) t.rooms[id] ??= pathPickLabel(card)
   }
   return t
 })
 /** What the board already offers: the side panels leave these out and point at the board. */
-const onBoard = computed(() => (myTurn.value ? boardActionKeys(actions.value) : new Set<string>()))
+const onBoard = computed(() => (viewTurn.value ? boardActionKeys(actions.value) : new Set<string>()))
 
 /** Online planning: what this device has already sent, while the others finish. */
 const myPlanDone = computed(() => {
@@ -290,7 +326,7 @@ function undoPlan() {
 /** Online: who the game is waiting on, for the side panel. */
 const waitingOn = computed(() => {
   const o = online.value
-  if (!o || myTurn.value) return null
+  if (!o || viewTurn.value || fx.starts) return null
   const st = view.value
   const names = actorsOf(st).map((p) => {
     const seat = session.data?.seats[String(p)]
@@ -679,7 +715,7 @@ watch(
 // a move or a plan stays theirs, and the whole room is told they are over time.
 
 const turnLimit = computed(() => (online.value && props.st.phase !== 'over' ? roomSettings.value.timer : 0))
-const fxBusy = computed(() => fx.dice.length > 0 || fx.perks.length > 0 || fx.boardBusy)
+const fxBusy = computed(() => fx.dice.length > 0 || fx.perks.length > 0 || !!fx.finale || !!fx.starts || fx.boardBusy)
 /** Changes with every new decision (or new set of players being waited on). */
 const waitKey = computed(() => JSON.stringify([props.st.step, actorsOf(props.st)]))
 const turnStarted = ref(Date.now())
@@ -850,11 +886,9 @@ watch(
 
 const over = computed(() => (view.value.step.t === 'gameOver' ? view.value.step.winner : null))
 const showOver = ref(true)
-watch(over, (w) => {
+watch(over, () => {
   showOver.value = true
   summaryRound.value = null
-  if (w === 'survivors') sfx.escape()
-  if (w === 'killer') sfx.sacrifice()
 })
 
 // ---------- full screen: hides the browser's bars, so the board gets bigger ----------
@@ -969,6 +1003,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
             @pointerdown.capture="trackPointer"
             :picked="revealing?.props ?? (oppressing ? multiPick : undefined)"
             :focus="boardFocus"
+            :hide-minis="startHidden"
+            :arrive="startArrive"
             @interact="onInteract"
             @path="onPath"
             @prop="onProp"
@@ -980,7 +1016,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       <aside v-show="!sideFolded" class="side" :class="{ nudge }">
         <!-- a perk decision (PerkPrompt), teleported here: while it is open it is the panel -->
         <div id="side-dock" />
-        <Planning v-if="planning && myTurn" :st="view" />
+        <Planning v-if="planning && viewTurn" :st="view" />
         <section v-else-if="waitingOn && !over" class="card waiting">
           <p v-if="myPlanDone" class="done-note">✓ {{ myPlanDone }}</p>
           <button v-if="myPlanDone" type="button" class="undo-plan" @click="undoPlan">↶ ยกเลิก — เลือกการ์ดใหม่</button>
@@ -1034,11 +1070,14 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       </button>
     </Teleport>
 
-    <BannerHost :paused="summaryRound !== null || !!over || fx.dice.length > 0 || fx.perks.length > 0" />
+    <BannerHost :paused="summaryRound !== null || !!over || fx.dice.length > 0 || fx.perks.length > 0 || !!fx.finale || !!fx.starts" />
     <ChoiceMenu v-if="menu" :st="view" :actions="menu.actions" :x="menu.x" :y="menu.y" @close="menu = null" />
     <PerkReveal :st="view" />
     <ActionReveal :st="view" />
-    <PerkPrompt :st="view" :hidden="secret || !!over || !myTurn" :on-board="onBoard" />
+    <SacrificeReveal :st="view" />
+    <FinaleReveal :st="props.st" />
+    <StartPlacement />
+    <PerkPrompt :st="view" :hidden="secret || !!over || !viewTurn" :on-board="onBoard" />
     <DiceModal />
     <RoundSummary v-if="summaryRound !== null && !over && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" @close="summaryRound = null" />
     <DetailModal v-if="inspecting" :st="view" :target="inspecting" @close="inspecting = null" />
@@ -1048,7 +1087,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 
 <style scoped>
 .game {
-  min-height: 100vh;
+  min-height: var(--vh);
   display: flex;
   flex-direction: column;
 }
@@ -1102,7 +1141,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 .stage > .board {
   flex: 0 1 auto;
   min-width: 0;
-  width: max(22rem, calc((100vh - 4rem) * var(--aspect)));
+  width: max(22rem, calc((var(--vh) - 4rem) * var(--aspect)));
 }
 @media (max-width: 980px) {
   /* one column: the map, then the tiles under it */
@@ -1176,11 +1215,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   }
   .side {
     top: 0.5rem;
-    max-height: calc(100vh - 1rem);
+    max-height: calc(var(--vh) - 1rem);
   }
   /* no top bar to leave room for: only the padding */
   .stage > .board {
-    width: max(22rem, calc((100vh - 1.25rem) * var(--aspect)));
+    width: max(22rem, calc((var(--vh) - 1.25rem) * var(--aspect)));
   }
 }
 /* online: while the game waits on this device, a pill at the top and a gold glow round the
@@ -1347,7 +1386,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   gap: 0.75rem;
   position: sticky;
   top: 4rem;
-  max-height: calc(100vh - 5rem);
+  max-height: calc(var(--vh) - 5rem);
   overflow-y: auto;
 }
 /* Screens narrower than 16:9 (a tablet): the map is limited by the width, so it takes the whole
@@ -1362,7 +1401,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     top: 3.4rem;
     right: 2.5rem;
     width: 320px;
-    max-height: calc(100vh - 4.2rem);
+    max-height: calc(var(--vh) - 4.2rem);
   }
   /* see-through, so the map shows under it; solid again while the pointer is on it, to read */
   .side > :deep(.card) {
@@ -1406,7 +1445,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 }
 @media (min-width: 981px) and (max-aspect-ratio: 1777/1000) {
   :global(body.hand-open .layout .side) {
-    max-height: calc(100vh - 3.4rem - 80px);
+    max-height: calc(var(--vh) - 3.4rem - 80px);
   }
 }
 /* The hand of cards rests sunk in the bottom-right corner (CardHand), its names showing: the
@@ -1414,17 +1453,17 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
    no pointer to hover (a tablet) the hand stays up, and the panel stops above all of it. */
 @media (min-width: 981px) {
   :global(body.hand-open .side) {
-    max-height: calc(100vh - 4rem - 70px);
+    max-height: calc(var(--vh) - 4rem - 70px);
   }
 }
 @media (min-width: 981px) and (min-aspect-ratio: 16/9) {
   :global(body.hand-open .side) {
-    max-height: calc(100vh - 1rem - 70px);
+    max-height: calc(var(--vh) - 1rem - 70px);
   }
 }
 @media (min-width: 981px) and (hover: none) {
   :global(body.hand-open .side) {
-    max-height: calc(100vh - 4rem - 250px);
+    max-height: calc(var(--vh) - 4rem - 250px);
   }
 }
 /* The mode bars float at the foot of the screen instead of sitting above the map, so the board

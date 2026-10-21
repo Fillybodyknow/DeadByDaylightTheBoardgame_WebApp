@@ -536,6 +536,8 @@ export type Task =
   | { k: 'itemUse'; s: number; use: ItemUse }
   /** The Hag teleported: interact once the room is revealed. */
   | { k: 'phantasmHit'; i: KillerInteraction | null }
+  /** The teleport to a Phantasm Trap, once a Firecracker has not stopped it: pays, goes, interacts. */
+  | { k: 'phantasmGo'; room: string; face: number; i: KillerInteraction | null }
   /** Poised: survivor `s` takes a bonus turn, then the turn goes back to `back`. */
   | { k: 'poisedTurn'; s: number }
   | { k: 'activeBack'; s: number | null }

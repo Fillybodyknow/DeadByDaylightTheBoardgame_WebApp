@@ -519,6 +519,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </details>
       </div>
       <!-- a perk is picked first (its targets then show on the board), again to put it back -->
+      <p v-if="buttons.length && !perkPicked" class="perk-lead">⚡ Perk ที่ใช้ได้ตอนนี้ — คลิกการ์ดเพื่อใช้ แล้วเลือกเป้าหมายบนแผนที่</p>
       <div v-for="b in buttons" :key="b.perk" class="perk-group" :class="{ picked: perkPicked === b.perk }">
         <!-- the perk's card: picture, name, cost and text — a click picks it -->
         <button type="button" class="perk-name perk-card" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
@@ -1039,6 +1040,38 @@ p {
   color: #d8c2ff;
 }
 /* the perk picked: its targets are on the board */
+/* a perk that can be used now: its card glows and pulses, and a line above says so — in the same
+   dark button chrome as the rest it was easy to miss */
+.perk-lead {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffe9b0;
+}
+.perk-group:not(.picked) {
+  border-left-width: 4px;
+  background: rgb(120 70 200 / 0.16);
+}
+.perk-group:not(.picked) .perk-name {
+  border-color: #c9a2ff;
+  animation: perk-ready 1.8s ease-in-out infinite;
+}
+.perk-group:not(.picked) .perk-card-hint {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+}
+@keyframes perk-ready {
+  50% {
+    box-shadow: 0 0 16px rgb(190 140 255 / 0.75);
+    border-color: #ffe9b0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .perk-group:not(.picked) .perk-name {
+    animation: none;
+  }
+}
 .perk-group.picked {
   border-left-color: #ffe9b0;
   background: rgb(255 214 140 / 0.1);

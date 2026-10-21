@@ -20,7 +20,7 @@
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { get, getDatabase, onChildAdded, onDisconnect, onValue, ref, remove, runTransaction, set, update, type Database } from 'firebase/database'
+import { get, getDatabase, onChildAdded, onValue, ref, runTransaction, set, update, type Database } from 'firebase/database'
 import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
@@ -66,6 +66,7 @@ function lobbyOf(r: RoomData): Lobby {
     ...(r.settings ? { settings: r.settings } : {}),
     ...(r.name ? { name: r.name } : {}),
     ...(r.passwordHash ? { passwordHash: r.passwordHash } : {}),
+    ...(r.kicked && Object.keys(r.kicked).length ? { kicked: r.kicked } : {}),
     ...(r.loadouts ? { loadouts: r.loadouts } : {}),
     ...(r.perksDone ? { perksDone: r.perksDone } : {}),
     ...(r.perkSeed ? { perkSeed: r.perkSeed } : {}),
@@ -332,17 +333,32 @@ export const firebaseBackend: Backend = {
     return onValue(ref(database(), 'roomIndex'), (snap) => cb(Object.values((snap.val() as Record<string, RoomListing> | null) ?? {})))
   },
   async publishRoom(listing) {
-    const node = ref(database(), `roomIndex/${listing.code}`)
-    await set(node, listing)
-    // the host's device keeps it; when it goes, the room leaves the board (the code still works)
-    await onDisconnect(node).remove()
+    // The listing stays when the host's device goes (every device in the room keeps it fresh,
+    // `touchRoom`): it is also how a room nobody uses any more is found and deleted (`reapRoom`).
+    await set(ref(database(), `roomIndex/${listing.code}`), listing)
+  },
+  async touchRoom(code) {
+    // the rules refuse a listing without a name, so this can't bring a deleted room back
+    await set(ref(database(), `roomIndex/${code}/updatedAt`), Date.now())
+  },
+  async deleteRoom(code) {
+    await update(ref(database()), { [`rooms/${code}`]: null, [`roomIndex/${code}`]: null })
+  },
+  async reapRoom(code, olderThan) {
+    // read it fresh: someone may have touched the room since the board was loaded
+    const snap = await get(ref(database(), `roomIndex/${code}/updatedAt`))
+    const at = snap.val() as number | null
+    if (typeof at !== 'number' || at >= olderThan) return false
+    await update(ref(database()), { [`rooms/${code}`]: null, [`roomIndex/${code}`]: null })
+    return true
   },
   async lockOf(code, member) {
-    const [hash, inRoom] = await Promise.all([get(ref(database(), `rooms/${code}/lobby/passwordHash`)), get(ref(database(), `rooms/${code}/lobby/members/${member}`))])
-    return { ...(hash.exists() ? { hash: hash.val() as string } : {}), member: inRoom.exists() }
-  },
-  async unlistRoom(code) {
-    await remove(ref(database(), `roomIndex/${code}`))
+    const [hash, inRoom, kicked] = await Promise.all([
+      get(ref(database(), `rooms/${code}/lobby/passwordHash`)),
+      get(ref(database(), `rooms/${code}/lobby/members/${member}`)),
+      get(ref(database(), `rooms/${code}/lobby/kicked/${member}`)),
+    ])
+    return { ...(hash.exists() ? { hash: hash.val() as string } : {}), member: inRoom.exists(), kicked: kicked.exists() }
   },
   async create(code, host) {
     const room = emptyRoom(host)

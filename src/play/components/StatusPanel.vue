@@ -305,6 +305,8 @@ function onPowerSlot() {
       >
         <span class="slot-crop"><img :src="asset(itemImage(st.survivors[slotOwner].item!))" alt="" /></span>
         <span class="slot-name">{{ ITEM_NAMES[st.survivors[slotOwner].item!] }}</span>
+        <!-- what the item can do now, in words: gold and pulsing when it can be used -->
+        <span class="slot-use">{{ itemUses(st, slotOwner).length > 0 ? '👆 กดเพื่อใช้' : 'ยังใช้ไม่ได้ตอนนี้' }}</span>
       </button>
       <div v-else class="slot empty" :title="`${st.survivors[slotOwner].name} ไม่มี item`">
         <span class="slot-crop" />
@@ -513,7 +515,57 @@ button.slot:hover .slot-crop {
     box-shadow: 0 0 18px rgb(255 214 140 / 0.9);
   }
 }
+/* an item that can be used now stands out of the rail: a gold frame, a ring spreading from the
+   icon, the words under it; one that cannot is dimmed, so the difference is not only a glow */
+.item-slot .slot-use {
+  font-size: 0.66rem;
+  line-height: 1.2;
+  color: var(--muted);
+}
+.item-slot:not(.usable) .slot-crop {
+  filter: saturate(0.45) brightness(0.7);
+}
+.item-slot.usable {
+  border-color: #ffd98a;
+  background: linear-gradient(180deg, rgb(70 52 14 / 0.9), rgb(28 22 10 / 0.95));
+  box-shadow: 0 0 16px rgb(255 205 100 / 0.35);
+}
+.item-slot.usable .slot-crop::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 6px;
+  border: 2px solid #ffe9b0;
+  animation: item-ring 1.6s ease-out infinite;
+  pointer-events: none;
+}
+.item-slot.usable .slot-use {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #ffe9b0;
+  text-shadow: 0 0 8px rgb(255 190 80 / 0.7);
+  animation: item-text 1.6s ease-in-out infinite;
+}
+@keyframes item-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+@keyframes item-text {
+  50% {
+    opacity: 0.6;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
+  .item-slot.usable .slot-crop::after,
+  .item-slot.usable .slot-use {
+    animation: none;
+  }
   .slot.usable .slot-icon,
   .slot.usable .slot-crop {
     animation: none;
@@ -894,6 +946,12 @@ button.item img {
 .item.usable {
   border-color: #ffe9b0;
   box-shadow: 0 0 10px rgb(255 214 140 / 0.55);
+  animation: ready 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .item.usable {
+    animation: none;
+  }
 }
 /* the item modal */
 .item-backdrop {

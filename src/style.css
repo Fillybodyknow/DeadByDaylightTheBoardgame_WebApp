@@ -6,6 +6,9 @@
  * uppercase condensed headings (Kanit covers Thai and Latin).
  */
 :root {
+  /* The screen's height as it is now: on a tablet's browser, 100vh counts the toolbars that are
+     showing, so a panel sized to it ran under the hand of cards (dvh follows the toolbars). */
+  --vh: 100vh;
   --bg: #07080a;
   --bg-raised: #111317;
   --bg-hover: #1b1e24;
@@ -29,6 +32,11 @@
   line-height: 1.5;
   color: var(--text);
   background: var(--bg);
+}
+@supports (height: 100dvh) {
+  :root {
+    --vh: 100dvh;
+  }
 }
 
 * {

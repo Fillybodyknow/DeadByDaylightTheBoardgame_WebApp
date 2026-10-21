@@ -1871,6 +1871,97 @@ describe("a Firecracker stops any move of the killer into its holder's room", ()
     expect(stopped.killer.room).toBe('shack')
     expect(stopped.survivors.some((sv) => sv.status === 'carried')).toBe(false)
   })
+
+  it("The Nurse's blink: stopped before it is spent, he stays", () => {
+    const st = game('nurse')
+    only(st)
+    st.killer.room = 'mine-depths'
+    st.survivors.forEach((sv) => (sv.room = 'backlot'))
+    Object.assign(st.survivors[2], { room: 'shack', item: 'firecracker' })
+    killerInteracting(st)
+    const asked = apply(st, { t: 'interact', i: { k: 'blink', path: 'p4' } })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'firecracker', holders: [2] })
+    const stopped = apply(asked, { t: 'react', s: 2 })
+    expect(stopped.killer.room).toBe('mine-depths')
+    expect(stopped.survivors[2].item).toBe(null)
+    // the blink is not spent
+    expect(stopped.killer.powerUsed).toBe(false)
+    // nobody throws: the blink goes through the wall as before
+    let on = apply(asked, { t: 'react', s: null })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.killer.room).toBe('shack')
+  })
+
+  it("The Wraith's Wailing Bell: a Firecracker in the room it rings in keeps him out", () => {
+    const st = game('wraith')
+    only(st)
+    st.killer.room = 'shack'
+    st.survivors.forEach((sv) => (sv.room = 'backlot'))
+    Object.assign(st.survivors[2], { room: 'coal-tower-upper', item: 'firecracker' })
+    killerInteracting(st)
+    const bell = killerInteractions(st).find((i) => i.k === 'bell' && i.room === 'coal-tower-upper')!
+    const asked = apply(st, { t: 'interact', i: bell })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'firecracker', holders: [2] })
+    expect(apply(asked, { t: 'react', s: 2 }).killer.room).toBe('shack')
+    let on = apply(asked, { t: 'react', s: null })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.killer.room).toBe('coal-tower-upper')
+  })
+
+  it("The Hag's teleport to a Phantasm Trap: stopped, and she doesn't pay for it", () => {
+    const base = game('hag')
+    only(base)
+    base.killer.room = 'mine-depths'
+    base.killer.bp = 8
+    base.phantasm = ['scrapyard']
+    base.survivors.forEach((sv) => (sv.room = 'backlot'))
+    base.survivors[0].room = 'ancient-tree'
+    base.phase = 'survivors'
+    base.activeSurvivor = 0
+    base.step = { t: 'survivorMove', s: 0, card: 'sneak' }
+    base.queue = [{ k: 'survivorInteract', s: 0 }]
+    let st = apply(base, { t: 'move', path: 'p14' })
+    while (st.step.t === 'revealProp') st = apply(st, legalActions(st)[0])
+    expect(st.step).toMatchObject({ t: 'phantasmChoice', room: 'scrapyard' })
+    // the survivor who walked in has a Firecracker
+    st.survivors[0].item = 'firecracker'
+    const bp = st.killer.bp
+    const asked = apply(st, { t: 'phantasm', teleport: true, i: { k: 'attack', target: 0 } })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'firecracker', holders: [0] })
+    const stopped = apply(asked, { t: 'react', s: 0 })
+    expect(stopped.killer.room).toBe('mine-depths')
+    expect(stopped.killer.bp).toBe(bp)
+    expect(stopped.survivors[0].wounded).toBe(false)
+    // nobody throws: the teleport goes ahead, paid
+    let on = apply(asked, { t: 'react', s: null })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.killer.room).toBe('scrapyard')
+    expect(on.killer.bp).toBeLessThan(bp)
+  })
+
+  it('Enduring: walking on after breaking the pallet is a move into the room too', () => {
+    const st = game('hillbilly')
+    only(st, 'enduring')
+    st.killer.room = 'scrapyard'
+    killerInteracting(st)
+    st.killer.planned = ['sprint', 'wait']
+    st.killer.revealedCount = 1
+    st.survivors.forEach((sv) => (sv.room = 'backlot'))
+    Object.assign(st.survivors[2], { room: 'shack', item: 'firecracker' })
+    const pallet = st.props.find((p) => p.kind === 'pallet')!
+    Object.assign(pallet, { room: null, path: 'p16', revealed: true, removed: false })
+    st.step = { t: 'killerMove', turn: 0, card: 'sprint' }
+    const offered = apply(st, { t: 'move', path: 'p16' })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'enduring' })
+    const asked = apply(offered, { t: 'perk', perk: 'enduring', use: true, choice: {} })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'firecracker', holders: [2] })
+    const stopped = apply(asked, { t: 'react', s: 2 })
+    expect(stopped.killer.room).toBe('scrapyard')
+    expect(stopped.props.find((p) => p.id === pallet.id)!.removed).toBe(true)
+    let on = apply(asked, { t: 'react', s: null })
+    while (on.step.t === 'revealProp') on = apply(on, legalActions(on)[0])
+    expect(on.killer.room).toBe('shack')
+  })
 })
 
 describe('David King', () => {

@@ -171,6 +171,17 @@ async function writeBoard(fn: (cur: Record<string, RoomListing>) => Record<strin
   ch.close()
 }
 
+/** Drop a room's record. */
+async function destroy(code: string) {
+  const db = await open()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    tx.objectStore(STORE).delete(code)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
 export const localBackend: Backend = {
   name: 'local',
   listRooms(cb) {
@@ -185,14 +196,24 @@ export const localBackend: Backend = {
   },
   async lockOf(code, member) {
     const d = await read(code)
-    return { ...(d?.passwordHash ? { hash: d.passwordHash } : {}), member: !!d?.members[member] }
+    return { ...(d?.passwordHash ? { hash: d.passwordHash } : {}), member: !!d?.members[member], kicked: !!d?.kicked?.[member] }
   },
-  async unlistRoom(code) {
+  async touchRoom(code) {
+    await writeBoard((cur) => (cur[code] ? { ...cur, [code]: { ...cur[code], updatedAt: Date.now() } } : cur))
+  },
+  async deleteRoom(code) {
+    await destroy(code)
     await writeBoard((cur) => {
       const next = { ...cur }
       delete next[code]
       return next
     })
+  },
+  async reapRoom(code, olderThan) {
+    const listing = (await readBoard()).find((l) => l.code === code)
+    if (!listing || listing.updatedAt >= olderThan) return false
+    await this.deleteRoom(code)
+    return true
   },
   async create(code, host) {
     await modify(code, () => emptyRoom(host))

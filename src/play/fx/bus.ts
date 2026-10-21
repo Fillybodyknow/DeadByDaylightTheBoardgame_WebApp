@@ -24,6 +24,18 @@ export interface DiceShow {
   progress?: { before: number; after: number; max: number }
 }
 
+/** One mini's start-room roll (setup step 11), read back from the room the engine put it in. */
+export interface StartMini {
+  /** The board's mini key: "s0".."s3" or "k". */
+  key: string
+  name: string
+  image: string
+  killer?: boolean
+  player: string
+  room: string
+  face: number
+}
+
 export type SkillVerdict = 'great' | 'good' | 'fail'
 
 export interface Banner {
@@ -48,6 +60,8 @@ export interface PerkShow {
   detail: string
   /** Not a card at all: a player's action (ActionReveal shows these, in the same queue). */
   action?: ActionShow
+  /** Not a card at all: the killer's Sacrifice Progress going up (SacrificeReveal shows these). */
+  sacrifice?: { total: number; gained: number }
 }
 
 /** A player's action, shown briefly before the board plays it out (built in casts.ts). */
@@ -75,6 +89,10 @@ export const fx = reactive({
   dice: [] as DiceShow[],
   banners: [] as Banner[],
   flash: null as { id: number; tone: 'red' | 'gold' | 'white' } | null,
+  /** The minis' start-room rolls, on the map: `shown` of them are placed so far. */
+  starts: null as { id: number; minis: StartMini[]; shown: number; face: number; landed: boolean } | null,
+  /** The game just ended: its last beat (FinaleReveal) shows after everything queued before it. */
+  finale: null as { id: number; winner: 'survivors' | 'killer' } | null,
   /** The board is animating what just happened (walks, hits, hooks): questions wait for it. */
   boardBusy: false,
 })
@@ -108,8 +126,20 @@ export function showAction(a: Omit<ActionShow, 'id'>) {
   fx.perks.push({ id: n, owner: a.owner, detail: '', action: { ...a, id: n } })
 }
 
+export function showSacrifice(total: number, gained: number) {
+  fx.perks.push({ id: ++id, owner: 'killer', detail: '', sacrifice: { total, gained } })
+}
+
 export function showPerk(p: Omit<PerkShow, 'id'>) {
   fx.perks.push({ ...p, id: ++id })
+}
+
+export function showStarts(minis: StartMini[]) {
+  fx.starts = { id: ++id, minis, shown: 0, face: 0, landed: false }
+}
+
+export function showFinale(winner: 'survivors' | 'killer') {
+  fx.finale = { id: ++id, winner }
 }
 
 export function flash(tone: 'red' | 'gold' | 'white') {
@@ -121,5 +151,7 @@ export function clearFx() {
   fx.dice.splice(0)
   fx.banners.splice(0)
   fx.flash = null
+  fx.finale = null
+  fx.starts = null
   fx.boardBusy = false
 }

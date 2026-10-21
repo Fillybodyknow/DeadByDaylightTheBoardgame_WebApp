@@ -26,6 +26,7 @@ import {
   setLoadout,
   doubleId,
   isHost,
+  kickMember,
   leaveRoom,
   lobbyBlocker,
   lockPicks,
@@ -118,6 +119,15 @@ const survivorCount = computed(() => memberList.value.filter((m) => m.side === '
 function side(s: 'killer' | 'survivor') {
   sfx.click()
   void setSide(me.value?.side === s ? null : s)
+}
+
+/** The host may kick anyone else out of the lobby. */
+const canKick = (id: string | undefined) => !!id && isHost.value && id !== session.me && data.value.phase === 'lobby' && !data.value.game
+function kick(id: string) {
+  const who = data.value.members[id]?.name ?? 'ผู้เล่น'
+  if (!confirm(`เตะ ${who} ออกจากห้อง? เขาจะกลับเข้าห้องนี้ไม่ได้อีก`)) return
+  sfx.click()
+  void kickMember(id)
 }
 
 /** Your own seat, while not ready yet: a click on it leaves that side. */
@@ -301,6 +311,7 @@ function start() {
               <span v-else class="seat-name">{{ killerMember.name }}</span>
               <span class="seat-sub">{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}</span>
               <span v-if="leavable(killerMember.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
+              <button v-if="canKick(killerMember.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(killerMember.id)">✕ เตะ</button>
             </template>
             <template v-else>
               <span class="plus" aria-hidden="true">+</span>
@@ -346,6 +357,7 @@ function start() {
                 {{ doubleId === m.id ? '👥 คุม 2 ตัว' : 'ให้คุม 2 ตัว' }}
               </button>
               <span v-if="leavable(m.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
+              <button v-if="canKick(m.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕ เตะ</button>
             </template>
             <template v-else>
               <span class="plus" aria-hidden="true">+</span>
@@ -358,7 +370,10 @@ function start() {
 
         <p v-if="bench.length" class="bench">
           <span class="muted">ยังไม่เลือกฝั่ง:</span>
-          <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me }">{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}</span>
+          <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me }">
+            {{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}
+            <button v-if="canKick(m.id)" type="button" class="kick small" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕</button>
+          </span>
           <span v-if="!me?.side" class="bench-hint">คลิกช่องว่างด้านบนเพื่อเลือกฝั่ง</span>
         </p>
         <p class="split muted">{{ splitNote }}</p>
@@ -780,6 +795,38 @@ button.seat-name.mine:hover i {
 .seat-sub {
   font-size: 0.85rem;
   color: rgb(var(--tone));
+}
+/* the host's kick: on the seat's top-right, where a player's own "leave" hint sits for themselves */
+.kick {
+  position: absolute !important;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 3;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.78rem;
+  border: 1px solid rgb(255 90 80 / 0.7);
+  background: rgb(60 10 10 / 0.85);
+  color: #ffb0a8;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+.seat:hover .kick,
+.kick:hover,
+.kick:focus-visible {
+  opacity: 1;
+  background: var(--blood);
+  color: #fff;
+}
+.kick.small {
+  position: static !important;
+  margin-left: 0.3rem;
+  padding: 0 0.35rem;
+  opacity: 0.7;
+}
+@media (hover: none) {
+  .kick {
+    opacity: 1;
+  }
 }
 .crown {
   position: absolute !important;
