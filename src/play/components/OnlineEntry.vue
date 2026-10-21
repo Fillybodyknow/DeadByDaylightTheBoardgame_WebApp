@@ -78,6 +78,16 @@ function askPassword(c: string) {
   askFor.value = c
 }
 
+// In a room, whichever way: the dialogs go at once, not when the last write of joining is done
+watch(
+  () => session.room,
+  (room) => {
+    if (!room) return
+    askFor.value = null
+    creating.value = false
+  },
+)
+
 function closePassword() {
   askFor.value = null
   joinPassword.value = ''
