@@ -1449,8 +1449,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   }
 }
 /* The hand of cards rests sunk in the bottom-right corner (CardHand), its names showing: the
-   panel stops above them (a raised hand covers its foot only while the pointer is on it). With
-   no pointer to hover (a tablet) the hand stays up, and the panel stops above all of it. */
+   panel stops above them (a raised hand covers its foot only while the pointer is on it). On a
+   tablet a tap raises the hand (body.hand-raised) and the panel stops above all of it then. */
 @media (min-width: 981px) {
   :global(body.hand-open .side) {
     max-height: calc(var(--vh) - 4rem - 70px);
@@ -1462,7 +1462,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   }
 }
 @media (min-width: 981px) and (hover: none) {
-  :global(body.hand-open .side) {
+  :global(body.hand-raised .side) {
     max-height: calc(var(--vh) - 4rem - 250px);
   }
 }

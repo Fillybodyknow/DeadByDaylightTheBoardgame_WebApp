@@ -4,10 +4,13 @@
 // draws that card up to look at; clicking picks it — it stays drawn up, glowing, until the choice
 // is confirmed in the panel (or clicked again to put it back).
 //
+// On a tablet (no pointer to hover with) the hand rests sunk too: a tap on it raises it, the next
+// tap on a card picks, and a tap anywhere else puts it down. It stays up while a perk asks for a card.
+//
 // Each card is a button that never moves (its rotation in the fan aside); only the card face
 // inside it slides up. So the pointer stays on the button while the card rises, and the card
 // doesn't bounce up and down under it.
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import type { MoveCard } from '../engine/types'
 import { CARD_NAMES } from '../engine/engine'
@@ -63,13 +66,38 @@ function hands(delta: number) {
 }
 onMounted(() => hands(1))
 onBeforeUnmount(() => hands(-1))
+
+// ---------- a tablet: tap to raise ----------
+
+const touch = typeof matchMedia === 'function' && matchMedia('(hover: none)').matches
+const raised = ref(false)
+/** Up: raised by a tap, or a perk is asking for a card. (A pointer raises it by hovering, in CSS.) */
+const up = computed(() => touch && (raised.value || !!props.prompt))
+
+function onSlot(card: MoveCard, index: number) {
+  // the first tap only brings the hand up, so a card isn't picked blind by the tap that raised it
+  if (touch && !up.value) return void (raised.value = true)
+  if (props.passive) return
+  emit('pick', card, index)
+}
+
+function lowerOnOutside(e: MouseEvent) {
+  if (raised.value && !(e.target as Element | null)?.closest('.hand')) raised.value = false
+}
+onMounted(() => document.addEventListener('click', lowerOnOutside, true))
+onBeforeUnmount(() => {
+  document.removeEventListener('click', lowerOnOutside, true)
+  document.body.classList.remove('hand-raised')
+})
+// the side panel stops above a raised hand (GameScreen)
+watch(up, (on) => document.body.classList.toggle('hand-raised', on))
 </script>
 
 <template>
   <Teleport to="body">
     <!-- The hand rests sunk, names showing, and rises while the pointer is on it — also when a
          perk asks for a card (it glows, and its prompt sits just above the names). -->
-    <div class="hand" :class="{ ask: !!prompt, passive }" role="group" :aria-label="label">
+    <div class="hand" :class="{ ask: !!prompt, passive, up }" role="group" :aria-label="label">
       <p v-if="prompt" class="prompt">⚡ <BpText :text="prompt" /></p>
       <div class="fan">
         <button
@@ -86,7 +114,7 @@ onBeforeUnmount(() => hands(-1))
           @focus="emit('hover', c.card)"
           @blur="emit('hover', null)"
           :aria-disabled="passive || undefined"
-          @click="!passive && emit('pick', c.card, i)"
+          @click="onSlot(c.card, i)"
         >
           <span class="face">
             <img :src="asset(cardImage(c.card))" :alt="cardLabel(c.card)" draggable="false" />
@@ -100,7 +128,7 @@ onBeforeUnmount(() => hands(-1))
       </div>
     </div>
     <!-- a soft shadow under the hand, so it reads over the map (after it: it follows its state) -->
-    <div class="tray" :class="{ ask: !!prompt }" aria-hidden="true" />
+    <div class="tray" :class="{ ask: !!prompt, up }" aria-hidden="true" />
   </Teleport>
 </template>
 
@@ -176,11 +204,11 @@ onBeforeUnmount(() => hands(-1))
   transform: translateY(186px);
   transition: transform 0.2s cubic-bezier(0.2, 1.2, 0.4, 1);
 }
-.hand:is(.open, :has(.face:hover), :has(.slot:focus-visible)) .prompt {
+.hand:is(.open, .up, :has(.slot:focus-visible)) .prompt {
   transform: none;
 }
-@media (hover: none) {
-  .prompt {
+@media (hover: hover) {
+  .hand:has(.face:hover) .prompt {
     transform: none;
   }
 }
@@ -199,15 +227,6 @@ onBeforeUnmount(() => hands(-1))
 }
 .hand.passive .face {
   filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.7)) saturate(0.8);
-}
-/* on a tablet a hand to pick from stays up; your own, only to look at, rests sunk (a tap raises it) */
-@media (hover: none) {
-  .hand.passive:not(:has(.face:hover)) .face {
-    --lift: 132px;
-  }
-  .hand.passive:not(:has(.face:hover)) + .tray {
-    height: 120px;
-  }
 }
 .slot {
   position: relative;
@@ -253,25 +272,30 @@ onBeforeUnmount(() => hands(-1))
   border-radius: 9px;
   pointer-events: none;
 }
-/* drawn up to look at */
-.slot:hover .face,
+/* drawn up to look at (a touch screen's sticky :hover would raise a card on the tap that picks it) */
 .slot:focus-visible .face {
   transform: translateY(-14px) scale(1.12);
   filter: drop-shadow(0 14px 18px rgb(0 0 0 / 0.8)) brightness(1.08);
 }
+@media (hover: hover) {
+  .slot:hover .face {
+    transform: translateY(-14px) scale(1.12);
+    filter: drop-shadow(0 14px 18px rgb(0 0 0 / 0.8)) brightness(1.08);
+  }
+}
 /* The pointer on any card (or a perk asking for one): the whole hand rises to full size. */
-.hand:is(.open, :has(.face:hover), :has(.slot:focus-visible)) .face {
+.hand:is(.open, .up, :has(.slot:focus-visible)) .face {
   --lift: 14px;
 }
-.hand:is(.open, :has(.face:hover), :has(.slot:focus-visible)) + .tray {
+.hand:is(.open, .up, :has(.slot:focus-visible)) + .tray,
+.tray.up {
   height: 270px;
 }
-/* no pointer to hover with (a tablet): the hand stays up */
-@media (hover: none) {
-  .face {
+@media (hover: hover) {
+  .hand:has(.face:hover) .face {
     --lift: 14px;
   }
-  .tray {
+  .hand:has(.face:hover) + .tray {
     height: 270px;
   }
 }

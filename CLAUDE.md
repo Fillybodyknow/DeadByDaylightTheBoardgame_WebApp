@@ -152,7 +152,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   bonus turns, every perk that picks a card, Predator and the Redeemer guess. A player with
   several survivors switches between them with tabs. The hand floats in the bottom-right corner,
   sunk so only the card names show (the side panel stops above them), and rises while the pointer is on a card (or when
-  a perk asks for one; on a tablet it stays up). It has no label of its own. Each card's button stays still and only the card face inside it moves, so the card
+  a perk asks for one; on a tablet a tap raises it, the next tap picks and a tap elsewhere puts it down). It has no label of its own. Each card's button stays still and only the card face inside it moves, so the card
   can't bounce under the pointer. Online, while nothing asks for a card, the player's own hand
   rests there anyway, only to look at (`passive`; `openHands` in `hands.ts` says when a hand to
   pick from is out and takes its place).

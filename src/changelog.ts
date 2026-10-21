@@ -12,6 +12,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.1.1',
+    date: '2026-10-21',
+    items: ['แท็บเล็ต: มือไพ่พับลงไว้ก่อน แตะครั้งแรกยกขึ้น แตะอีกครั้งเลือกไพ่ แตะที่อื่นเพื่อพับกลับ'],
+  },
+  {
     version: '1.1.0',
     date: '2026-10-21',
     items: [
