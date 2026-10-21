@@ -12,13 +12,15 @@ import { quoteOrTip } from '../../loading'
 import { boards } from '../engine/boards'
 import type { GameState } from '../engine/types'
 import { fxSound } from '../fx/audio'
+import { online } from '../game'
 import { gameAssets, preload } from '../intro'
 
 const props = defineProps<{ st: GameState }>()
 const emit = defineEmits<{ done: [] }>()
 
 /** The page shows at least this long (to be read), and waits at most this long for slow pictures. */
-const MIN_MS = 2600
+// Online the page is the table's moment together before the trial: longer, to read the quote.
+const MIN_MS = online.value ? 6500 : 2600
 const MAX_MS = 20000
 
 const slide = quoteOrTip(props.st.survivors.map((s) => s.characterId))
