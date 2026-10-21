@@ -217,7 +217,7 @@ describe('The Trapper', () => {
 })
 
 describe('attack and sacrifice', () => {
-  it('lets the killer hang at once on a free hook in the room, or carry on', () => {
+  it('hangs a picked-up survivor at once on a free hook in the room (p.18)', () => {
     let st = planned()
     st.killer.room = 'shack'
     st.survivors.forEach((sv) => Object.assign(sv, { item: null, room: 'backlot' }))
@@ -225,10 +225,10 @@ describe('attack and sacrifice', () => {
     placeProp(st, 'hook', 'shack')
     killerInteracting(st)
     st = apply(st, { t: 'interact', i: { k: 'pickUp', target: 1 } })
-    // House rule: the killer may hang here or carry on (the rulebook hangs at once).
-    expect(st.step).toEqual({ t: 'carryDice', s: 1 })
-    st = apply(st, { t: 'hang' })
+    // no choice, no struggle dice: hung here
+    expect(st.step.t).not.toBe('carryDice')
     expect(st.survivors[1].status).toBe('hooked')
+    expect(st.survivors[1].room).toBe('shack')
     expect(st.sacrifice).toBe(1)
     expect(st.survivors[1].sacrificeToken).toBe(false)
   })

@@ -50,6 +50,9 @@ and the host starts the game.
   never "default MacMillan" by omission). The start button waits for the map. A step bar shows
   where the room is and chips show who is done; "แก้ตัวละคร" on the perks or map stage reopens the
   player's characters, which takes everyone back to the characters stage and clears the loadouts.
+  The foot of the bans, characters and map stages is a sticky `StageBar` (progress dots, a line of
+  words, the confirm / start button), so the button is never lost under a long grid; the
+  characters stage keeps the team in a side panel (`.team-panel`) beside the pickers.
 - **Trust model: friends, not strangers.** Every device runs the same engine, so the room carries
   the **moves**, not the state: each device replays them and arrives at the same game (the engine
   is a pure reducer and its RNG lives in the state, so a replay is exact — nothing in
@@ -196,9 +199,12 @@ needs its graph in `boards.ts`), the 2-player rule, then bots from the automated
 
 ## House rules
 
-- Hanging is the killer's choice: picking up a survivor next to a free hook, or carrying one
-  into a room with a free hook while steps are left, the killer may hang them there or carry on
-  (the rulebook, p.18, hangs at once). Ending the carry on a free hook still hangs.
+- Picking up a survivor in a room with a free (revealed, unoccupied) hook hangs them there at
+  once, as the rulebook does (p.18): the killer can't carry them away and there are no struggle
+  dice. (Dead Hard may still answer the hanging.) Elsewhere they are carried; carrying one into a
+  room with a free hook while steps are left is the killer's choice — hang there or carry on —
+  and ending the carry on a free hook hangs. (Before 1.4.1 the killer could also choose to carry
+  on from the pick-up itself.)
 - A survivor being carried may use their own key to re-roll a die of their roll to struggle
   free (the key says "at any time"). No other item, and no key on anyone else's roll, while carried.
 - A Firecracker also stops the killer while he carries someone: he can't enter that room and

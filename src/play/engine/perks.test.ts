@@ -1475,6 +1475,8 @@ describe('The Trickster', () => {
     Object.assign(st.survivors[0], { wounded: true })
     st.survivors[2].room = to
     st.props.forEach((p) => p.room === to && (p.revealed = true))
+    // no free hook where he lands: the pick-up is a carry (with one, he would hang at once)
+    st.props.filter((p) => p.kind === 'hook' && p.room === to).forEach((p) => (p.room = 'backlot'))
     const offered = apply(st, { t: 'interact', i: { k: 'pickUp', target: 0 } })
     expect(offered.step).toMatchObject({ t: 'offer', perk: 'starstruck' })
     const w = (offered.step as Extract<GameState['step'], { t: 'offer' }>).w
@@ -1484,6 +1486,26 @@ describe('The Trickster', () => {
     expect(g.killer.room).toBe(to)
     expect(g.survivors[2].status).toBe('carried')
     expect(g.survivors[0].status).toBe('board')
+  })
+
+  it('Starstruck: landing on a free hook, the one he picks up is hung there at once', () => {
+    const st = trickster('starstruck')
+    st.killer.room = 'shack'
+    const to = next(st, 'shack')
+    Object.assign(st.survivors[0], { wounded: true })
+    st.survivors[2].room = to
+    st.props.forEach((p) => p.room === to && (p.revealed = true))
+    if (!st.props.some((p) => p.kind === 'hook' && p.room === to)) {
+      const hook = st.props.find((p) => p.kind === 'hook')!
+      Object.assign(hook, { room: to, revealed: true, occupant: null })
+    }
+    const offered = apply(st, { t: 'interact', i: { k: 'pickUp', target: 0 } })
+    const w = (offered.step as Extract<GameState['step'], { t: 'offer' }>).w
+    const c = perkChoices(offered, 'starstruck', 'killer', w).find((x) => x.target === 2)!
+    let g = apply(offered, { t: 'perk', perk: 'starstruck', use: true, choice: c })
+    for (let n = 0; n < 5 && g.survivors[2].status !== 'hooked' && g.step.t !== 'carryDice'; n++) g = apply(g, legalActions(g)[0])
+    expect(g.survivors[2].status).toBe('hooked')
+    expect(g.step.t).not.toBe('carryDice')
   })
 })
 

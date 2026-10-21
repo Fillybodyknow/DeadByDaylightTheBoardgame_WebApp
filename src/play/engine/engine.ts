@@ -1813,8 +1813,11 @@ function pickUp(st: GameState, s: number) {
   if (sv.status === 'locker') leaveLocker(st, s)
   sv.status = 'carried'
   sv.room = st.killer.room
-  // House rule (the rulebook, p.18, hangs at once): with a free hook here the killer may still
-  // choose to carry the survivor elsewhere; `hang` in the carry steps hangs them here.
+  // A free hook in this room: the survivor is hung on it at once, as the rulebook has it
+  // (p.18) — no choosing to carry them away, no struggle dice. (Dead Hard still gets its
+  // chance, in `hang`.) Otherwise they are carried.
+  const hook = usableHook(st, st.killer.room)
+  if (hook) return hang(st, s, hook)
   wait(st, { t: 'carryDice', s })
 }
 

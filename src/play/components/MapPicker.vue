@@ -76,8 +76,8 @@ function random() {
 }
 .map-chosen img {
   flex: none;
-  width: 190px;
-  aspect-ratio: 4 / 3;
+  width: 260px;
+  aspect-ratio: 16 / 10;
   object-fit: cover;
   border-radius: 4px;
   border: 2px solid #ffd56a;
@@ -113,30 +113,57 @@ h2 {
 }
 .maps {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.8rem;
 }
 .map {
-  display: grid;
-  gap: 0.35rem;
-  padding: 0.35rem;
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: hidden;
   text-align: left;
   border: 2px solid var(--line);
   background: rgb(0 0 0 / 0.25);
+  transition:
+    transform 0.15s,
+    border-color 0.15s;
+}
+.map:not(:disabled):hover {
+  transform: translateY(-3px);
+  border-color: var(--blood-bright);
 }
 .map img {
+  display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 10;
   object-fit: cover;
-  border-radius: 4px;
 }
+/* the name over the foot of the picture */
 .map span {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 1.6rem 0.7rem 0.55rem;
+  background: linear-gradient(180deg, transparent, rgb(0 0 0 / 0.85));
+  font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
 }
 .map.on {
   border-color: #ffd56a;
-  box-shadow: 0 0 14px rgb(255 214 106 / 0.45);
+  box-shadow: 0 0 18px rgb(255 214 106 / 0.5);
+}
+.map.on::after {
+  content: '✓ เลือกแล้ว';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.1rem 0.6rem;
+  border-radius: 99px;
+  background: #ffd56a;
+  color: #1a1204;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 .map:disabled {
   opacity: 0.35;
