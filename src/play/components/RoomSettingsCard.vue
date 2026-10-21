@@ -4,10 +4,9 @@
 // card starts folded to its summary chips, and a change shows on it for a moment (what changed);
 // nobody's ready is reset by it.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { isHost, roomSettings, session, setSettings } from '../online/session'
-import { KILLER_BP_RANGE, SURVIVOR_BP_RANGE, TIMER_CHOICES, playableKillers, playableSurvivors, settingsChips, type RoomSettings } from '../online/settings'
+import { BAN_COUNT_RANGE, KILLER_BP_RANGE, SURVIVOR_BP_RANGE, TIMER_CHOICES, settingsChips, type RoomSettings } from '../online/settings'
 import BpIcon from '../../components/BpIcon.vue'
 
 const s = computed(() => roomSettings.value)
@@ -34,9 +33,7 @@ function step(key: 'survivorBp' | 'killerBp', by: number) {
   if (v !== s.value[key]) set({ [key]: v })
 }
 
-/** Repeats off needs four survivors left unbanned. */
 function toggleDupes() {
-  if (s.value.dupes && survivorsList.filter((c) => !s.value.bans.includes(c.id)).length < 4) return
   set({ dupes: !s.value.dupes })
 }
 
@@ -57,8 +54,10 @@ function describe(key: keyof RoomSettings, v: RoomSettings): string {
       return v.dupes ? 'Survivor ซ้ำกับเพื่อนได้' : 'Survivor ห้ามซ้ำกัน'
     case 'showKiller':
       return v.showKiller ? 'Survivor เห็นฆาตกรที่เลือก' : 'Survivor ไม่เห็นฆาตกรที่เลือก'
-    case 'bans':
-      return `แบนตัวละคร → ${v.bans.length} ตัว`
+    case 'banlist':
+      return v.banlist ? `Banlist เปิด (ฝั่งละ ${v.banCount} ตัว)` : 'Banlist ปิด'
+    case 'banCount':
+      return `Banlist → ฝั่งละ ${v.banCount} ตัว`
     case 'survivorBp':
       return `BP เริ่มต้น Survivor → ${v.survivorBp}`
     case 'killerBp':
@@ -78,19 +77,6 @@ watch(s, (now, before) => {
 })
 onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
 
-// ---------- bans ----------
-
-const showBans = ref(false)
-const survivorsList = playableSurvivors()
-const killersList = playableKillers()
-
-/** A ban that would leave too few to play is refused: 4 survivors (or 1 with repeats) and 1 killer. */
-function toggleBan(id: string, kind: 'survivor' | 'killer') {
-  const bans = s.value.bans.includes(id) ? s.value.bans.filter((b) => b !== id) : [...s.value.bans, id]
-  const left = (kind === 'survivor' ? survivorsList : killersList).filter((c) => !bans.includes(c.id)).length
-  if (left < (kind === 'killer' ? 1 : s.value.dupes ? 1 : 4)) return
-  set({ bans })
-}
 </script>
 
 <template>
@@ -157,41 +143,24 @@ function toggleBan(id: string, kind: 'survivor' | 'killer') {
           <input type="checkbox" :checked="s.showKiller" :disabled="busy" @change="set({ showKiller: !s.showKiller })" />
           Survivor เห็นฆาตกรที่เลือก
         </label>
-        <button type="button" class="ban-toggle" @click="showBans = !showBans">
-          🚫 แบนตัวละคร{{ s.bans.length ? ` (${s.bans.length})` : '' }} {{ showBans ? '▴' : '▾' }}
-        </button>
       </div>
 
-      <div v-if="showBans" class="bans">
-        <p class="muted small">{{ isHost ? 'แตะเพื่อแบน / ยกเลิก — ตัวที่แบนจะเลือกและสุ่มไม่ได้' : 'ตัวที่หัวห้องแบน' }}</p>
-        <div class="ban-grid">
-          <button
-            v-for="c in survivorsList"
-            :key="c.id"
-            type="button"
-            class="ban surv"
-            :class="{ on: s.bans.includes(c.id) }"
-            :disabled="busy"
-            :title="c.name"
-            @click="toggleBan(c.id, 'survivor')"
-          >
-            <img :src="asset(c.images.mini)" :alt="c.name" loading="lazy" />
-          </button>
-        </div>
-        <div class="ban-grid">
-          <button
-            v-for="c in killersList"
-            :key="c.id"
-            type="button"
-            class="ban kill"
-            :class="{ on: s.bans.includes(c.id) }"
-            :disabled="busy"
-            :title="c.name"
-            @click="toggleBan(c.id, 'killer')"
-          >
-            <img :src="asset(c.images.mini)" :alt="c.name" loading="lazy" />
-          </button>
-        </div>
+      <div class="row">
+        <span class="label">🚫 Banlist</span>
+        <label class="check">
+          <input type="checkbox" :checked="s.banlist" :disabled="busy" @change="set({ banlist: !s.banlist })" />
+          แต่ละฝั่งแบนตัวละครของอีกฝั่งก่อนเลือกตัวละคร
+        </label>
+        <span v-if="s.banlist" class="stepper">
+          ฝั่งละไม่เกิน
+          <button type="button" :disabled="busy || s.banCount <= BAN_COUNT_RANGE[0]" @click="set({ banCount: s.banCount - 1 })">−</button>
+          <b>{{ s.banCount }}</b>
+          <button type="button" :disabled="busy || s.banCount >= BAN_COUNT_RANGE[1]" @click="set({ banCount: s.banCount + 1 })">+</button>
+          ตัว
+        </span>
+        <small class="muted hint">
+          Survivor ช่วยกันแบน Killer และ Killer แบน Survivor — อีกฝั่งไม่เห็นจนกว่าทั้งสองฝั่งยืนยัน
+        </small>
       </div>
 
       <div class="row">
@@ -311,53 +280,6 @@ function toggleBan(id: string, kind: 'survivor' | 'killer') {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.9rem;
-}
-.ban-toggle {
-  padding: 0.3rem 0.7rem;
-  font-size: 0.85rem;
-}
-.bans {
-  padding: 0.6rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: rgb(0 0 0 / 0.25);
-}
-.ban-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.4rem;
-}
-.ban {
-  position: relative;
-  padding: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  overflow: hidden;
-}
-.ban img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.ban.kill {
-  box-shadow: 0 0 0 1px var(--blood-dim);
-}
-.ban.on img {
-  filter: grayscale(1) brightness(0.45);
-}
-.ban.on::after {
-  content: '🚫';
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font-size: 1.3rem;
-}
-.ban:disabled {
-  opacity: 1;
-  cursor: default;
 }
 .stepper {
   display: inline-flex;

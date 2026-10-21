@@ -12,10 +12,12 @@ import { asset, cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
 import { KILLER_PLAYER } from '../engine/seats'
 import {
-  allLocked,
-  allReady,
   backToLobby,
   confirmPerks,
+  lockBans,
+  myBans,
+  revealedBans,
+  toggleBan,
   myPerkKeys,
   perkChars,
   perkHands,
@@ -30,11 +32,13 @@ import {
   leaveRoom,
   lobbyBlocker,
   lockPicks,
+  mapDone,
   mayPickBoard,
   me,
   memberList,
   mySeat,
   pickCharacter,
+  pickStage,
   pickWaiting,
   proceedToPick,
   roomSettings,
@@ -45,10 +49,12 @@ import {
   setReady,
   setSide,
   slotsOf,
+  startable,
   startOnlineGame,
 } from '../online/session'
 import { cardChoices, printedOf, takenBy } from '../engine/loadout'
 import type { PerkId } from '../engine/perks'
+import BanPicker from './BanPicker.vue'
 import CharacterPicker from './CharacterPicker.vue'
 import PerkLoadout from './PerkLoadout.vue'
 import MapPicker from './MapPicker.vue'
@@ -263,6 +269,54 @@ function start() {
   void startOnlineGame()
 }
 
+// ---------- the bans ----------
+
+const myBansLocked = computed(() => !!mySeat.value && !!data.value.bansLocked?.[String(mySeat.value)])
+const banWaiting = computed(() => Array.from({ length: data.value.players }, (_, i) => String(i + 1)).filter((p) => !data.value.bansLocked?.[p]).length)
+function toggleBans() {
+  sfx.select()
+  void lockBans(!myBansLocked.value)
+}
+
+// ---------- the stages ----------
+
+const stage = pickStage
+/** The steps of the picks, in order (bans and perks only when the room sets them). */
+const steps = computed(() => [
+  ...(roomSettings.value.banlist ? [{ id: 'bans', label: 'แบนตัวละคร' }] : []),
+  { id: 'chars', label: 'เลือกตัวละคร' },
+  ...(roomSettings.value.mode !== 'adept' ? [{ id: 'perks', label: 'แต่ง Perk' }] : []),
+  { id: 'map', label: 'เลือกแผนที่' },
+])
+const stepIndex = computed(() => Math.max(0, steps.value.findIndex((s) => s.id === stage.value)))
+
+/** Which player each character key belongs to: 'killer' is player 1, a survivor slot its hand's player. */
+function playerOfKey(key: string): number {
+  return key === 'killer' ? KILLER_PLAYER : survivorSlots.value[Number(key)]?.player ?? 0
+}
+
+/**
+ * Each player and whether they are done with this stage (null: not shown — the killer's own
+ * progress is only the killer's, unless the room shows the killer).
+ */
+const seatStatus = computed(() =>
+  Array.from({ length: data.value.players }, (_, i) => i + 1).map((player) => {
+    const killer = player === KILLER_PLAYER
+    const hidden = stage.value === 'chars' && killer && !amKiller.value && !roomSettings.value.showKiller
+    const done =
+      stage.value === 'bans'
+        ? !!data.value.bansLocked?.[String(player)]
+        : stage.value === 'chars'
+          ? !!data.value.locked[String(player)]
+          : stage.value === 'perks'
+            ? perkChars.value.filter((c) => playerOfKey(c.key) === player).every((c) => perkDone(c.key))
+            : true
+    return { player, killer, name: data.value.seats[String(player)]?.name ?? '', mine: player === mySeat.value, done: hidden ? null : done }
+  }),
+)
+/** Players still to lock in, as the others see it (the killer counts only for the killer). */
+const waitingCount = computed(() => (amKiller.value ? pickWaiting.value.length : survivorsWaiting.value.length))
+
 </script>
 
 <template>
@@ -270,7 +324,7 @@ function start() {
     <!-- the room bar: its name and phase, the code (a click copies it), the invite, leaving -->
     <header class="room-bar">
       <div class="rb-title">
-        <p class="rb-phase">{{ data.phase === 'lobby' ? 'Lobby' : 'เลือกตัวละคร' }}</p>
+        <p class="rb-phase">{{ data.phase === 'lobby' ? 'Lobby' : steps[stepIndex]?.label }}</p>
         <h1>{{ data.passwordHash ? '🔒 ' : '' }}{{ data.name || `ห้อง ${code}` }}</h1>
       </div>
       <button type="button" class="code-chip" title="คลิกเพื่อคัดลอกรหัสห้อง" @click="copy('code')">
@@ -399,143 +453,203 @@ function start() {
       </footer>
     </template>
 
-    <!-- ================= character picks ================= -->
+    <!-- ================= the picks, a stage at a time ================= -->
     <template v-else>
-      <!-- the survivor team (everyone sees it, the killer included) -->
-      <section class="card">
-        <h2>ทีม Survivor</h2>
-        <div class="slots">
-          <button
-            v-for="s in survivorSlots"
-            :key="s.slot"
-            class="slot"
-            :class="{ mine: s.mine, active: s.mine && activeSlot === s.slot && !locked, locked: s.locked }"
-            :disabled="!s.mine || locked"
-            @click="activeSlot = s.slot"
-          >
-            <Mini v-if="s.character" class="mini aura-survivor" :src="asset(s.character.images.mini)" />
-            <span v-else class="empty">?</span>
-            <span class="slot-text">
-              <strong>{{ s.character?.name ?? (s.mine ? 'เลือกตัวละคร' : 'กำลังเลือก…') }}</strong>
-              <small class="muted">ผู้เล่น {{ s.player }} · {{ s.who }}{{ s.mine ? ' (คุณ)' : '' }}</small>
-            </span>
-            <span v-if="s.locked" class="lock">🔒</span>
-          </button>
-        </div>
-      </section>
+      <!-- where the room is: characters → perks (when the room sets them) → map → start -->
+      <ol class="steps" aria-label="ขั้นตอน">
+        <li v-for="(st, i) in steps" :key="st.id" :class="{ done: i < stepIndex, now: i === stepIndex }">
+          <span class="num">{{ i < stepIndex ? '✓' : i + 1 }}</span>
+          {{ st.label }}
+        </li>
+      </ol>
 
-      <!-- the killer's map, on top: the character picker below is long, and this would be lost under it -->
-      <!-- the killer, for the survivors when the room shows it -->
-      <section v-if="roomSettings.showKiller && !amKiller" class="card drawn">
-        <Mini v-if="shownKiller" class="mini aura-killer" :src="asset(shownKiller.images.mini)" />
-        <span v-else class="empty">?</span>
-        <span>
-          <small class="muted">ฆาตกร{{ data.locked['1'] ? ' (ยืนยันแล้ว)' : '' }}</small>
-          <strong class="killer-name">{{ shownKiller?.name ?? 'กำลังเลือก…' }}</strong>
+      <!-- who has finished this stage -->
+      <section v-if="seatStatus.length" class="who-done" aria-label="สถานะผู้เล่น">
+        <span v-for="p in seatStatus" :key="p.player" class="pchip" :class="{ ok: p.done, killer: p.killer, me: p.mine }">
+          <b>{{ p.done === null ? '·' : p.done ? '✓' : '…' }}</b>
+          {{ p.killer ? '🔪 ' : '' }}{{ p.name }}{{ p.mine ? ' (คุณ)' : '' }}
         </span>
       </section>
 
-      <!-- a secret map (room settings): the survivors learn it when the game starts -->
-      <section v-if="!mayPickBoard && roomSettings.map === 'secret'" class="card">
-        <h2>🗺 แผนที่ลับ</h2>
-        <p class="muted">ฆาตกรเลือกแผนที่แบบลับ — จะรู้ตอนเริ่มเกม</p>
-      </section>
-      <MapPicker v-else-if="!mayPickBoard" :model-value="data.board ?? 'macmillan'" :chooser="boardChooser" readonly />
-
-      <!-- characters drawn for everyone (room settings): nothing to pick, only to confirm -->
-      <section v-if="roomSettings.random && mySeat" class="card">
-        <h2>🎲 สุ่มตัวละครให้แล้ว</h2>
-        <p class="muted">หัวห้องตั้งให้สุ่มตัวละครทุกคน — ตรวจดูแล้วกดยืนยันด้านล่าง</p>
-        <div v-if="amKiller && data.picks.killer" class="drawn">
-          <Mini class="mini aura-killer" :src="asset(killerById.get(data.picks.killer)?.images.mini ?? '')" />
-          <strong>{{ killerById.get(data.picks.killer)?.name }}</strong>
-        </div>
-      </section>
-
-      <!-- survivor players pick survivors -->
-      <section v-if="mySlots.length && !roomSettings.random" class="card">
-        <h2>เลือก Survivor {{ mySlots.length > 1 ? `(คุณคุม ${mySlots.length} ตัว — แตะช่องด้านบนเพื่อสลับ)` : '' }}</h2>
-        <CharacterPicker
-          kind="survivor"
-          :taken="[...takenByOthers]"
-          :banned="roomSettings.bans"
-          :selected="myPicks"
-          :remaining="mySlots.length - myPicks.length"
-          :locked="locked"
-          taken-label="เพื่อนเลือกแล้ว"
-          :roll-title="activeSlot !== null ? `สุ่ม Survivor ตัวที่ ${activeSlot + 1}` : ''"
-          @pick="pickSurvivor"
-          @unpick="unpickSurvivor"
-        />
-      </section>
-
-      <!-- the killer picks a killer; survivors never see this part -->
-      <section v-if="amKiller && !roomSettings.random" class="card killer-card">
-        <h2>🔪 เลือกฆาตกร</h2>
-        <CharacterPicker
-          kind="killer"
-          :selected="data.picks.killer ? [data.picks.killer] : []"
-          :banned="roomSettings.bans"
-          :remaining="data.picks.killer ? 0 : 1"
-          :locked="locked"
-          @pick="pickCharacter('killer', $event)"
-          @unpick="pickCharacter('killer', null)"
-        />
-      </section>
-
-      <!-- perks: once every character is locked in, each player sets theirs (Bloodweb, Devout) -->
-      <section v-if="perkStage && myLoadouts.length" class="perks-stage">
-        <h2>🃏 แต่ง Perk — {{ roomSettings.mode === 'devout' ? 'Devout' : 'Bloodweb' }}</h2>
-        <p class="muted small">
-          {{ roomSettings.mode === 'devout' ? 'เลือก Perk ได้สูงสุด 3 ใบ — คนอื่นไม่เห็นจนกว่าเกมจะเริ่ม' : 'การ์ดที่จั่วได้ 5 ใบ เลือกวางทับ Perk บนกระดานได้สูงสุด 3 ใบ' }}
-          · การ์ดมีใบเดียว: Perk ที่มีคนใช้แล้วจะมืดลง
-        </p>
-        <PerkLoadout
-          v-for="c in myLoadouts"
-          :key="c.key"
-          :model-value="c.perks"
-          :side="c.side"
-          :character-id="c.id"
-          :mode="roomSettings.mode"
-          :who="c.side === 'killer' ? 'Killer' : `Survivor ${Number(c.key) + 1}`"
-          :choices="cardChoices(roomSettings.mode, c, perkHands[c.key])"
-          :taken="perkTaken(c.key)"
-          :problem="perkProblem(c.key, c.perks)"
-          :confirmed="perkDone(c.key)"
-          @update:model-value="(p: PerkId[]) => setLoadout(c.key, p)"
-          @confirm="(on: boolean) => confirmLoadout(c.key, on)"
-        />
-      </section>
-
-      <!-- whoever picks the board (the killer, or the host); everyone else's copy of it is above -->
-      <MapPicker v-if="mayPickBoard" :model-value="data.board ?? 'macmillan'" @update:model-value="setBoard" />
-
-      <section v-if="mySeat" class="card actions">
-        <button class="lockbtn" :class="{ primary: !locked }" :disabled="session.busy || !myPicksComplete" @click="toggleLock">
-          {{ locked ? '🔒 ล็อกแล้ว (กดเพื่อแก้)' : myPicksComplete ? 'ยืนยันตัวละคร' : 'เลือกตัวละครให้ครบ' }}
-        </button>
-        <template v-if="amKiller">
-          <button class="primary big" :disabled="!allReady || session.busy" @click="start">
+      <!-- ===== 0 · the Banlist (room setting): each side bans characters of the other ===== -->
+      <template v-if="stage === 'bans'">
+        <section v-if="mySeat" class="card">
+          <h2>🚫 แบนตัวละคร{{ amKiller ? ' Survivor' : ' Killer' }}</h2>
+          <p class="muted small">
             {{
-              !allLocked
-                ? `รอผู้เล่นยืนยัน (${pickWaiting.length} คน)`
-                : perksWaiting.length
-                  ? `รอแต่ง Perk (${perksWaiting.length} ตัว)`
-                  : 'ดำเนินเกม — เริ่ม Trial'
+              amKiller
+                ? `คุณแบน Survivor ได้ไม่เกิน ${roomSettings.banCount} ตัว — Survivor จะไม่เห็นจนกว่าทั้งสองฝั่งยืนยัน`
+                : `ทีม Survivor ช่วยกันแบน Killer ได้ไม่เกิน ${roomSettings.banCount} ตัว (เพื่อนร่วมทีมเห็นรายการเดียวกัน ใครแก้ก็ต้องยืนยันใหม่ทุกคน) — Killer จะไม่เห็นจนกว่าทั้งสองฝั่งยืนยัน`
             }}
+          </p>
+          <BanPicker :kind="amKiller ? 'survivor' : 'killer'" :banned="myBans" :max="roomSettings.banCount" :locked="myBansLocked" @toggle="toggleBan" />
+        </section>
+        <section v-if="mySeat" class="card actions">
+          <button class="lockbtn" :class="{ primary: !myBansLocked }" :disabled="session.busy" @click="toggleBans">
+            {{ myBansLocked ? '🔒 ยืนยันแล้ว (กดเพื่อแก้)' : 'ยืนยันการแบน' }}
           </button>
-        </template>
-        <p v-else class="muted center">
-          {{
-            survivorsWaiting.length
-              ? `รอ Survivor ยืนยัน (${survivorsWaiting.length} คน)`
-              : perkStage && perksWaiting.length
-                ? `รอทุกคนแต่ง Perk (${perksWaiting.length} ตัว)`
-                : 'ทีม Survivor พร้อมแล้ว — รอ Killer ดำเนินเกม'
-          }}
-        </p>
-      </section>
-      <section v-else class="card">
+          <p class="muted center">{{ banWaiting ? `รอผู้เล่นยืนยันการแบน (${banWaiting} คน)` : '' }}</p>
+        </section>
+      </template>
+
+      <!-- ===== 1 · characters ===== -->
+      <template v-else-if="stage === 'chars'">
+        <!-- the bans, public now -->
+        <section v-if="roomSettings.banlist && revealedBans.length" class="card banned-card">
+          <h2>🚫 ตัวละครที่ถูกแบน</h2>
+          <p class="banned-list">
+            <span v-for="id in revealedBans" :key="id" class="banned-chip">
+              <img :src="asset((survivorById.get(id) ?? killerById.get(id))?.images.mini ?? '')" alt="" />
+              {{ (survivorById.get(id) ?? killerById.get(id))?.name }}
+            </span>
+          </p>
+        </section>
+
+        <!-- the survivor team (everyone sees it, the killer included) -->
+        <section class="card">
+          <h2>ทีม Survivor</h2>
+          <div class="slots">
+            <button
+              v-for="s in survivorSlots"
+              :key="s.slot"
+              class="slot"
+              :class="{ mine: s.mine, active: s.mine && activeSlot === s.slot && !locked, locked: s.locked }"
+              :disabled="!s.mine || locked"
+              @click="activeSlot = s.slot"
+            >
+              <Mini v-if="s.character" class="mini aura-survivor" :src="asset(s.character.images.mini)" />
+              <span v-else class="empty">?</span>
+              <span class="slot-text">
+                <strong>{{ s.character?.name ?? (s.mine ? 'เลือกตัวละคร' : 'กำลังเลือก…') }}</strong>
+                <small class="muted">ผู้เล่น {{ s.player }} · {{ s.who }}{{ s.mine ? ' (คุณ)' : '' }}</small>
+              </span>
+              <span v-if="s.locked" class="lock">🔒</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- the killer, for the survivors when the room shows it -->
+        <section v-if="roomSettings.showKiller && !amKiller" class="card drawn">
+          <Mini v-if="shownKiller" class="mini aura-killer" :src="asset(shownKiller.images.mini)" />
+          <span v-else class="empty">?</span>
+          <span>
+            <small class="muted">ฆาตกร{{ data.locked['1'] ? ' (ยืนยันแล้ว)' : '' }}</small>
+            <strong class="killer-name">{{ shownKiller?.name ?? 'กำลังเลือก…' }}</strong>
+          </span>
+        </section>
+
+        <!-- characters drawn for everyone (room settings): nothing to pick, only to confirm -->
+        <section v-if="roomSettings.random && mySeat" class="card">
+          <h2>🎲 สุ่มตัวละครให้แล้ว</h2>
+          <p class="muted">หัวห้องตั้งให้สุ่มตัวละครทุกคน — ตรวจดูแล้วกดยืนยันด้านล่าง</p>
+          <div v-if="amKiller && data.picks.killer" class="drawn">
+            <Mini class="mini aura-killer" :src="asset(killerById.get(data.picks.killer)?.images.mini ?? '')" />
+            <strong>{{ killerById.get(data.picks.killer)?.name }}</strong>
+          </div>
+        </section>
+
+        <!-- survivor players pick survivors -->
+        <section v-if="mySlots.length && !roomSettings.random" class="card">
+          <h2>เลือก Survivor {{ mySlots.length > 1 ? `(คุณคุม ${mySlots.length} ตัว — แตะช่องด้านบนเพื่อสลับ)` : '' }}</h2>
+          <CharacterPicker
+            kind="survivor"
+            :taken="[...takenByOthers]"
+            :banned="revealedBans"
+            :selected="myPicks"
+            :remaining="mySlots.length - myPicks.length"
+            :locked="locked"
+            taken-label="เพื่อนเลือกแล้ว"
+            :roll-title="activeSlot !== null ? `สุ่ม Survivor ตัวที่ ${activeSlot + 1}` : ''"
+            @pick="pickSurvivor"
+            @unpick="unpickSurvivor"
+          />
+        </section>
+
+        <!-- the killer picks a killer; survivors never see this part -->
+        <section v-if="amKiller && !roomSettings.random" class="card killer-card">
+          <h2>🔪 เลือกฆาตกร</h2>
+          <CharacterPicker
+            kind="killer"
+            :selected="data.picks.killer ? [data.picks.killer] : []"
+            :banned="revealedBans"
+            :remaining="data.picks.killer ? 0 : 1"
+            :locked="locked"
+            @pick="pickCharacter('killer', $event)"
+            @unpick="pickCharacter('killer', null)"
+          />
+        </section>
+
+        <section v-if="mySeat" class="card actions">
+          <button class="lockbtn" :class="{ primary: !locked }" :disabled="session.busy || !myPicksComplete" @click="toggleLock">
+            {{ locked ? '🔒 ล็อกแล้ว (กดเพื่อแก้)' : myPicksComplete ? 'ยืนยันตัวละคร' : 'เลือกตัวละครให้ครบ' }}
+          </button>
+          <p class="muted center">
+            {{ pickWaiting.length ? `รอผู้เล่นยืนยันตัวละคร (${waitingCount} คน)` : '' }}
+          </p>
+        </section>
+      </template>
+
+      <!-- ===== 2 · perks (Bloodweb, Devout): once every character is locked in ===== -->
+      <template v-else-if="stage === 'perks'">
+        <section v-if="myLoadouts.length" class="perks-stage">
+          <h2>🃏 แต่ง Perk — {{ roomSettings.mode === 'devout' ? 'Devout' : 'Bloodweb' }}</h2>
+          <p class="muted small">
+            {{ roomSettings.mode === 'devout' ? 'เลือก Perk ได้สูงสุด 3 ใบ — คนอื่นไม่เห็นจนกว่าเกมจะเริ่ม' : 'การ์ดที่จั่วได้ 5 ใบ เลือกวางทับ Perk บนกระดานได้สูงสุด 3 ใบ' }}
+            · การ์ดมีใบเดียว: Perk ที่มีคนใช้แล้วจะมืดลง
+          </p>
+          <PerkLoadout
+            v-for="c in myLoadouts"
+            :key="c.key"
+            :model-value="c.perks"
+            :side="c.side"
+            :character-id="c.id"
+            :mode="roomSettings.mode"
+            :who="c.side === 'killer' ? 'Killer' : `Survivor ${Number(c.key) + 1}`"
+            :choices="cardChoices(roomSettings.mode, c, perkHands[c.key])"
+            :taken="perkTaken(c.key)"
+            :problem="perkProblem(c.key, c.perks)"
+            :confirmed="perkDone(c.key)"
+            @update:model-value="(p: PerkId[]) => setLoadout(c.key, p)"
+            @confirm="(on: boolean) => confirmLoadout(c.key, on)"
+          />
+        </section>
+        <section v-else class="card wait-card">
+          <h2>🃏 กำลังแต่ง Perk</h2>
+          <p class="muted">คุณไม่ได้แต่ง Perk ในเกมนี้ — รอผู้เล่นอื่นแต่งให้เสร็จ</p>
+        </section>
+        <section v-if="mySeat" class="card actions">
+          <p class="muted center">{{ perksWaiting.length ? `รอทุกคนแต่ง Perk (${perksWaiting.length} ตัว)` : '' }}</p>
+          <button class="back-chars" :disabled="session.busy" @click="toggleLock">← แก้ตัวละคร (ล้าง Perk ที่แต่งไว้ทั้งหมด)</button>
+        </section>
+      </template>
+
+      <!-- ===== 3 · the map, then the killer starts ===== -->
+      <template v-else>
+        <!-- whoever picks the board: the killer, or the host -->
+        <MapPicker v-if="mayPickBoard" :model-value="data.board ?? ''" @update:model-value="setBoard" />
+        <!-- a secret map (room settings): the survivors learn it when the game starts -->
+        <section v-else-if="roomSettings.map === 'secret'" class="card wait-card">
+          <h2>🗺 แผนที่ลับ</h2>
+          <p class="muted">{{ mapDone ? 'ฆาตกรเลือกแผนที่แล้ว — จะรู้ตอนเริ่มเกม' : 'ฆาตกรกำลังเลือกแผนที่ (แบบลับ) — จะรู้ตอนเริ่มเกม' }}</p>
+        </section>
+        <MapPicker v-else-if="mapDone" :model-value="data.board ?? 'macmillan'" :chooser="boardChooser" readonly />
+        <section v-else class="card wait-card">
+          <h2>🗺 เลือกแผนที่</h2>
+          <p class="muted">รอ{{ boardChooser }}เลือกแผนที่…</p>
+        </section>
+
+        <section v-if="mySeat" class="card actions">
+          <template v-if="amKiller">
+            <button class="primary big" :disabled="!startable || session.busy" @click="start">
+              {{ startable ? 'ดำเนินเกม — เริ่ม Trial' : `รอ${boardChooser}เลือกแผนที่` }}
+            </button>
+          </template>
+          <p v-else class="muted center">{{ mapDone ? 'ทุกอย่างพร้อมแล้ว — รอ Killer ดำเนินเกม' : '' }}</p>
+          <button class="back-chars" :disabled="session.busy" @click="toggleLock">← แก้ตัวละคร{{ perkStage ? ' (ล้าง Perk ที่แต่งไว้ทั้งหมด)' : '' }}</button>
+        </section>
+      </template>
+
+      <section v-if="!mySeat" class="card">
         <p class="muted">คุณไม่ได้อยู่ในเกมนี้ — รอดูได้เมื่อเกมเริ่ม</p>
       </section>
 
@@ -1128,6 +1242,113 @@ button.seat-name.mine:hover i {
   .go-btn:not(:disabled) {
     animation: none;
   }
+}
+/* where the picks are: numbered steps, the finished ones ticked, the current one lit */
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem 0.4rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: rgb(10 11 14 / 0.7);
+  color: var(--muted);
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+.steps .num {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.08);
+  font-size: 0.8rem;
+}
+.steps li.done {
+  color: var(--ok);
+  border-color: rgb(80 200 120 / 0.4);
+}
+.steps li.done .num {
+  background: rgb(80 200 120 / 0.2);
+}
+.steps li.now {
+  color: #fff;
+  border-color: var(--blood-bright);
+  background: linear-gradient(90deg, rgb(70 8 12 / 0.85), rgb(20 10 12 / 0.85));
+  box-shadow: 0 0 14px rgb(255 59 48 / 0.3);
+}
+.steps li.now .num {
+  background: var(--blood);
+}
+/* who has finished the stage */
+.who-done {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.pchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: rgb(10 11 14 / 0.7);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.pchip.ok {
+  border-color: rgb(80 200 120 / 0.5);
+  color: var(--text);
+}
+.pchip.ok b {
+  color: var(--ok);
+}
+.pchip.me {
+  box-shadow: inset 0 0 0 1px rgb(255 214 120 / 0.5);
+}
+/* the bans, once public */
+.banned-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+}
+.banned-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.7rem 0.15rem 0.2rem;
+  border: 1px solid var(--blood-dim);
+  border-radius: 99px;
+  background: rgb(40 6 8 / 0.6);
+  font-size: 0.88rem;
+}
+.banned-chip img {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  filter: grayscale(1) brightness(0.6);
+}
+.wait-card h2 {
+  margin-bottom: 0.3rem;
+}
+.back-chars {
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--muted);
+  text-decoration: underline;
 }
 .perks-stage {
   display: flex;

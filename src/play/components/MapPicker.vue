@@ -42,7 +42,7 @@ function random() {
     <header>
       <div>
         <small class="muted">แผนที่</small>
-        <h2>{{ list.find((b) => b.id === modelValue)?.name }}</h2>
+        <h2>{{ list.find((b) => b.id === modelValue)?.name ?? 'เลือกแผนที่' }}</h2>
       </div>
       <button v-if="!readonly" type="button" class="roll" @click="random">🎲 สุ่มแผนที่</button>
     </header>

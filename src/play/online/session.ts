@@ -385,6 +385,20 @@ export function setSettings(patch: Partial<RoomSettings>) {
 
 const draw = <T>(list: T[]): T => list[Math.floor(Math.random() * list.length)]
 
+/** Every character drawn (random characters): none banned; teammates differ unless repeats are allowed. */
+function drawPicks(s: RoomSettings, banned: string[]): Record<string, string> {
+  const picks: Record<string, string> = {}
+  const free = (list: { id: string }[]) => list.map((c) => c.id).filter((id) => !banned.includes(id))
+  const pool = free(playableSurvivors())
+  for (const slot of [0, 1, 2, 3]) {
+    const left = s.dupes ? pool : pool.filter((id) => !Object.values(picks).includes(id))
+    if (left.length) picks[String(slot)] = draw(left)
+  }
+  const ks = free(playableKillers())
+  if (ks.length) picks.killer = draw(ks)
+  return picks
+}
+
 /**
  * Host: seat everyone (killer = player 1, survivors in join order, the one playing two survivors
  * first as player 2) and go to character picks.
@@ -404,20 +418,84 @@ export function proceedToPick() {
     const s = settingsOf(cur.settings)
     // drawn at once, so everyone sees the result while confirming: the board, and with random
     // characters every pick (none banned; teammates differ unless repeats are allowed)
-    const board = s.map === 'random' ? draw(Object.keys(boards)) : cur.board
-    const picks: Record<string, string> = {}
-    if (s.random) {
-      const free = (list: { id: string }[]) => list.map((c) => c.id).filter((id) => !s.bans.includes(id))
-      const pool = free(playableSurvivors())
-      for (const slot of [0, 1, 2, 3]) {
-        const left = s.dupes ? pool : pool.filter((id) => !Object.values(picks).includes(id))
-        if (left.length) picks[String(slot)] = draw(left)
-      }
-      const ks = free(playableKillers())
-      if (ks.length) picks.killer = draw(ks)
-    }
+    const board = s.map === 'random' ? draw(Object.keys(boards)) : undefined
+    // with a Banlist the characters are drawn once the bans are in (lockBans)
+    const picks = s.random && !s.banlist ? drawPicks(s, []) : {}
     const perkSeed = Math.floor(Math.random() * 0x7fffffff) + 1
-    return { ...cur, phase: 'pick', seats, players: survivors.length + 1, picks, locked: {}, loadouts: {}, perksDone: {}, perkSeed, ...(board ? { board } : {}) }
+    const next: RoomData = {
+      ...cur,
+      phase: 'pick',
+      seats,
+      players: survivors.length + 1,
+      picks,
+      locked: {},
+      loadouts: {},
+      perksDone: {},
+      perkSeed,
+      boardSet: !!board,
+      banPicks: { killer: '', survivors: '' },
+      bansLocked: {},
+    }
+    // the map is picked in its own stage, after the characters (and perks): none until then
+    if (board) next.board = board
+    else delete next.board
+    return next
+  })
+}
+
+// ---------- bans (Banlist) ----------
+
+const listOf = (s: string | undefined) => (s ? s.split(',').filter(Boolean) : [])
+/** Every character banned, both sides' lists together. */
+export const bannedOf = (d: RoomData | null): string[] => (d ? [...listOf(d.banPicks?.killer), ...listOf(d.banPicks?.survivors)] : [])
+const bansDoneOf = (d: RoomData) => Array.from({ length: d.players }, (_, i) => String(i + 1)).every((p) => d.bansLocked?.[p])
+const seatOf = (d: RoomData) => Object.entries(d.seats).find(([, v]) => v.id === session.me)?.[0]
+
+/** The bans are final (everyone confirmed), or the room has none. */
+export const bansDone = computed(() => !!session.data && (!roomSettings.value.banlist || bansDoneOf(session.data)))
+/** What is banned, once it is public: after both sides have confirmed. */
+export const revealedBans = computed(() => (bansDone.value ? bannedOf(session.data) : []))
+/** This player's side's list: the killers the survivors ban, or the survivors the killer bans. */
+export const myBans = computed(() => {
+  const d = session.data
+  const seat = d && seatOf(d)
+  return d && seat ? listOf(d.banPicks?.[Number(seat) === KILLER_PLAYER ? 'killer' : 'survivors']) : []
+})
+
+/**
+ * Ban (or take back) a character of the other side, for this player's side. The survivors share
+ * one list: when it changes every survivor confirms it again.
+ */
+export function toggleBan(id: string) {
+  return update((cur) => {
+    const s = settingsOf(cur.settings)
+    const seat = seatOf(cur)
+    if (cur.phase !== 'pick' || !s.banlist || !seat || bansDoneOf(cur) || cur.bansLocked?.[seat]) return null
+    const key = Number(seat) === KILLER_PLAYER ? 'killer' : 'survivors'
+    const pool = (key === 'killer' ? playableSurvivors() : playableKillers()).map((c) => c.id)
+    if (!pool.includes(id)) return null
+    const list = listOf(cur.banPicks?.[key])
+    const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
+    // a ban that would leave too few to play is refused: 4 survivors (1 with repeats), 1 killer
+    if (next.length > s.banCount || pool.length - next.length < (key === 'killer' ? (s.dupes ? 1 : 4) : 1)) return null
+    const bansLocked = { ...(cur.bansLocked ?? {}) }
+    if (key === 'survivors') for (const p of Object.keys(cur.seats)) if (Number(p) !== KILLER_PLAYER) delete bansLocked[p]
+    return { ...cur, banPicks: { killer: '', survivors: '', ...cur.banPicks, [key]: next.join(',') }, bansLocked }
+  })
+}
+
+/** Confirm (or reopen) this player's side's bans. With the last confirmation random characters are drawn. */
+export function lockBans(on: boolean) {
+  return update((cur) => {
+    const s = settingsOf(cur.settings)
+    const seat = seatOf(cur)
+    if (cur.phase !== 'pick' || !s.banlist || !seat || bansDoneOf(cur)) return null
+    const bansLocked = { ...(cur.bansLocked ?? {}) }
+    if (on) bansLocked[seat] = true
+    else delete bansLocked[seat]
+    const next: RoomData = { ...cur, bansLocked }
+    if (on && s.random && bansDoneOf(next)) next.picks = drawPicks(s, bannedOf(next))
+    return next
   })
 }
 
@@ -432,8 +510,8 @@ export function pickCharacter(slot: 'killer' | number, id: string | null) {
     const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
     if (cur.phase !== 'pick' || !seat || cur.locked[seat]) return null
     const s = settingsOf(cur.settings)
-    // drawn characters stay; banned ones can't be picked
-    if (s.random || (id && s.bans.includes(id))) return null
+    // the bans come first; drawn characters stay; banned ones can't be picked
+    if ((s.banlist && !bansDoneOf(cur)) || s.random || (id && bannedOf(cur).includes(id))) return null
     const player = Number(seat)
     if (slot === 'killer' ? player !== KILLER_PLAYER : !slotsOf(player, cur.players).includes(slot)) return null
     const key = String(slot)
@@ -449,7 +527,7 @@ export function pickCharacter(slot: 'killer' | number, id: string | null) {
 export function lockPicks(locked: boolean) {
   return update((cur) => {
     const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
-    if (cur.phase !== 'pick' || !seat) return null
+    if (cur.phase !== 'pick' || !seat || (settingsOf(cur.settings).banlist && !bansDoneOf(cur))) return null
     const player = Number(seat)
     const mine = player === KILLER_PLAYER ? ['killer'] : slotsOf(player, cur.players).map(String)
     if (locked && mine.some((k) => !cur.picks[k])) return null
@@ -553,6 +631,16 @@ export function confirmPerks(key: string, on: boolean) {
   })
 }
 
+/** Which stage of the picks the room is in: characters, then perks (Bloodweb, Devout), then the map. */
+export type PickStage = 'bans' | 'chars' | 'perks' | 'map'
+export const pickStage = computed<PickStage>(() =>
+  !bansDone.value ? 'bans' : !allLocked.value ? 'chars' : perksWaiting.value.length ? 'perks' : 'map',
+)
+/** The map is settled: drawn at the start of the picks, or picked by whoever the room lets. */
+export const mapDone = computed(() => !!session.data?.boardSet)
+/** Everything is in: the killer may start. */
+export const startable = computed(() => allReady.value && mapDone.value)
+
 /** Who picks the board under the room's settings: the killer's seat, the host, or nobody (drawn). */
 export const mayPickBoard = computed(() => {
   const d = session.data
@@ -568,14 +656,14 @@ export function setBoard(id: string) {
     const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
     const how = settingsOf(cur.settings).map
     const may = how === 'killer' || how === 'secret' ? Number(seat) === KILLER_PLAYER : how === 'host' && session.me === cur.host
-    return cur.phase === 'pick' && may ? { ...cur, board: id } : null
+    return cur.phase === 'pick' && may ? { ...cur, board: id, boardSet: true } : null
   })
 }
 
 /** The killer starts the game once everyone has locked in. The seed is drawn here, once. */
 export function startOnlineGame() {
   const d = session.data
-  if (!d || !allReady.value || mySeat.value !== KILLER_PLAYER) return
+  if (!d || !startable.value || mySeat.value !== KILLER_PLAYER) return
   const perks = roomSettings.value.mode === 'adept' ? {} : loadoutsOf(d)
   const survivors = [0, 1, 2, 3].map((i) => d.picks[String(i)])
   const killer = d.picks.killer
@@ -602,7 +690,7 @@ export function startOnlineGame() {
 /** Host: back to the lobby from the character picks. */
 export function backToLobby() {
   if (!isHost.value) return
-  return update((cur) => ({ ...cur, phase: 'lobby', seats: {}, players: 0, picks: {}, locked: {}, loadouts: {}, perksDone: {} }))
+  return update((cur) => ({ ...cur, phase: 'lobby', seats: {}, players: 0, picks: {}, locked: {}, loadouts: {}, perksDone: {}, boardSet: false, banPicks: { killer: '', survivors: '' }, bansLocked: {} }))
 }
 
 /** Seated players still on the game's summary (not back in the lobby yet). */

@@ -42,6 +42,14 @@ Each player plays on their own device. The host creates a room and shares its 4-
 the invite link). Everyone takes a seat (player 1 = killer, players 2.. = the survivor hands, p.19),
 and the host starts the game.
 
+- **The way into a game** (`OnlineRoom`, `session.ts`): Lobby (sides, ready) → the picks, a stage
+  at a time → the killer starts. A stage opens when everyone has finished the one before
+  (`pickStage`, derived from the room's data, so there is no stage field to drift): **characters**
+  (everyone confirms; a **Banlist** stage comes before it when the room sets one) → **perks** (only when the room's mode is Bloodweb or Devout) → **map**
+  (picked by whoever the setting says; drawn maps are settled at once — `boardSet`, so a map is
+  never "default MacMillan" by omission). The start button waits for the map. A step bar shows
+  where the room is and chips show who is done; "แก้ตัวละคร" on the perks or map stage reopens the
+  player's characters, which takes everyone back to the characters stage and clears the loadouts.
 - **Trust model: friends, not strangers.** Every device runs the same engine, so the room carries
   the **moves**, not the state: each device replays them and arrives at the same game (the engine
   is a pure reducer and its RNG lives in the state, so a replay is exact — nothing in
@@ -93,9 +101,15 @@ and the host starts the game.
   - **The killer's pick**: hidden from the survivors (default) or shown to them as it is made.
     Either way it is in the room's data (friends, not strangers).
   - **Characters**: picked, or drawn for everyone when the picks open (players only confirm);
-    survivors may repeat a teammate's (the second gets a number after the name); the host may
-    ban characters (never picked or drawn; at least 4 survivors — 1 with repeats — and 1
-    killer stay).
+    survivors may repeat a teammate's (the second gets a number after the name).
+  - **Banlist** (off by default; 1–3 characters per side): a stage before the characters. Each
+    side bans characters of the *other* side — the survivors together ban killers (one shared
+    list: whoever changes it, every survivor confirms again), the killer bans survivors — up
+    to the set number, leaving at least 4 survivors (1 with repeats) and 1 killer. A side's
+    list is hidden from the other until everyone has confirmed, then it is public: banned
+    characters are never picked or drawn (with random characters the draw happens after the
+    bans). Once everyone confirmed, the bans are final. Stored as `banPicks` and `bansLocked`
+    in the lobby node (`lobbyOf` lists them). The host's old per-room ban list is gone.
   - **Starting ▲**: survivors 0–4, the killer 2–6 (the rulebook's 2 and 4 by default, p.6).
 - **Backends** (`online/`):
   - `firebase.ts` is the Realtime Database. Its URL goes in the project root's `.env.local`

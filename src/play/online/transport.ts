@@ -35,9 +35,10 @@ export interface Member {
 /**
  * What the room holds. The game state travels as a JSON string (see `firebase.ts`).
  *
- * Phases: `lobby` (everyone picks a side and says ready; the host goes on) → `pick` (characters:
- * survivors pick theirs, the killer theirs; the killer starts) → a game. Maps hold no nulls, which
- * the Realtime Database would drop.
+ * Phases: `lobby` (everyone picks a side and says ready; the host goes on) → `pick` → a game.
+ * The picks go through stages, each of which opens when everyone has finished the one before
+ * (session.ts `pickStage`): characters, then perks (Bloodweb, Devout), then the map; the killer
+ * starts the game last. Maps hold no nulls, which the Realtime Database would drop.
  */
 export interface RoomData {
   host: string
@@ -52,6 +53,8 @@ export interface RoomData {
   double?: string
   /** The board picked (by the killer or the host, or drawn; unset: MacMillan Estate). */
   board?: string
+  /** The board is settled (drawn, or picked by whoever the room lets): the map stage is done. */
+  boardSet?: boolean
   /** The host's room settings (anything unset: its default, see settings.ts). */
   settings?: Partial<RoomSettings>
   /** The room's name, shown on the room board and in the room. */
@@ -60,6 +63,13 @@ export interface RoomData {
   passwordHash?: string
   /** Players the host kicked from the lobby (client id → when): they can't come back in. */
   kicked?: Record<string, number>
+  /**
+   * Banlist (settings `banlist`): what each side banned of the other, as "a,b" lists — 'killer':
+   * the survivors the killer banned, 'survivors': the killers the survivors banned.
+   */
+  banPicks?: Record<string, string>
+  /** Player number → this player confirmed their side's bans (all of them: the bans are final). */
+  bansLocked?: Record<string, boolean>
   /** Character picks: 'killer' → killer id, survivor slot '0'..'3' → survivor id. */
   picks: Record<string, string>
   /** Player number → picks confirmed. */

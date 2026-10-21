@@ -23,8 +23,13 @@ export interface RoomSettings {
   dupes: boolean
   /** Characters are drawn for everyone when the picks open; players only confirm. */
   random: boolean
-  /** Characters nobody may play. */
-  bans: string[]
+  /**
+   * Banlist: before the characters, each side bans characters of the other side (the survivors
+   * together bans killers, the killer bans survivors), `banCount` at most each; revealed once
+   * both sides have confirmed.
+   */
+  banlist: boolean
+  banCount: number
   /** Starting ▲, to balance a table with new players (the rulebook's are 2 and 4, p.6). */
   survivorBp: number
   killerBp: number
@@ -37,18 +42,21 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   showKiller: false,
   dupes: false,
   random: false,
-  bans: [],
+  banlist: false,
+  banCount: 2,
   survivorBp: SURVIVOR_BP.start,
   killerBp: KILLER_BP.start,
 }
 
 export const TIMER_CHOICES = [0, 60, 90, 120]
+export const BAN_COUNT_RANGE = [1, 3] as const
 export const SURVIVOR_BP_RANGE = [0, 4] as const
 export const KILLER_BP_RANGE = [2, 6] as const
 
-/** The room's settings with every default filled in (the database drops empty lists). */
-export function settingsOf(stored: Partial<RoomSettings> | undefined): RoomSettings {
-  return { ...DEFAULT_SETTINGS, ...stored, bans: stored?.bans ?? [] }
+/** The room's settings with every default filled in (a host's old `bans` list is no longer used). */
+export function settingsOf(stored: (Partial<RoomSettings> & { bans?: unknown }) | undefined): RoomSettings {
+  const { bans: _old, ...rest } = stored ?? {}
+  return { ...DEFAULT_SETTINGS, ...rest }
 }
 
 /** Characters the full game can play, by side. */
@@ -67,7 +75,7 @@ export function settingsChips(s: RoomSettings): string[] {
   if (s.random) out.push('🎲 สุ่มตัวละคร')
   if (s.showKiller) out.push('👁 เห็นฆาตกรที่เลือก')
   if (s.dupes) out.push('👯 Survivor ซ้ำได้')
-  if (s.bans.length) out.push(`🚫 แบน ${s.bans.length} ตัว`)
+  if (s.banlist) out.push(`🚫 Banlist ${s.banCount} ตัว/ฝั่ง`)
   if (s.survivorBp !== DEFAULT_SETTINGS.survivorBp || s.killerBp !== DEFAULT_SETTINGS.killerBp) out.push(`▲ เริ่ม ${s.survivorBp} / ${s.killerBp}`)
   return out
 }
