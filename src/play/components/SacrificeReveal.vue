@@ -1,15 +1,16 @@
 <script setup lang="ts">
-// The killer's Sacrifice Progress going up: the track of hooks lights its new pip. It shares the
-// perk cards' queue (fx.perks), so it shows after the hook that caused it and the screen waits for
-// it like for a card. A tap skips ahead. The last one has FinaleReveal instead.
-import { computed, onBeforeUnmount, watch } from 'vue'
+// The killer's Sacrifice Progress going up, as the HUD's own token (ObjectiveHud) blown up in
+// the middle of the screen: a ring of 8 cells, the ones already won gold, and the new ones
+// filling with gold one after another while the number counts up. It shares the perk cards' queue (fx.perks), so it shows after the hook that caused
+// it and the screen waits for it like for a card. A tap skips ahead. The last one has
+// FinaleReveal instead.
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { SACRIFICE_TO_WIN } from '../engine/engine'
 import type { GameState } from '../engine/types'
-import { killerMini } from '../labels'
-import Mini from './Mini.vue'
+import { SACRIFICE_IMAGE } from '../labels'
 
 const props = defineProps<{ st: GameState }>()
 
@@ -19,29 +20,55 @@ const current = computed(() => {
   const dice = fx.dice[0]
   return head?.sacrifice && (!dice || head.id < dice.id) ? head : null
 })
-const total = computed(() => current.value?.sacrifice?.total ?? 0)
 const gained = computed(() => current.value?.sacrifice?.gained ?? 1)
-const pips = Array.from({ length: SACRIFICE_TO_WIN }, (_, i) => i)
+const total = computed(() => current.value?.sacrifice?.total ?? 0)
+
+/** The ring (r = 21 in a 48 box) is cut in one cell per sacrifice, with a gap between them. */
+const RING = 2 * Math.PI * 21
+const GAP = 5
+const CELL = RING / SACRIFICE_TO_WIN - GAP
+const cells = Array.from({ length: SACRIFICE_TO_WIN }, (_, i) => ({
+  // the cell's start, turned round the centre (the ring itself starts at the top, going clockwise)
+  turn: (i * 360) / SACRIFICE_TO_WIN + (GAP / RING) * 180,
+  i,
+}))
+/** The number shows the old count first, the new one as the first new cell fills. */
+const shown = ref(0)
+const bump = ref(0)
 
 const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
-let timer: number | undefined
+let timers: number[] = []
+const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms))
+function clearTimers() {
+  timers.forEach((t) => clearTimeout(t))
+  timers = []
+}
+
 watch(
   () => current.value?.id,
   (id) => {
-    clearTimeout(timer)
-    if (id === undefined) return
+    clearTimers()
+    const s = current.value?.sacrifice
+    if (id === undefined || !s) return
+    shown.value = reduceMotion ? s.total : s.total - s.gained
     fxSound.perk(true)
-    timer = window.setTimeout(next, reduceMotion ? 1500 : 2000)
+    if (!reduceMotion)
+      later(550, () => {
+        shown.value = s.total
+        bump.value++
+      })
+    // each new cell takes 350 ms to fill, one after the other
+    later(reduceMotion ? 1500 : 2400 + (s.gained - 1) * 350, next)
   },
   { immediate: true },
 )
 
 function next() {
-  clearTimeout(timer)
+  clearTimers()
   fx.perks.shift()
 }
-onBeforeUnmount(() => clearTimeout(timer))
+onBeforeUnmount(clearTimers)
 </script>
 
 <template>
@@ -49,13 +76,26 @@ onBeforeUnmount(() => clearTimeout(timer))
     <div v-if="current" :key="current.id" class="sac" role="status" aria-live="polite" @click="next">
       <div class="panel">
         <span class="label">Sacrifice Progress</span>
-        <div class="row">
-          <Mini class="face aura-killer" :src="asset(killerMini(props.st))" />
-          <div class="pips" aria-hidden="true">
-            <span v-for="i in pips" :key="i" class="pip" :class="{ on: i < total, fresh: i >= total - gained && i < total }" />
-          </div>
-        </div>
-        <h2>{{ total }}<small>/{{ SACRIFICE_TO_WIN }}</small></h2>
+        <span class="icon">
+          <svg viewBox="0 0 48 48" aria-hidden="true">
+            <circle class="track" cx="24" cy="24" r="21" />
+            <g v-for="c in cells" :key="c.i" :style="{ transform: `rotate(${c.turn}deg)`, transformOrigin: '24px 24px' }">
+              <circle class="cell" cx="24" cy="24" r="21" :stroke-dasharray="`${CELL} ${RING}`" />
+              <circle
+                v-if="c.i < total"
+                class="cell gold"
+                :class="{ fresh: c.i >= total - gained }"
+                cx="24"
+                cy="24"
+                r="21"
+                :stroke-dasharray="`${CELL} ${RING}`"
+                :style="{ '--n': c.i - (total - gained), '--cell': CELL, '--ring': RING }"
+              />
+            </g>
+          </svg>
+          <img class="token" :src="asset(SACRIFICE_IMAGE)" alt="" />
+        </span>
+        <span :key="bump" class="count" :class="{ bump }"><b>{{ shown }}</b><small>/{{ SACRIFICE_TO_WIN }}</small></span>
         <p>{{ props.st.killer.name }} ได้ Sacrifice{{ gained > 1 ? ` +${gained}` : '' }}</p>
       </div>
     </div>
@@ -77,12 +117,12 @@ onBeforeUnmount(() => clearTimeout(timer))
 .panel {
   display: grid;
   justify-items: center;
-  gap: 0.4rem;
-  min-width: min(24rem, 90vw);
-  padding: 1rem 1.6rem 1.1rem;
+  gap: 0.5rem;
+  min-width: min(20rem, 90vw);
+  padding: 1rem 1.8rem 1.1rem;
   border: 1px solid rgb(var(--glow) / 0.75);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgb(14 15 19 / 0.97), rgb(8 9 12 / 0.97));
+  background: linear-gradient(180deg, rgb(10 11 14 / 0.97), rgb(30 6 9 / 0.97));
   box-shadow:
     0 0 0 1px rgb(0 0 0 / 0.6),
     0 0 50px rgb(var(--glow) / 0.4),
@@ -101,45 +141,77 @@ onBeforeUnmount(() => clearTimeout(timer))
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
-.row {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  margin: 0.2rem 0;
+/* the HUD's icon, five times the size */
+.icon {
+  position: relative;
+  width: 160px;
+  height: 160px;
 }
-.face {
-  width: 56px;
-  height: 56px;
+.icon svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* the ring starts at the top and fills clockwise */
+  transform: rotate(-90deg);
 }
-.pips {
-  display: flex;
-  gap: 0.35rem;
+.icon img {
+  position: absolute;
+  inset: 17%;
+  width: 66%;
+  height: 66%;
 }
-.pip {
-  width: 20px;
-  height: 20px;
+/* the token is a disc already: it fills the ring */
+.icon img.token {
+  inset: 11%;
+  width: 78%;
+  height: 78%;
   border-radius: 50%;
-  border: 2px solid rgb(var(--glow) / 0.45);
-  background: rgb(0 0 0 / 0.5);
 }
-.pip.on {
-  border-color: rgb(var(--glow));
-  background: rgb(var(--glow));
-  box-shadow: 0 0 8px rgb(var(--glow) / 0.7);
+.track {
+  fill: rgb(0 0 0 / 0.55);
+  stroke: rgb(255 255 255 / 0.12);
+  stroke-width: 3;
 }
-/* the new pip lights up after the card has landed */
-.pip.fresh {
-  animation: light 0.5s ease-out 0.4s both;
+/* the ring's cells: a dim slot each, gold once won */
+.cell {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.14);
+  stroke-width: 3.5;
 }
-h2 {
-  margin: 0;
-  font-size: clamp(1.6rem, 4vw, 2.2rem);
-  color: #fff;
-  text-shadow: 0 0 18px rgb(var(--glow) / 0.8);
+.cell.gold {
+  stroke: #f5c542;
+  filter: drop-shadow(0 0 3px rgb(245 197 66 / 0.8));
 }
-h2 small {
-  font-size: 0.6em;
+/* a new cell draws itself along its slot, with a flash of light, in turn */
+.cell.gold.fresh {
+  animation: fill 0.45s ease-out calc(0.55s + var(--n) * 0.35s) both;
+}
+@keyframes fill {
+  from {
+    stroke-dasharray: 0 var(--ring);
+    stroke: #fff6c8;
+    filter: drop-shadow(0 0 10px rgb(255 224 120 / 1));
+  }
+}
+.count {
+  display: flex;
+  align-items: baseline;
+  font-family: var(--font-display);
+  line-height: 1;
+}
+.count b {
+  font-size: 2.6rem;
+  font-weight: 700;
+  color: #f2efe6;
+  text-shadow: 0 0 12px rgb(var(--glow) / 0.8);
+}
+.count small {
+  font-size: 1.1rem;
   color: var(--muted);
+}
+.count.bump {
+  animation: bump 0.7s ease-out;
 }
 p {
   margin: 0;
@@ -151,15 +223,10 @@ p {
     opacity: 0;
   }
 }
-@keyframes light {
-  from {
-    background: rgb(0 0 0 / 0.5);
-    box-shadow: none;
-    transform: scale(0.6);
-  }
-  60% {
-    transform: scale(1.6);
-    box-shadow: 0 0 22px rgb(var(--glow));
+@keyframes bump {
+  30% {
+    transform: scale(1.5);
+    filter: brightness(1.6);
   }
 }
 .sac-enter-active {
@@ -174,7 +241,10 @@ p {
 }
 @media (prefers-reduced-motion: reduce) {
   .panel,
-  .pip.fresh {
+  .count.bump {
+    animation: none;
+  }
+  .cell.gold.fresh {
     animation: none;
   }
 }

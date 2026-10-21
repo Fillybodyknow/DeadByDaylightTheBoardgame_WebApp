@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import { GENERATORS_TO_POWER, PROGRESS_MAX, SACRIFICE_TO_WIN, gatesPowered, generatorsDone } from '../engine/engine'
 import type { GameState } from '../engine/types'
-import { PROP_IMAGE } from '../labels'
+import { PROP_IMAGE, SACRIFICE_IMAGE } from '../labels'
 
 const props = defineProps<{ st: GameState }>()
 
@@ -40,7 +40,7 @@ const RING = 2 * Math.PI * 21
           <circle class="track" cx="24" cy="24" r="21" />
           <circle class="fill" cx="24" cy="24" r="21" :stroke-dasharray="`${RING * sacFrac} ${RING}`" />
         </svg>
-        <img :src="asset(PROP_IMAGE.hook)" alt="" />
+        <img class="token" :src="asset(SACRIFICE_IMAGE)" alt="" />
       </span>
       <span class="count"><b>{{ sacrifice }}</b><small>/{{ SACRIFICE_TO_WIN }}</small></span>
     </div>
@@ -105,6 +105,13 @@ const RING = 2 * Math.PI * 21
   inset: 17%;
   width: 66%;
   height: 66%;
+}
+/* the token is a disc already: it fills the ring */
+.icon img.token {
+  inset: 11%;
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
 }
 .track {
   fill: rgb(0 0 0 / 0.55);

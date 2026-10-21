@@ -27,6 +27,9 @@ export const PROP_IMAGE: Record<PropKind, string> = {
   totem: 'assets/props/totem.webp',
 }
 
+/** The Sacrifice Progress token (a red disc with the hook): the HUD's icon and the reveal's. */
+export const SACRIFICE_IMAGE = 'assets/tokens/sacrifice-progress.webp'
+
 export const cardImage = (c: MoveCard) => `assets/movement/${c}.webp`
 /**
  * A survivor's face-down movement card: the deck's own back. (The numbered backs, back-one to

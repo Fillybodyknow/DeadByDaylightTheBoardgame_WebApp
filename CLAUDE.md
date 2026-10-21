@@ -127,7 +127,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 
 - **Results never run ahead of animations.** `GameScreen` holds the view on the old state while
   dice, perk cards and board animations play. Pending rolls show their dice first.
-- **Every rise of the Sacrifice track shows** (`SacrificeReveal`, in the perk cards' queue, from the `sacrifice` event when the total goes up; Breakdown lowering it shows nothing). The eighth is the finale's instead.
+- **Every rise of the Sacrifice track shows** (`SacrificeReveal` (a ring of 8 cells, new ones filling gold), in the perk cards' queue, from the `sacrifice` event when the total goes up; Breakdown lowering it shows nothing). The eighth is the finale's instead.
 - **The game's last beat shows before the summary:** Sacrifice filling up or the exit gate
   opening (`FinaleReveal`, `fx.finale`, queued on the `gameOver` event after the cards and rolls
   before it); the screen holds the old state until it is done.
