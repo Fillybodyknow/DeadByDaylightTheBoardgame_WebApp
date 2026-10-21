@@ -1024,8 +1024,10 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           <strong v-for="w in waitingOn" :key="w">{{ w }}</strong>
           <span class="dots" aria-hidden="true"><i /><i /><i /></span>
         </section>
+        <!-- while the start-room rolls play on the map, nobody is asked anything: the panel stays empty
+             (else the step waiting next — a killer perk at the start of planning — showed to everyone) -->
         <ActionPanel
-          v-else-if="!over"
+          v-else-if="!over && !fx.starts"
           :st="view"
           :power-on="powerOn"
           :undying-on="undyingOn"

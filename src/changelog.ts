@@ -12,6 +12,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.5.3',
+    date: '2026-10-21',
+    items: ['แก้บั๊ก: ระหว่างทอยหาห้องเริ่มต้น แผงคำถาม Perk ของ Killer (เช่น The Third Seal) เด้งให้ทุกคนเห็น'],
+  },
+  {
     version: '1.5.2',
     date: '2026-10-21',
     items: ['ออนไลน์: หน้า Loading ค้างนานขึ้น (อย่างน้อย 6.5 วินาที) ให้อ่านคำพูด/เคล็ดลับทัน'],
