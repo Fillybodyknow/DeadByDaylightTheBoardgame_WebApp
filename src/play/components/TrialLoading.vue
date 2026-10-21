@@ -2,21 +2,24 @@
 // The loading page between the match-ready beat and the trial: the two sides fill the screen as
 // its background — the killer, a gap with VS in it, then the four survivors, each the portrait
 // strip cut from their character board and scaled to cover its share of the width — with a
-// survivor's quote or a rules tip and a loading bar. The Bloodweb's refresh sounds as it opens;
-// the game opens when the bar is full (`done`), or at a tap.
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+// survivor's quote or a rules tip and a loading bar. The bar is real: it fills as the pictures the
+// game will show are fetched (`gameAssets`), and the game opens once they all are and the page has
+// been up a moment (`done`), or at a tap. The Bloodweb's refresh sounds as it opens.
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { killerById, survivorById } from '../../data'
 import { asset, cssUrl } from '../../i18n'
 import { quoteOrTip } from '../../loading'
 import { boards } from '../engine/boards'
 import type { GameState } from '../engine/types'
 import { fxSound } from '../fx/audio'
+import { gameAssets, preload } from '../intro'
 
 const props = defineProps<{ st: GameState }>()
 const emit = defineEmits<{ done: [] }>()
 
-/** How long the page shows (the bar fills over it). */
-const MS = 3600
+/** The page shows at least this long (to be read), and waits at most this long for slow pictures. */
+const MIN_MS = 2600
+const MAX_MS = 20000
 
 const slide = quoteOrTip(props.st.survivors.map((s) => s.characterId))
 
@@ -42,20 +45,35 @@ const fighters = computed<Fighter[]>(() => {
   return list
 })
 
-let timer: number | undefined
+const assets = gameAssets(props.st)
+const loaded = ref(0)
+const progress = computed(() => (assets.length ? loaded.value / assets.length : 1))
+
+let timers: number[] = []
+let finished = false
+/** How long the page takes to leave: the portraits rush in and go dark, then the game opens. */
+const LEAVE_MS = 650
+const leaving = ref(false)
 function finish() {
-  clearTimeout(timer)
-  emit('done')
+  if (finished) return
+  finished = true
+  timers.forEach((t) => clearTimeout(t))
+  leaving.value = true
+  fxSound.whoosh()
+  timers.push(window.setTimeout(() => emit('done'), LEAVE_MS))
 }
 onMounted(() => {
   fxSound.bwRefresh()
-  timer = window.setTimeout(finish, MS)
+  const shown = new Promise<void>((r) => timers.push(window.setTimeout(r, MIN_MS)))
+  const all = Promise.all(assets.map((a) => preload(a).then(() => void loaded.value++)))
+  void Promise.all([shown, all]).then(finish)
+  timers.push(window.setTimeout(finish, MAX_MS))
 })
-onBeforeUnmount(() => clearTimeout(timer))
+onBeforeUnmount(() => timers.forEach((t) => clearTimeout(t)))
 </script>
 
 <template>
-  <div class="ready" role="status" :style="{ '--ms': `${MS}ms` }" @click="finish">
+  <div class="ready" :class="{ leaving }" role="status" :style="{ '--leave': `${LEAVE_MS}ms` }" @click="finish">
     <!-- the two sides, edge to edge -->
     <div class="lineup">
       <template v-for="(f, i) in fighters" :key="f.key">
@@ -82,8 +100,10 @@ onBeforeUnmount(() => clearTimeout(timer))
           <cite v-if="slide.by">— {{ slide.by }}</cite>
         </span>
       </blockquote>
-      <div class="bar" aria-hidden="true"><i /></div>
-      <small class="skip">แตะเพื่อข้าม</small>
+      <div class="bar" role="progressbar" :aria-valuenow="Math.round(progress * 100)" aria-valuemin="0" aria-valuemax="100">
+        <i :style="{ transform: `scaleX(${progress})` }" />
+      </div>
+      <small class="skip">โหลด {{ loaded }}/{{ assets.length }} · แตะเพื่อข้าม</small>
     </footer>
   </div>
 </template>
@@ -280,16 +300,30 @@ h1 {
   background: var(--blood-bright);
   box-shadow: 0 0 10px rgb(255 59 48 / 0.9);
   transform-origin: left;
-  animation: fill var(--ms) linear both;
+  transition: transform 0.25s ease-out;
 }
 .skip {
   color: var(--muted);
   font-size: 0.75rem;
 }
-@keyframes fill {
-  from {
-    transform: scaleX(0);
-  }
+/* leaving: the portraits rush forward and darken, the words go, all into black */
+.ready.leaving {
+  cursor: default;
+}
+.ready.leaving .lineup {
+  transition:
+    transform var(--leave) cubic-bezier(0.6, 0, 0.8, 0.4),
+    filter var(--leave) ease-in,
+    opacity var(--leave) ease-in;
+  transform: scale(1.18);
+  filter: brightness(0.2) blur(2px);
+  opacity: 0;
+}
+.ready.leaving header,
+.ready.leaving footer,
+.ready.leaving .vs {
+  transition: opacity calc(var(--leave) * 0.5) ease-in;
+  opacity: 0;
 }
 @media (max-height: 640px) {
   .slide {

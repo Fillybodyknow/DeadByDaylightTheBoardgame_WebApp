@@ -4,6 +4,7 @@
 import { ref, watch } from 'vue'
 import GameScreen from '../components/GameScreen.vue'
 import TrialLoading from '../components/TrialLoading.vue'
+import TrialFade from '../components/TrialFade.vue'
 import { introStage } from '../intro'
 import MatchBeat from '../components/MatchBeat.vue'
 import OnlineEntry from '../components/OnlineEntry.vue'
@@ -18,6 +19,12 @@ import { closeOnlineGame, isHost, leaveRoom, returnToLobby, session, stillInGame
  */
 const intro = introStage
 const introAt = ref(0)
+/** The game just opened from the loading page: it comes in out of the black (`TrialFade`). */
+const fadeIn = ref(false)
+function loaded() {
+  intro.value = null
+  fadeIn.value = true
+}
 watch(
   () => !!session.data?.game,
   (on, was) => {
@@ -47,7 +54,7 @@ watch(
           <button @click="leaveRoom()">ออกจากห้อง</button>
         </div>
       </section>
-      <TrialLoading v-else-if="session.data.game && game && intro === 'loading'" :st="game" @done="intro = null" />
+      <TrialLoading v-else-if="session.data.game && game && intro === 'loading'" :st="game" @done="loaded" />
       <!-- during the beat the room stays on screen, under it -->
       <template v-else-if="session.data.game && game && intro !== 'beat'">
         <GameScreen :st="game" />
@@ -56,6 +63,7 @@ watch(
     </template>
     <OnlineEntry v-else />
     <MatchBeat v-if="intro === 'beat'" :since="introAt" @done="intro = 'loading'" />
+    <TrialFade v-if="fadeIn" @done="fadeIn = false" />
   </div>
 </template>
 

@@ -2,8 +2,24 @@
 // "Once" is per browser session and per game, so a reload or a second device doesn't replay it.
 
 import { ref } from 'vue'
-import { killerById, survivorById } from '../data'
+import { components, killerById, survivorById } from '../data'
+import { asset } from '../i18n'
 import { boards } from './engine/boards'
+import { PERKS, type PerkId } from './engine/perks'
+import {
+  BEAR_TRAP_IMAGE,
+  KNIFE_IMAGE,
+  MADNESS_IMAGE,
+  PROP_IMAGE,
+  SACRIFICE_IMAGE,
+  VICTOR_MINI,
+  VILE_PURGE_IMAGE,
+  cardImage,
+  itemImage,
+  killerMini,
+  perkImage,
+  survivorMini,
+} from './labels'
 import type { GameState } from './engine/types'
 import type { StartMini } from './fx/bus'
 
@@ -64,4 +80,51 @@ export function startMinis(st: GameState): StartMini[] {
       face: faceOf(st.killer.room),
     },
   ]
+}
+
+/**
+ * Every picture this game will put on screen early: the map and its backdrop, the minis, the props
+ * (face up and face down), the movement cards, the dice, the tokens, the killer's power and passive,
+ * the items in hand and every perk in play. The loading page fetches them so the game opens whole.
+ */
+export function gameAssets(st: GameState): string[] {
+  const k = killerById.get(st.killer.characterId)
+  const perks = [...st.killer.perks, ...st.survivors.flatMap((s) => s.perks)] as PerkId[]
+  const list = [
+    boards[st.board]?.image,
+    `assets/app/background-img/background_${st.board}.webp`,
+    killerMini(st),
+    ...st.survivors.map((_, i) => survivorMini(st, i)),
+    ...(st.killer.characterId === 'twins' ? [VICTOR_MINI] : []),
+    ...Object.values(PROP_IMAGE),
+    ...(['objective', 'survival', 'altruism', 'boldness'] as const).map((c) => `assets/props/back-${c}.webp`),
+    ...(['sneak', 'sprint', 'crouch', 'vault', 'wait'] as const).map(cardImage),
+    ...components.skillDieFaces,
+    ...components.dangerDieFaces,
+    components.bloodpoint.image,
+    components.entity.image,
+    components.breakableWall.image,
+    SACRIFICE_IMAGE,
+    k?.power.image?.th,
+    k?.passiveImage?.th,
+    ...(k?.tokens ?? []).map((t) => t.image),
+    ...(st.killer.characterId === 'trapper' ? [BEAR_TRAP_IMAGE] : []),
+    ...(st.killer.characterId === 'doctor' ? [MADNESS_IMAGE] : []),
+    ...(st.killer.characterId === 'trickster' ? [KNIFE_IMAGE] : []),
+    ...(st.killer.characterId === 'plague' ? [VILE_PURGE_IMAGE] : []),
+    ...st.survivors.flatMap((s) => (s.item ? [itemImage(s.item)] : [])),
+    'assets/items/back.webp',
+    ...perks.filter((p) => PERKS[p]).map(perkImage),
+  ]
+  return [...new Set(list.filter((x): x is string => !!x))]
+}
+
+/** Fetch and decode one picture; settles either way (a missing one doesn't hold the game back). */
+export function preload(path: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => void img.decode().then(resolve, resolve)
+    img.onerror = () => resolve()
+    img.src = asset(path)
+  })
 }

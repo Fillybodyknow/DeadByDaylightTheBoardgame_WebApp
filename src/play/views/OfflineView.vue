@@ -11,6 +11,7 @@ import CharacterPicker from '../components/CharacterPicker.vue'
 import MapPicker from '../components/MapPicker.vue'
 import GameScreen from '../components/GameScreen.vue'
 import TrialLoading from '../components/TrialLoading.vue'
+import TrialFade from '../components/TrialFade.vue'
 import { introStage } from '../intro'
 import MatchBeat from '../components/MatchBeat.vue'
 import { macmillan } from '../engine/boards'
@@ -30,6 +31,12 @@ const router = useRouter()
  */
 const intro = introStage
 const introAt = ref(0)
+/** The game just opened from the loading page: it comes in out of the black (`TrialFade`). */
+const fadeIn = ref(false)
+function loaded() {
+  intro.value = null
+  fadeIn.value = true
+}
 watch(
   () => !!game.value,
   (on, was) => {
@@ -214,7 +221,7 @@ function start() {
       </div>
     </section>
 
-    <TrialLoading v-else-if="game && intro === 'loading'" :st="game" @done="intro = null" />
+    <TrialLoading v-else-if="game && intro === 'loading'" :st="game" @done="loaded" />
 
     <!-- during the beat the setup stays on screen, under it -->
     <template v-else-if="game && intro !== 'beat'">
@@ -337,6 +344,7 @@ function start() {
       </template>
     </div>
     <MatchBeat v-if="intro === 'beat'" :since="introAt" @done="intro = 'loading'" />
+    <TrialFade v-if="fadeIn" @done="fadeIn = false" />
   </div>
 </template>
 

@@ -208,7 +208,9 @@ local backend syncs browser tabs.
   path a mini walks (`pathSound`); the room's from OnlineRoom. A game starting: `MatchBeat` plays
   match-ready over the page as it was (laid out as that page: `introStage` in `intro.ts` keeps App
   from the game's layout), with a heartbeat (`fxSound.heartbeat`) and the screen throbbing red on it, for its
-  4.6 s; then `TrialLoading` is the loading page (bw-refresh, a quote or rules tip, a loading bar),
+  4.6 s; then `TrialLoading` is the loading page (bw-refresh, a quote or rules tip, a bar that fills as
+  the game's pictures load — `gameAssets` in `intro.ts` lists them; at least 2.6 s, at most 20 s; it leaves by
+  rushing into black, and `TrialFade` opens the board out of it),
   then the game. The loading page's portraits fill the screen: the strip on the left of each character's board
   (`boardTh`, 0.255 of its width: 0.334 high-to-wide for a killer's 2400×1833 board, 0.421 for a
   survivor's 2400×1615 with the "ITEM CARD" label under it cropped off), the killer, a gap with
