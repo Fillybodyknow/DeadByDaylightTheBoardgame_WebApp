@@ -472,7 +472,7 @@ const seatStatus = computed(() =>
         <p class="split muted">{{ splitNote }}</p>
         <!-- the colour of this player's pings in the game: one each, none the same -->
         <div v-if="me" class="ping-pick" role="radiogroup" aria-label="สี Ping ของคุณ">
-          <span class="ping-pick-label">📍 สี Ping ของคุณ <small class="muted">— ระหว่างเกมกดปุ่ม 📍 หรือ Alt+คลิกบนแผนที่ ทุกคนในห้องเห็น (รวม Killer)</small></span>
+          <span class="ping-pick-label">📍 สี Ping ของคุณ <small class="muted">— ระหว่างเกมคลิกขวาบนแผนที่ หรือชี้แล้วกด Q (แท็บเล็ต: กดค้าง) ทุกคนในห้องเห็น รวม Killer</small></span>
           <span class="swatches">
             <button
               v-for="c in PING_COLORS"

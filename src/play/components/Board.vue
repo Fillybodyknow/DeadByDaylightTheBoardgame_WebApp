@@ -6,7 +6,7 @@
 //
 // The board also animates what the engine reports in the log: minis walk through the path
 // they took, tiles flip, and hits, hooks, repairs and breaks get an effect where they happen.
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components } from '../../data'
 import { asset } from '../../i18n'
 import { boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, victorRoom } from '../engine/engine'
@@ -520,9 +520,12 @@ function play(ev: GameEvent, delay: number): number {
 
 let pressTimer: number | undefined
 let pressed = false
+/** The pointerdown a prop or a mini took for its own long-press (the board then leaves it). */
+let pressEvent: Event | null = null
 
 function pressStart(e: PointerEvent, target: InspectTarget) {
   if (e.pointerType !== 'touch') return
+  pressEvent = e
   pressed = false
   clearTimeout(pressTimer)
   pressTimer = window.setTimeout(() => {
@@ -533,7 +536,71 @@ function pressStart(e: PointerEvent, target: InspectTarget) {
 
 function pressEnd() {
   clearTimeout(pressTimer)
+  pressAt = null
 }
+
+// ---------- pings (online): many ways in, so marking a spot never takes a detour ----------
+
+/** Ping the spot under these page coordinates. */
+function pingAt(x: number, y: number) {
+  const r = boardEl.value?.getBoundingClientRect()
+  if (r) sendPing((x - r.left) / r.width, (y - r.top) / r.height)
+}
+
+/** Right-click on the map pings (a prop or a mini keeps its own right-click: its details). */
+function onContext(e: MouseEvent) {
+  if (e.defaultPrevented || !canPing.value) return
+  e.preventDefault()
+  pingAt(e.clientX, e.clientY)
+}
+
+/** The middle button pings anywhere on the map (and doesn't start the browser's autoscroll). */
+function onMiddle(e: MouseEvent) {
+  if (e.button !== 1 || !canPing.value) return
+  e.preventDefault()
+  if (e.type === 'mousedown') pingAt(e.clientX, e.clientY)
+}
+
+/** Where the pointer is over the map (null: not over it), for the Q key. */
+let pointer: { x: number; y: number } | null = null
+let pressAt: { x: number; y: number } | null = null
+
+function onPointerMove(e: PointerEvent) {
+  pointer = { x: e.clientX, y: e.clientY }
+  // a finger that moves is scrolling or dragging, not holding still to ping
+  if (pressAt && Math.hypot(e.clientX - pressAt.x, e.clientY - pressAt.y) > 12) {
+    pressAt = null
+    clearTimeout(pressTimer)
+  }
+}
+
+function onPointerLeave() {
+  pressEnd()
+  pointer = null
+}
+
+/** Touch: holding a finger still on the map pings there (on a prop or a mini it shows details). */
+function onPointerDown(e: PointerEvent) {
+  if (e.pointerType !== 'touch' || pressEvent === e || !canPing.value) return
+  pressed = false
+  pressAt = { x: e.clientX, y: e.clientY }
+  clearTimeout(pressTimer)
+  pressTimer = window.setTimeout(() => {
+    pressed = true
+    pressAt = null
+    pingAt(e.clientX, e.clientY)
+  }, 550)
+}
+
+/** Q pings where the pointer is (the key, not the letter: a Thai layout types ๆ there). */
+function onKey(e: KeyboardEvent) {
+  if (e.code !== 'KeyQ' || e.repeat || e.ctrlKey || e.metaKey || !pointer || !canPing.value) return
+  const t = e.target as HTMLElement | null
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+  pingAt(pointer.x, pointer.y)
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 /** Swallow the click that ends a long-press. */
 function guard(e: MouseEvent) {
@@ -547,14 +614,22 @@ function guard(e: MouseEvent) {
   if (canPing.value && (pingArmed.value || e.altKey) && boardEl.value) {
     e.stopImmediatePropagation()
     e.preventDefault()
-    const r = boardEl.value.getBoundingClientRect()
-    sendPing((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height)
+    pingAt(e.clientX, e.clientY)
   }
 }
 </script>
 
 <template>
-  <div ref="boardEl" class="board" :class="{ shake: shaking, pinging: pingArmed && canPing }" :style="{ aspectRatio: String(board.aspect) }" @click.capture="guard">
+  <div ref="boardEl" class="board" :class="{ shake: shaking, pinging: pingArmed && canPing }" :style="{ aspectRatio: String(board.aspect) }" @click.capture="guard"
+    @contextmenu="onContext"
+    @mousedown="onMiddle"
+    @auxclick="onMiddle"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="pressEnd"
+    @pointercancel="pressEnd"
+    @pointerleave="onPointerLeave"
+  >
     <img class="map" :src="asset(board.image)" :alt="board.name" draggable="false" />
 
     <component

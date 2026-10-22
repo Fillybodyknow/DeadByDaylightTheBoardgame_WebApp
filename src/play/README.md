@@ -68,9 +68,10 @@ and the host starts the game.
   few. A device whose replay refuses a move keeps what it has and waits for the next checkpoint,
   which replaces everything.
 - **Planning happens for everyone at once.** Each survivor player sends their own hand with
-  `planHand`, and the killer sends his two cards with `planKiller` in the same step; they are
-  kept in `killerDraft` until the last survivor hand is in, and whoever confirms last starts the
-  round. Until then a confirmed plan can be taken back and made again (`unplanHand`,
+  `planHand`, and the killer sends his two cards with `planKiller` in the same step. Every plan stays
+  a draft (`planDraft`, `killerDraft`) until the last one is in, survivors' or killer's, and whoever
+  confirms last starts the round: with the survivors all in and the killer still choosing, a
+  survivor can still change their mind. Until then a confirmed plan can be taken back and made again (`unplanHand`,
   `unplanKiller`; the "ยกเลิก — เลือกการ์ดใหม่" button in the waiting panel). Nobody learns anything new from it — the survivors' cards are face down to the killer
   either way (p.8) — it only saves the wait. On one shared device the survivors still plan first
   and the device then goes to the killer, behind the hand-off curtain.
@@ -89,7 +90,10 @@ and the host starts the game.
   **The database rules must be updated** (`roomIndex`) for the board to show rooms; without
   them rooms still work by code.
 - **Pings** (`src/play/pings.ts`, `PingLayer.vue`): in the game a player marks a spot on the map for
-  everyone — the 📍 button in the controls, then a click on the map (or Alt+click). A ring in
+  everyone, straight away: a right-click on the map (a prop or a mini keeps its right-click, its
+  details), the middle button, Q while pointing, or on a tablet a finger held still on the map
+  (a long-press on a prop or a mini still shows its details). The 📍 button in the controls then
+  a click, and Alt+click, work too. A ring in
   their colour pulses there with their name for 4 s; a new ping of theirs replaces it. Everyone
   sees every ping, the killer too: survivors may talk but never in secret (p.8). Each member picks a colour in the
   lobby from a fixed set (`online/pingColors.ts`, `Member.color`), never one another member holds;

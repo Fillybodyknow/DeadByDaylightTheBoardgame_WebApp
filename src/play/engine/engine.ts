@@ -743,6 +743,13 @@ function handle(st: GameState, a: Action) {
       // held until the survivors are in, and whoever confirms last starts the round.
       if (a.t === 'planKiller') {
         if (a.cards.length !== 2 || !takeCards(st.killer.hand, a.cards)) fail('pick 2 cards from the hand')
+        // the survivors were all in already (their plans still drafts): the round starts now
+        const drafted = st.planDraft
+        if (drafted && survivorsPlanned(st, drafted)) {
+          delete st.planDraft
+          planSurvivors(st, drafted)
+          return finishKillerPlan(st, a.cards)
+        }
         st.killerDraft = a.cards
         return wait(st, { t: 'planSurvivors' })
       }
@@ -775,7 +782,9 @@ function handle(st: GameState, a: Action) {
           draft[i] = c
         }
         st.planDraft = draft
-        if (st.survivors.some((sv, i) => sv.status !== 'hooked' && sv.planned === null && !draft[i])) return wait(st, { t: 'planSurvivors' })
+        // Every plan stays a draft until the last of everyone's is in, the killer's too: until
+        // then each survivor can still take theirs back (the killer confirming starts the round).
+        if (!survivorsPlanned(st, draft) || !st.killerDraft) return wait(st, { t: 'planSurvivors' })
         delete st.planDraft
         planSurvivors(st, draft)
       } else {
@@ -1521,6 +1530,11 @@ function startPlanning(st: GameState) {
 /** Cleanup, after Adrenaline's chance at its start. */
 function queueCleanup(st: GameState) {
   st.queue.push({ k: 'trigger', w: { k: 'cleanupStart' }, done: [] }, { k: 'carnifex' }, { k: 'cleanup' })
+}
+
+/** Every survivor who sets a card this planning has one in `draft` (not those hooked or face up from Stridor). */
+function survivorsPlanned(st: GameState, draft: (MoveCard | null)[]): boolean {
+  return st.survivors.every((sv, i) => sv.status === 'hooked' || sv.planned !== null || !!draft[i])
 }
 
 function planSurvivors(st: GameState, cards: (MoveCard | null)[]) {

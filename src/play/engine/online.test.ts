@@ -28,7 +28,7 @@ function handCards(st: GameState, hand: number): (MoveCard | null)[] {
 }
 
 describe('online planning (planHand)', () => {
-  it('waits for every hand, then plans all survivors at once (5 players)', () => {
+  it('waits for every hand and the killer, then plans everyone at once (5 players)', () => {
     let st = toPlanning(5)
     // everyone plans at the same time: the four survivor players and the killer
     expect(actorsOf(st)).toEqual([1, 2, 3, 4, 5])
@@ -40,10 +40,17 @@ describe('online planning (planHand)', () => {
     expect(handsToPlan(st)).toEqual([1])
     expect(actorsOf(st)).toEqual([1, 3])
     st = apply(st, { t: 'planHand', hand: 1, cards: handCards(st, 1) })
-    expect(st.step.t).toBe('planKiller')
-    expect(st.survivors.every((sv) => sv.planned !== null)).toBe(true)
-    expect(st.planDraft).toBeUndefined()
+    // every survivor is in, but their plans stay drafts until the killer's is in too
+    expect(st.step.t).toBe('planSurvivors')
+    expect(st.survivors.every((sv) => sv.planned === null)).toBe(true)
     expect(actorsOf(st)).toEqual([1])
+    const [a, b] = st.killer.hand
+    st = apply(st, { t: 'planKiller', cards: [a, b] })
+    // the killer, last, starts the round with everyone's cards in place
+    expect(st.survivors.every((sv) => sv.planned !== null)).toBe(true)
+    expect(st.killer.planned).toEqual([a, b])
+    expect(st.planDraft).toBeUndefined()
+    expect(st.phase).toBe('survivors')
   })
 
   it('lets the killer plan while the survivors do; the last one in starts the round', () => {
@@ -91,7 +98,10 @@ describe('online planning (planHand)', () => {
     st = apply(st, { t: 'planHand', hand: 0, cards: handCards(st, 0) })
     st = apply(st, { t: 'planHand', hand: 1, cards: handCards(st, 1) })
     st = apply(st, { t: 'planHand', hand: 2, cards: handCards(st, 2) })
-    expect(st.step.t).toBe('planKiller')
+    expect(actorsOf(st)).toEqual([1]) // only the killer left: the hooked one sets no card
+    const [a, b] = st.killer.hand
+    st = apply(st, { t: 'planKiller', cards: [a, b] })
+    expect(st.phase).toBe('survivors')
     expect(st.survivors[3].planned).toBeNull()
   })
 
@@ -128,6 +138,27 @@ describe('taking a plan back', () => {
     expect(st.killer.planned).toEqual([b, a])
     // once the round has started there is nothing to take back
     expect(tryApply(st, { t: 'unplanKiller' })).toBeNull()
+  })
+
+  it('lets a survivor take their plan back while only the killer is left', () => {
+    let st = toPlanning(5)
+    for (const hand of [0, 1, 2, 3]) st = apply(st, { t: 'planHand', hand, cards: handCards(st, hand) })
+    expect(actorsOf(st)).toEqual([1])
+    // every survivor is in, the killer not yet: player 3 (hand 1) still changes their mind
+    expect(mayAct(st, 3, { t: 'unplanHand', hand: 1 })).toBe(true)
+    st = apply(st, { t: 'unplanHand', hand: 1 })
+    expect(actorsOf(st)).toEqual([1, 3])
+    // the killer confirms meanwhile: held, as the survivors are not all in
+    const [a, b] = st.killer.hand
+    st = apply(st, { t: 'planKiller', cards: [a, b] })
+    expect(st.step.t).toBe('planSurvivors')
+    expect(st.killerDraft).toEqual([a, b])
+    // a different card this time; being the last in, it starts the round
+    const other = [...st.survivorHands[1]].reverse()
+    st = apply(st, { t: 'planHand', hand: 1, cards: st.survivors.map((sv) => (sv.hand === 1 ? other.shift()! : null)) })
+    expect(st.phase).toBe('survivors')
+    expect(st.survivors.every((sv) => sv.planned !== null)).toBe(true)
+    expect(st.killer.planned).toEqual([a, b])
   })
 })
 
@@ -241,9 +272,17 @@ describe('move protocol', () => {
     for (let i = 0; i < 4000 && host.phase !== 'over'; i++) {
       const actors = actorsOf(host)
       if (!actors.length) break
+      // planning: the survivor hands first, then the killer (his confirm starts the round)
+      const planKiller = (): Action => {
+        const h = host.killer.hand
+        const i = rand(h.length)
+        return { t: 'planKiller', cards: [h[i], h[(i + 1 + rand(h.length - 1)) % h.length]] }
+      }
       const action: Action =
         host.step.t === 'planSurvivors'
-          ? { t: 'planHand', hand: handsToPlan(host)[0], cards: handCards(host, handsToPlan(host)[0]) }
+          ? handsToPlan(host).length
+            ? { t: 'planHand', hand: handsToPlan(host)[0], cards: handCards(host, handsToPlan(host)[0]) }
+            : planKiller()
           : (() => {
               const options = legalActions(host).filter((a) => actors.some((p) => mayAct(host, p, a)))
               return options[rand(options.length)]

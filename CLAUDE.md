@@ -143,7 +143,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   warning and a chime, a banner saying what is asked, the side panel glowing, and with the tab in
   the background a blinking title and a system notification. While it stays their turn a gold
   pill at the top and a gold screen edge say so, and every 20 s without a move it rings again.
-- **Pings (online):** the 📍 button (or Alt+click) marks a spot on the map with a pulsing ring in the
+- **Pings (online):** a right-click on the map (not on a prop or a mini: those show details), the
+  middle button, Q while pointing, a long-press on a tablet, the 📍 button or Alt+click marks a spot on the map with a pulsing ring in the
   player's colour, picked in the lobby from a fixed set, one per member (`pings.ts`, `PingLayer`,
   `online/pingColors.ts`). Everyone sees it, the killer too (no secret talk, p.8); spam is limited on the device and by
   the database rules. Not part of the game: never saved or replayed.
@@ -186,7 +187,9 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   panel (320 px) on the right. The side panel folds into one tab on the right edge (always in the same place)
   (the panel's fold is remembered per device, and the board takes its width); the panel's tab
   glows when a new decision comes. On screens narrower than 16:9 (a tablet) the map takes the
-  whole row and the panel floats over its right edge. Player tiles don't list perks: clicking a tile opens the
+  whole row and the panel floats over its right edge. A survivor's tile shows their hand's four movement
+  cards small, the ones face up this round (played or discarded) crossed out, so the killer knows
+  what is left, as at the table; a card still face down in planning shows as unused. Player tiles don't list perks: clicking a tile opens the
   character details, with the perks and whether they were used this round. There is no game
   log on screen. Pointing at a revealed prop enlarges it.
 - Fixed overlays inside a `.card` must `<Teleport to="body">`: `.card` has `backdrop-filter`,

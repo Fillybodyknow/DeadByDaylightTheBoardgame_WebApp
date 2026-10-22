@@ -4,8 +4,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components, items, killerById } from '../../data'
 import { asset } from '../../i18n'
-import { ITEM_NAMES, KILLER_BP, isPower, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
-import type { GameState, ItemUse } from '../engine/types'
+import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
+import type { GameState, ItemUse, PathKind } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
 import type { InspectTarget } from '../inspect'
@@ -43,6 +43,37 @@ function onKey(e: KeyboardEvent) {
 }
 onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+
+/**
+ * A survivor's hand this round, as the table shows it: each of its four cards, and whether it is
+ * already face up — played (its card turned over) or discarded (a bonus turn, a perk). A card
+ * still face down in planning is no one else's business: it counts as not used. Players sharing a
+ * hand (p.19) show the same one. Everything comes back at Cleanup (p.11).
+ */
+function handCards(s: number): { card: PathKind; used: boolean }[] {
+  const st = props.st
+  const hand = st.survivors[s].hand
+  const missing = [...SURVIVOR_CARDS] as PathKind[]
+  for (const c of st.survivorHands[hand] ?? []) {
+    const i = missing.indexOf(c as PathKind)
+    if (i >= 0) missing.splice(i, 1)
+  }
+  for (const sv of st.survivors)
+    if (sv.hand === hand && sv.planned && !sv.plannedRevealed) {
+      const i = missing.indexOf(sv.planned as PathKind)
+      if (i >= 0) missing.splice(i, 1)
+    }
+  return SURVIVOR_CARDS.map((card) => {
+    const i = missing.indexOf(card)
+    if (i >= 0) missing.splice(i, 1)
+    return { card, used: i >= 0 }
+  })
+}
+const handTitle = (s: number) => {
+  const used = handCards(s).filter((c) => c.used)
+  const mates = props.st.survivors.filter((sv, i) => i !== s && sv.hand === props.st.survivors[s].hand).map((sv) => sv.name)
+  return `การ์ดที่ใช้ไปแล้วรอบนี้: ${used.length ? used.map((c) => CARD_NAMES[c.card]).join(', ') : 'ยังไม่มี'}${mates.length ? ` (มือร่วมกับ ${mates.join(', ')})` : ''}`
+}
 
 const STATUS_TH = { board: '', locker: 'ใน Locker', carried: 'ถูกแบก', hooked: 'บน Hook' }
 
@@ -239,6 +270,12 @@ function onPowerSlot() {
         <!-- The Trickster's Knives: one token each, the ▲ maximum 2 lower for every one -->
         <span v-if="st.survivors[s].knives" class="knives" :class="{ full: st.survivors[s].knives === 3 }" :title="`Knife ${st.survivors[s].knives}/3 — ▲ สูงสุดลดลง ${2 * st.survivors[s].knives!}${st.survivors[s].knives === 3 ? ' · หายบาดเจ็บไม่ได้' : ''} · เข้า Locker เพื่อทิ้ง`">
           <img :src="asset(KNIFE_IMAGE)" alt="Knife" /><b>{{ st.survivors[s].knives }}/3</b>
+        </span>
+        <!-- the hand's movement cards: the ones already face up this round are crossed out -->
+        <span class="hand-strip" :title="handTitle(s)" :aria-label="handTitle(s)">
+          <span v-for="c in handCards(s)" :key="c.card" class="hcard" :class="{ used: c.used }">
+            <img :src="asset(cardImage(c.card))" alt="" />
+          </span>
         </span>
       </div>
       <div class="cards">
@@ -775,6 +812,41 @@ button.slot:hover .slot-crop {
 .bp {
   color: #ff8a80;
   font-size: 0.82rem;
+}
+/* the hand's four movement cards, small; used ones dim under a red cross */
+.hand-strip {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.hcard {
+  position: relative;
+  width: 15px;
+  height: 21px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.hcard img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hcard.used img {
+  opacity: 0.28;
+  filter: grayscale(0.8);
+}
+.hcard.used::after {
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  color: #ff4d4d;
+  text-shadow: 0 0 2px #000;
 }
 .knives {
   display: inline-flex;

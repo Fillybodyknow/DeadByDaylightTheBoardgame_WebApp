@@ -20,7 +20,7 @@ import { timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
 import { STEP_NAME, boardActionKeys, perkPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
-import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, killerMini, playerOf, survivorMini } from '../labels'
+import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, cardImage, killerMini, playerOf, survivorMini } from '../labels'
 import SoundSettings from '../../components/SoundSettings.vue'
 import ActionPanel from './ActionPanel.vue'
 import ActionReveal from './ActionReveal.vue'
@@ -310,6 +310,15 @@ const myPlanDone = computed(() => {
   if (o.seat === KILLER_PLAYER) return st.killerDraft ? `คุณวางการ์ดแล้ว: ${st.killerDraft.map((c) => CARD_NAMES[c]).join(' → ')}` : null
   const mine = st.survivors.flatMap((sv, i) => (st.handPlayers[sv.hand] === o.seat && st.planDraft?.[i] ? [`${sv.name} — ${CARD_NAMES[st.planDraft![i]!]}`] : []))
   return mine.length ? `คุณวางการ์ดแล้ว: ${mine.join(' · ')}` : null
+})
+
+/** The cards this device has sent, to show them with the undo button: each with whose it is. */
+const myPlanCards = computed<{ card: MoveCard; sub: string }[]>(() => {
+  const st = view.value
+  const o = online.value
+  if (!o?.seat || st.step.t !== 'planSurvivors') return []
+  if (o.seat === KILLER_PLAYER) return (st.killerDraft ?? []).map((card, i) => ({ card, sub: i === 0 ? 'ใบซ้าย' : 'ใบขวา' }))
+  return st.survivors.flatMap((sv, i) => (st.handPlayers[sv.hand] === o.seat && st.planDraft?.[i] ? [{ card: st.planDraft[i]!, sub: sv.name.split(' ')[0] }] : []))
 })
 
 /** Take this device's confirmed plan back, to pick again (until the last plan is in). */
@@ -987,7 +996,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           :style="{ '--c': pingHex(pingColors[session.me]) }"
           :disabled="!!pingWait"
           :aria-pressed="pingArmed"
-          :title="pingArmed ? 'คลิกจุดบนแผนที่เพื่อปิง — กดอีกครั้งเพื่อยกเลิก' : 'ปิงจุดบนแผนที่ให้ทุกคนเห็น (หรือกด Alt ค้างแล้วคลิกบนแผนที่)'"
+          :title="pingArmed ? 'คลิกจุดบนแผนที่เพื่อปิง — กดอีกครั้งเพื่อยกเลิก' : 'ปิงจุดบนแผนที่ให้ทุกคนเห็น — หรือปิงได้ทันที: คลิกขวาบนแผนที่, คลิกปุ่มกลาง, ชี้แล้วกด Q (แท็บเล็ต: กดค้างบนแผนที่)'"
           @click="pingArmed = !pingArmed"
         >
           📍<b v-if="pingWait" class="ping-count">{{ pingWait }}</b><span v-else class="btn-text"> {{ pingArmed ? 'คลิกบนแผนที่' : 'ปิง' }}</span>
@@ -1047,7 +1056,14 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <div id="side-dock" />
         <Planning v-if="planning && viewTurn" :st="view" />
         <section v-else-if="waitingOn && !over" class="card waiting">
-          <p v-if="myPlanDone" class="done-note">✓ {{ myPlanDone }}</p>
+          <p v-if="myPlanDone" class="done-note">✓ คุณวางการ์ดแล้ว</p>
+          <!-- the cards sent, face up to their own player, right by the button that takes them back -->
+          <div v-if="myPlanCards.length" class="plan-sent" :aria-label="myPlanDone ?? undefined">
+            <figure v-for="(c, i) in myPlanCards" :key="i">
+              <img :src="asset(cardImage(c.card))" :alt="CARD_NAMES[c.card]" />
+              <figcaption><b>{{ CARD_NAMES[c.card] }}</b>{{ c.sub }}</figcaption>
+            </figure>
+          </div>
           <button v-if="myPlanDone" type="button" class="undo-plan" @click="undoPlan">↶ ยกเลิก — เลือกการ์ดใหม่</button>
           <p class="muted small">กำลังรอ</p>
           <strong v-for="w in waitingOn" :key="w">{{ w }}</strong>
@@ -1559,6 +1575,35 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 }
 .waiting p {
   margin: 0;
+}
+.plan-sent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.4rem 0 0.5rem;
+}
+.plan-sent figure {
+  margin: 0;
+  width: 72px;
+  text-align: center;
+}
+.plan-sent img {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.55);
+}
+.plan-sent figcaption {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: var(--muted, #aaa);
+}
+.plan-sent figcaption b {
+  color: #fff;
+  font-size: 0.78rem;
 }
 .undo-plan {
   margin-bottom: 0.4rem;
