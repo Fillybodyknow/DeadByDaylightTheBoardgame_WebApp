@@ -1060,6 +1060,7 @@ function handle(st: GameState, a: Action) {
       const cost = bonusCost(st)
       k.bp -= cost
       k.bonusUsed = true
+      k.bonusAt = k.planned.length - 1
       log(st, `${k.name} จ่าย ${cost} ▲ เล่น Bonus Turn`, 'killer')
       st.queue.push({ k: 'killerTurn', turn: 2 })
       return
@@ -2218,7 +2219,7 @@ function cleanup(st: GameState) {
     sv.acted = false
     sv.woundedThisRound = false
   }
-  Object.assign(st.killer, { hand: killerDeck(st.killer.characterId), planned: [], revealedCount: 0, plannedShown: false, powerUsed: false, bonusUsed: false, shown: [] })
+  Object.assign(st.killer, { hand: killerDeck(st.killer.characterId), planned: [], revealedCount: 0, plannedShown: false, powerUsed: false, bonusUsed: false, bonusAt: null, shown: [] })
   Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
@@ -3184,8 +3185,8 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return w.k === 'killerBreak' && w.what === 'pallet' ? NONE : []
     // ----- The Skull Merchant -----
     case 'game_afoot': {
-      // an attack on someone healthy in his room on a bonus turn (his third card): a pick-up instead
-      if (w.k !== 'preKillerInteract' || w.pickUp || w.turn === null || w.turn === undefined || w.turn < 2) return []
+      // an attack on someone healthy in his room on his bonus turn: a pick-up instead
+      if (w.k !== 'preKillerInteract' || w.pickUp || w.turn === null || w.turn === undefined || w.turn !== k.bonusAt) return []
       const sv = st.survivors[w.target]
       return !sv.wounded && sv.status === 'board' && sv.room === st.killer.room ? NONE : []
     }
@@ -3627,12 +3628,17 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, `${name(target)} เล่น Bonus Turn`)
       return startBonusMove(st, target, c.card as PathKind)
     }
-    case 'no_one_escapes_death':
+    case 'no_one_escapes_death': {
+      // "at the end of your turn, take a bonus turn": right after this one, before his next card
+      const turn = (w as Extract<PerkWindow, { k: 'killerTurnEnd' }>).turn
       payPerk(st, o, perk, 'Bonus Turn')
       k.hand.splice(k.hand.indexOf(c.card!), 1)
-      k.planned.push(c.card!)
+      k.planned.splice(turn + 1, 0, c.card!)
+      k.shown = k.shown.map((i) => (i > turn ? i + 1 : i))
       k.bonusUsed = true
+      k.bonusAt = turn + 1
       return
+    }
     case 'inner_healing':
       payPerk(st, o, perk, 'หายบาดเจ็บ')
       discardPerkCard(st, o as number, perk)
@@ -3966,6 +3972,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       k.hand.splice(k.hand.indexOf(c.card!), 1)
       k.planned.push(c.card!)
       k.bonusUsed = true
+      k.bonusAt = k.planned.length - 1
       st.phase = 'killer'
       st.queue.unshift({ k: 'killerTurn', turn: k.planned.length - 1, extra: true })
       return
@@ -3980,6 +3987,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       k.hand.splice(k.hand.indexOf(c.card!), 1)
       k.planned.push(c.card!)
       k.bonusUsed = true
+      k.bonusAt = k.planned.length - 1
       return
     case 'predator': {
       const sv = st.survivors[c.target!]
@@ -4156,6 +4164,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       k.planned.splice(turn + 1, 0, card)
       k.shown = k.shown.map((i) => (i > turn ? i + 1 : i))
       k.bonusUsed = true
+      k.bonusAt = turn + 1
       return
     }
     case 'oppression': {

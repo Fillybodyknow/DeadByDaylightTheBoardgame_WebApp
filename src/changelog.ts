@@ -12,6 +12,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.7.1',
+    date: '2026-10-23',
+    items: [
+      'Fogwise เลือกบนแผนที่: คลิกกำแพง/Pallet แล้วคลิกเส้นทางว่างที่เรืองแสง (มีชิ้นเดียวก็ข้ามไปเลือกปลายทางทันที)',
+      'No One Escapes Death: ใช้หลังการ์ดใบแรก Bonus Turn เล่นทันที ก่อนการ์ดใบที่ 2',
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-10-23',
     items: [

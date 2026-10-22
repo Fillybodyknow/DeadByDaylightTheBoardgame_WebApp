@@ -133,6 +133,8 @@ export interface KillerState {
   plannedShown: boolean
   powerUsed: boolean
   bonusUsed: boolean
+  /** The planned card played as this round's bonus turn (its index), once there is one. */
+  bonusAt?: number | null
   /** Bear traps not on the board (The Trapper has 4). */
   trapsInSupply: number
   /** Planned cards shown to the survivors early (Lightborn), by index. */
@@ -330,7 +332,7 @@ export type PerkWindow =
   /** Start of one of the killer's turns, before the card is revealed (Zanshin Tactics). */
   | { k: 'killerTurnBegin'; turn: number }
   /** The killer is about to attack or pick up `target` (Red Herring). */
-  /** `turn`: the killer's turn it happens on (2 and up: a bonus turn, for Game Afoot). */
+  /** `turn`: the killer's turn it happens on (his planned card's index; Game Afoot looks for `bonusAt`). */
   | { k: 'preKillerInteract'; target: number; pickUp?: boolean; turn?: number | null }
   /** A survivor was hung on a hook — "sacrificed" (Blood Echo, Dead Man's Switch). */
   | { k: 'afterHang'; s: number }

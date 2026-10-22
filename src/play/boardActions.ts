@@ -21,6 +21,7 @@ import {
   killerMoves,
   mustMove,
   offeredPerks,
+  palletOn,
   perkButtons,
   perkChoices,
   phantasmInteractions,
@@ -67,6 +68,8 @@ export interface BoardModes {
   calmCrow: Ref<string | null>
   /** Ace in the Hole: the prop in Ace's room picked first. */
   aceFirst: Ref<string | null>
+  /** Fogwise: the path whose wall or pallet was picked, waiting for the path it goes to. */
+  fogwiseFrom: Ref<string | null>
   /** Breakout (Yui): the wounded survivor picked, waiting for the path to move them along. */
   breakoutTarget: Ref<number | null>
   /** An item whose target is being picked on the board. */
@@ -248,6 +251,18 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         add(`prop:${c.prop2}`, `${PERKS[b!.perk].name}: ${perkChoiceLabel(st, b!.perk, b!.owner, b!.w, c)}`, () => {
           modes.aceFirst.value = null
           go({ t: 'perk', perk: b!.perk, use: true, choice: c }, sfx.select)()
+        })
+    return out
+  }
+
+  // Fogwise: the wall or pallet picked, the free paths of the room are the targets
+  if (modes.fogwiseFrom.value && s.t === 'turnStart') {
+    const b = perkButtons(st).find((x) => x.perk === 'fogwise')
+    for (const c of b?.choices ?? [])
+      if (c.path === modes.fogwiseFrom.value)
+        add(spotKey(st, `path:${c.path2}`), `Fogwise: ${perkChoiceLabel(st, 'fogwise', b!.owner, b!.w, c)}`, () => {
+          modes.fogwiseFrom.value = null
+          go({ t: 'perk', perk: 'fogwise', use: true, choice: c }, sfx.drop)()
         })
     return out
   }
@@ -660,11 +675,20 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
         out.push({ key: `prop:${first}`, label: `${name}: ${then}`, style: 'act', run: () => ((modes.aceFirst.value = first), sfx.click()) })
       continue
     }
-    // Fogwise: the path with the wall or pallet; where it goes, chosen from a menu there
+    // Fogwise: the path with the wall or pallet first; then the path it goes to, on the map too.
+    // With only one wall or pallet to move, its free paths are the targets straight away.
     if (b.perk === 'fogwise') {
-      for (const c of b.choices) {
-        const run = go({ t: 'perk', perk: b.perk, use: true, choice: c }, sfx.drop)
-        out.push({ key: spotKey(st, `path:${c.path}`), label: `${name}: ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)}`, style: 'act', run, action: run.action })
+      const froms = new Set(b.choices.map((c) => c.path!))
+      if (froms.size === 1) {
+        for (const c of b.choices) {
+          const run = go({ t: 'perk', perk: b.perk, use: true, choice: c }, sfx.drop)
+          out.push({ key: spotKey(st, `path:${c.path2}`), label: `${name}: ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)}`, style: 'act', run, action: run.action })
+        }
+        continue
+      }
+      for (const from of froms) {
+        const what = palletOn(st, from) ? 'Pallet' : 'กำแพง'
+        out.push({ key: spotKey(st, `path:${from}`), label: `${name}: ย้าย${what}นี้ (แล้วคลิกเส้นทางที่จะวาง)`, style: 'act', run: () => ((modes.fogwiseFrom.value = from), sfx.click()) })
       }
       continue
     }

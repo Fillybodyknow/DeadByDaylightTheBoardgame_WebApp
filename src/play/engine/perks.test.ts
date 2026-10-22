@@ -2586,10 +2586,11 @@ describe('The Skull Merchant', () => {
   it('Game Afoot: on a bonus turn, an attack on a healthy survivor here becomes a pick-up', () => {
     const st = merchant('game_afoot')
     st.killer.room = 'shack'
+    st.killer.bonusAt = 2
     const w = { k: 'preKillerInteract', target: 0, turn: 2 } as const
     st.queue = [{ k: 'killerDo', i: { k: 'attack', target: 0 }, turn: 2 }, { k: 'endKillerTurn', turn: 2 }]
     expect(perkChoices(st, 'game_afoot', 'killer', w)).toEqual([{}])
-    // not on his first two cards
+    // not on another card
     expect(perkChoices(st, 'game_afoot', 'killer', { ...w, turn: 1 })).toEqual([])
     st.step = { t: 'offer', perk: 'game_afoot', owner: 'killer', w }
     const after = apply(st, { t: 'perk', perk: 'game_afoot', use: true, choice: {} })
@@ -3151,6 +3152,26 @@ describe('perk cards that are on no board (the edit-perks mode)', () => {
     // without the gates powered it offers nothing
     const dark = { ...st, props: st.props.map((p) => (p.kind === 'generator' ? { ...p, done: false, progress: 0 } : p)) }
     expect(perkChoices(dark, 'no_one_escapes_death', 'killer', { k: 'killerTurnEnd', turn: 1 })).toEqual([])
+  })
+
+  it('No One Escapes Death after his first card: the bonus turn comes before his second', () => {
+    const st = game()
+    deal(st, 'killer', 'no_one_escapes_death')
+    st.props
+      .filter((p) => p.kind === 'generator')
+      .slice(0, 4)
+      .forEach((p) => Object.assign(p, { done: true, progress: 3 }))
+    st.phase = 'killer'
+    st.killer.planned = ['sneak', 'sprint']
+    st.killer.hand = ['crouch', 'vault', 'wait']
+    st.killer.revealedCount = 1
+    const w = { k: 'killerTurnEnd', turn: 0 } as const
+    st.step = { t: 'offer', perk: 'no_one_escapes_death', owner: 'killer', w }
+    st.queue = [{ k: 'endKillerTurn', turn: 0, ended: true }]
+    const g = apply(st, { t: 'perk', perk: 'no_one_escapes_death', use: true, choice: { card: 'crouch' } })
+    expect(g.killer.planned).toEqual(['sneak', 'crouch', 'sprint'])
+    expect(g.killer.bonusAt).toBe(1)
+    expect(g.killer.revealedCount).toBe(2)
   })
 })
 

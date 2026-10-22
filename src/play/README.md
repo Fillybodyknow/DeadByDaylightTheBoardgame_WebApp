@@ -440,8 +440,9 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   their room to his board.
 - Eyes in the Sky (his power): a face-up Drone in any room back to his board, or one from his board
   face up into his room. With neither, the power can't be used.
-- Game Afoot: asked before an attack on a healthy survivor in his room on his bonus turn (his third
-  card, or Devour Hope's extra one); they are picked up instead.
+- Game Afoot: asked before an attack on a healthy survivor in his room on his bonus turn (the card
+  of any bonus turn: paid, No One Escapes Death, Coup de Grâce, Shadowborn, Devour Hope); they are
+  picked up instead.
 - Leverage: asked at the start of planning; the survivor chosen can't become healthy until the next
   round (heals, perks and items that would heal them do nothing).
 - THWACK!: asked after he reveals a survival or altruism prop himself (moving into its room, or by a
@@ -529,7 +530,8 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   generator next door (a menu when his room has two).
 - Fogwise: a button at the start of his turn. A wall or a pallet on a path (icon) of his room goes
   to another path of his room with nothing on it. Clicked on the map: the path it leaves, then the
-  path it goes to, from a menu.
+  path it goes to (the free paths of his room light up). With only one wall or pallet to
+  move, its free paths light up straight away.
 - Quick Gambit: asked when he would leave the killer's room by any move along a path; the killer
   follows along it after him, as Thrill of the Hunt (a pallet there: he breaks it and stays). Not
   while carrying someone, and only once per move (with Thrill of the Hunt too).
@@ -637,8 +639,9 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   (a survivor entering, the killer, a Map); not during setup, where perks aren't in play yet.
 - Sloppy Butcher: asked before a heal roll of a survivor in the killer's space — the danger die.
 - No One Escapes Death: asked at the end of a killer turn once the exit gates are powered, and
-  not with the round's bonus turn used: a card from his hand goes onto his planned cards and is
-  played as that bonus turn.
+  not with the round's bonus turn used: a card from his hand is played as that bonus turn right
+  away ("at the end of your turn"), so after his first card it comes before his second, as Coup de
+  Grâce's does. The rulebook's own bonus turn, paid in ▲, stays at the end of his second (p.10).
 - A card laid over a printed perk covers it: the printed perk can't be used while the card is
   there (`covered`), and the moment the card is discarded from play it can be, that same round
   (it has used nothing). A card under one of The Plague's Vile Purges can't be used, so it can't

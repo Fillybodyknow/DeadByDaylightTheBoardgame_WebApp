@@ -169,6 +169,8 @@ const revealing = ref<{ s: number; props: string[] } | null>(null)
 const calmCrow = ref<string | null>(null)
 /** Ace in the Hole: the prop in Ace's room, waiting for the one to swap with. */
 const aceFirst = ref<string | null>(null)
+/** Fogwise: the path whose wall or pallet moves, waiting for where it goes. */
+const fogwiseFrom = ref<string | null>(null)
 /** A survivor's item whose target is being picked on the board. */
 const itemPick = ref<number | null>(null)
 /** Breakout: the wounded survivor picked, waiting for where to move them. */
@@ -207,7 +209,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion }
 
 watch(
   () => view.value.step,
@@ -219,6 +221,7 @@ watch(
     palletMode.value = null
     calmCrow.value = null
     aceFirst.value = null
+    fogwiseFrom.value = null
     breakoutTarget.value = null
     diversion.value = false
     perkPicked.value = null
@@ -388,6 +391,7 @@ const modeBar = computed(() => {
     return view.value.step.t === 'killerInteract'
       ? { text: 'Iron Maiden: คลิก Hook ที่จะสลับกับ Locker นี้', cancel: () => (aceFirst.value = null) }
       : { text: 'Ace in the Hole: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
+  if (fogwiseFrom.value) return { text: 'Fogwise: คลิกเส้นทางว่างที่เรืองแสงเพื่อวางกำแพง/Pallet', cancel: () => (fogwiseFrom.value = null) }
   if (perkPicked.value && (view.value.step.t === 'survivorInteract' || view.value.step.t === 'killerInteract'))
     return {
       text: perkPicked.value === 'iron_maiden' ? 'Iron Maiden: คลิก Locker ว่างที่กระพริบบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`,
