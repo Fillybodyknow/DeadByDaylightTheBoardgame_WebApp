@@ -12,6 +12,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.7.0',
+    date: '2026-10-23',
+    items: [
+      'ฆาตกรใหม่: The Skull Merchant — Drone ในทุกห้อง (Skill Check ใต้ Drone หงายหน้า สำเร็จเขาได้ ▲ ล้มเหลวบาดเจ็บ), พลัง Eyes in the Sky และ Perk Game Afoot, Leverage, THWACK!',
+      'The Knight: Jailer ที่ทำให้ผู้รอดชีวิตบาดเจ็บแล้วกลับขึ้นบอร์ดของเขา วางใหม่ได้ (กฎบ้าน)',
+      'วาง Guard / Token บนแผนที่: คลิกห้องแล้วมีเมนูให้เลือกตัวเสมอ ไม่เลือกให้เองอีกต่อไป',
+    ],
+  },
+  {
     version: '1.6.3',
     date: '2026-10-23',
     items: [

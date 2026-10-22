@@ -173,11 +173,11 @@ and the host starts the game.
   above their character picker (which is long enough to hide anything under it).
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist, The Skull Merchant** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
   Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (102 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (123 perks).
 - The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
   the printed ones; 35 are on no board. All 35 are in the engine (`DECK_PERKS` in
   `engine/perks.ts`). A card-only perk has no character and no index: its
@@ -225,6 +225,9 @@ needs its graph in `boards.ts`), the 2-player rule, then bots from the automated
 
 ## House rules
 
+- The Knight's Jailer, after a failed roll in its room (the survivor wounded), goes back onto his
+  board instead of out of play (the user's call): his power or Face the Darkness may place it
+  again, in his room or a connected one, as the other Guards.
 - Picking up a survivor in a room with a free (revealed, unoccupied) hook hangs them there at
   once, as the rulebook does (p.18): the killer can't carry them away and there are no struggle
   dice. (Dead Hard may still answer the hanging.) Elsewhere they are carried; carrying one into a
@@ -410,7 +413,7 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   room of his choice. Assassin: anyone entering its room by their own move (not carried) rolls the
   danger die after the reveal; a failure wounds. Jailer: every skill check (repair, gate, totem,
   heal) by a survivor on the board in its room is on the danger die; a failure wounds them and the
-  Jailer leaves the game for good. Not being searched: in a locker they are off the board (p.12). The killer still gains ▲ for the failures.
+  Jailer leaves the board (back to his, see House rules). Not being searched: in a locker they are off the board (p.12). The killer still gains ▲ for the failures.
 - Nowhere to Hide: asked before the search roll; it is on the danger die.
 - Hubris: a survivor entering his room by any move pays 1 ▲; with none, they can't interact this
   turn if it is their turn (on someone else's turn there is no interaction to lose).
@@ -428,6 +431,21 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Pain Resonance: his interaction, with an empty revealed hook in his room (no Entity on it); a
   healthy survivor on the board in a connected room is wounded (clicked on the map). Paid 3 ▲.
 - Pentimento: by itself, +2 ▲ after any successful cleanse; once a round.
+- The Skull Merchant's passive: after setup (once the start rooms are rolled), a face-down Drone goes
+  into every room, and the kinds of that room's face-down objective props are dealt among them again
+  (the shuffle). A Drone is revealed as any prop. A skill check rolled by a survivor on the board in a
+  room with a face-up Drone (repair, open, cleanse, heal; not someone searched in a locker, who is off
+  the board, p.12): a success pays him 1 ▲, a failure wounds; either way one Drone there turns face
+  down (to be revealed again when someone comes in). A survivor's interaction sends a face-up Drone in
+  their room to his board.
+- Eyes in the Sky (his power): a face-up Drone in any room back to his board, or one from his board
+  face up into his room. With neither, the power can't be used.
+- Game Afoot: asked before an attack on a healthy survivor in his room on his bonus turn (his third
+  card, or Devour Hope's extra one); they are picked up instead.
+- Leverage: asked at the start of planning; the survivor chosen can't become healthy until the next
+  round (heals, perks and items that would heal them do nothing).
+- THWACK!: asked after he reveals a survival or altruism prop himself (moving into its room, or by a
+  power or perk that reveals); it is removed, unless someone is in it or on it.
 - The Dredge's passive: his hand is six direct movement cards (skull, 1–5: the numbered cards of
   the box), one per start-room face, and no Wait. A card takes him straight to the room with that
   start face (no path: walls, pallets and traps don't matter), then he interacts. The card of the

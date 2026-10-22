@@ -50,7 +50,10 @@ export interface BoardAction {
   action?: Action
   /** A move along a path: the room it leads to (a fork's icon offers several). */
   dest?: string
-  /** A picture for the chooser in place of a face: the token it places (The Clown's Afterpiece). */
+  /**
+   * A picture for the chooser in place of a face: the token it places (The Clown's Afterpiece, The
+   * Knight's Guards, The Artist's crows). With one, the chooser opens even for a single choice.
+   */
   icon?: string
 }
 
@@ -506,6 +509,14 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             // a room offers a Crow and a Dire Crow, when he has both: each with its picture
             add(`room:${i.room}`, label, run)
             out[out.length - 1].icon = i.dire ? DIRE_CROW_IMAGE : PROP_IMAGE.crow
+            break
+          case 'droneTake':
+            add(`prop:${i.prop}`, label, run)
+            break
+          case 'droneDrop':
+            // his room: a Drone off his board, its picture in the chooser
+            add(`room:${st.killer.room}`, label, run)
+            out[out.length - 1].icon = PROP_IMAGE.drone
             break
           case 'afterpiece':
             // a room offers both tokens: the chooser shows each one's picture

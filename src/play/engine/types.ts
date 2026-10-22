@@ -9,7 +9,8 @@ export type DirectCard = 'skull' | 'one' | 'two' | 'three' | 'four' | 'five'
 export type MoveCard = PathKind | 'wait' | DirectCard
 
 export type PropCategory = 'objective' | 'survival' | 'altruism' | 'boldness'
-export type PropKind = 'generator' | 'exitGate' | 'chest' | 'locker' | 'crow' | 'pallet' | 'hook' | 'totem'
+/** `drone`: The Skull Merchant's Drone, an objective prop of his (one per room). */
+export type PropKind = 'generator' | 'exitGate' | 'chest' | 'locker' | 'crow' | 'pallet' | 'hook' | 'totem' | 'drone'
 
 // ---------- static board ----------
 
@@ -74,6 +75,8 @@ export interface Prop {
   dire?: boolean
   /** A crow on The Artist's board (removed from play by him, or a Dire Crow not placed yet). */
   artist?: boolean
+  /** A Drone on The Skull Merchant's board (returned to him, or taken back by his power). */
+  merchant?: boolean
 }
 
 export type SurvivorStatus = 'board' | 'locker' | 'carried' | 'hooked'
@@ -200,6 +203,8 @@ export type SurvivorInteraction =
   | { k: 'rummage'; prop: string }
   | { k: 'hide'; prop: string }
   | { k: 'crow'; prop: string }
+  /** A face-up Drone of The Skull Merchant's, sent back to his board. */
+  | { k: 'drone'; prop: string }
   | { k: 'dropPallet'; prop: string; path: string }
   | { k: 'repair'; prop: string }
   | { k: 'openGate'; prop: string }
@@ -262,6 +267,9 @@ export type KillerInteraction =
   | { k: 'afterpiece'; which: 'tonic' | 'antidote'; room: string }
   /** The Artist's Birds of Torment: a crow (or a Dire Crow) from his board into any room. */
   | { k: 'birds'; dire: boolean; room: string }
+  /** The Skull Merchant's Eyes in the Sky: a face-up Drone anywhere back to his board, or one from it face up into his room. */
+  | { k: 'droneTake'; prop: string }
+  | { k: 'droneDrop' }
   /** Pain Resonance: an empty hook in his room, and a survivor next door is wounded. */
   | { k: 'painResonance'; target: number }
   /** The Knight: a Guard into his room or a connected one (moved if it is out already). */
@@ -293,6 +301,8 @@ export type PerkWindow =
   | { k: 'afterReveal'; s: number; prop: string }
   /** The killer has entered `room`, before his reveal there (Darkness Revealed). */
   | { k: 'killerArrived'; room: string }
+  /** The killer revealed this prop (THWACK!). */
+  | { k: 'killerRevealed'; prop: string }
   /** `rescued`: the survivor taken off the hook, when there was one (Deliverance). */
   | { k: 'afterSabotage'; s: number; rescued?: number }
   /** Start / end of any survivor's turn (Open-Handed, Urban Evasion, Up the Ante). */
@@ -320,7 +330,8 @@ export type PerkWindow =
   /** Start of one of the killer's turns, before the card is revealed (Zanshin Tactics). */
   | { k: 'killerTurnBegin'; turn: number }
   /** The killer is about to attack or pick up `target` (Red Herring). */
-  | { k: 'preKillerInteract'; target: number; pickUp?: boolean }
+  /** `turn`: the killer's turn it happens on (2 and up: a bonus turn, for Game Afoot). */
+  | { k: 'preKillerInteract'; target: number; pickUp?: boolean; turn?: number | null }
   /** A survivor was hung on a hook — "sacrificed" (Blood Echo, Dead Man's Switch). */
   | { k: 'afterHang'; s: number }
   /** A survivor dropped a pallet or hid in a locker (Nemesis). */
@@ -754,7 +765,7 @@ export interface GameState {
   phantasm: string[]
   /** The Clown's Afterpiece Tonic and Antidote: the rooms they stand in (one of each). */
   afterpiece?: { tonic?: string; antidote?: string }
-  /** The Knight's Guards: the rooms they stand in. `jailerGone`: the Jailer is out of play. */
+  /** The Knight's Guards: the rooms they stand in. `jailerGone`: no longer used (the Jailer comes back, a house rule). */
   guards?: { carnifex?: string; assassin?: string; jailer?: string }
   jailerGone?: boolean
   /** The survivor whose skill check the Jailer turned into a danger-die roll (until it resolves). */
@@ -780,6 +791,8 @@ export interface GameState {
   deception?: boolean
   /** Guardian: this survivor is the killer's only interaction for the turn he walked in on them. */
   guardian?: number | null
+  /** Leverage: this survivor can't become healthy this round. */
+  leverage?: number | null
   /** Empathy this round: who said no to whom (`from:to`), so they aren't asked again. */
   empathyNo?: string[]
   /** Dissolution: the path (its icon) with the ▲ on it, until the end of cleanup. */

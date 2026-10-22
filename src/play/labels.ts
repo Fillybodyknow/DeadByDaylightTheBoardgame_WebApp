@@ -36,6 +36,7 @@ export const PROP_IMAGE: Record<PropKind, string> = {
   pallet: 'assets/props/pallet.webp',
   hook: 'assets/props/hook.webp',
   totem: 'assets/props/totem.webp',
+  drone: 'assets/props/skullmerchant-drone.webp',
 }
 
 /** The Sacrifice Progress token (a red disc with the hook): the HUD's icon and the reveal's. */
@@ -118,6 +119,7 @@ const PROP_NAMES_TH: Record<PropKind, string> = {
   pallet: 'Pallet',
   hook: 'Hook',
   totem: 'Hex Totem',
+  drone: 'Drone',
 }
 
 function prop(st: GameState, id: string) {
@@ -133,6 +135,8 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
       return 'ซ่อนใน Locker'
     case 'crow':
       return 'ไล่ Crow (ฆาตกร +1 ▲, ได้ Bonus Turn)'
+    case 'drone':
+      return `ส่ง Drone กลับบอร์ดของ ${st.killer.name}`
     case 'dropPallet':
       return `ทิ้ง Pallet บนทาง ${iconLabel(st, i.path, room)}`
     case 'repair':
@@ -204,6 +208,10 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Pain Resonance: Interact กับ Hook — ${st.survivors[i.target].name} บาดเจ็บ (${PERKS.pain_resonance.cost} ▲)`
     case 'birds':
       return `${i.dire ? 'Dire Crow' : 'Crow'} → ${roomName(st, i.room)}`
+    case 'droneTake':
+      return `Eyes in the Sky: เก็บ Drone ที่ ${roomName(st, prop(st, i.prop).room!)} กลับขึ้นบอร์ด`
+    case 'droneDrop':
+      return `Eyes in the Sky: วาง Drone หงายหน้าที่ ${roomName(st, st.killer.room)}`
     case 'guard':
       return `${GUARD_NAMES[i.guard]} → ${roomName(st, i.room)}${st.guards?.[i.guard] ? ' (ย้าย)' : ''}`
     case 'afterpiece':
@@ -597,7 +605,14 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     case 'iron_grasp':
       return 'ทอยเต๋า Skill Check ใหม่ทั้งหมด'
     case 'insidious':
+    case 'game_afoot':
       return `อุ้ม ${name((w as { target: number }).target)} แทนการโจมตี`
+    case 'leverage':
+      return `${name(c.target!)} หายบาดเจ็บไม่ได้รอบนี้`
+    case 'thwack': {
+      const p = prop(st, (w as { prop: string }).prop)
+      return `นำ ${PROP_NAMES_TH[p.kind]} ที่ ${roomName(st, p.room!)} ออก`
+    }
     case 'whispers':
       return `เลือก ${name(c.target!)} — จ่าย 1 ▲ หรือวางการ์ดหงายหน้า`
     case 'kinship':
@@ -710,6 +725,10 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return `${st.killer.name} เข้ามาใน ${roomName(st, w.room)}`
     case 'killerArrived':
       return `${st.killer.name} เข้า ${roomName(st, w.room)} (ก่อนเปิด prop)`
+    case 'killerRevealed': {
+      const p = prop(st, w.prop)
+      return `${st.killer.name} เปิด ${PROP_NAMES_TH[p.kind]} ที่ ${roomName(st, p.room!)}`
+    }
     case 'killerWouldInteract':
       return `${st.killer.name} จะ Interact ใน ${roomName(st, w.room)}`
     case 'killerInteract':

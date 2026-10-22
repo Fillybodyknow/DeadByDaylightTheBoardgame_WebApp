@@ -57,6 +57,9 @@ export type PerkId =
   | 'face_the_darkness'
   | 'nowhere_to_hide'
   | 'hubris'
+  | 'game_afoot'
+  | 'leverage'
+  | 'thwack'
   | 'grim_embrace'
   | 'pain_resonance'
   | 'pentimento'
@@ -278,6 +281,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   pop_goes_the_weasel: def('pop_goes_the_weasel', 'Pop Goes the Weasel', 0, 'killer', 'clown', 2, 'ถามหลังทำให้ผู้รอดชีวิตบาดเจ็บ หรือแขวนบน Hook'),
   face_the_darkness: def('face_the_darkness', 'Face the Darkness', 1, 'killer', 'knight', 0, 'ถามตอนเริ่มเทิร์นฆาตกร ก่อนเปิดการ์ด'),
   nowhere_to_hide: def('nowhere_to_hide', 'Nowhere to Hide', 1, 'killer', 'knight', 1, 'ถามเมื่อคุณค้น Locker ที่มีคนซ่อน'),
+  game_afoot: def('game_afoot', 'Game Afoot', 2, 'killer', 'skullmerchant', 0, 'ถามเมื่อคุณจะโจมตีผู้ที่ไม่บาดเจ็บใน Killer bonus turn'),
+  leverage: def('leverage', 'Leverage', 1, 'killer', 'skullmerchant', 1, 'ถามตอนเริ่มเฟสวางแผน: ผู้รอดชีวิต 1 คนหายบาดเจ็บไม่ได้รอบนี้'),
+  thwack: def('thwack', 'Thwack!', 1, 'killer', 'skullmerchant', 2, 'ถามหลังคุณเปิด prop สีฟ้าหรือสีเขียว'),
   grim_embrace: def('grim_embrace', 'Grim Embrace', 3, 'killer', 'artist', 0, 'ถามหลังผู้รอดชีวิตช่วยคนลงจาก Hook: วาง ▲ บนบอร์ดของผู้ช่วย'),
   pain_resonance: def('pain_resonance', 'Pain Resonance', 3, 'killer', 'artist', 1, 'Interact กับ Hook ว่างในห้องคุณ: ผู้รอดชีวิตในห้องที่เชื่อมกันบาดเจ็บ'),
   pentimento: def('pentimento', 'Pentimento', 0, 'killer', 'artist', 2, 'ทำงานเองหลังผู้รอดชีวิตชำระ Hex Totem สำเร็จ'),
@@ -380,4 +386,4 @@ export const DECK_PERKS: PerkId[] = Object.values(PERKS)
   .map((p) => p.id)
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant']

@@ -370,6 +370,9 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   if (i.k === 'hatchet' || i.k === 'reign') f.survivors.push(i.target)
   if (i.k === 'spark' || i.k === 'bell') f.dests.push(i.room)
   if (i.k === 'phantasm') f.rooms.push(room)
+  // Eyes in the Sky: the Drone's room, or his own
+  if (i.k === 'droneTake') f.rooms.push(st.props.find((p) => p.id === i.prop)!.room!)
+  if (i.k === 'droneDrop') f.dests.push(room)
   // Showstopper: his room, the connected ones, and who gets a Knife
   if (i.k === 'showstopper') {
     f.rooms.push(room, ...touchingPaths(st, room).map((p) => (p.a === room ? p.b : p.a)))

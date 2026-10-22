@@ -49,7 +49,8 @@ export function survivorMax(st: GameState, s: number): number {
 /** Can be made healthy: wounded, and not holding three Knives (The Trickster's passive). */
 export function healable(st: GameState, s: number): boolean {
   const sv = st.survivors[s]
-  return sv.wounded && (sv.knives ?? 0) < 3
+  // Leverage: not this round
+  return sv.wounded && (sv.knives ?? 0) < 3 && st.leverage !== s
 }
 export const KILLER_BP = { start: 4, max: 12 }
 export const SACRIFICE_TO_WIN = 8
@@ -131,6 +132,7 @@ export const PROP_NAMES: Record<PropKind, string> = {
   pallet: 'Pallet',
   hook: 'Hook',
   totem: 'Hex Totem',
+  drone: 'Drone',
 }
 
 export const ITEM_NAMES: Record<string, string> = {
@@ -287,6 +289,26 @@ export function createGame(config: GameConfig): GameState {
   return st
 }
 
+/**
+ * The Skull Merchant's passive: after setup, a face-down Drone into each room, shuffled in with the
+ * room's face-down objective props (the tiles of a colour look alike face down: the kinds are dealt
+ * among them again).
+ */
+function placeDrones(st: GameState) {
+  if (st.killer.characterId !== 'skullmerchant' || st.props.some((p) => p.kind === 'drone')) return
+  for (const room of boardOf(st).rooms) {
+    st.props.push({ id: `drone-${room.id}`, kind: 'drone', category: 'objective', room: room.id, path: null, revealed: false, removed: false, progress: 0, done: false, occupant: null })
+    const hidden = st.props.filter((p) => p.room === room.id && p.category === 'objective' && !p.revealed && !p.removed)
+    const kinds = shuffle(st, hidden.map((p) => p.kind))
+    hidden.forEach((p, i) => (p.kind = kinds[i]))
+  }
+}
+
+/** Drones on The Skull Merchant's board. */
+export function merchantDrones(st: GameState): Prop[] {
+  return st.props.filter((p) => p.kind === 'drone' && p.merchant)
+}
+
 /** Setup step 11 (p.6): every mini rolls a skill check die for its start room. */
 function rollStartRooms(st: GameState) {
   // a game saved mid-setup before this order came in has its minis placed already
@@ -301,6 +323,7 @@ function rollStartRooms(st: GameState) {
   })
   const kf = rollFace(st)
   st.killer.room = startRoom(kf)
+  placeDrones(st)
   log(st, `${st.killer.name} ทอยได้ ${kf} เริ่มที่ ${roomName(st, st.killer.room)}`, 'killer')
 }
 
@@ -495,6 +518,9 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
         break
       case 'pallet':
         for (const path of touchingTokens(st, sv.room)) if (pathFree(st, path)) out.push({ k: 'dropPallet', prop: p.id, path })
+        break
+      case 'drone':
+        out.push({ k: 'drone', prop: p.id })
         break
       case 'generator':
         out.push({ k: 'repair', prop: p.id })
@@ -1674,6 +1700,8 @@ function revealProp(st: GameState, p: Prop, who: LogWho) {
     payPerk(st, 'killer', 'spies_from_the_shadows', '+1 ▲')
     gainKiller(st, 1)
   }
+  // THWACK!: his own reveal of a survival or altruism prop
+  if (who === 'killer' && st.phase !== 'setup' && (p.category === 'survival' || p.category === 'altruism')) trigger(st, { k: 'killerRevealed', prop: p.id })
   // Haunted Ground answers a survivor's reveal (not the setup, where perks aren't in play yet)
   if (typeof who === 'number' && st.phase !== 'setup') trigger(st, { k: 'afterReveal', s: who, prop: p.id })
 }
@@ -1725,6 +1753,10 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       log(st, `${sv.name} ไล่ Crow — ${st.killer.name} +1 ▲`, s)
       emit(st, { k: 'touch', who: s, what: 'crow' }, s)
       if (st.survivorHands[sv.hand].length > 0) wait(st, { t: 'bonusOffer', s })
+      return
+    case 'drone':
+      Object.assign(prop!, { removed: true, merchant: true, room: null })
+      log(st, `${sv.name} ส่ง Drone กลับไปบนบอร์ดของ ${st.killer.name}`, s)
       return
     case 'calmSpirit':
       payPerk(st, s, 'calm_spirit', `ย้าย Crow ไป ${roomName(st, i.room)}`)
@@ -1952,8 +1984,10 @@ function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, t
 
 /** Interact; Red Herring may first turn an attack or pick-up into damaging a generator. */
 function killerActs(st: GameState, i: KillerInteraction, turn: number | null) {
-  if ((i.k === 'attack' || i.k === 'pickUp') && perkCandidates(st, { k: 'preKillerInteract', target: i.target, pickUp: i.k === 'pickUp' }, []).length) {
-    st.queue.unshift({ k: 'trigger', w: { k: 'preKillerInteract', target: i.target, pickUp: i.k === 'pickUp' }, done: [] }, { k: 'killerDo', i, turn })
+  if (i.k === 'attack' || i.k === 'pickUp') {
+    const w: PerkWindow = { k: 'preKillerInteract', target: i.target, pickUp: i.k === 'pickUp', turn }
+    if (!perkCandidates(st, w, []).length) return killerDo(st, i, turn)
+    st.queue.unshift({ k: 'trigger', w, done: [] }, { k: 'killerDo', i, turn })
     return
   }
   killerDo(st, i, turn)
@@ -2185,7 +2219,7 @@ function cleanup(st: GameState) {
     sv.woundedThisRound = false
   }
   Object.assign(st.killer, { hand: killerDeck(st.killer.characterId), planned: [], revealedCount: 0, plannedShown: false, powerUsed: false, bonusUsed: false, shown: [] })
-  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], empathyNo: [], guardian: null, dissolution: null, fearmonger: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
+  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
   startPlanning(st)
@@ -2315,14 +2349,26 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
   if (!logged) logRoll(st, ctx, dice, fails)
   else if (fails) log(st, `${st.killer.name} +${fails} ▲ จากผลล้มเหลว`, 'killer')
   if (fails) gainKiller(st, fails)
-  // The Jailer's roll failed: it leaves play, and the survivor is wounded
+  // The Jailer's roll failed: the survivor is wounded, and the Jailer leaves the board — back onto
+  // The Knight's, to be placed again (a house rule: the rulebook removes it from play)
   if (st.jailerRoll === s) {
     st.jailerRoll = null
     if (!ok) {
       st.guards = { ...st.guards, jailer: undefined }
-      st.jailerGone = true
-      log(st, `Jailer ออกจากเกม`, 'killer')
+      log(st, `Jailer กลับไปบนบอร์ดของ ${st.killer.name} — วางใหม่ได้`, 'killer')
       wound(st, s, 'power', `${sv.name} ทอยพลาดต่อหน้า Jailer — บาดเจ็บ`)
+    }
+  }
+  // The Skull Merchant's Drones: a skill check in a room with one face up pays him a ▲ (success)
+  // or wounds (failure), and one of them turns face down; not for someone in a locker (off the board)
+  if (SKILL_CHECKS.includes(ctx.k) && sv.status === 'board') {
+    const drone = propsIn(st, sv.room).find((p) => p.kind === 'drone' && p.revealed)
+    if (drone) {
+      if (ok) {
+        gainKiller(st, 1)
+        log(st, `Drone เห็น ${sv.name} — ${st.killer.name} +1 ▲`, 'killer')
+      } else wound(st, s, 'power', `${sv.name} ทอยพลาดใต้ Drone — บาดเจ็บ`)
+      drone.revealed = false
     }
   }
   // Lucky Break: after a great success (the die kept; any die of the carry roll).
@@ -3136,6 +3182,22 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     }
     case 'spirit_fury':
       return w.k === 'killerBreak' && w.what === 'pallet' ? NONE : []
+    // ----- The Skull Merchant -----
+    case 'game_afoot': {
+      // an attack on someone healthy in his room on a bonus turn (his third card): a pick-up instead
+      if (w.k !== 'preKillerInteract' || w.pickUp || w.turn === null || w.turn === undefined || w.turn < 2) return []
+      const sv = st.survivors[w.target]
+      return !sv.wounded && sv.status === 'board' && sv.room === st.killer.room ? NONE : []
+    }
+    case 'leverage':
+      // a survivor who can't become healthy this round
+      if (w.k !== 'planningStart' || (st.leverage !== null && st.leverage !== undefined)) return []
+      return st.survivors.map((_, i) => ({ target: i }))
+    case 'thwack': {
+      if (w.k !== 'killerRevealed') return []
+      const p = st.props.find((x) => x.id === w.prop)
+      return p && !p.removed && p.occupant === null ? NONE : []
+    }
     // ----- The Artist -----
     case 'grim_embrace':
       // a rescue: a ▲ from the supply on the rescuer's board
@@ -4259,6 +4321,24 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       st.canInteract = false
       return
     }
+    case 'game_afoot': {
+      const { target } = w as Extract<PerkWindow, { k: 'preKillerInteract' }>
+      const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')!
+      payPerk(st, o, perk, `อุ้ม ${st.survivors[target].name} แทนการโจมตี`)
+      task.i = { k: 'pickUp', target }
+      return
+    }
+    case 'leverage':
+      payPerk(st, o, perk, `${st.survivors[c.target!].name} หายบาดเจ็บไม่ได้รอบนี้`)
+      st.leverage = c.target!
+      return
+    case 'thwack': {
+      const p = st.props.find((x) => x.id === (w as Extract<PerkWindow, { k: 'killerRevealed' }>).prop)!
+      payPerk(st, o, perk, `นำ ${PROP_NAMES[p.kind]} ที่ ${roomName(st, p.room!)} ออก`)
+      p.removed = true
+      toArtist(st, p)
+      return
+    }
     case 'grim_embrace': {
       const { s } = w as Extract<PerkWindow, { k: 'afterSabotage' }>
       const sv = st.survivors[s]
@@ -4385,7 +4465,7 @@ function makeHealthy(st: GameState, s: number, text: string, by: number) {
   const sv = st.survivors[s]
   if (!sv.wounded) return
   if (!healable(st, s)) {
-    log(st, `${sv.name} มี Knife 3 เล่ม — หายบาดเจ็บไม่ได้`, s)
+    log(st, st.leverage === s ? `${sv.name} หายบาดเจ็บไม่ได้รอบนี้ (Leverage)` : `${sv.name} มี Knife 3 เล่ม — หายบาดเจ็บไม่ได้`, s)
     return
   }
   sv.wounded = false
@@ -4413,7 +4493,7 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
 // ---------- killer powers ----------
 
 export function isPower(i: KillerInteraction): boolean {
-  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'reign', 'birds'].includes(i.k)
+  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'reign', 'birds', 'droneTake', 'droneDrop'].includes(i.k)
 }
 
 // ---------- The Twins ----------
@@ -4505,6 +4585,12 @@ export function powerOptions(st: GameState): KillerInteraction[] {
     case 'blight':
       // Blighted Corruption: needs a card to discard.
       return k.hand.length ? [{ k: 'rush' }] : []
+    case 'skullmerchant':
+      // Eyes in the Sky: a face-up Drone anywhere back to his board, or one of his face up into his room
+      return [
+        ...st.props.filter((p) => p.kind === 'drone' && p.revealed && !p.removed && p.room).map((p) => ({ k: 'droneTake' as const, prop: p.id })),
+        ...(merchantDrones(st).length ? [{ k: 'droneDrop' as const }] : []),
+      ]
     case 'artist': {
       // Birds of Torment: a crow or a Dire Crow from his board into any room
       const on = artistCrows(st)
@@ -4635,6 +4721,17 @@ function usePower(st: GameState, i: KillerInteraction) {
       return
     case 'rush':
       return blightRush(st)
+    case 'droneTake': {
+      const p = st.props.find((x) => x.id === i.prop)!
+      log(st, `${k.name} ใช้ Eyes in the Sky — เก็บ Drone ที่ ${roomName(st, p.room!)} กลับขึ้นบอร์ด`, 'killer')
+      return void Object.assign(p, { removed: true, merchant: true, room: null })
+    }
+    case 'droneDrop': {
+      const p = merchantDrones(st)[0]
+      Object.assign(p, { removed: false, merchant: false, room: k.room, revealed: true })
+      log(st, `${k.name} ใช้ Eyes in the Sky — วาง Drone หงายหน้าที่ ${roomName(st, k.room)}`, 'killer', { ev: { k: 'reveal', prop: p.id, kind: p.kind, room: k.room } })
+      return
+    }
     case 'birds': {
       const p = st.props.find((x) => x.artist && !!x.dire === i.dire)!
       Object.assign(p, { artist: false, removed: false, room: i.room, path: null, revealed: true })
@@ -4793,7 +4890,6 @@ export function guardOptions(st: GameState): { guard: Guard; room: string }[] {
   const k = st.killer
   const rooms = [k.room, ...connectedRooms(st, k.room)]
   return (['carnifex', 'assassin', 'jailer'] as const)
-    .filter((g) => g !== 'jailer' || !st.jailerGone)
     .flatMap((guard) => rooms.filter((r) => st.guards?.[guard] !== r).map((room) => ({ guard, room })))
 }
 

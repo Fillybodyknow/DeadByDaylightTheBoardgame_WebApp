@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { DIRECT_CARDS, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { DIRECT_CARDS, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { boards } from './boards'
 import { actorsOf } from './seats'
@@ -10,7 +10,7 @@ import type { Action, GameState, MoveCard, PerkWindow, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
 const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah', 'haddie', 'mikaela', 'vittorio']
-const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist']
+const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant']
 
 function game(killer = 'trapper', seed = 1): GameState {
   let st = createGame({ board: 'macmillan', survivors: SURVIVORS.map((id) => ({ id, name: id })), killer: { id: killer, name: killer }, players: 5, seed })
@@ -52,7 +52,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(155)
+    expect(Object.keys(PERKS)).toHaveLength(158)
     // the cards that are on no board: their name, cost and text come from the deck data instead
     for (const p of DECK_PERKS) {
       expect(PERKS[p].character, p).toBe('')
@@ -419,8 +419,10 @@ describe('perks', () => {
         const eager = options.filter(
           (a: Action) =>
             (a.t === 'perk' && a.use) ||
-            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp', 'search'].includes(a.i.k)) ||
-            (a.t === 'useItem'),
+            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'droneTake', 'droneDrop', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp', 'search'].includes(a.i.k)) ||
+            (a.t === 'useItem') ||
+            // Game Afoot's moment is an attack on a bonus turn: that killer takes both when he can
+            (only === 'game_afoot' && (a.t === 'bonus' || (a.t === 'interact' && a.i.k === 'attack'))),
         )
         rng = (rng * 1103515245 + 12345) >>> 0
         const pool = eager.length && rng % 3 === 0 ? eager : options
@@ -2509,6 +2511,116 @@ describe('The Artist', () => {
   })
 })
 
+describe('The Skull Merchant', () => {
+  /** The Skull Merchant with only these perks, about to interact; the survivors in the shack. */
+  function merchant(...perks: PerkId[]) {
+    const st = game('skullmerchant')
+    only(st, ...perks)
+    killerInteracting(st)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, sacrificeToken: false }))
+    return st
+  }
+  /** A Drone face up in this room. */
+  function drone(st: GameState, room: string) {
+    const d = st.props.find((p) => p.kind === 'drone' && !p.removed && p.room !== room)!
+    Object.assign(d, { room, revealed: true })
+    return d
+  }
+
+  it('setup puts a face-down Drone into every room', () => {
+    const st = game('skullmerchant')
+    const drones = st.props.filter((p) => p.kind === 'drone')
+    expect(drones.length).toBe(boardOf(st).rooms.length)
+    expect(new Set(drones.map((p) => p.room)).size).toBe(drones.length)
+    expect(drones.every((p) => p.category === 'objective')).toBe(true)
+    expect(game().props.some((p) => p.kind === 'drone')).toBe(false)
+  })
+
+  it('a skill check under a face-up Drone: success pays him a ▲, failure wounds; the Drone turns face down', () => {
+    const base = merchant()
+    const d = drone(base, 'shack')
+    const gen = placeProp(base, 'generator', 'shack')
+    base.phase = 'survivors'
+    base.activeSurvivor = 0
+    base.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    base.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const rolled = (rng: number) => {
+      let x = apply({ ...structuredClone(base), rng }, { t: 'interact', i: { k: 'repair', prop: gen.id } })
+      while (x.step.t === 'roll') x = apply(x, { t: 'acceptRoll' })
+      return x
+    }
+    const fail = findOutcome(rolled, (g) => g.survivors[0].wounded)
+    expect(fail.props.find((p) => p.id === d.id)!.revealed).toBe(false)
+    const ok = findOutcome(rolled, (g) => g.props.find((p) => p.id === gen.id)!.progress > 0)
+    expect(ok.killer.bp).toBe(base.killer.bp + 1)
+    expect(ok.survivors[0].wounded).toBe(false)
+    expect(ok.props.find((p) => p.id === d.id)!.revealed).toBe(false)
+  })
+
+  it('a survivor sends a face-up Drone back to his board; Eyes in the Sky puts it face up in his room', () => {
+    const st = merchant()
+    const d = drone(st, 'shack')
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    expect(survivorInteractions(st, 0)).toContainEqual({ k: 'drone', prop: d.id })
+    let g = apply(st, { t: 'interact', i: { k: 'drone', prop: d.id } })
+    expect(g.props.find((p) => p.id === d.id)).toMatchObject({ removed: true, merchant: true, room: null })
+    killerInteracting(g)
+    expect(killerInteractions(g)).toContainEqual({ k: 'droneDrop' })
+    g = apply(g, { t: 'interact', i: { k: 'droneDrop' } })
+    expect(g.props.find((p) => p.id === d.id)).toMatchObject({ removed: false, merchant: false, room: g.killer.room, revealed: true })
+    expect(g.killer.powerUsed).toBe(true)
+  })
+
+  it('Eyes in the Sky takes any face-up Drone on the map back to his board', () => {
+    const st = merchant()
+    const d = drone(st, 'backlot')
+    expect(powerOptions(st)).toContainEqual({ k: 'droneTake', prop: d.id })
+    expect(powerOptions(st).some((i) => i.k === 'droneDrop')).toBe(false)
+    const g = apply(st, { t: 'interact', i: { k: 'droneTake', prop: d.id } })
+    expect(g.props.find((p) => p.id === d.id)).toMatchObject({ removed: true, merchant: true })
+  })
+
+  it('Game Afoot: on a bonus turn, an attack on a healthy survivor here becomes a pick-up', () => {
+    const st = merchant('game_afoot')
+    st.killer.room = 'shack'
+    const w = { k: 'preKillerInteract', target: 0, turn: 2 } as const
+    st.queue = [{ k: 'killerDo', i: { k: 'attack', target: 0 }, turn: 2 }, { k: 'endKillerTurn', turn: 2 }]
+    expect(perkChoices(st, 'game_afoot', 'killer', w)).toEqual([{}])
+    // not on his first two cards
+    expect(perkChoices(st, 'game_afoot', 'killer', { ...w, turn: 1 })).toEqual([])
+    st.step = { t: 'offer', perk: 'game_afoot', owner: 'killer', w }
+    const after = apply(st, { t: 'perk', perk: 'game_afoot', use: true, choice: {} })
+    expect(after.survivors[0].status).toBe('carried')
+    expect(after.survivors[0].wounded).toBe(false)
+  })
+
+  it('Leverage: the survivor chosen at the start of planning cannot become healthy this round', () => {
+    const st = merchant('leverage')
+    st.survivors[1].wounded = true
+    const w = { k: 'planningStart' } as const
+    expect(perkChoices(st, 'leverage', 'killer', w)).toHaveLength(4)
+    st.step = { t: 'offer', perk: 'leverage', owner: 'killer', w }
+    st.queue = [{ k: 'endKillerTurn', turn: 0 }]
+    const g = apply(st, { t: 'perk', perk: 'leverage', use: true, choice: { target: 1 } })
+    expect(g.leverage).toBe(1)
+    expect(healable(g, 1)).toBe(false)
+    expect(healable({ ...g, leverage: null }, 1)).toBe(true)
+  })
+
+  it('THWACK!: a blue or green prop he reveals may be removed', () => {
+    const st = merchant('thwack')
+    const chest = st.props.find((p) => p.kind === 'chest' && !p.removed)!
+    const w = { k: 'killerRevealed', prop: chest.id } as const
+    expect(perkChoices(st, 'thwack', 'killer', w)).toEqual([{}])
+    st.step = { t: 'offer', perk: 'thwack', owner: 'killer', w }
+    const g = apply(st, { t: 'perk', perk: 'thwack', use: true, choice: {} })
+    expect(g.props.find((p) => p.id === chest.id)!.removed).toBe(true)
+  })
+})
+
 describe('The Dredge', () => {
   /** The Dredge with only these perks, about to interact (turn 0 of 2); the survivors in the shack. */
   function dredge(...perks: PerkId[]) {
@@ -2678,7 +2790,7 @@ describe('The Knight', () => {
     expect(findOutcome(walked, (g) => !g.survivors[0].wounded).survivors[0].room).toBe(m.to)
   })
 
-  it('Jailer: a skill check in its room is a danger die; a failure wounds and the Jailer leaves play', () => {
+  it('Jailer: a skill check in its room is a danger die; a failure wounds and sends the Jailer back to his board', () => {
     const base = knight()
     base.guards = { jailer: 'shack' }
     const gen = placeProp(base, 'generator', 'shack')
@@ -2690,7 +2802,10 @@ describe('The Knight', () => {
     const fail = findOutcome(rolled, (g) => g.survivors[0].wounded)
     expect(fail.log.findLast((e) => e.dice)!.dice![0].kind).toBe('danger')
     expect(fail.guards?.jailer).toBeUndefined()
-    expect(fail.jailerGone).toBe(true)
+    // back on his board (a house rule): the power may place it again
+    expect(fail.jailerGone).toBeFalsy()
+    killerInteracting(fail)
+    expect(killerInteractions(fail).some((i) => i.k === 'guard' && i.guard === 'jailer')).toBe(true)
     const ok = findOutcome(rolled, (g) => !g.survivors[0].wounded && g.log.some((e) => e.dice))
     expect(ok.guards?.jailer).toBe('shack')
   })

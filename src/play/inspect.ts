@@ -50,4 +50,8 @@ export const PROP_RULES: Record<PropKind, { survivor: string; killer: string }> 
     survivor: 'Cleanse: ทอย Skill Check สำเร็จ = นำ Hex Totem ออก ได้ +2 ▲ (หน้า 13)',
     killer: 'Venerate: ได้ +2 ▲ (Totem ไม่ถูกนำออก) (หน้า 14)',
   },
+  drone: {
+    survivor: 'Drone ของ The Skull Merchant (หงายหน้า): ส่งกลับบอร์ดของเขา · ทอย Skill Check ในห้องที่มี Drone หงายหน้า — สำเร็จ ฆาตกร +1 ▲, ล้มเหลว = บาดเจ็บ แล้ว Drone 1 ตัวคว่ำลง',
+    killer: 'Eyes in the Sky: เก็บ Drone หงายหน้ากลับขึ้นบอร์ด หรือวาง Drone จากบอร์ดหงายหน้าในห้องของคุณ',
+  },
 }

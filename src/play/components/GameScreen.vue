@@ -361,8 +361,10 @@ function onSpot(key: string) {
     return
   }
   if (forkMoves.value && key.startsWith('room:')) forkMoves.value = null
-  if (found.length === 1) found[0].run()
-  else if (found.length > 1) menu.value = { actions: found, x: pointer.x + 8, y: pointer.y + 8 }
+  // a token to place (a Guard, an Afterpiece, a crow) is always picked from the chooser, even when
+  // only one can go there: a click on the room shouldn't place one the player never chose
+  if (found.length === 1 && !found[0].icon) found[0].run()
+  else if (found.length) menu.value = { actions: found, x: pointer.x + 8, y: pointer.y + 8 }
 }
 
 function onPath(id: string) {
