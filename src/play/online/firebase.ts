@@ -21,7 +21,7 @@
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { get, getDatabase, onChildAdded, onValue, ref, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
+import { get, getDatabase, onChildAdded, onChildChanged, onValue, ref, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
 import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
@@ -160,15 +160,22 @@ class FirebaseRoom implements Room {
         }
         this.replay()
       }),
-      // The moves themselves: a few hundred bytes each, and only the new ones are sent.
-      onChildAdded(this.path('/moves'), (snap) => {
-        const n = Number(String(snap.key).slice(1))
-        if (!Number.isInteger(n) || n <= this.baseRev) return
-        this.moves.set(n, JSON.parse(snap.val() as string) as Action)
-        this.replay()
-      }),
+      // The moves themselves: a few hundred bytes each, and only the new ones are sent. A slot can
+      // also change: when two devices race for it, the loser's own move may show there for a
+      // moment before the server's winner replaces it. Missing that change left the loser's game
+      // one move short of everyone else's (two survivor players confirming their plans at once).
+      onChildAdded(this.path('/moves'), (snap) => this.takeMove(snap.key, snap.val())),
+      onChildChanged(this.path('/moves'), (snap) => this.takeMove(snap.key, snap.val())),
     )
     return () => this.close()
+  }
+
+  /** A move slot from the room, new or replaced: replayed from the checkpoint, so a replaced one takes effect. */
+  private takeMove(key: string | null, val: unknown) {
+    const n = Number(String(key).slice(1))
+    if (!Number.isInteger(n) || n <= this.baseRev || typeof val !== 'string') return
+    this.moves.set(n, JSON.parse(val) as Action)
+    this.replay()
   }
 
   /** The checkpoint with every move in front of it applied, in order. */
@@ -228,13 +235,19 @@ class FirebaseRoom implements Room {
       if (!action) return false
       const n = this.applied + 1
       let taken = false
-      const res = await runTransaction(this.path(`/moves/${moveKey(n)}`), (cur: string | null) => {
-        if (cur !== null) {
-          taken = true
-          return undefined
-        }
-        return JSON.stringify(action)
-      })
+      // not applied locally first: this device only sees its move once the server has taken it,
+      // so a slot lost to someone else never shows our move in it
+      const res = await runTransaction(
+        this.path(`/moves/${moveKey(n)}`),
+        (cur: string | null) => {
+          if (cur !== null) {
+            taken = true
+            return undefined
+          }
+          return JSON.stringify(action)
+        },
+        { applyLocally: false },
+      )
       if (res.committed && !taken) {
         await this.afterMove(n)
         return true
@@ -267,10 +280,12 @@ class FirebaseRoom implements Room {
     if (n % CHECKPOINT_EVERY !== 0) return
     try {
       await set(this.path('/game'), { rev: n, json: JSON.stringify(trimLog(st, this.archived)) })
-      // The checkpoint holds them now, so the moves it covers can go.
+      // The checkpoint holds them now, so the moves it covers can go: the slots since the last one,
+      // by number. (Not from this.moves: writing the checkpoint has already pruned it here, so
+      // nothing used to be deleted and every move of the game stayed in the room.)
       const done: Record<string, null> = {}
-      for (const i of this.moves.keys()) if (i <= n) done[moveKey(i)] = null
-      if (Object.keys(done).length) await update(this.path('/moves'), done)
+      for (let i = Math.max(1, n - CHECKPOINT_EVERY + 1); i <= n; i++) done[moveKey(i)] = null
+      await update(this.path('/moves'), done)
     } catch (e) {
       console.warn('online: could not write the checkpoint', e)
     }
