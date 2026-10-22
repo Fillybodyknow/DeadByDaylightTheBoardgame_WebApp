@@ -143,9 +143,16 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   warning and a chime, a banner saying what is asked, the side panel glowing, and with the tab in
   the background a blinking title and a system notification. While it stays their turn a gold
   pill at the top and a gold screen edge say so, and every 20 s without a move it rings again.
+- **Pings (online):** the 📍 button (or Alt+click) marks a spot on the map with a pulsing ring in the
+  player's colour, picked in the lobby from a fixed set, one per member (`pings.ts`, `PingLayer`,
+  `online/pingColors.ts`). Everyone sees it, the killer too (no secret talk, p.8); spam is limited on the device and by
+  the database rules. Not part of the game: never saved or replayed.
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
-  already offers and show "เลือกบนแผนที่" instead.
+  already offers and show "เลือกบนแผนที่" instead. The exception is a survivor's perk aimed on the
+  map: it is armed in the side panel first ("ใช้ [perk]", glowing until pressed; `perksToPick`),
+  and only then are its targets on the map, so a path or generator clicked by habit stays an
+  ordinary move or repair.
 - **Movement cards are picked from the hand** (`CardHand`): point to draw a card up (the map shows
   where it goes), click to pick (it stays up), confirm in the side panel. In planning and on a
   bonus turn a path out of the room on the map picks the card of its colour too (`pathPick.ts`). This covers planning,

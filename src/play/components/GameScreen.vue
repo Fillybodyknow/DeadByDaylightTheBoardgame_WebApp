@@ -13,7 +13,9 @@ import { canUndo, controls, dispatch, myTurn, online, quitGame, undo } from '../
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
-import { closeOnlineGame, isHost, leaveRoom, returnToLobby, roomSettings, session } from '../online/session'
+import { closeOnlineGame, isHost, leaveRoom, pingColors, returnToLobby, roomSettings, session } from '../online/session'
+import { pingHex } from '../online/pingColors'
+import { canPing, pingArmed, pingWait } from '../pings'
 import { timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
@@ -976,6 +978,20 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <SyncBadge v-if="online" />
         <span v-if="online" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
         <button v-else :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶<span class="btn-text"> ย้อน</span></button>
+        <!-- online: ping a spot on the map for everyone (or Alt+click on it) -->
+        <button
+          v-if="canPing"
+          type="button"
+          class="ping-btn"
+          :class="{ on: pingArmed }"
+          :style="{ '--c': pingHex(pingColors[session.me]) }"
+          :disabled="!!pingWait"
+          :aria-pressed="pingArmed"
+          :title="pingArmed ? 'คลิกจุดบนแผนที่เพื่อปิง — กดอีกครั้งเพื่อยกเลิก' : 'ปิงจุดบนแผนที่ให้ทุกคนเห็น (หรือกด Alt ค้างแล้วคลิกบนแผนที่)'"
+          @click="pingArmed = !pingArmed"
+        >
+          📍<b v-if="pingWait" class="ping-count">{{ pingWait }}</b><span v-else class="btn-text"> {{ pingArmed ? 'คลิกบนแผนที่' : 'ปิง' }}</span>
+        </button>
         <button v-if="canFullscreen" :title="fullscreen ? 'ออกจากเต็มจอ' : 'เต็มจอ'" @click="toggleFullscreen">{{ fullscreen ? '🗗' : '⛶' }}</button>
         <SoundSettings />
         <button @click="leave">ออก</button>
@@ -1173,6 +1189,19 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
+}
+/* the ping button wears the player's ping colour, and glows while the next click pings */
+.ping-btn {
+  border-color: var(--c);
+}
+.ping-count {
+  margin-left: 0.2em;
+  font-size: 0.8em;
+}
+.ping-btn.on {
+  color: #111;
+  background: var(--c);
+  box-shadow: 0 0 12px var(--c);
 }
 
 /* the round and its button sit in the bar as if they weren't wrapped */

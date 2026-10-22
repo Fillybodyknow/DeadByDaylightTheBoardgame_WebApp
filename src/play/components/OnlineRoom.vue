@@ -46,6 +46,8 @@ import {
   setBoard,
   setDouble,
   setName,
+  setPingColor,
+  pingColors,
   setReady,
   setSide,
   slotsOf,
@@ -57,6 +59,7 @@ import type { PerkId } from '../engine/perks'
 import BanPicker from './BanPicker.vue'
 import CharacterPicker from './CharacterPicker.vue'
 import StageBar from './StageBar.vue'
+import { PING_COLORS, pingHex } from '../online/pingColors'
 import PerkLoadout from './PerkLoadout.vue'
 import MapPicker from './MapPicker.vue'
 import Mini from './Mini.vue'
@@ -126,6 +129,11 @@ const survivorMembers = computed(() => {
   return [...on, ...Array<null>(Math.max(0, 4 - on.length)).fill(null)].slice(0, 4)
 })
 const bench = computed(() => memberList.value.filter((m) => !m.side))
+/** Who else holds a ping colour (their name), or null when it is free or this player's own. */
+const colorHolder = (color: string) => {
+  const id = Object.keys(pingColors.value).find((k) => pingColors.value[k] === color)
+  return id && id !== session.me ? (session.data?.members[id]?.name ?? '?') : null
+}
 const readyCount = computed(() => memberList.value.filter((m) => m.ready).length)
 /** The silhouettes on the slots: the figure on the Sprint card, the skull on a card's back. */
 const artVars = { '--sprint': cssUrl('assets/movement/sprint.webp'), '--skull': cssUrl('assets/movement/back-skull.webp') }
@@ -394,7 +402,7 @@ const seatStatus = computed(() =>
                 <button v-else type="button" class="seat-name mine" title="เปลี่ยนชื่อ" @click.stop="startRename">{{ killerMember.name }} <i>✎</i></button>
               </template>
               <span v-else class="seat-name">{{ killerMember.name }}</span>
-              <span class="seat-sub">{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}</span>
+              <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}</span>
               <span v-if="leavable(killerMember.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
               <button v-if="canKick(killerMember.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(killerMember.id)">✕ เตะ</button>
             </template>
@@ -428,7 +436,7 @@ const seatStatus = computed(() =>
                 <button v-else type="button" class="seat-name mine" title="เปลี่ยนชื่อ" @click.stop="startRename">{{ m.name }} <i>✎</i></button>
               </template>
               <span v-else class="seat-name">{{ m.name }}</span>
-              <span class="seat-sub">{{ m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}</span>
+              <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}</span>
               <!-- 3 survivor players: one of them plays two survivors -->
               <button
                 v-if="doubleId"
@@ -456,12 +464,33 @@ const seatStatus = computed(() =>
         <p v-if="bench.length" class="bench">
           <span class="muted">ยังไม่เลือกฝั่ง:</span>
           <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me }">
-            {{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}
+            <i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}
             <button v-if="canKick(m.id)" type="button" class="kick small" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕</button>
           </span>
           <span v-if="!me?.side" class="bench-hint">คลิกช่องว่างด้านบนเพื่อเลือกฝั่ง</span>
         </p>
         <p class="split muted">{{ splitNote }}</p>
+        <!-- the colour of this player's pings in the game: one each, none the same -->
+        <div v-if="me" class="ping-pick" role="radiogroup" aria-label="สี Ping ของคุณ">
+          <span class="ping-pick-label">📍 สี Ping ของคุณ <small class="muted">— ระหว่างเกมกดปุ่ม 📍 หรือ Alt+คลิกบนแผนที่ ทุกคนในห้องเห็น (รวม Killer)</small></span>
+          <span class="swatches">
+            <button
+              v-for="c in PING_COLORS"
+              :key="c.id"
+              type="button"
+              role="radio"
+              class="swatch"
+              :class="{ on: pingColors[session.me] === c.id, taken: !!colorHolder(c.id) }"
+              :style="{ '--c': c.hex }"
+              :aria-checked="pingColors[session.me] === c.id"
+              :disabled="session.busy || !!colorHolder(c.id)"
+              :title="colorHolder(c.id) ? `${c.name} — ${colorHolder(c.id)} ใช้อยู่` : c.name"
+              @click="setPingColor(c.id)"
+            >
+              <span v-if="colorHolder(c.id)" class="holder">{{ colorHolder(c.id)!.slice(0, 1) }}</span>
+            </button>
+          </span>
+        </div>
       </section>
 
       <!-- the room's settings: everyone reads them before saying ready -->
@@ -1164,6 +1193,66 @@ button.seat-name.mine:hover i {
 .split {
   margin: 0;
   font-size: 0.85rem;
+}
+
+/* ---------- ping colours: a dot on every seat, and this player's picker ---------- */
+.ping-dot {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  margin-right: 0.35em;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 6px var(--c);
+  vertical-align: 0.05em;
+}
+.ping-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.8rem;
+  margin-top: 0.4rem;
+}
+.ping-pick-label {
+  font-size: 0.9rem;
+}
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.swatch {
+  position: relative;
+  width: 1.9rem;
+  height: 1.9rem;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 0.25);
+  background: var(--c);
+  cursor: pointer;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+.swatch:hover:not(:disabled) {
+  transform: scale(1.12);
+}
+.swatch.on {
+  border-color: #fff;
+  box-shadow:
+    0 0 0 3px rgb(0 0 0 / 0.6),
+    0 0 12px var(--c);
+}
+/* someone else's: dimmed, with their initial on it */
+.swatch.taken {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.swatch .holder {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #111;
 }
 
 /* ---------- the ready bar, held at the foot of the screen ---------- */

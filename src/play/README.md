@@ -88,6 +88,17 @@ and the host starts the game.
   the room comes back without it. Friends, not strangers: the check is on the joining device.
   **The database rules must be updated** (`roomIndex`) for the board to show rooms; without
   them rooms still work by code.
+- **Pings** (`src/play/pings.ts`, `PingLayer.vue`): in the game a player marks a spot on the map for
+  everyone — the 📍 button in the controls, then a click on the map (or Alt+click). A ring in
+  their colour pulses there with their name for 4 s; a new ping of theirs replaces it. Everyone
+  sees every ping, the killer too: survivors may talk but never in secret (p.8). Each member picks a colour in the
+  lobby from a fixed set (`online/pingColors.ts`, `Member.color`), never one another member holds;
+  a member without one gets the first free. Spam: one ping per 1.5 s and 4 in 10 s on the device
+  (the button counts down), and the database rules refuse more than one a second per member.
+  Pings aren't moves: they go through `Room.ping` / `onPings` (Firebase: `rooms/<code>/pings/<id>`,
+  one slot each; local: a BroadcastChannel) and are never saved or replayed.
+  **The database rules must be updated** (`pings`) for pings to reach the others on Firebase; the
+  sender is told when the room refuses them.
 - **Kicking:** in the lobby the host has a ✕ on every other seat and bench chip. The kicked
   device's id goes into `lobby.kicked`: it is sent back to the entry page with a notice, and
   `join` / `joinRoom` refuse it (also with the password). Everyone un-readies, as the table changed.
@@ -195,6 +206,13 @@ survivors by turn order, then the killer, who decides after seeing theirs. When 
 several perks for that moment, they are offered together (`alt` on the `offer` step). The owner
 uses any of them first, the rest are asked again if they still apply, and pass passes on all
 of them. Example: The Trapper's Brutal Strength and Agitation after an attack.
+
+A survivor's perk aimed at something on the map (a path, a prop, a survivor, a room) is **armed
+first** in the side panel (`perksToPick` in `boardActions.ts`): its targets show on the map only
+after "ใช้ [perk]" is pressed, offered or as a button, even when it is the only one. Sprint
+Burst's paths and For the People's generator look just like an ordinary move or repair, and
+players clicking them by habit used the perk by mistake. Usable perks glow and pulse until one is
+armed. The killer's offers still put their targets on the map at once.
 
 Next: the other killers and survivors, Devout / Bloodweb perk choice, the other boards (each
 needs its graph in `boards.ts`), the 2-player rule, then bots from the automated rules.

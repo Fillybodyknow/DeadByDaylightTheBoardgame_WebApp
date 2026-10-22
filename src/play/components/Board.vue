@@ -17,6 +17,8 @@ import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
 import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini } from '../labels'
 import Mini from './Mini.vue'
+import PingLayer from './PingLayer.vue'
+import { canPing, pingArmed, sendPing, shownPings } from '../pings'
 import WoundRing from './WoundRing.vue'
 import BpText from '../../components/BpText.vue'
 
@@ -539,12 +541,20 @@ function guard(e: MouseEvent) {
     e.stopImmediatePropagation()
     e.preventDefault()
     pressed = false
+    return
+  }
+  // a ping (the 📍 button, or Alt+click): it marks the spot and does nothing else
+  if (canPing.value && (pingArmed.value || e.altKey) && boardEl.value) {
+    e.stopImmediatePropagation()
+    e.preventDefault()
+    const r = boardEl.value.getBoundingClientRect()
+    sendPing((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height)
   }
 }
 </script>
 
 <template>
-  <div ref="boardEl" class="board" :class="{ shake: shaking }" :style="{ aspectRatio: String(board.aspect) }" @click.capture="guard">
+  <div ref="boardEl" class="board" :class="{ shake: shaking, pinging: pingArmed && canPing }" :style="{ aspectRatio: String(board.aspect) }" @click.capture="guard">
     <img class="map" :src="asset(board.image)" :alt="board.name" draggable="false" />
 
     <component
@@ -716,6 +726,7 @@ function guard(e: MouseEvent) {
       <template v-if="f.kind === 'spikes'"><i v-for="n in 7" :key="n" :style="{ '--n': n }" /></template>
       <template v-if="f.kind === 'debris'"><i v-for="n in 8" :key="n" :style="{ '--n': n }" /></template>
     </div>
+    <PingLayer v-if="canPing || shownPings.length" />
   </div>
 </template>
 
@@ -728,6 +739,11 @@ function guard(e: MouseEvent) {
   container-type: inline-size;
   user-select: none;
   -webkit-touch-callout: none;
+}
+/* the 📍 button is on: any click on the map is a ping */
+.board.pinging,
+.board.pinging * {
+  cursor: crosshair !important;
 }
 .board.shake {
   animation: shake 0.42s ease-in-out;

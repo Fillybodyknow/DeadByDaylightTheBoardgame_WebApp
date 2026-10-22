@@ -4,6 +4,7 @@
 //          rooms/<code>/game   { rev, json }               checkpoint: the state after `rev` moves
 //          rooms/<code>/moves  { m000001: json, … }        one action each, played in key order
 //          rooms/<code>/log    { r1: json, r2: json, … }  log of finished rounds (see logArchive.ts)
+//          rooms/<code>/pings  { <client id>: { x, y, at, n } }  each member's last ping
 //
 // A move is written to its own numbered slot, and every device replays the moves on top of the
 // checkpoint to get the same game (see transport.ts). That keeps a move at a few hundred bytes
@@ -20,11 +21,11 @@
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { get, getDatabase, onChildAdded, onValue, ref, runTransaction, set, update, type Database } from 'firebase/database'
+import { get, getDatabase, onChildAdded, onValue, ref, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
 import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
-import type { Backend, Room, RoomData, RoomListing } from './transport'
+import type { Backend, Ping, Room, RoomData, RoomListing } from './transport'
 import { CHECKPOINT_EVERY, emptyRoom, moveKey, normalizeRoom } from './transport'
 
 const env = import.meta.env
@@ -295,13 +296,37 @@ class FirebaseRoom implements Room {
     }, delay)
   }
 
+  // ----- pings: one slot per member, overwritten by their next one -----
+  // The server's time in `at` lets the database rules refuse a member pinging more than once a
+  // second, whatever their device does. `n` tells one ping from the next.
+
+  async ping(p: Ping) {
+    await set(this.path(`/pings/${p.from}`), { x: p.x, y: p.y, at: serverTimestamp(), n: Math.random().toString(36).slice(2, 10) })
+  }
+
+  onPings(cb: (p: Ping) => void) {
+    // the first snapshot holds the pings from before: only what changes after it is new
+    let seen: Record<string, string> | null = null
+    const off = onValue(this.path('/pings'), (snap) => {
+      const all = (snap.val() as Record<string, { x: number; y: number; n: string }> | null) ?? {}
+      const prev = seen
+      seen = {}
+      for (const [from, p] of Object.entries(all)) {
+        seen[from] = p.n
+        if (prev && prev[from] !== p.n) cb({ from, x: p.x, y: p.y })
+      }
+    })
+    this.unsubs.push(off)
+    return off
+  }
+
   onConnection(cb: (up: boolean) => void) {
     const off = onValue(ref(database(), '.info/connected'), (snap) => cb(snap.val() === true))
     this.unsubs.push(off)
     return off
   }
   async resetGame() {
-    await update(this.path(), { game: null, log: null, moves: null })
+    await update(this.path(), { game: null, log: null, moves: null, pings: null })
   }
 
   async updateRoom(fn: (cur: RoomData) => RoomData | null): Promise<boolean> {

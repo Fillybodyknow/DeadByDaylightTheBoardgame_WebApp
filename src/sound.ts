@@ -185,6 +185,11 @@ export const sfx = {
     tone(1047, 0.35, { type: 'triangle', gain: 0.2, at: 0.14 })
     tone(1568, 0.6, { type: 'triangle', gain: 0.16, at: 0.28 })
   },
+  /** A ping on the map: two quick high blips, light enough to hear often. */
+  ping() {
+    tone(1319, 0.08, { type: 'sine', gain: 0.14 })
+    tone(1760, 0.14, { type: 'sine', gain: 0.11, at: 0.08 })
+  },
   /** A reel or die face flicking past. */
   tick() {
     noise(0.025, { freq: 3500, q: 4, gain: 0.25 })

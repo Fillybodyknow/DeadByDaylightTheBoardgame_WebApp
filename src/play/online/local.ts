@@ -6,7 +6,7 @@
 
 import { tryApply } from '../engine/engine'
 import type { Action, GameState } from '../engine/types'
-import type { Backend, Room, RoomData, RoomListing } from './transport'
+import type { Backend, Ping, Room, RoomData, RoomListing } from './transport'
 import { CHECKPOINT_EVERY, emptyRoom, normalizeRoom } from './transport'
 
 const DB = 'dbdl-rooms'
@@ -141,12 +141,36 @@ class LocalRoom implements Room {
     })
   }
 
+  // Pings go round the tabs on a channel of their own and are never stored.
+  private pingChannel: BroadcastChannel | null = null
+  private pingListeners = new Set<(p: Ping) => void>()
+
+  private pings(): BroadcastChannel {
+    if (!this.pingChannel) {
+      this.pingChannel = new BroadcastChannel(`${DB}-${this.code}-pings`)
+      this.pingChannel.onmessage = (e: MessageEvent<Ping>) => this.pingListeners.forEach((cb) => cb(e.data))
+    }
+    return this.pingChannel
+  }
+
+  async ping(p: Ping) {
+    this.pings().postMessage({ from: p.from, x: p.x, y: p.y })
+  }
+
+  onPings(cb: (p: Ping) => void) {
+    this.pings()
+    this.pingListeners.add(cb)
+    return () => void this.pingListeners.delete(cb)
+  }
+
   private closed = false
 
   close() {
     this.closed = true
     this.listeners.clear()
     this.channel.close()
+    this.pingListeners.clear()
+    this.pingChannel?.close()
   }
 }
 

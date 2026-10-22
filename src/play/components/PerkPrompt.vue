@@ -59,8 +59,10 @@ function choosePerk(perk: PerkId) {
 const activePerk = computed<PerkId | null>(() => {
   const s = step.value
   if (s.t !== 'offer') return null
-  return offeredPerks(s).length > 1 ? perkPicked.value : s.perk
+  return pickPerk.value ? perkPicked.value : s.perk
 })
+/** A single survivor perk aimed on the map, waiting to be armed with its button first. */
+const armOffer = computed(() => step.value.t === 'offer' && offerList.value.length === 1 && pickPerk.value)
 
 const offerChoices = computed(() => {
   const s = step.value
@@ -187,7 +189,7 @@ function confirmPurge() {
 }
 
 /** Killer perks moving a survivor along a path: the survivor first, then the path. */
-const movesSomeone = computed(() => step.value.t === 'offer' && ['dark_devotion', 'infectious_fright', 'exponential'].includes(step.value.perk))
+const movesSomeone = computed(() => step.value.t === 'offer' && !!activePerk.value && ['dark_devotion', 'infectious_fright', 'exponential'].includes(step.value.perk))
 const moveTargets = computed(() => (movesSomeone.value ? [...new Set(offerChoices.value.map((c) => c.target!))] : []))
 const moveWho = ref<number | null>(null)
 watch(
@@ -459,10 +461,12 @@ const cost = (p: PerkId) => (PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี
 /** How many of this decision's choices are on the board (for the hint). */
 const boardCount = computed(() => {
   const s = step.value
+  // nothing armed yet: nothing on the map
+  if (pickPerk.value && !perkPicked.value) return 0
   if (isOppression.value) return offerChoices.value.filter((c) => !c.prop2).length
-  if (s.t === 'offer') return offerList.value.reduce((n, o) => n + o.choices.filter((c) => !here(perkAct(o.perk, c))).length, 0)
+  if (s.t === 'offer') return offerList.value.reduce((n, o) => n + (pickPerk.value && perkPicked.value !== o.perk ? 0 : o.choices.filter((c) => !here(perkAct(o.perk, c))).length), 0)
   // Breakout's own hint says to use the board, so it isn't counted here
-  if (s.t === 'turnStart') return buttons.value.reduce((n, b) => n + (b.perk === 'breakout' ? 0 : b.choices.filter((c) => !here(perkAct(b.perk, c))).length), 0)
+  if (s.t === 'turnStart') return buttons.value.reduce((n, b) => n + (b.perk === 'breakout' || !perkOpen(b.perk) ? 0 : b.choices.filter((c) => !here(perkAct(b.perk, c))).length), 0)
   if (s.t === 'phantasmChoice') return [...hagMoves.value.map((i) => ({ t: 'phantasm', teleport: true, i }) as Action), { t: 'phantasm', teleport: true } as Action].filter((a) => !here(a)).length
   return 0
 })
@@ -559,6 +563,12 @@ const boardCount = computed(() => {
             <p class="text"><BpText :text="perkText(step.perk)" /></p>
           </div>
         </div>
+        <!-- a survivor perk aimed on the map: armed here first, so a path or a generator clicked by
+             habit is an ordinary move, not this perk -->
+        <button v-if="armOffer" type="button" class="arm" :class="{ on: perkPicked === step.perk }" :aria-pressed="perkPicked === step.perk" @click="choosePerk(step.perk)">
+          <template v-if="perkPicked === step.perk">🎯 เลือกเป้าหมายบนแผนที่ — กดอีกครั้งเพื่อยกเลิก</template>
+          <template v-else>⚡ ใช้ {{ PERKS[step.perk].name }} <span class="arm-sub">กดก่อน แล้วเลือกเป้าหมายบนแผนที่</span></template>
+        </button>
         <!-- Tinkerer: the planned cards, then the hand -->
         <div v-if="isTinkerer" class="tinker">
           <p class="tinker-step">1. เลือกการ์ดที่วางไว้ที่จะเปลี่ยน</p>
@@ -1064,6 +1074,51 @@ header {
 }
 .perk.boxed.dim {
   opacity: 0.5;
+}
+/* nothing armed yet: the perks that can be used now glow and pulse, so a player sees they are buttons */
+.perk.boxed.pickable:not(.picked):not(.dim) {
+  border-color: #c9a2ff;
+  animation: perk-ready 1.8s ease-in-out infinite;
+}
+.arm {
+  display: block;
+  width: 100%;
+  margin: 0.6rem 0 0.2rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  border: 2px solid #c9a2ff;
+  background: rgb(120 70 200 / 0.28);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  text-align: left;
+  cursor: pointer;
+  animation: perk-ready 1.8s ease-in-out infinite;
+}
+.arm-sub {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #e6dcff;
+}
+.arm.on {
+  border-color: #ffe9b0;
+  background: rgb(255 214 140 / 0.14);
+  color: #ffe9b0;
+  animation: none;
+  box-shadow: 0 0 14px rgb(255 214 140 / 0.45);
+}
+@keyframes perk-ready {
+  50% {
+    box-shadow: 0 0 16px rgb(190 140 255 / 0.75);
+    border-color: #ffe9b0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .perk.boxed.pickable,
+  .arm {
+    animation: none !important;
+  }
 }
 .perk.boxed {
   padding: 0.6rem;

@@ -15,6 +15,7 @@ import type { PerkId } from '../engine/perks'
 import { game, online, receive, restoreLocal } from '../game'
 import { firebaseBackend, firebaseConfigured } from './firebase'
 import { localBackend } from './local'
+import { PING_COLORS, freeColor, memberColors } from './pingColors'
 import { settingsOf, playableKillers, playableSurvivors, type RoomSettings } from './settings'
 import { clientId, newRoomCode, type Backend, type Room, type RoomData, type RoomListing, type Side } from './transport'
 
@@ -175,9 +176,29 @@ function join(name: string) {
       ...cur,
       members: {
         ...cur.members,
-        [session.me]: { name: name || old?.name || 'ผู้เล่น', side: old?.side ?? null, ready: old?.ready ?? false, joinedAt: old?.joinedAt ?? Date.now() },
+        [session.me]: {
+          name: name || old?.name || 'ผู้เล่น',
+          side: old?.side ?? null,
+          ready: old?.ready ?? false,
+          joinedAt: old?.joinedAt ?? Date.now(),
+          color: old?.color ?? freeColor(cur.members),
+        },
       },
     }
+  })
+}
+
+/** Every member's ping colour (pingColors.ts), by client id. */
+export const pingColors = computed(() => memberColors(session.data?.members ?? {}))
+
+/** Take a ping colour; refused when someone else in the room holds it. */
+export function setPingColor(color: string) {
+  return update((cur) => {
+    const mine = cur.members[session.me]
+    if (!mine || !PING_COLORS.some((c) => c.id === color)) return null
+    const held = memberColors(cur.members)
+    if (Object.entries(held).some(([id, c]) => id !== session.me && c === color)) return null
+    return { ...cur, members: { ...cur.members, [session.me]: { ...mine, color } } }
   })
 }
 

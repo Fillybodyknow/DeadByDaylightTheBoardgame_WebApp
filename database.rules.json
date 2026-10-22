@@ -29,6 +29,11 @@
             ".validate": "$move.matches(/^m[0-9]{6}$/) && newData.isString() && newData.val().length < 20000"
           }
         },
+        "pings": {
+          "$member": {
+            ".validate": "newData.hasChildren(['x', 'y', 'at', 'n']) && newData.child('x').isNumber() && newData.child('x').val() >= 0 && newData.child('x').val() <= 1 && newData.child('y').isNumber() && newData.child('y').val() >= 0 && newData.child('y').val() <= 1 && newData.child('n').isString() && newData.child('n').val().length <= 16 && newData.child('at').val() == now && (!data.exists() || now - data.child('at').val() >= 1000)"
+          }
+        },
         "$other": {
           ".validate": false
         }

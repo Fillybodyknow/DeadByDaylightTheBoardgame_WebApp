@@ -385,7 +385,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         }
         break
       }
-      // several at once: the one picked in the panel (none yet: nothing on the board)
+      // several at once, or a survivor's perk aimed on the map: the one armed in the panel (none
+      // yet: nothing on the board)
       const perk = perksToPick(st) ? perkPicked.value : s.perk
       if (!perk) break
       // Dark Devotion, Infectious Fright, Exponential move a survivor: who first, then the path (as
@@ -588,16 +589,24 @@ function hookSpot(st: GameState, add: (key: SpotKey, label: string, run: () => v
  */
 export const perkPicked = ref<PerkId | null>(null)
 
+/** A perk choice made by clicking the map (a path, a prop, a survivor, a room), not a card or a button. */
+const onMap = (c: PerkChoice) => !c.card && (!!c.path || !!c.prop || c.target !== undefined || !!c.room)
+
 /**
- * A perk has to be picked before its targets show: at the start of a turn with more than one, and
- * in the interact step with any (they would mix with the ordinary interactions on the board).
+ * A perk has to be picked (armed) in the panel before its targets show: with several offered at
+ * once, and for any survivor perk with targets on the map — at the start of a turn, in the
+ * interact step, or offered at its moment. Its paths and generators look just like an ordinary
+ * move or repair, so a player clicking one by habit set off Sprint Burst or For the People.
  */
 export function perksToPick(st: GameState): boolean {
   const s = st.step
-  // several perks of one owner offered at the same moment (p.16)
-  if (s.t === 'offer') return offeredPerks(s).length > 1
+  if (s.t === 'offer') {
+    // several perks of one owner offered at the same moment (p.16)
+    if (offeredPerks(s).length > 1) return true
+    return s.owner !== 'killer' && perkChoices(st, s.perk, s.owner, s.w).some(onMap)
+  }
   const n = new Set(perkButtons(st).map((b) => b.perk)).size
-  return (s.t === 'turnStart' && n > 1) || ((s.t === 'survivorInteract' || s.t === 'killerInteract') && n > 0)
+  return (s.t === 'turnStart' || s.t === 'survivorInteract' || s.t === 'killerInteract') && n > 0
 }
 
 function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {

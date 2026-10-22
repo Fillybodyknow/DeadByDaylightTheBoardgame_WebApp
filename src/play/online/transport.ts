@@ -30,6 +30,19 @@ export interface Member {
   joinedAt: number
   /** The game is over and this member went back to the lobby (waiting for the others). */
   back?: boolean
+  /** Their pings' colour (pingColors.ts), unique in the room; unset: the first one free. */
+  color?: string
+}
+
+/**
+ * A ping: someone pointing at a spot on the map, as fractions of the board's width and height.
+ * Pings are not part of the game: they go round the room once and are never replayed.
+ */
+export interface Ping {
+  /** Client id of whoever pinged. */
+  from: string
+  x: number
+  y: number
 }
 
 /**
@@ -110,6 +123,13 @@ export interface Room {
   resetGame(): Promise<void>
   /** Atomically update the rest of the room (lobby, seats, picks). */
   updateRoom(fn: (cur: RoomData) => RoomData | null): Promise<boolean>
+  /** Send a ping to everyone in the room. */
+  ping?(p: Ping): Promise<void>
+  /**
+   * Pings as they come (none of those sent before subscribing); this device's own may come back
+   * too, so the caller drops them. Returns an unsubscribe.
+   */
+  onPings?(cb: (p: Ping) => void): () => void
   /** Whether this device is connected to the room's server (a backend without one is always). */
   onConnection?(cb: (up: boolean) => void): () => void
   close(): void
