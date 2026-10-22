@@ -144,6 +144,10 @@ function enter(room: Room) {
       session.kicked = code
       return
     }
+    // A room whose host is no longer in it (they left before hosts were handed on): the member who
+    // joined first takes it, so someone keeps the board's listing and can start the game.
+    if (!data.members[data.host] && nextHost(data.members) === session.me)
+      void room.updateRoom((cur) => (cur.members[cur.host] || nextHost(cur.members) !== session.me ? null : { ...cur, host: session.me }))
     if (data.host === session.me) publish(room.code, data)
     // Mirror the room's game. A device without a seat watches (seat 0 may not act).
     online.value = data.game ? { room, seat: mySeat.value ?? 0, latest: () => toRaw(session.data)?.game ?? null } : null
@@ -262,12 +266,25 @@ export function leaveRoom() {
   // the last one out of a lobby closes the room: its data goes with it, not left on the server
   const lastOut = !!room && !!d && d.phase === 'lobby' && !d.game && Object.keys(d.members).every((id) => id === session.me)
   // In the lobby, leaving frees the place; once seated, the member stays so they can come back.
-  if (room && !lastOut && d?.phase === 'lobby' && !d.game)
-    void room.updateRoom((cur) => {
-      const members = { ...cur.members }
-      delete members[session.me]
-      return { ...cur, members }
-    })
+  // The host leaving hands the room to whoever joined first, and puts the listing right on the
+  // board (the new host's device keeps it from then on).
+  if (room && !lastOut && d?.phase === 'lobby' && !d.game) {
+    let after: RoomData | null = null
+    void room
+      .updateRoom((cur) => {
+        const members = { ...cur.members }
+        delete members[session.me]
+        const host = cur.host === session.me ? (nextHost(members) ?? cur.host) : cur.host
+        return (after = { ...cur, members, host })
+      })
+      .then(() => {
+        if (after && d.host === session.me) {
+          published = ''
+          publish(room.code, after)
+        }
+      })
+      .catch(() => {})
+  }
   unsubscribe?.()
   unsubscribe = null
   unwatchConnection?.()
@@ -280,6 +297,12 @@ export function leaveRoom() {
   session.data = null
   remember(null)
   restoreLocal()
+}
+
+/** Who takes over as host: the member in the room longest. */
+function nextHost(members: RoomData['members']): string | null {
+  const left = Object.entries(members).sort((a, b) => a[1].joinedAt - b[1].joinedAt)
+  return left[0]?.[0] ?? null
 }
 
 // ---------- the room board ----------

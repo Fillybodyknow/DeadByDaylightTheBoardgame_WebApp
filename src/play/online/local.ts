@@ -99,10 +99,15 @@ class LocalRoom implements Room {
 
   private async write(fn: (cur: StoredRoom) => StoredRoom | null): Promise<boolean> {
     const ok = await modify(this.code, (cur) => (cur ? fn(cur) : null))
-    // a write still finishing as the room is left (leaving writes, then closes): nobody to tell
     if (ok && !this.closed) {
       this.channel.postMessage('changed')
       await this.notify()
+    } else if (ok) {
+      // a write landing after the room was left (leaving writes, then closes): the other tabs still
+      // hear of it, on a channel of its own (this one is closed); there is no one here to tell
+      const ch = new BroadcastChannel(`${DB}-${this.code}`)
+      ch.postMessage('changed')
+      ch.close()
     }
     return ok
   }

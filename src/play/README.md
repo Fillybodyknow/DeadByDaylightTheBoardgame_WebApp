@@ -77,7 +77,9 @@ and the host starts the game.
   and the device then goes to the killer, behind the hand-off curtain.
 - **The room board** (`#/online`): open rooms are listed under `roomIndex/<code>` (name, host,
   members, phase, locked), apart from the rooms, which are still only read with their code. The
-  host's device keeps the listing current on every change, and every device in the room touches
+  host's device keeps the listing current on every change (a host leaving the lobby hands the room
+  to the member who joined first, and puts the new count on the board as it goes; a room left
+  without its host, from before, is taken over the same way by that member's device), and every device in the room touches
   its `updatedAt` every 4 minutes (a heartbeat); listings quiet for 15 minutes aren't shown.
   **Clearing stale rooms:** the listing is never removed when a device disconnects — it is how a
   forgotten room is found. The last one out of a lobby deletes the whole room (data and listing),
