@@ -9,7 +9,7 @@ import { perkCard, perkImage, perkText } from '../labels'
 import type { Action, GameState, MoveCard, PerkWindow, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
-const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah', 'haddie', 'mikaela', 'vittorio']
+const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah', 'haddie', 'mikaela', 'vittorio', 'renato', 'thalita']
 const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant']
 
 function game(killer = 'trapper', seed = 1): GameState {
@@ -52,7 +52,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(158)
+    expect(Object.keys(PERKS)).toHaveLength(164)
     // the cards that are on no board: their name, cost and text come from the deck data instead
     for (const p of DECK_PERKS) {
       expect(PERKS[p].character, p).toBe('')
@@ -419,7 +419,7 @@ describe('perks', () => {
         const eager = options.filter(
           (a: Action) =>
             (a.t === 'perk' && a.use) ||
-            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'droneTake', 'droneDrop', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp', 'search'].includes(a.i.k)) ||
+            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'droneTake', 'droneDrop', 'partner', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp', 'search'].includes(a.i.k)) ||
             (a.t === 'useItem') ||
             // Game Afoot's moment is an attack on a bonus turn: that killer takes both when he can
             (only === 'game_afoot' && (a.t === 'bonus' || (a.t === 'interact' && a.i.k === 'attack'))),
@@ -2264,6 +2264,122 @@ describe('Vittorio Toscano', () => {
     for (let n = 0; n < 6 && g.step.t === 'revealProp'; n++) g = apply(g, legalActions(g)[0])
     expect(g.survivors[0].room).toBe(m.to)
     expect(g.killer.room).toBe(m.to)
+  })
+})
+
+describe('Renato and Thalita Lyra', () => {
+  /** Renato is survivor 0, Thalita survivor 1, Meg 2 (Jake 3); Meg's turn, about to interact. */
+  function lyras(...perks: PerkId[]) {
+    let g = createGame({ board: 'macmillan', survivors: ['renato', 'thalita', 'meg', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (g.step.t === 'setupReveal') g = apply(g, legalActions(g)[0])
+    only(g, ...perks)
+    g.survivors.forEach((sv) => Object.assign(sv, { status: 'board', wounded: false, room: 'shack' }))
+    g.killer.room = 'backlot'
+    g.phase = 'survivors'
+    g.activeSurvivor = 2
+    g.step = { t: 'survivorInteract', s: 2, canInteract: true }
+    g.queue = [{ k: 'endSurvivorTurn', s: 2 }]
+    return g
+  }
+
+  it('Collective Stealth: Meg interacts with Renato; he moves along any path, then she does', () => {
+    const st = lyras('collective_stealth')
+    const i = { k: 'partner', target: 0, perk: 'collective_stealth' } as const
+    expect(survivorInteractions(st, 2)).toContainEqual(i)
+    // not with himself, and not once it is used this round
+    expect(survivorInteractions(st, 0).some((x) => x.k === 'partner')).toBe(false)
+    let g = apply(st, { t: 'interact', i })
+    expect(g.perksUsed).toContain('0:collective_stealth')
+    expect(g.step).toMatchObject({ t: 'anyMove', s: 0, why: 'collective' })
+    const m0 = anyMoves(g, 0)[0]
+    g = apply(g, { t: 'move', path: m0.path.id })
+    for (let n = 0; n < 6 && g.step.t === 'revealProp'; n++) g = apply(g, legalActions(g)[0])
+    expect(g.survivors[0].room).toBe(m0.to)
+    expect(g.step).toMatchObject({ t: 'anyMove', s: 2, why: 'collective' })
+    g = apply(g, { t: 'stop' })
+    expect(g.survivors[2].room).toBe('shack')
+    expect(survivorInteractions({ ...g, step: { t: 'survivorInteract', s: 3, canInteract: true } }, 3).some((x) => x.k === 'partner')).toBe(false)
+  })
+
+  it('Power of Two: Meg interacts with Thalita; the killer gains a ▲ and Meg takes a bonus turn', () => {
+    const st = lyras('power_of_two')
+    const bp = st.killer.bp
+    const g = apply(st, { t: 'interact', i: { k: 'partner', target: 1, perk: 'power_of_two' } })
+    expect(g.killer.bp).toBe(bp + 1)
+    expect(g.step).toMatchObject({ t: 'bonusOffer', s: 2, why: 'power_of_two' })
+  })
+
+  it('Background Player: at the end of his turn, with someone hooked, a bonus turn', () => {
+    const st = lyras('background_player')
+    const w = { k: 'turnEnd', s: 0 } as const
+    expect(perkChoices(st, 'background_player', 0, w)).toEqual([])
+    const hook = placeProp(st, 'hook', 'backlot')
+    Object.assign(st.survivors[3], { status: 'hooked', room: 'backlot' })
+    hook.occupant = 3
+    const choices = perkChoices(st, 'background_player', 0, w)
+    expect(choices.length).toBeGreaterThan(0)
+    st.activeSurvivor = 0
+    st.step = { t: 'offer', perk: 'background_player', owner: 0, w }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const g = apply(st, { t: 'perk', perk: 'background_player', use: true, choice: choices[0] })
+    expect(g.survivorHands[g.survivors[0].hand]).not.toContain(choices[0].card)
+    expect(g.survivors[0].bp).toBe(st.survivors[0].bp - 2)
+    // the end of a bonus turn asks too (a house rule)
+    expect(g.queue).toContainEqual({ k: 'trigger', w: { k: 'bonusEnd', s: 0 }, done: [] })
+    expect(perkChoices({ ...st, perksUsed: [] }, 'background_player', 0, { k: 'bonusEnd', s: 0 }).length).toBeGreaterThan(0)
+  })
+
+  it('Blood Rush: with no sacrifice progress on his board, a bonus turn, and the progress goes on it', () => {
+    const st = lyras('blood_rush')
+    const w = { k: 'turnEnd', s: 0 } as const
+    expect(perkChoices(st, 'blood_rush', 0, w)).toEqual([])
+    st.survivors[0].sacrificeToken = false
+    const choices = perkChoices(st, 'blood_rush', 0, w)
+    expect(choices.length).toBeGreaterThan(0)
+    st.activeSurvivor = 0
+    st.step = { t: 'offer', perk: 'blood_rush', owner: 0, w }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const g = apply(st, { t: 'perk', perk: 'blood_rush', use: true, choice: choices[0] })
+    expect(g.survivors[0].sacrificeToken).toBe(true)
+    expect(g.survivorHands[g.survivors[0].hand]).not.toContain(choices[0].card)
+  })
+
+  it('Friendly Competition: after her repair of a generator someone else worked on this round, +1', () => {
+    const st = lyras('friendly_competition')
+    const gen = placeProp(st, 'generator', 'shack')
+    gen.progress = 0
+    const w = { k: 'repairFail', s: 1, prop: gen.id } as const
+    expect(perkChoices({ ...st, genBy: { [gen.id]: [1] } }, 'friendly_competition', 1, w)).toEqual([])
+    st.genBy = { [gen.id]: [2, 1] }
+    expect(perkChoices(st, 'friendly_competition', 1, w)).toEqual([{}])
+    st.step = { t: 'offer', perk: 'friendly_competition', owner: 1, w }
+    const g = apply(st, { t: 'perk', perk: 'friendly_competition', use: true, choice: {} })
+    expect(g.props.find((p) => p.id === gen.id)!.progress).toBe(1)
+    // a repair is remembered for the round
+    const r = apply({ ...structuredClone(st), step: { t: 'survivorInteract', s: 2, canInteract: true } }, { t: 'interact', i: { k: 'repair', prop: gen.id } })
+    expect(r.genBy?.[gen.id]).toContain(2)
+  })
+
+  it('Cut Loose: her planned Vault is played as Sneak, Crouch or Sprint', () => {
+    const st = lyras('cut_loose')
+    const sv = st.survivors[1]
+    const hand = st.survivorHands[sv.hand]
+    hand.splice(hand.indexOf('vault'), 1)
+    Object.assign(sv, { planned: 'vault', plannedRevealed: false, acted: false })
+    Object.assign(sv, { plannedRevealed: true, acted: true })
+    st.activeSurvivor = 1
+    // her turn has begun: the planned card's move comes next
+    st.step = { t: 'turnStart', s: 1 }
+    st.queue = [{ k: 'cardMove', s: 1, card: 'vault', planned: true }, { k: 'survivorInteract', s: 1 }, { k: 'endSurvivorTurn', s: 1 }]
+    let g = apply(st, { t: 'continue' })
+    expect(g.step).toMatchObject({ t: 'offer', perk: 'cut_loose', owner: 1 })
+    // the colours that can move from her room
+    const open = (['sneak', 'crouch', 'sprint'] as const).filter((c) => survivorMoves(g, 1, c).length)
+    expect(perkChoices(g, 'cut_loose', 1, (g.step as { w: PerkWindow }).w).map((c) => c.card)).toEqual(open)
+    g = apply(g, { t: 'perk', perk: 'cut_loose', use: true, choice: { card: open[0] } })
+    expect(g.step).toMatchObject({ t: 'survivorMove', s: 1, card: open[0] })
+    // a bonus turn's Vault is not her planned card
+    expect(perkChoices(g, 'cut_loose', 1, { k: 'cardMove', s: 1, card: 'vault' })).toEqual([])
   })
 })
 

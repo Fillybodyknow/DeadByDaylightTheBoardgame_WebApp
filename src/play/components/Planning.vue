@@ -11,7 +11,7 @@ import { CARD_NAMES, directRoom, isDirect, isPathCard, killerMoves, roomName, tu
 import { KILLER_PLAYER, handsToPlan } from '../engine/seats'
 import type { GameState, MoveCard } from '../engine/types'
 import { choicePreview, preview } from '../focus'
-import { dispatch, online } from '../game'
+import { dispatch, online, tutorial } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, cardImage, cardLabel, killerMini, playerOf, survivorMini } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
@@ -65,11 +65,12 @@ function confirmStridor() {
   }
 }
 
-// Online every player has their own screen, so there is no curtain to pass behind.
-const curtainOpen = ref(!!online.value)
+// Online every player has their own screen, so there is no curtain to pass behind; nor in a
+// tutorial, which plays the killer itself.
+const curtainOpen = ref(!!online.value || !!tutorial.value)
 watch(
   () => props.st.step.t,
-  () => (curtainOpen.value = !!online.value),
+  () => (curtainOpen.value = !!online.value || !!tutorial.value),
 )
 
 function hover(card: MoveCard | null, owner: number | 'killer') {

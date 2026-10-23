@@ -530,6 +530,10 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>Afterpiece Antidote</b> — <b>{{ st.survivors[step.s].name }}</b> เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
       </p>
       <p v-else-if="step.why === 'deadHard'"><b>Dead Hard!</b> <b>{{ st.survivors[step.s].name }}</b> หลุดจากการแบก — ต้องเดินไปตามเส้นทางใดก็ได้ 1 ครั้ง</p>
+      <p v-else-if="step.why === 'collective'">
+        <b>Collective Stealth</b> — <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง หรือจะอยู่ห้องเดิมก็ได้
+        <span class="muted small">(Renato เดินก่อน แล้วคนที่ Interact กับเขาเดินต่อ)</span>
+      </p>
       <p v-else-if="step.why === 'spineChill'"><b>Spine Chill!</b> <b>{{ st.survivors[step.s].name }}</b> รู้ตัวทัน — ต้องเดินไปตามเส้นทางใดก็ได้ 1 ครั้งก่อนฆาตกร Interact</p>
       <p v-else>ช่วยลงจาก Hook แล้ว: <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง (หน้า 13) หรือจะอยู่ห้องเดิมก็ได้</p>
       <p class="muted small">{{ step.t === 'anyMove' && mustMove(step.why) ? 'คลิกเส้นทางบนแผนที่' : 'คลิกเส้นทางบนแผนที่ — คลิกห้องที่อยู่เพื่ออยู่ห้องเดิม' }}</p>
@@ -585,7 +589,10 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
     <!-- bonus turns -->
     <template v-else-if="step.t === 'bonusOffer' || step.t === 'killerBonusOffer'">
-      <p v-if="step.t === 'bonusOffer'">Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง (หน้า 9)</p>
+      <p v-if="step.t === 'bonusOffer' && step.why === 'power_of_two'">
+        <b>Power of Two</b> — {{ st.killer.name }} ได้ +1 ▲ แล้ว ตอนนี้ <b>{{ st.survivors[step.s].name }}</b> เล่น Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง
+      </p>
+      <p v-else-if="step.t === 'bonusOffer'">Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง (หน้า 9)</p>
       <p v-else>จ่าย {{ bonusCost(st) }} <BpIcon /> (มี {{ st.killer.bp }}) เพื่อเล่นเทิร์นที่ 3? (หน้า 10)</p>
       <p class="muted small">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทาง · คลิกเพื่อเลือก แล้วกดยืนยัน</p>
       <div class="buttons col">

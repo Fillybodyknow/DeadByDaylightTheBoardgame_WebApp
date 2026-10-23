@@ -6,8 +6,8 @@
 
 import { tryApply } from '../engine/engine'
 import type { Action, GameState } from '../engine/types'
-import type { Backend, Ping, Room, RoomData, RoomListing } from './transport'
-import { CHECKPOINT_EVERY, emptyRoom, normalizeRoom } from './transport'
+import type { Backend, ChatMessage, Ping, Room, RoomData, RoomListing } from './transport'
+import { CHAT_KEEP, CHECKPOINT_EVERY, emptyRoom, normalizeRoom } from './transport'
 
 const DB = 'dbdl-rooms'
 const STORE = 'rooms'
@@ -168,6 +168,57 @@ class LocalRoom implements Room {
     return () => void this.pingListeners.delete(cb)
   }
 
+  // Presence: tabs have no connection to lose, so closing one stands in for it (best effort: the
+  // write may not finish as the page goes).
+  private presenceOf: { member: string; mode: 'lobby' | 'game' } | null = null
+  private onHide = () => {
+    const p = this.presenceOf
+    if (!p) return
+    void this.write((cur) => {
+      const members = { ...cur.members }
+      if (p.mode === 'lobby') delete members[p.member]
+      return { ...cur, members, dropped: { ...(cur.dropped ?? {}), [p.member]: Date.now() } }
+    })
+  }
+
+  async presence(member: string, mode: 'lobby' | 'game' | null) {
+    this.presenceOf = mode ? { member, mode } : null
+    window.removeEventListener('pagehide', this.onHide)
+    if (mode) window.addEventListener('pagehide', this.onHide)
+  }
+
+  // The chat is a record of its own beside the room (so room writes never carry it), and a
+  // channel says when it changed.
+  private chatChannel: BroadcastChannel | null = null
+  private chatListeners = new Set<(m: ChatMessage[]) => void>()
+
+  private chats(): BroadcastChannel {
+    if (!this.chatChannel) {
+      this.chatChannel = new BroadcastChannel(`${DB}-${this.code}-chat`)
+      this.chatChannel.onmessage = () => void this.sendChat()
+    }
+    return this.chatChannel
+  }
+
+  private async sendChat() {
+    const list = await readChat(this.code)
+    this.chatListeners.forEach((cb) => cb(list))
+  }
+
+  async chat(m: { from: string; name: string; text: string }) {
+    const msg: ChatMessage = { ...m, id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, at: Date.now() }
+    await modify(chatKey(this.code), (cur) => [...((cur as unknown as ChatMessage[]) ?? []), msg].slice(-CHAT_KEEP) as unknown as StoredRoom)
+    this.chats().postMessage('changed')
+    void this.sendChat()
+  }
+
+  onChat(cb: (m: ChatMessage[]) => void) {
+    this.chats()
+    this.chatListeners.add(cb)
+    void readChat(this.code).then((list) => this.chatListeners.has(cb) && cb(list))
+    return () => void this.chatListeners.delete(cb)
+  }
+
   private closed = false
 
   close() {
@@ -176,6 +227,9 @@ class LocalRoom implements Room {
     this.channel.close()
     this.pingListeners.clear()
     this.pingChannel?.close()
+    this.chatListeners.clear()
+    this.chatChannel?.close()
+    window.removeEventListener('pagehide', this.onHide)
   }
 }
 
@@ -200,12 +254,25 @@ async function writeBoard(fn: (cur: Record<string, RoomListing>) => Record<strin
   ch.close()
 }
 
-/** Drop a room's record. */
+/** A room's chat record. */
+const chatKey = (code: string) => `${code}#chat`
+
+async function readChat(code: string): Promise<ChatMessage[]> {
+  const db = await open()
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE).objectStore(STORE).get(chatKey(code))
+    req.onsuccess = () => resolve((req.result as ChatMessage[] | undefined) ?? [])
+    req.onerror = () => reject(req.error)
+  })
+}
+
+/** Drop a room's record (and its chat). */
 async function destroy(code: string) {
   const db = await open()
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite')
     tx.objectStore(STORE).delete(code)
+    tx.objectStore(STORE).delete(chatKey(code))
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
   })

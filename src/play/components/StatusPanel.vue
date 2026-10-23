@@ -138,6 +138,9 @@ function peek(owner: number | 'killer' | null) {
   peeking.value = owner
 }
 
+/** A player's first tile (in turn order), where their chat bubbles point (ChatDock). */
+const firstOfPlayer = (s: number) => turnOrder(props.st).find((x) => playerOf(props.st, x) === playerOf(props.st, s)) === s
+
 // ---------- online: the characters this device plays ----------
 // Their tiles are highlighted, so a player finds their own at a glance.
 
@@ -187,7 +190,7 @@ function onPowerSlot() {
     <div id="rail-top" class="rail-slot" />
     <div class="tiles">
     <!-- killer -->
-    <div class="tile killer" :class="{ me: mine.includes('killer') }" role="button" tabindex="0" :title="`${st.killer.name} — ดูรายละเอียดตัวละคร`" @click="emit('inspect', { k: 'killer' })" @keydown.enter="emit('inspect', { k: 'killer' })">
+    <div class="tile killer" :class="{ me: mine.includes('killer') }" :data-chat-seat="KILLER_PLAYER" role="button" tabindex="0" :title="`${st.killer.name} — ดูรายละเอียดตัวละคร`" @click="emit('inspect', { k: 'killer' })" @keydown.enter="emit('inspect', { k: 'killer' })">
       <div class="head">
         <Mini class="mini aura-killer" :src="asset(killerMini(st))" :alt="st.killer.name" />
         <div class="names">
@@ -239,6 +242,7 @@ function onPowerSlot() {
       v-for="s in turnOrder(st)"
       :key="s"
       class="tile"
+      :data-chat-seat="firstOfPlayer(s) ? playerOf(st, s) : undefined"
       :class="{ active: st.activeSurvivor === s, hooked: st.survivors[s].status === 'hooked', wounded: st.survivors[s].wounded, me: mine.includes(s) }"
       role="button"
       tabindex="0"

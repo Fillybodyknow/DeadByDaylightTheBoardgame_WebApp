@@ -57,6 +57,7 @@ import {
 import { cardChoices, printedOf, takenBy } from '../engine/loadout'
 import type { PerkId } from '../engine/perks'
 import BanPicker from './BanPicker.vue'
+import ChatDock from './ChatDock.vue'
 import CharacterPicker from './CharacterPicker.vue'
 import StageBar from './StageBar.vue'
 import { PING_COLORS, pingHex } from '../online/pingColors'
@@ -736,6 +737,9 @@ const seatStatus = computed(() =>
     </template>
 
     <p v-if="session.error" class="error">{{ session.error }}</p>
+
+    <!-- the room's chat: beside the column on a wide screen, a 💬 button otherwise -->
+    <ChatDock mode="room" />
   </div>
 </template>
 

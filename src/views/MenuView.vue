@@ -36,6 +36,15 @@ const modes = computed(() => [
     resume: offlineGame.value ? `เล่นต่อ · รอบ ${offlineGame.value.round}` : '',
   },
   {
+    to: '/tutorial',
+    icon: '🕯️',
+    title: 'Tutorial',
+    sub: 'สอนเล่นทีละบท',
+    text: 'ไม่เคยเล่นมาก่อน? The Entity จะพาเล่นบนกระดานจริงทีละขั้น ตั้งแต่การเดินจนถึงการหนี',
+    image: 'assets/app/background-img/background_autohaven.webp',
+    resume: '',
+  },
+  {
     to: '/lobby',
     icon: '📋',
     title: 'Companion',

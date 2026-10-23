@@ -105,6 +105,34 @@ and the host starts the game.
   one slot each; local: a BroadcastChannel) and are never saved or replayed.
   **The database rules must be updated** (`pings`) for pings to reach the others on Firebase; the
   sender is told when the room refuses them.
+- **Chat** (`src/play/chat.ts`, `ChatPanel.vue`, `ChatDock.vue`): one channel for the whole room, in
+  the lobby and the game. Everyone reads every message, the killer too (p.8); a spectator may
+  write as well. In the lobby the panel sits beside the room's column on a screen 1760 px wide or
+  more, otherwise behind a 💬 button in the corner. In the game a 💬 tab under the side panel's
+  tab opens a drawer (Enter opens it ready to type, Escape closes it); its badge counts unread
+  messages. A new message shows for 6 s as a bubble beside its sender's first tile (StatusPanel
+  marks it `data-chat-seat`; the bubble is drawn by ChatDock, as the player column clips), a
+  spectator's as a line beside the tab. Ready-made lines for tablets. Messages are at most 200
+  characters; the room shows its latest 100. Spam: one message per 1.2 s and 5 in 10 s on the
+  device, and the rules refuse more than one a second per member (`chatAt/<id>`, written with
+  the message). Not moves: `Room.chat` / `onChat` (Firebase: `rooms/<code>/chat/<push id>`;
+  local: a record `<code>#chat` beside the room and a BroadcastChannel), never saved with the
+  game; the room's deletion takes the chat with it. **The database rules must be updated**
+  (`chat`, `chatAt`) for chat to work on Firebase.
+  Notices among the messages (not sent: each device reads them off the members as they change,
+  from the moment it entered; none about itself): someone joined, left, was kicked (`kicked`),
+  lost their connection or came back (`dropped`). The newest also shows beside the 💬 button
+  for a few seconds while the chat is closed.
+- **Presence** (`Room.presence`, `settle` in `session.ts`): Firebase's `onDisconnect` on the lobby
+  node. In the lobby a dropped connection (a closed tab, a lost network) takes the member out and
+  marks them in `dropped`, so a closed tab never keeps a place; from the picks on it only marks
+  them (their seat waits for them). The server forgets it once it has run: the device sets it
+  again after every reconnection, clears its own `dropped` mark, and if it was taken out of the
+  lobby, goes straight back in (only a member in `kicked` is sent to the entry page). Leaving
+  with the button cancels it. The local backend stands in with `pagehide` (best effort).
+  Back in the lobby after a game, members still marked `dropped` are let go (by any device there),
+  are never handed the host role, and don't keep the room alive: the last member left who is
+  connected leaving deletes it.
 - **Kicking:** in the lobby the host has a ✕ on every other seat and bench chip. The kicked
   device's id goes into `lobby.kicked`: it is sent back to the entry page with a notice, and
   `join` / `joinRoom` refuse it (also with the password). Everyone un-readies, as the table changed.
@@ -162,6 +190,34 @@ and the host starts the game.
   players leave and can rejoin with the same code; the seat is kept per device.
 - `?test` in the URL exposes the game to automated multi-player tests (`window.__dbdl`).
 
+## Tutorial
+
+`#/tutorial` (a card on the menu): the survivors' side taught a chapter at a time on the real board,
+The Entity speaking (`src/play/tutorial/`).
+
+- **A chapter** (`chapters.ts`) is a scene and its steps. The scene (`scene.ts`) is a real game on
+  MacMillan Estate laid out by hand: rooms, props face up or down, cards planned, the step to
+  start at; a roll the lesson needs is rigged by trying seeds (`rigged`). The learner plays survivor
+  0 (Dwight); the tutorial plays everyone else, the plainest move after a short pause
+  (`policy.ts`), and holds them still while The Entity explains.
+- **A step** says something (`**key words**` lit, pictures beside) and may point at something
+  (`spot`: a room, prop, path icon or any element). A step with a `task` asks for something on the
+  board: only the actions it allows go through (`tutorial.allow` in `game.ts`; anything else gets
+  its hint), and it ends when `done` holds. A step without one waits for "ถัดไป", the screen dimmed
+  round the spot. While dice, perk cards or the board are still playing, the guide waits.
+- The tutorial's game is never saved (the hot-seat save stays as it was), has no undo and no hand-off
+  curtains. Chapters finished are remembered per device (`dbdl-tutorial-done`).
+- `tutorial.test.ts` plays every chapter through as a learner doing what each step asks.
+- A step may also set a **new scene** as it begins (`setup`: the lesson moves on in time, e.g. to
+  the next round) or ask a **question** (`quiz`: only the right answer goes on; a wrong one is told
+  why). A scene change starts the game screen afresh (`run.scene` is its key).
+- A chapter may play the others its own way (`auto`): chapter 7's killer hunts the learner (into
+  their room, attack, pick up, carry to the hook).
+- The chapters: 1 the goal, 2 movement cards, 3 revealing props, 4 repairing and the skill check,
+  5 survival props (chest, locker, pallet), 6 crows, bonus turns and ▲ (a Hex Totem cleansed),
+  7 the killer arriving (wounded, carried, hung), 8 helping others (healing, a rescue), 9 escaping
+  (the fourth generator, the exit gate), 10 rules to know (a quiz). The killer's side is to come.
+
 ## Scope
 
 - Boards: **MacMillan Estate** (11 rooms, 22 paths), **Autohaven Wreckers** (10 rooms, 19 path
@@ -175,9 +231,9 @@ and the host starts the game.
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
   The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist, The Skull Merchant** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano, Renato Lyra, Thalita Lyra**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (123 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (129 perks).
 - The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
   the printed ones; 35 are on no board. All 35 are in the engine (`DECK_PERKS` in
   `engine/perks.ts`). A card-only perk has no character and no index: its
@@ -225,6 +281,10 @@ needs its graph in `boards.ts`), the 2-player rule, then bots from the automated
 
 ## House rules
 
+- Background Player, Blood Rush (Renato), Situational Awareness and Renewal are asked at the end of
+  a bonus turn too (from a crow, a perk, or one of these), not only of the survivor phase's turn
+  (the user's call): the owner's own for the first three, anyone's for Renewal. Each is still
+  once a round.
 - The Knight's Jailer, after a failed roll in its room (the survivor wounded), goes back onto his
   board instead of out of play (the user's call): his power or Face the Darkness may place it
   again, in his room or a connected one, as the other Guards.
@@ -535,6 +595,21 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Quick Gambit: asked when he would leave the killer's room by any move along a path; the killer
   follows along it after him, as Thrill of the Hunt (a pallet there: he breaks it and stays). Not
   while carrying someone, and only once per move (with Thrill of the Hunt too).
+- Collective Stealth (Renato) and Power of Two (Thalita): an interaction of another survivor on the
+  board in their room (clicked on Renato's or Thalita's mini, beside healing them), in place of any
+  other. The perk is theirs: once a round, and they must be on the board (not in a locker). Collective
+  Stealth: Renato moves along any path, then the survivor who interacted does; as after a rescue
+  (a house rule there), each may stay instead. Power of Two: the killer gains 1 ▲, then that survivor
+  takes a bonus turn (a card from their hand, as a crow's Sprint), or passes it up.
+- Background Player: asked at the end of Renato's own turn while someone is on a hook (being
+  sacrificed, p.15). Blood Rush: asked at the end of his turn with no sacrifice progress token on
+  his board (one used up by a hook); the token goes back on it, so his next hook adds to the track.
+  Either bonus turn is a card from his hand. Both are asked at the end of any of his turns, bonus
+  turns too (see House rules); each is still once a round.
+- Friendly Competition: asked after Thalita's own repair (success or failure) of a generator another
+  survivor repaired this round (any of their attempts, before hers), while it is still unfinished.
+- Cut Loose: asked when Thalita's card set in planning turns out to be Vault, as she is about to move
+  (not a bonus turn's Vault). Only the colours with a path she can take are offered.
 - Empathy: "a willing Survivor": the other survivor is asked (on their own device online) and
   answers yes or no. Only a yes uses the perk; after a no, Claudette may ask someone else, but
   not the same survivor again that round.
@@ -631,7 +706,8 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   turn with a card from their own hand (as Adrenaline's).
 - We'll Make It: asked after the owner's heal of another survivor succeeds; that survivor takes
   the bonus turn, with a card from their own hand, and the owner pays.
-- Renewal: asked at the end of a turn when the owner healed someone or was healed this round
+- Renewal: asked at the end of a turn (a bonus turn's too, see House rules) when the owner healed
+  someone or was healed this round
   (`healedWith`, cleared at cleanup); a bonus turn with a card from their hand.
 - Monstrous Shrine: works by itself when the killer hangs a survivor with nobody else on the
   board in that room (a survivor in a locker isn't there, p.12); +2 ▲.
@@ -649,7 +725,8 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
 - Inner Healing: a button at the start of the owner's turn while wounded (not with three Knives).
   It heals them with no roll and no help, so it counts as healing themselves: Renewal and
   We'll Make It don't answer it, A Nurse's Calling does (any heal).
-- Situational Awareness: asked at the end of the owner's own turn; the bonus turn is taken with
+- Situational Awareness: asked at the end of the owner's own turn (a bonus turn's too, see House
+  rules); the bonus turn is taken with
   a card from their hand, as every survivor bonus turn is.
 - Kinship: a button in place of the owner's interaction for the turn, on another survivor on the
   board in their room or a connected one who still has a card in hand. "After this one" is the

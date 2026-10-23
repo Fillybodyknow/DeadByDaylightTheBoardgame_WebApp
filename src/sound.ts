@@ -190,6 +190,11 @@ export const sfx = {
     tone(1319, 0.08, { type: 'sine', gain: 0.14 })
     tone(1760, 0.14, { type: 'sine', gain: 0.11, at: 0.08 })
   },
+  /** A chat message from someone else: one soft low blip, quieter than a ping. */
+  chat() {
+    tone(988, 0.1, { type: 'sine', gain: 0.09 })
+    tone(1319, 0.12, { type: 'sine', gain: 0.06, at: 0.06 })
+  },
   /** A reel or die face flicking past. */
   tick() {
     noise(0.025, { freq: 3500, q: 4, gain: 0.25 })

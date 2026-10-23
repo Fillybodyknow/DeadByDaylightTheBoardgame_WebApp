@@ -137,6 +137,12 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
       return 'ไล่ Crow (ฆาตกร +1 ▲, ได้ Bonus Turn)'
     case 'drone':
       return `ส่ง Drone กลับบอร์ดของ ${st.killer.name}`
+    case 'partner': {
+      const t = st.survivors[i.target].name
+      return i.perk === 'collective_stealth'
+        ? `Collective Stealth: Interact กับ ${t} — ${t} เดินก่อน แล้วคุณเดิน (เส้นทางใดก็ได้)`
+        : `Power of Two: Interact กับ ${t} — ฆาตกร +1 ▲ แล้วคุณได้ Bonus Turn`
+    }
     case 'dropPallet':
       return `ทิ้ง Pallet บนทาง ${iconLabel(st, i.path, room)}`
     case 'repair':
@@ -580,7 +586,16 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     case 'renewal':
     case 'situational_awareness':
     case 'no_one_escapes_death':
+    case 'background_player':
       return `Bonus Turn ด้วย ${CARD_NAMES[c.card!]}`
+    case 'blood_rush':
+      return `Bonus Turn ด้วย ${CARD_NAMES[c.card!]} แล้วรับ Sacrifice Progress บนบอร์ดคุณ`
+    case 'friendly_competition': {
+      const p = prop(st, (w as { prop: string }).prop)
+      return `Generator ที่ ${roomName(st, p.room!)} +1 (${p.progress}/${PROGRESS_MAX} → ${Math.min(PROGRESS_MAX, p.progress + 1)})`
+    }
+    case 'cut_loose':
+      return `ใช้ Vault เป็น ${CARD_NAMES[c.card!]}`
     case 'well_make_it':
       return `ให้ ${name((w as { s: number }).s)} เล่น Bonus Turn ด้วย ${CARD_NAMES[c.card!]}`
     case 'inner_healing':
@@ -669,6 +684,10 @@ export function cardCaption(perk: PerkId, c: PerkChoice): string {
       return `แทนใบที่ ${c.index! + 1}`
     case 'any_means_necessary':
       return 'ยอมบาดเจ็บ'
+    case 'cut_loose':
+      return 'ใช้แทน Vault'
+    case 'blood_rush':
+      return 'Bonus Turn + Sacrifice'
     default:
       return 'Bonus Turn'
   }
@@ -745,6 +764,8 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return 'หลัง Sabotage Hook'
     case 'turnBegin':
       return `เริ่มเทิร์นของ ${st.survivors[w.s].name}`
+    case 'bonusEnd':
+      return `จบ Bonus Turn ของ ${st.survivors[w.s].name}`
     case 'turnEnd':
       return `จบเทิร์นของ ${st.survivors[w.s].name}`
     case 'killerBreak':

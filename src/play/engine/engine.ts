@@ -537,6 +537,9 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
     }
   }
   for (const t of onBoardIn(st, sv.room)) if (t !== s && healable(st, t)) out.push({ k: 'heal', target: t })
+  // Collective Stealth (Renato), Power of Two (Thalita): someone else here may interact with them instead
+  for (const t of onBoardIn(st, sv.room))
+    for (const perk of ['collective_stealth', 'power_of_two'] as const) if (t !== s && perkReady(st, t, perk)) out.push({ k: 'partner', target: t, perk })
   // The Twins: Victor can be removed by a survivor in his room.
   if (victorRoom(st) === sv.room) out.push({ k: 'removeVictor' })
   // Power Struggle (Élodie): with the killer (Charlotte for The Twins), before their first card.
@@ -610,7 +613,7 @@ export function trapPlacements(st: GameState): KillerInteraction[] {
 }
 
 /** Moves along any path that the survivor must make, with no staying put: Dead Hard, Spine Chill. */
-export function mustMove(why?: 'antidote' | 'deadHard' | 'spineChill'): boolean {
+export function mustMove(why?: 'antidote' | 'deadHard' | 'spineChill' | 'collective'): boolean {
   return why === 'deadHard' || why === 'spineChill'
 }
 
@@ -1218,7 +1221,7 @@ function runTask(st: GameState, task: Task) {
       st.queue.unshift(
         { k: 'trigger', w: { k: 'turnBegin', s: task.s }, done: [] },
         { k: 'turnStart', s: task.s },
-        { k: 'cardMove', s: task.s, card: sv.planned as PathKind },
+        { k: 'cardMove', s: task.s, card: sv.planned as PathKind, planned: true },
         { k: 'survivorInteract', s: task.s },
         { k: 'trigger', w: { k: 'turnEnd', s: task.s }, done: [] },
         { k: 'endSurvivorTurn', s: task.s },
@@ -1229,7 +1232,7 @@ function runTask(st: GameState, task: Task) {
       if (perkButtons({ ...st, step: { t: 'turnStart', s: task.s } }).length) wait(st, { t: 'turnStart', s: task.s })
       return
     case 'cardMove':
-      st.queue.unshift({ k: 'trigger', w: { k: 'cardMove', s: task.s, card: task.card }, done: [] }, { k: 'doMove', s: task.s, card: task.card })
+      st.queue.unshift({ k: 'trigger', w: { k: 'cardMove', s: task.s, card: task.card, ...(task.planned ? { planned: true } : {}) }, done: [] }, { k: 'doMove', s: task.s, card: task.card })
       return
     case 'doMove':
       // Deception (Élodie): she stays, gives up the interaction, and gains a ▲.
@@ -1770,7 +1773,22 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       trigger(st, { k: 'afterPalletLocker', s, prop: prop!.id })
       return
     case 'repair':
+      // Friendly Competition looks back at who worked on a generator this round
+      st.genBy = { ...st.genBy, [i.prop]: [...new Set([...(st.genBy?.[i.prop] ?? []), s])] }
       return startCheck(st, { k: 'repair', s, prop: i.prop })
+    case 'partner': {
+      const t = i.target
+      if (i.perk === 'collective_stealth') {
+        payPerk(st, t, i.perk, `${sv.name} Interact กับ ${st.survivors[t].name} — ทั้งคู่เดินตามเส้นทางใดก็ได้`)
+        // Renato moves first, then the survivor who interacted with him
+        st.queue.unshift({ k: 'anyMove', s: t, why: 'collective' }, { k: 'anyMove', s, why: 'collective' })
+        return
+      }
+      payPerk(st, t, i.perk, `${sv.name} Interact กับ ${st.survivors[t].name} — ${st.killer.name} +1 ▲, ${sv.name} ได้ Bonus Turn`)
+      gainKiller(st, 1)
+      if (st.survivorHands[sv.hand].length > 0) wait(st, { t: 'bonusOffer', s, why: 'power_of_two' })
+      return
+    }
     case 'openGate':
       return startCheck(st, { k: 'openGate', s, prop: i.prop })
     case 'cleanse':
@@ -2220,7 +2238,7 @@ function cleanup(st: GameState) {
     sv.woundedThisRound = false
   }
   Object.assign(st.killer, { hand: killerDeck(st.killer.characterId), planned: [], revealedCount: 0, plannedShown: false, powerUsed: false, bonusUsed: false, bonusAt: null, shown: [] })
-  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
+  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], genBy: {}, empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
   startPlanning(st)
@@ -2803,7 +2821,8 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return [...new Set(st.survivorHands[them.hand])].map((card) => ({ card }))
     }
     case 'renewal':
-      if (w.k !== 'turnEnd' || !(st.healedWith ?? []).includes(o as number) || me!.status !== 'board') return []
+      // the end of any survivor's turn, a bonus turn's too (a house rule)
+      if ((w.k !== 'turnEnd' && w.k !== 'bonusEnd') || !(st.healedWith ?? []).includes(o as number) || me!.status !== 'board') return []
       return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
     case 'no_one_escapes_death':
       if (w.k !== 'killerTurnEnd' || !gatesPowered(st) || k.bonusUsed) return []
@@ -2812,7 +2831,8 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // a button at the start of the turn, as Self-Care is, but no roll: the card is spent instead
       return w.k === 'turnStart' && w.s === o && healable(st, o as number) ? NONE : []
     case 'situational_awareness':
-      if (w.k !== 'turnEnd' || w.s !== o || me!.status !== 'board') return []
+      // the end of any turn of the owner's, a bonus turn's too (a house rule)
+      if ((w.k !== 'turnEnd' && w.k !== 'bonusEnd') || w.s !== o || me!.status !== 'board') return []
       return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
     case 'kinship':
       // her interaction for the turn: another survivor takes a bonus turn at the end of it
@@ -3317,6 +3337,31 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       const to = tokens.filter((t) => pathFree(st, t))
       return from.flatMap((a) => to.filter((b) => b !== a).map((b) => ({ path: a, path2: b })))
     }
+    // ----- Renato -----
+    case 'collective_stealth':
+    case 'power_of_two':
+      return [] // an interaction of the others, see allSurvivorInteractions
+    case 'background_player':
+      // the end of any turn of his (a bonus turn's too: a house rule), with someone on a hook
+      if ((w.k !== 'turnEnd' && w.k !== 'bonusEnd') || w.s !== o || me!.status !== 'board' || !st.survivors.some((sv) => sv.status === 'hooked')) return []
+      return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
+    case 'blood_rush':
+      // the end of any turn of his (a bonus turn's too: a house rule), with no sacrifice progress on his board
+      if ((w.k !== 'turnEnd' && w.k !== 'bonusEnd') || w.s !== o || me!.status !== 'board' || me!.sacrificeToken) return []
+      return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
+    // ----- Thalita -----
+    case 'friendly_competition': {
+      // after her own repair (success or not) of a generator someone else worked on this round
+      if ((w.k !== 'repaired' && w.k !== 'repairFail') || w.s !== o) return []
+      const gen = st.props.find((p) => p.id === w.prop)
+      if (!gen || gen.done || gen.removed) return []
+      return (st.genBy?.[gen.id] ?? []).some((x) => x !== o) ? NONE : []
+    }
+    case 'cut_loose':
+      // her planned card turns out to be Vault: play it as another colour
+      if (w.k !== 'cardMove' || !w.planned || w.s !== o || w.card !== 'vault' || st.activeSurvivor !== o || !movePending(st, o as number)) return []
+      // only the colours that go somewhere (one that can't would only lose her the interaction)
+      return (['sneak', 'crouch', 'sprint'] as const).filter((card) => survivorMoves(st, o as number, card).length).map((card) => ({ card }))
     case 'quick_gambit':
       // he leaves the killer's room: the killer comes along (not while carrying, not twice)
       if (w.k !== 'survivorLeave' || w.s !== o || st.survivors.some((sv) => sv.status === 'carried')) return []
@@ -3873,6 +3918,26 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       }
       pathState(st, c.path!).wall = false
       pathState(st, c.path2!).wall = true
+      return
+    }
+    case 'background_player':
+      payPerk(st, o, perk, 'Bonus Turn')
+      return startBonusMove(st, o as number, c.card as PathKind)
+    case 'blood_rush':
+      payPerk(st, o, perk, 'Bonus Turn + Sacrifice Progress บนบอร์ด')
+      st.survivors[o as number].sacrificeToken = true
+      return startBonusMove(st, o as number, c.card as PathKind)
+    case 'friendly_competition': {
+      const gen = st.props.find((p) => p.id === (w as { prop: string }).prop)!
+      payPerk(st, o, perk, `Generator ที่ ${roomName(st, gen.room!)} +1`)
+      return addGenerator(st, gen, 1, o as number)
+    }
+    case 'cut_loose': {
+      payPerk(st, o, perk, `ใช้ Vault เป็น ${CARD_NAMES[c.card!]}`)
+      const move = st.queue.find((t): t is Extract<Task, { k: 'doMove' }> => t.k === 'doMove' && t.s === o)!
+      move.card = c.card as PathKind
+      // the perks asked after this one see the new colour too
+      ;(w as Extract<PerkWindow, { k: 'cardMove' }>).card = c.card as PathKind
       return
     }
     case 'quick_gambit': {
@@ -4496,7 +4561,7 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
   // a bonus turn is a turn of its own (Dance With Me)
   st.lockerTurn = st.survivors[s].status === 'locker' ? s : null
   log(st, `${st.survivors[s].name} ทิ้ง ${CARD_NAMES[card]} เล่น Bonus Turn`, s)
-  st.queue.unshift({ k: 'cardMove', s, card }, { k: 'survivorInteract', s })
+  st.queue.unshift({ k: 'cardMove', s, card }, { k: 'survivorInteract', s }, { k: 'trigger', w: { k: 'bonusEnd', s }, done: [] })
 }
 
 // ---------- killer powers ----------

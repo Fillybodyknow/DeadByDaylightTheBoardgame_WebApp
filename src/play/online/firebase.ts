@@ -5,6 +5,8 @@
 //          rooms/<code>/moves  { m000001: json, … }        one action each, played in key order
 //          rooms/<code>/log    { r1: json, r2: json, … }  log of finished rounds (see logArchive.ts)
 //          rooms/<code>/pings  { <client id>: { x, y, at, n } }  each member's last ping
+//          rooms/<code>/chat   { <push id>: { from, name, text, at } }  the chat, oldest first
+//          rooms/<code>/chatAt { <client id>: at }  when each member last chatted (the rules' rate limit)
 //
 // A move is written to its own numbered slot, and every device replays the moves on top of the
 // checkpoint to get the same game (see transport.ts). That keeps a move at a few hundred bytes
@@ -21,12 +23,12 @@
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { get, getDatabase, onChildAdded, onChildChanged, onValue, ref, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
+import { get, getDatabase, limitToLast, onChildAdded, onChildChanged, onDisconnect, onValue, push, query, ref, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
 import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
-import type { Backend, Ping, Room, RoomData, RoomListing } from './transport'
-import { CHECKPOINT_EVERY, emptyRoom, moveKey, normalizeRoom } from './transport'
+import type { Backend, ChatMessage, Ping, Room, RoomData, RoomListing } from './transport'
+import { CHAT_KEEP, CHECKPOINT_EVERY, emptyRoom, moveKey, normalizeRoom } from './transport'
 
 const env = import.meta.env
 
@@ -71,6 +73,7 @@ function lobbyOf(r: RoomData): Lobby {
     ...(r.name ? { name: r.name } : {}),
     ...(r.passwordHash ? { passwordHash: r.passwordHash } : {}),
     ...(r.kicked && Object.keys(r.kicked).length ? { kicked: r.kicked } : {}),
+    ...(r.dropped && Object.keys(r.dropped).length ? { dropped: r.dropped } : {}),
     ...(r.loadouts ? { loadouts: r.loadouts } : {}),
     ...(r.perksDone ? { perksDone: r.perksDone } : {}),
     ...(r.perkSeed ? { perkSeed: r.perkSeed } : {}),
@@ -309,6 +312,29 @@ class FirebaseRoom implements Room {
           .finally(() => this.archiving.delete(round))
       }
     }, delay)
+  }
+
+  // ----- presence: what the server does to the lobby when this device's connection drops -----
+  async presence(member: string, mode: 'lobby' | 'game' | null) {
+    const od = onDisconnect(this.path('/lobby'))
+    await od.cancel()
+    if (!mode) return
+    await od.update({ ...(mode === 'lobby' ? { [`members/${member}`]: null } : {}), [`dropped/${member}`]: serverTimestamp() })
+  }
+
+  // ----- chat: messages in push order; the sender's chatAt goes in the same write, so the
+  // database rules can refuse more than one message a second from a member -----
+  async chat(m: { from: string; name: string; text: string }) {
+    const key = push(this.path('/chat')).key!
+    await update(this.path(), { [`chat/${key}`]: { ...m, at: serverTimestamp() }, [`chatAt/${m.from}`]: serverTimestamp() })
+  }
+
+  onChat(cb: (messages: ChatMessage[]) => void) {
+    return onValue(query(this.path('/chat'), limitToLast(CHAT_KEEP)), (snap) => {
+      const out: ChatMessage[] = []
+      snap.forEach((c) => void out.push({ id: c.key!, ...(c.val() as Omit<ChatMessage, 'id'>) }))
+      cb(out)
+    })
   }
 
   // ----- pings: one slot per member, overwritten by their next one -----

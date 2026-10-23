@@ -9,7 +9,7 @@ import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
 import { openHands } from '../hands'
 import CardHand, { type HandCard } from './CardHand.vue'
-import { canUndo, controls, dispatch, myTurn, online, quitGame, undo } from '../game'
+import { canUndo, controls, dispatch, myTurn, online, quitGame, tutorial, undo } from '../game'
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
@@ -41,6 +41,7 @@ import RoundSummary from './RoundSummary.vue'
 import StatusPanel from './StatusPanel.vue'
 import SyncBadge from './SyncBadge.vue'
 import BpText from '../../components/BpText.vue'
+import ChatDock from './ChatDock.vue'
 
 const props = defineProps<{ st: GameState }>()
 
@@ -906,7 +907,8 @@ const secretWhat = computed(() => {
   return 'เลือกการ์ดที่จะทิ้งแบบคว่ำ (Redeemer)'
 })
 // Online every player has their own screen: no hand-off curtain needed.
-const secret = computed(() => !online.value && secretFor.value !== null && !secretSeen.value)
+// (a tutorial plays the other sides itself: nothing to hand over)
+const secret = computed(() => !online.value && !tutorial.value && secretFor.value !== null && !secretSeen.value)
 watch(
   () => view.value.step,
   () => (secretSeen.value = false),
@@ -1103,6 +1105,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       <span aria-hidden="true">{{ sideFolded ? '◂' : '▸' }}</span>
       <span class="side-tab-text">{{ sideFolded ? 'เปิดแผงควบคุม' : 'พับแผงควบคุม' }}</span>
     </button>
+    <!-- online: the room's chat — a 💬 tab above the side panel's, bubbles beside the tiles -->
+    <ChatDock v-if="online" mode="game" />
     <!-- online: your own hand, to look at, while no hand to pick from is out -->
     <CardHand v-if="ownHand.length && openHands === 0" :cards="ownHand" label="มือของคุณ" passive />
     <!-- online: the others are waiting on this device — a gold edge (the notice is in the bar) -->

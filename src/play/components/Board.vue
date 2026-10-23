@@ -779,6 +779,8 @@ function guard(e: MouseEvent) {
     <img v-for="t in roomTokens" :key="t.key" class="room-token" :class="t.kind" :style="rectStyle(rects.tokens.get(t.key)!)" :src="asset(t.image)" :alt="t.title" :title="t.title" />
 
     <template v-for="p in paths" :key="p.id">
+      <!-- where the path's icon is on the map art, for the tutorial's guide to point at -->
+      <span class="path-anchor" :data-path="p.id" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" aria-hidden="true" />
       <img v-if="p.token" class="path-token" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" :src="asset(p.token)" alt="" />
       <span
         v-if="focusPaths.has(p.id) || hotPaths.has(p.id)"
@@ -1204,6 +1206,13 @@ button.tile.act {
   translate: -50% -50%;
   pointer-events: none;
   filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.95));
+}
+.path-anchor {
+  position: absolute;
+  width: 6%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  pointer-events: none;
 }
 .path-target {
   position: absolute;

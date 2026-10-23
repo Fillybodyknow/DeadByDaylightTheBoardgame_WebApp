@@ -283,7 +283,7 @@ watch(
 )
 
 /** Perks whose card is then played to move: hovering it shows where it goes. */
-const MOVE_PERKS: PerkId[] = ['adrenaline', 'saboteur', 'up_the_ante', 'any_means_necessary', 'devour_hope', 'shadowborn', 'resilience', 'renewal', 'situational_awareness', 'lightweight']
+const MOVE_PERKS: PerkId[] = ['adrenaline', 'saboteur', 'up_the_ante', 'any_means_necessary', 'devour_hope', 'shadowborn', 'resilience', 'renewal', 'situational_awareness', 'lightweight', 'background_player', 'blood_rush', 'cut_loose']
 
 /** The cards to choose from: an offer's card choices (Tinkerer / Zanshin: for the planned card picked), or Predator's new card. */
 const handChoices = computed<PerkChoice[]>(() => {

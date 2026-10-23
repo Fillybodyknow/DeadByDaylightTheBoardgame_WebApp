@@ -36,10 +36,16 @@ export function controls(st: GameState, s: number): boolean {
   return !o || (!!o.seat && st.handPlayers[st.survivors[s].hand] === o.seat)
 }
 
+/**
+ * Set while a tutorial chapter plays (tutorial/runner.ts): its game is never saved over the
+ * hot-seat one, and `allow` may hold back an action (the learner is shown what to do instead).
+ */
+export const tutorial = shallowRef<{ allow(st: GameState, action: Action): boolean } | null>(null)
+
 /** Online moves made on this device that the room hasn't confirmed yet. */
 export const pendingWrites = shallowRef(0)
 
-export const canUndo = computed(() => !online.value && history.value.length > 0)
+export const canUndo = computed(() => !online.value && !tutorial.value && history.value.length > 0)
 
 /** Whether this device may act now (always, on one shared device). */
 export const myTurn = computed(() => {
@@ -60,6 +66,7 @@ function load(): GameState | null {
 
 function save() {
   if (online.value) return // the room holds an online game; keep the local save for hot-seat
+  if (tutorial.value) return // a lesson's game: the hot-seat save stays as it was
   try {
     if (game.value) localStorage.setItem(KEY, JSON.stringify(game.value))
     else localStorage.removeItem(KEY)
@@ -90,6 +97,7 @@ export function dispatch(action: Action): boolean {
       .finally(() => pendingWrites.value--)
     return true
   }
+  if (tutorial.value && !tutorial.value.allow(cur, action)) return false
   const next = tryApply(cur, action)
   if (!next) return false
   history.value = [...history.value.slice(-MAX_UNDO + 1), cur]
@@ -133,6 +141,19 @@ export function quitGame() {
   history.value = []
   game.value = null
   save()
+}
+
+/** A tutorial chapter's game on screen (never saved). */
+export function playTutorial(st: GameState) {
+  history.value = []
+  game.value = st
+}
+
+/** Back to the hot-seat save after a tutorial. */
+export function leaveTutorial() {
+  tutorial.value = null
+  history.value = []
+  game.value = load()
 }
 
 /** Back to the hot-seat save after leaving an online room. */

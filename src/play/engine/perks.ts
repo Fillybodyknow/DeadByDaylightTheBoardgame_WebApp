@@ -115,6 +115,12 @@ export type PerkId =
   | 'potential_energy'
   | 'fogwise'
   | 'quick_gambit'
+  | 'collective_stealth'
+  | 'background_player'
+  | 'blood_rush'
+  | 'power_of_two'
+  | 'friendly_competition'
+  | 'cut_loose'
   | 'overzealous'
   | 'residual_manifest'
   | 'inner_focus'
@@ -314,6 +320,12 @@ export const PERKS: Record<PerkId, PerkDef> = {
   potential_energy: def('potential_energy', 'Potential Energy', 1, 'survivor', 'vittorio', 0, 'ปุ่มตอนเริ่มเทิร์นของคุณ: ย้ายความคืบหน้า 1 แต้มจาก Generator ห้องข้าง ๆ มาห้องคุณ'),
   fogwise: def('fogwise', 'Fogwise', 1, 'survivor', 'vittorio', 1, 'ปุ่มตอนเริ่มเทิร์นของคุณ: ย้ายกำแพงหรือ Pallet จากเส้นทางที่เชื่อมห้องคุณ'),
   quick_gambit: def('quick_gambit', 'Quick Gambit', 2, 'survivor', 'vittorio', 2, 'ถามเมื่อคุณจะออกจากห้องของฆาตกร'),
+  collective_stealth: def('collective_stealth', 'Collective Stealth', 0, 'survivor', 'renato', 0, 'ผู้รอดชีวิตอื่นในห้องคุณ Interact กับคุณได้ (คลิกตัวคุณ) แล้วคุณกับเขาเดินตามเส้นทางใดก็ได้'),
+  background_player: def('background_player', 'Background Player', 2, 'survivor', 'renato', 1, 'ถามตอนจบทุกเทิร์นของคุณ (รวม Bonus Turn) ถ้ามีผู้รอดชีวิตถูกแขวนอยู่: Bonus Turn'),
+  blood_rush: def('blood_rush', 'Blood Rush', 0, 'survivor', 'renato', 2, 'ถามตอนจบทุกเทิร์นของคุณ (รวม Bonus Turn) ถ้าบอร์ดคุณไม่มี Sacrifice Progress: Bonus Turn แล้วรับ Sacrifice Progress'),
+  power_of_two: def('power_of_two', 'Power of Two', 0, 'survivor', 'thalita', 0, 'ผู้รอดชีวิตอื่นในห้องคุณ Interact กับคุณได้ (คลิกตัวคุณ): ฆาตกร +1 ▲ แล้วเขาได้ Bonus Turn'),
+  friendly_competition: def('friendly_competition', 'Friendly Competition', 2, 'survivor', 'thalita', 1, 'ถามหลังคุณซ่อม Generator ที่คนอื่นซ่อมไปแล้วรอบนี้: +1 ความคืบหน้า'),
+  cut_loose: def('cut_loose', 'Cut Loose', 1, 'survivor', 'thalita', 2, 'ถามเมื่อการ์ดที่คุณวางไว้คือ Vault: ใช้เป็น Sneak / Crouch / Sprint แทน'),
   overzealous: def('overzealous', 'Overzealous', 0, 'survivor', 'haddie', 0, 'ทำงานเองเมื่อคุณเข้าห้องของฆาตกร'),
   residual_manifest: def('residual_manifest', 'Residual Manifest', 2, 'survivor', 'haddie', 1, 'ถามเมื่อฆาตกรจะ Interact ในห้องของคุณ (ทิ้ง item กันไว้)'),
   inner_focus: def('inner_focus', 'Inner Focus', 1, 'survivor', 'haddie', 2, 'ถามเมื่อคุณจะเดินด้วยการ์ด: ทอยเต๋า 2 ลูก เลือก 1 แล้วไปห้องเริ่มต้นนั้น'),
@@ -338,14 +350,14 @@ export const PERKS: Record<PerkId, PerkDef> = {
   this_is_not_happening: deck('this_is_not_happening', 'This Is Not Happening', 1, 'survivor', 'this-is-not-happening', 'ถามก่อนคุณทอย Skill Check'),
   resilience: deck('resilience', 'Resilience', 2, 'survivor', 'resilience', 'ถามตอนเริ่มเก็บกวาด ถ้าคุณบาดเจ็บในรอบนี้'),
   well_make_it: deck('well_make_it', "We'll Make It", 2, 'survivor', 'well-make-it', 'ถามหลังคุณรักษาผู้รอดชีวิตคนอื่นสำเร็จ'),
-  renewal: deck('renewal', 'Renewal', 2, 'survivor', 'renewal', 'ถามตอนจบเทิร์น ถ้ารอบนี้คุณรักษาคนอื่นหรือถูกรักษา'),
+  renewal: deck('renewal', 'Renewal', 2, 'survivor', 'renewal', 'ถามตอนจบทุกเทิร์น (รวม Bonus Turn) ถ้ารอบนี้คุณรักษาคนอื่นหรือถูกรักษา'),
   monstrous_shrine: deck('monstrous_shrine', 'Monstrous Shrine', 0, 'killer', 'monstrous-shrine', 'ทำงานเองหลังแขวนผู้รอดชีวิต ถ้าไม่มีใครอื่นในห้อง'),
   spies_from_the_shadows: deck('spies_from_the_shadows', 'Spies from the Shadows', 0, 'killer', 'spies-from-the-shadows', 'ทำงานเองเมื่อมีการเปิด Crow'),
   sloppy_butcher: deck('sloppy_butcher', 'Sloppy Butcher', 1, 'killer', 'sloppy-butcher', 'ถามก่อนผู้รอดชีวิตทอยรักษา'),
   no_one_escapes_death: deck('no_one_escapes_death', 'No One Escapes Death', 0, 'killer', 'no-one-escapes-death', 'ถามตอนจบเทิร์นฆาตกร ถ้าประตูมีไฟแล้ว'),
   // these four are discarded when used, freeing the printed perk they were laid over
   inner_healing: deck('inner_healing', 'Inner Healing', 2, 'survivor', 'inner-healing', 'ปุ่มตอนเริ่มเทิร์นของคุณ ถ้าบาดเจ็บ (ใช้แล้วทิ้งการ์ด)'),
-  situational_awareness: deck('situational_awareness', 'Situational Awareness', 1, 'survivor', 'situational-awareness', 'ถามตอนจบเทิร์นของคุณ (ใช้แล้วทิ้งการ์ด)'),
+  situational_awareness: deck('situational_awareness', 'Situational Awareness', 1, 'survivor', 'situational-awareness', 'ถามตอนจบทุกเทิร์นของคุณ รวม Bonus Turn (ใช้แล้วทิ้งการ์ด)'),
   kinship: deck('kinship', 'Kinship', 1, 'survivor', 'kinship', 'ปุ่มแทนการ Interact: ให้ผู้รอดชีวิตอีกคนเล่น Bonus Turn (ใช้แล้วทิ้งการ์ด)'),
   guardian: deck('guardian', 'Guardian', 1, 'survivor', 'guardian', 'ถามเมื่อฆาตกรเข้าห้องของคุณ (ใช้แล้วทิ้งการ์ด)'),
   dark_sense: deck('dark_sense', 'Dark Sense', 1, 'survivor', 'dark-sense', 'ถามเมื่อคุณเข้าห้องที่ไม่มี prop ในเทิร์นของคุณ'),

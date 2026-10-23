@@ -8,7 +8,7 @@ import UpdateBanner from './components/UpdateBanner.vue'
 import WhatsNew from './components/WhatsNew.vue'
 import { quoteOrTip, showLoading } from './loading'
 import { asset, lang } from './i18n'
-import { game } from './play/game'
+import { game, tutorial } from './play/game'
 import { isPhone } from './play/device'
 import { introStage } from './play/intro'
 import { session } from './play/online/session'
@@ -36,11 +36,11 @@ const lastSection = ref<Section>('menu')
 const section = computed<Section>(() => route.meta.section ?? lastSection.value)
 watch(section, (s) => (lastSection.value = s))
 
-const SUBTITLE: Record<Section, string> = { menu: '', companion: 'Companion', offline: 'Offline', online: 'Online' }
+const SUBTITLE: Record<Section, string> = { menu: '', companion: 'Companion', offline: 'Offline', online: 'Online', tutorial: 'Tutorial' }
 
 /** The full game (Online / Offline) is for computers and tablets; a phone gets a notice. */
 const phone = isPhone()
-const phoneBlocked = computed(() => phone && (route.name === 'offline' || route.name === 'online'))
+const phoneBlocked = computed(() => phone && (route.name === 'offline' || route.name === 'online' || route.name === 'tutorial'))
 
 /** A full game is on screen: it has its own top bar and takes the whole width. */
 const inGame = computed(
@@ -48,7 +48,9 @@ const inGame = computed(
     !phoneBlocked.value &&
     // the alarm before a game plays over the page it started from, laid out as that page
     introStage.value !== 'beat' &&
-    ((route.name === 'offline' && !!game.value && !session.room) || (route.name === 'online' && !!session.data?.game && !!game.value)),
+    ((route.name === 'offline' && !!game.value && !session.room) ||
+      (route.name === 'online' && !!session.data?.game && !!game.value) ||
+      (route.name === 'tutorial' && !!tutorial.value && !!game.value)),
 )
 
 const links = computed(() => [

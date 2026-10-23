@@ -3,7 +3,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 declare module 'vue-router' {
   interface RouteMeta {
     /** Which part of the app the screen belongs to (top bar links, brand subtitle). */
-    section?: 'menu' | 'companion' | 'offline' | 'online'
+    section?: 'menu' | 'companion' | 'offline' | 'online' | 'tutorial'
   }
 }
 
@@ -15,6 +15,7 @@ export const router = createRouter({
     // the full game: hot-seat on one device, or online with each player on their own
     { path: '/play', name: 'offline', component: () => import('./play/views/OfflineView.vue'), meta: { section: 'offline' } },
     { path: '/online', name: 'online', component: () => import('./play/views/OnlineView.vue'), meta: { section: 'online' } },
+    { path: '/tutorial', name: 'tutorial', component: () => import('./play/tutorial/TutorialView.vue'), meta: { section: 'tutorial' } },
     // the companion for the physical board game
     { path: '/lobby', name: 'lobby', component: () => import('./views/LobbyView.vue'), meta: { section: 'companion' } },
     { path: '/setup', name: 'setup', component: () => import('./views/SetupView.vue'), meta: { section: 'companion' } },

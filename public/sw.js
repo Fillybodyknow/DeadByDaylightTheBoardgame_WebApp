@@ -9,7 +9,7 @@
 // Bump VERSION to drop the old caches when the caching rules change.
 
 // v2: the sounds moved from MP3 to OGG, so the cached MP3s are dropped.
-const VERSION = 'v2'
+const VERSION = 'v3'
 const SHELL = `dbdl-shell-${VERSION}`
 const ASSETS = `dbdl-assets-${VERSION}`
 

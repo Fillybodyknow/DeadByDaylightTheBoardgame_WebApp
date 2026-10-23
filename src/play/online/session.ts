@@ -125,20 +125,70 @@ function stopHeartbeat() {
   heartbeat = null
 }
 
+/** What this device's presence is set to in the room (undefined: not set, or forgotten by the server). */
+let armed: 'lobby' | 'game' | undefined
+
+/**
+ * Keep this device's place right after every change and every reconnection: back into a lobby its
+ * dropped connection took it out of (not after a kick), its `dropped` mark cleared, its presence
+ * set for the phase (the lobby lets a dropped member go; a game keeps their seat).
+ */
+function settle(room: Room, data: RoomData | null) {
+  if (!data || !joined || !session.connected) return
+  const me = session.me
+  const inLobby = data.phase === 'lobby' && !data.game
+  if (!data.members[me]) {
+    if (inLobby && !data.kicked?.[me]) void join(savedName())
+    return
+  }
+  if (data.dropped?.[me])
+    void room.updateRoom((cur) => {
+      if (!cur.dropped?.[me]) return null
+      const dropped = { ...cur.dropped }
+      delete dropped[me]
+      return { ...cur, dropped }
+    })
+  // Back in the lobby, whoever lost their connection during the game is let go (a member who is
+  // here clears their own mark; one taken out by mistake comes straight back in).
+  if (inLobby && Object.keys(data.members).some((id) => id !== me && data.dropped?.[id]))
+    void room.updateRoom((cur) => {
+      const gone = Object.keys(cur.members).filter((id) => id !== me && cur.dropped?.[id])
+      if (cur.phase !== 'lobby' || cur.game || !gone.length) return null
+      const members = { ...cur.members }
+      for (const id of gone) delete members[id]
+      return { ...cur, members, host: members[cur.host] ? cur.host : (nextHost(members, cur.dropped) ?? me) }
+    })
+  const mode = inLobby ? 'lobby' : 'game'
+  if (armed === mode || !room.presence) return
+  armed = mode
+  room.presence(me, mode).catch(() => (armed = undefined))
+}
+
 function enter(room: Room) {
   joined = false
+  armed = undefined
   session.room = room
   stopHeartbeat()
   heartbeat = window.setInterval(() => void backend.touchRoom(room.code).catch(() => {}), HEARTBEAT_MS)
   unwatchConnection?.()
   session.connected = true
-  unwatchConnection = room.onConnection?.((up) => (session.connected = up)) ?? null
+  unwatchConnection =
+    room.onConnection?.((up) => {
+      const was = session.connected
+      session.connected = up
+      // back online: the server has run (and so forgotten) this device's presence
+      if (up && !was) {
+        armed = undefined
+        settle(room, session.data)
+      }
+    }) ?? null
   unsubscribe?.()
   unsubscribe = room.subscribe((data) => {
     session.data = data
     if (!data) return leaveRoom()
-    // Taken out of the lobby by the host: back to the entry page, with a notice
-    if (joined && data.phase === 'lobby' && !data.game && !data.members[session.me]) {
+    // Taken out of the lobby by the host: back to the entry page, with a notice. (Taken out by its
+    // own dropped connection, it goes straight back in: settle.)
+    if (joined && data.phase === 'lobby' && !data.game && !data.members[session.me] && data.kicked?.[session.me]) {
       const code = room.code
       leaveRoom()
       session.kicked = code
@@ -146,9 +196,10 @@ function enter(room: Room) {
     }
     // A room whose host is no longer in it (they left before hosts were handed on): the member who
     // joined first takes it, so someone keeps the board's listing and can start the game.
-    if (!data.members[data.host] && nextHost(data.members) === session.me)
-      void room.updateRoom((cur) => (cur.members[cur.host] || nextHost(cur.members) !== session.me ? null : { ...cur, host: session.me }))
+    if (!data.members[data.host] && nextHost(data.members, data.dropped) === session.me)
+      void room.updateRoom((cur) => (cur.members[cur.host] || nextHost(cur.members, cur.dropped) !== session.me ? null : { ...cur, host: session.me }))
     if (data.host === session.me) publish(room.code, data)
+    settle(room, data)
     // Mirror the room's game. A device without a seat watches (seat 0 may not act).
     online.value = data.game ? { room, seat: mySeat.value ?? 0, latest: () => toRaw(session.data)?.game ?? null } : null
     if (data.game) receive(data.game)
@@ -176,8 +227,11 @@ function join(name: string) {
   return session.room!.updateRoom((cur) => {
     if (cur.kicked?.[session.me]) return null
     const old = cur.members[session.me]
+    const dropped = { ...(cur.dropped ?? {}) }
+    delete dropped[session.me]
     return {
       ...cur,
+      dropped,
       members: {
         ...cur.members,
         [session.me]: {
@@ -228,6 +282,8 @@ export function createRoom(name: string, roomName = '', password = '') {
     await room.updateRoom((cur) => ({ ...cur, name: roomName.trim() || randomRoomName(), ...(hash ? { passwordHash: hash } : {}) }))
     await join(name)
     joined = true
+    // the room may not change again for a while: set this device's presence now
+    settle(room, session.data)
     return code
   })
 }
@@ -254,6 +310,8 @@ export function joinRoom(code: string, name: string, password = '') {
     enter(room)
     await join(name)
     joined = true
+    // the room may not change again for a while: set this device's presence now
+    settle(room, session.data)
     return room.code
   })
 }
@@ -262,9 +320,13 @@ export function leaveRoom() {
   joined = false
   stopHeartbeat()
   const room = session.room
+  // leaving on purpose: the server mustn't mark this device dropped later
+  void room?.presence?.(session.me, null).catch(() => {})
+  armed = undefined
   const d = session.data
   // the last one out of a lobby closes the room: its data goes with it, not left on the server
-  const lastOut = !!room && !!d && d.phase === 'lobby' && !d.game && Object.keys(d.members).every((id) => id === session.me)
+  // (members whose connection is gone don't count: nobody is left to use the room)
+  const lastOut = !!room && !!d && d.phase === 'lobby' && !d.game && Object.keys(d.members).every((id) => id === session.me || d.dropped?.[id])
   // In the lobby, leaving frees the place; once seated, the member stays so they can come back.
   // The host leaving hands the room to whoever joined first, and puts the listing right on the
   // board (the new host's device keeps it from then on).
@@ -274,7 +336,7 @@ export function leaveRoom() {
       .updateRoom((cur) => {
         const members = { ...cur.members }
         delete members[session.me]
-        const host = cur.host === session.me ? (nextHost(members) ?? cur.host) : cur.host
+        const host = cur.host === session.me ? (nextHost(members, cur.dropped) ?? cur.host) : cur.host
         return (after = { ...cur, members, host })
       })
       .then(() => {
@@ -299,9 +361,9 @@ export function leaveRoom() {
   restoreLocal()
 }
 
-/** Who takes over as host: the member in the room longest. */
-function nextHost(members: RoomData['members']): string | null {
-  const left = Object.entries(members).sort((a, b) => a[1].joinedAt - b[1].joinedAt)
+/** Who takes over as host: the member in the room longest whose connection isn't gone. */
+function nextHost(members: RoomData['members'], dropped: RoomData['dropped'] = {}): string | null {
+  const left = Object.entries(members).filter(([id]) => !dropped?.[id]).sort((a, b) => a[1].joinedAt - b[1].joinedAt)
   return left[0]?.[0] ?? null
 }
 

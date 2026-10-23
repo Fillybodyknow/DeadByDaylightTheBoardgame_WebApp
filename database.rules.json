@@ -34,6 +34,16 @@
             ".validate": "newData.hasChildren(['x', 'y', 'at', 'n']) && newData.child('x').isNumber() && newData.child('x').val() >= 0 && newData.child('x').val() <= 1 && newData.child('y').isNumber() && newData.child('y').val() >= 0 && newData.child('y').val() <= 1 && newData.child('n').isString() && newData.child('n').val().length <= 16 && newData.child('at').val() == now && (!data.exists() || now - data.child('at').val() >= 1000)"
           }
         },
+        "chat": {
+          "$msg": {
+            ".validate": "newData.hasChildren(['from', 'name', 'text', 'at']) && newData.child('from').isString() && newData.child('from').val().length <= 64 && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 200 && newData.child('at').val() == now && newData.parent().parent().child('chatAt').child(newData.child('from').val()).val() == now"
+          }
+        },
+        "chatAt": {
+          "$member": {
+            ".validate": "newData.val() == now && (!data.exists() || now - data.val() >= 1000)"
+          }
+        },
         "$other": {
           ".validate": false
         }

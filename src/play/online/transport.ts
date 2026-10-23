@@ -46,6 +46,25 @@ export interface Ping {
 }
 
 /**
+ * A chat message. Everyone in the room reads every one, the killer too (no secret talk, p.8).
+ * Like pings, chat is not part of the game: never replayed, never saved with it.
+ */
+export interface ChatMessage {
+  id: string
+  /** Client id of the sender. */
+  from: string
+  /** Their name when they sent it (they may leave the room later). */
+  name: string
+  text: string
+  /** The server's time. */
+  at: number
+}
+
+/** The longest message, and how many of the latest a room shows. */
+export const CHAT_MAX = 200
+export const CHAT_KEEP = 100
+
+/**
  * What the room holds. The game state travels as a JSON string (see `firebase.ts`).
  *
  * Phases: `lobby` (everyone picks a side and says ready; the host goes on) → `pick` → a game.
@@ -58,6 +77,11 @@ export interface RoomData {
   createdAt: number
   phase: 'lobby' | 'pick'
   members: Record<string, Member>
+  /**
+   * Members whose connection went (client id → when), written by the server when it does
+   * (`Room.presence`) and cleared when they are back. In the lobby the member is taken out too.
+   */
+  dropped?: Record<string, number>
   /** Player number → who sits there; set when leaving the lobby (1 = killer, 2.. = survivors). */
   seats: Record<string, SeatInfo>
   /** Number of players (3–5) once seated; 0 in the lobby. */
@@ -130,6 +154,17 @@ export interface Room {
    * too, so the caller drops them. Returns an unsubscribe.
    */
   onPings?(cb: (p: Ping) => void): () => void
+  /**
+   * What happens to this member if their connection drops: `lobby` takes them out of the room
+   * (a closed tab mustn't keep a place), `game` only marks them dropped (they may come back to
+   * their seat), null nothing (they left). Marked in `dropped` either way. Set again after every
+   * reconnection: the server forgets it once it has run.
+   */
+  presence?(member: string, mode: 'lobby' | 'game' | null): Promise<void>
+  /** Send a chat message to everyone in the room. */
+  chat?(m: { from: string; name: string; text: string }): Promise<void>
+  /** The room's latest messages (CHAT_KEEP), oldest first: now and on every new one. Returns an unsubscribe. */
+  onChat?(cb: (messages: ChatMessage[]) => void): () => void
   /** Whether this device is connected to the room's server (a backend without one is always). */
   onConnection?(cb: (up: boolean) => void): () => void
   close(): void

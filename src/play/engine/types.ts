@@ -207,6 +207,8 @@ export type SurvivorInteraction =
   | { k: 'crow'; prop: string }
   /** A face-up Drone of The Skull Merchant's, sent back to his board. */
   | { k: 'drone'; prop: string }
+  /** Collective Stealth (Renato) / Power of Two (Thalita): interacting with that survivor instead. */
+  | { k: 'partner'; target: number; perk: 'collective_stealth' | 'power_of_two' }
   | { k: 'dropPallet'; prop: string; path: string }
   | { k: 'repair'; prop: string }
   | { k: 'openGate'; prop: string }
@@ -287,7 +289,8 @@ export type PerkWindow =
   | { k: 'preRoll'; ctx: RollContext }
   | { k: 'planningStart' }
   | { k: 'planningEnd' }
-  | { k: 'cardMove'; s: number; card: PathKind }
+  /** `planned`: the card set in planning (not a bonus turn's), for Cut Loose. */
+  | { k: 'cardMove'; s: number; card: PathKind; planned?: boolean }
   /** `target`: the survivor he attacked or picked up, when it was one (Unrelenting). */
   | { k: 'afterKillerInteract'; turn: number; target?: number }
   | { k: 'palletBlock'; path: string; to: string }
@@ -310,6 +313,8 @@ export type PerkWindow =
   /** Start / end of any survivor's turn (Open-Handed, Urban Evasion, Up the Ante). */
   | { k: 'turnBegin'; s: number }
   | { k: 'turnEnd'; s: number }
+  /** The end of a survivor's bonus turn (Background Player, Blood Rush, Situational Awareness, Renewal: a house rule). */
+  | { k: 'bonusEnd'; s: number }
   /** The killer broke a pallet or a wall, or damaged generator `prop` (Alert, Overcharge, Oppression). */
   | { k: 'killerBreak'; what: 'pallet' | 'wall' | 'damage'; prop?: string }
   /** End of one of the killer's turns (Coup de Grâce). */
@@ -430,10 +435,11 @@ export type Step =
    * `survivalOnly`: Desperate Measures' second interaction targets a chest or a locker.
    */
   | { t: 'survivorInteract'; s: number; canInteract: boolean; exclude?: string; survivalOnly?: boolean }
-  | { t: 'bonusOffer'; s: number }
+  /** `why`: the perk that gave it (Power of Two); otherwise a crow's Sprint. */
+  | { t: 'bonusOffer'; s: number; why?: 'power_of_two' }
   /** Move along any path (after a rescue, p.13). */
   /** `why`: The Clown's Afterpiece Antidote, or Dead Hard / Spine Chill (a move they must make); else a rescue (p.13). */
-  | { t: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' | 'spineChill' }
+  | { t: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' | 'spineChill' | 'collective' }
   /** The Clown's Afterpiece Antidote: the killer walked in, and may move on along any path. */
   /** `why`: Darkness Revealed's move (otherwise the Afterpiece Antidote's). */
   | { t: 'killerAnyMove'; why?: 'darkness' }
@@ -521,7 +527,7 @@ export type Task =
   | { k: 'survivorTurn'; s: number }
   | { k: 'survivorInteract'; s: number }
   | { k: 'endSurvivorTurn'; s: number }
-  | { k: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' | 'spineChill' }
+  | { k: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' | 'spineChill' | 'collective' }
   /** The killer entered the room with the Afterpiece Antidote. */
   | { k: 'killerAntidote' }
   /** A survivor's card move, after Coulrophobia had its chance to stop it. */
@@ -581,7 +587,8 @@ export type Task =
   | { k: 'plan' }
   | { k: 'turnStart'; s: number }
   /** A survivor is about to move with a card (Huntress Lullaby may stop it). */
-  | { k: 'cardMove'; s: number; card: PathKind }
+  /** `planned`: the card set in planning (not a bonus turn's), for Cut Loose. */
+  | { k: 'cardMove'; s: number; card: PathKind; planned?: boolean }
   | { k: 'doMove'; s: number; card: PathKind }
   | { k: 'roll'; ctx: RollContext; n: number; kind: Die['kind'] }
   /** Go back to a step after work queued during it (an item used mid-step). */
@@ -748,6 +755,8 @@ export interface GameState {
   perksUsed: string[]
   /** Survivors who healed or were healed this round, either way round (Renewal). */
   healedWith?: number[]
+  /** Who interacted with each generator this round (Friendly Competition). */
+  genBy?: Record<string, number[]>
   /** Perks whose owner said "don't ask again this round". */
   perksMuted: string[]
   /** Huntress Lullaby stopped the next card move. */

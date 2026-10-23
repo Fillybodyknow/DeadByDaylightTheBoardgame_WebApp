@@ -57,6 +57,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 | `src/play/focus.ts` | Board highlights and the facts listed for a decision |
 | `src/play/labels.ts` | Thai labels for actions, perk choices, windows |
 | `src/play/fx/` | Sound effects (`audio.ts`) and the animation queue (`bus.ts`) |
+| `src/play/tutorial/` | Tutorial mode (`#/tutorial`): chapters (`chapters.ts`) on scenes built from the engine (`scene.ts`), The Entity's guide (`GuideBox`), the runner gating the learner's actions and playing everyone else |
 | `src/play/online/` | Firebase and local (multi-tab) backends, room session. The room carries **moves**, not states: each device replays them on the last checkpoint (`transport.ts`) |
 | `src/data/` | Character, item and map data (Thai + English text, image paths) |
 | `public/assets/` | Card art, maps, minis, sounds (`app/sound/game/` = game sound clips) |
@@ -148,6 +149,14 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   player's colour, picked in the lobby from a fixed set, one per member (`pings.ts`, `PingLayer`,
   `online/pingColors.ts`). Everyone sees it, the killer too (no secret talk, p.8); spam is limited on the device and by
   the database rules. Not part of the game: never saved or replayed.
+- **Chat (online):** one channel for the room, the killer reads it too (p.8), spectators may write
+  (`chat.ts`, `ChatPanel`, `ChatDock`). Lobby: a panel beside the room on wide screens, a 💬 button
+  otherwise. Game: a 💬 tab under the side panel's tab opens a drawer (Enter to type), an unread
+  badge, and each new message as a 6 s bubble beside the sender's tile. Never saved or replayed.
+  Notices in it (joined, left, kicked, lost connection, back) come from the members' changes.
+- **Presence (online):** a member whose connection drops leaves the lobby by itself (Firebase
+  `onDisconnect`, `Room.presence`); in a game they keep their seat, marked `dropped`. Re-set after
+  every reconnection (`settle` in `session.ts`).
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
   already offers and show "เลือกบนแผนที่" instead. The exception is a survivor's perk aimed on the

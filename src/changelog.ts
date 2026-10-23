@@ -12,6 +12,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.8.0',
+    date: '2026-10-23',
+    items: [
+      'โหมด Tutorial ฝั่งผู้รอดชีวิต 10 บท — The Entity พาเล่นบนกระดานจริงทีละขั้น ตั้งแต่การเดินจนถึงการหนี พร้อมคำถามท้ายบท',
+      'ผู้รอดชีวิตใหม่: Renato Lyra และ Thalita Lyra',
+      'Background Player, Blood Rush, Situational Awareness และ Renewal ใช้ได้ตอนจบ Bonus Turn ด้วย (กฎบ้าน)',
+      'แชทในห้อง Online ทั้งใน Lobby และระหว่างเกม — ข้อความขึ้นเป็นฟองข้างรูปผู้ส่ง มีข้อความด่วน และแจ้งเมื่อมีคนเข้า ออก ถูกเตะ หรือหลุด',
+      'Online: คนที่ปิดแท็บหรือเน็ตหลุดใน Lobby ถูกเอาออกจากห้องเอง และห้องไม่ค้างเพราะคนที่หลุดไปแล้ว',
+      'ชื่อแอปใหม่ "ดบดล — Dead by Daylight: The Board Game" และโลโก้ใหม่',
+    ],
+  },
+  {
     version: '1.7.1',
     date: '2026-10-23',
     items: [
