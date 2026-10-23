@@ -13,6 +13,7 @@ import {
   reignCards,
   itemUses,
   killerInteractions,
+  killerCardCount,
   killerMoves,
   hookHere,
   isPower,
@@ -197,8 +198,14 @@ function faceDown(st: GameState): string[] {
 
 /** The killer's two cards, by place in the hand (The Blight holds two copies of each). */
 function killerPlans(st: GameState): Action[] {
+  // two cards in order (The Unknown: one per Unknown on the board), by place in the hand
+  const n = killerCardCount(st)
   const out: Action[] = []
-  st.killer.hand.forEach((l, i) => st.killer.hand.forEach((r, j) => i !== j && out.push({ t: 'planKiller', cards: [l, r] })))
+  const pick = (used: number[]) => {
+    if (used.length === n) return void out.push({ t: 'planKiller', cards: used.map((h) => st.killer.hand[h]) })
+    st.killer.hand.forEach((_, h) => !used.includes(h) && pick([...used, h]))
+  }
+  pick([])
   return out
 }
 

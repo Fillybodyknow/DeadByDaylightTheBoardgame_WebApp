@@ -135,6 +135,15 @@ export interface KillerState {
   bonusUsed: boolean
   /** The planned card played as this round's bonus turn (its index), once there is one. */
   bonusAt?: number | null
+  /**
+   * The Unknown: the room of each of its four minis (index = its number - 1), null while off the
+   * board. One of them is "the killer" at a time, standing in `room` (its own entry here is stale):
+   * `unknownAt`. On his turns it is the one whose card is played.
+   */
+  unknowns?: (string | null)[]
+  unknownAt?: number
+  /** Unbound: copies of movement cards added to his hand for good. */
+  extraCards?: MoveCard[]
   /** Bear traps not on the board (The Trapper has 4). */
   trapsInSupply: number
   /** Planned cards shown to the survivors early (Lightborn), by index. */
@@ -273,6 +282,8 @@ export type KillerInteraction =
   | { k: 'birds'; dire: boolean; room: string }
   /** The Skull Merchant's Eyes in the Sky: a face-up Drone anywhere back to his board, or one from it face up into his room. */
   | { k: 'droneTake'; prop: string }
+  /** The Unknown's Hallucination: the lowest-numbered Unknown off the board into a connected room. */
+  | { k: 'hallucinate'; room: string }
   | { k: 'droneDrop' }
   /** Pain Resonance: an empty hook in his room, and a survivor next door is wounded. */
   | { k: 'painResonance'; target: number }
@@ -294,7 +305,9 @@ export type PerkWindow =
   /** `target`: the survivor he attacked or picked up, when it was one (Unrelenting). */
   | { k: 'afterKillerInteract'; turn: number; target?: number }
   | { k: 'palletBlock'; path: string; to: string }
-  | { k: 'genDone' }
+  | { k: 'genDone'; prop?: string }
+  /** Progress is about to be added to a generator (Undone may take one off). */
+  | { k: 'genProgress'; prop: string; add: number; s: number }
   | { k: 'afterCardMove'; s: number; from: string; to: string; path: string }
   | { k: 'cleanupStart' }
   /**
@@ -573,6 +586,8 @@ export type Task =
   | { k: 'survivorStep'; s: number; path: string; to: string }
   /** Thrill of the Hunt: the killer follows survivor `s` along `path`, if they left. */
   | { k: 'killerFollow'; s: number; path: string; to: string }
+  /** Progress added to a generator, held while Undone was asked. */
+  | { k: 'addGen'; prop: string; add: number; s: number }
   | { k: 'killerInteract'; turn: number }
   /** `ended`: the end-of-turn perks were asked. */
   | { k: 'endKillerTurn'; turn: number; extra?: boolean; ended?: boolean }

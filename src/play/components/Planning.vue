@@ -7,7 +7,7 @@
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
-import { CARD_NAMES, directRoom, isDirect, isPathCard, killerMoves, roomName, turnOrder } from '../engine/engine'
+import { CARD_NAMES, directRoom, isDirect, isPathCard, killerCardCount, killerMoves, roomName, turnOrder, unknownRooms } from '../engine/engine'
 import { KILLER_PLAYER, handsToPlan } from '../engine/seats'
 import type { GameState, MoveCard } from '../engine/types'
 import { choicePreview, preview } from '../focus'
@@ -153,10 +153,15 @@ function confirmSurvivors() {
 // ---------- killer ----------
 
 /**
- * The two slots (left, right): the place in the hand of the card set there, or null. By place,
- * as The Blight's hand holds two of each card.
+ * The slots (left, right; The Unknown: one per Unknown on the board, 1 first): the place in the
+ * hand of the card set there, or null. By place, as a hand may hold two of a card (The Blight,
+ * Unbound).
  */
-const killerSlots = ref<(number | null)[]>([null, null])
+const slotCount = computed(() => killerCardCount(props.st))
+const killerSlots = ref<(number | null)[]>(Array(slotCount.value).fill(null))
+watch(slotCount, (n) => (killerSlots.value = Array(n).fill(null)))
+/** The Unknown: each slot is an Unknown's card. */
+const unknown = computed(() => !!props.st.killer.unknowns)
 const killerPicks = computed(() => killerSlots.value.map((h) => (h === null ? null : props.st.killer.hand[h])))
 const killerReady = computed(() => killerSlots.value.every((h) => h !== null))
 const SIDE = ['ซ้าย', 'ขวา']
@@ -168,7 +173,7 @@ const copiesOf = (card: MoveCard) => props.st.killer.hand.flatMap((c, h) => (c =
 const killerHand = computed<HandCard[]>(() =>
   [...new Set(props.st.killer.hand)].map((card) => {
     const copies = copiesOf(card)
-    const sides = killerSlots.value.flatMap((h, i) => (h !== null && copies.includes(h) ? [SIDE[i]] : []))
+    const sides = killerSlots.value.flatMap((h, i) => (h !== null && copies.includes(h) ? [unknown.value ? `U${i + 1}` : SIDE[i]] : []))
     return { card, picked: sides.length > 0, ...(sides.length ? { badge: sides.join(' + ') } : {}), ...(copies.length > 1 ? { count: copies.length - sides.length } : {}) }
   }),
 )
@@ -187,7 +192,7 @@ function pickKiller(card: MoveCard) {
   const empty = slots.indexOf(null)
   if (mine.length && (!free.length || empty < 0)) slots[mine[mine.length - 1]] = null
   else if (empty >= 0) slots[empty] = free[0]
-  else slots[1] = free[0]
+  else slots[slots.length - 1] = free[0]
 }
 
 /** Take back the card in one slot (left or right); the slot stays empty for the next pick. */
@@ -212,6 +217,8 @@ const directHand = computed(() => props.st.killer.hand.some(isDirect) || killerP
 
 const killerFrom = computed(() => {
   const st = props.st
+  // The Unknown: the next card is played by the next Unknown, from where it stands
+  if (unknown.value) return [unknownRooms(st)[Math.max(0, killerSlots.value.indexOf(null))] ?? st.killer.room]
   const first = killerPicks.value[0]
   if (killerSlots.value.indexOf(null) !== 1 || !first || first === 'wait') return [st.killer.room]
   // the Dredge's direct card: its start room (or nowhere new if he is there already)
@@ -238,7 +245,7 @@ function confirmKiller() {
   if (!killerReady.value) return
   if (dispatch({ t: 'planKiller', cards: killerPicks.value as MoveCard[] })) {
     sfx.entity()
-    killerSlots.value = [null, null]
+    killerSlots.value = Array(slotCount.value).fill(null)
     preview.value = null
   }
 }
@@ -334,21 +341,23 @@ function confirmKiller() {
 
   <!-- killer -->
   <section v-else class="card panel">
-    <h2>{{ st.killer.name }}: เลือกการ์ด 2 ใบ</h2>
-    <p v-if="directHand" class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · การ์ดตรงพาไปห้องเริ่มต้นที่มีเลขเดียวกับการ์ด (ไอคอนมุมซ้ายบนของห้อง) — อยู่ห้องนั้นแล้ว = เคลื่อนที่ไม่ได้และเสียการ Interact</p>
+    <h2>{{ st.killer.name }}: เลือกการ์ด {{ slotCount }} ใบ</h2>
+    <p v-if="unknown" class="muted">การ์ดหนึ่งใบต่อ The Unknown หนึ่งตัวบนกระดาน — ใบที่ 1 ของตัวหมายเลข 1, ใบที่ 2 ของตัวหมายเลข 2… แต่ละตัวเดินจากห้องของตัวเอง · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
+    <p v-else-if="directHand" class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · การ์ดตรงพาไปห้องเริ่มต้นที่มีเลขเดียวกับการ์ด (ไอคอนมุมซ้ายบนของห้อง) — อยู่ห้องนั้นแล้ว = เคลื่อนที่ไม่ได้และเสียการ Interact</p>
     <p v-else class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
     <p v-if="st.step.t === 'planSurvivors'" class="muted small">วางแผนพร้อมกับผู้รอดชีวิต — การ์ดของพวกเขาคว่ำอยู่ รอบจะเริ่มเมื่อทุกคนยืนยันครบ</p>
     <p v-for="c in faceUpFirst" :key="c.name" class="stridor-note">👁 {{ c.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[c.card] }}</b></p>
     <div class="slots">
-      <button v-for="i in [0, 1]" :key="i" type="button" class="slot" :class="{ filled: killerPicks[i] }" :disabled="!killerPicks[i]" :title="killerPicks[i] ? 'คลิกเพื่อเอาใบนี้ออก' : ''" @click="clearSlot(i)">
-        <span class="muted small">{{ i === 0 ? 'เทิร์น 1 (ซ้าย)' : 'เทิร์น 2 (ขวา)' }}</span>
+      <button v-for="(_, i) in killerSlots" :key="i" type="button" class="slot" :class="{ filled: killerPicks[i] }" :disabled="!killerPicks[i]" :title="killerPicks[i] ? 'คลิกเพื่อเอาใบนี้ออก' : ''" @click="clearSlot(i)">
+        <span class="muted small">{{ unknown ? `The Unknown ${i + 1}` : i === 0 ? 'เทิร์น 1 (ซ้าย)' : 'เทิร์น 2 (ขวา)' }}</span>
         <img v-if="killerPicks[i]" :src="asset(cardImage(killerPicks[i]!))" :alt="cardLabel(killerPicks[i]!)" />
         <img v-else class="empty" :src="asset(KILLER_CARD_BACK)" alt="" />
         <span v-if="killerPicks[i]" class="remove" aria-hidden="true">✕</span>
       </button>
-      <button type="button" class="swap" :disabled="!killerReady" title="สลับซ้าย / ขวา" @click="swapKiller">⇄ สลับ</button>
+      <button v-if="slotCount === 2" type="button" class="swap" :disabled="!killerReady" title="สลับซ้าย / ขวา" @click="swapKiller">⇄ สลับ</button>
     </div>
-    <p v-if="directHand" class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูว่าพาไปห้องไหน (ห้องจะกระพริบบนแผนที่) · คลิกเพื่อเลือก (ใบแรก = ซ้าย)</p>
+    <p v-if="unknown" class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูว่าพาไปห้องไหน · คลิกเพื่อเลือก (ใบแรก = The Unknown 1) — หรือคลิกเส้นทางบนแผนที่จากห้องของตัวถัดไป (คลิกที่ห้อง = Wait)</p>
+    <p v-else-if="directHand" class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูว่าพาไปห้องไหน (ห้องจะกระพริบบนแผนที่) · คลิกเพื่อเลือก (ใบแรก = ซ้าย)</p>
     <p v-else class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดู · คลิกเพื่อเลือก (ใบแรก = ซ้าย) — หรือคลิกเส้นทางบนแผนที่: ใบซ้ายจากห้องตอนนี้, ใบขวาจากห้องที่ใบซ้ายพาไป (คลิกที่ห้อง = Wait)</p>
     <p class="muted small">คลิกการ์ดในช่องเพื่อเอาใบนั้นออก</p>
     <button class="primary" :disabled="!killerReady" @click="confirmKiller">
@@ -357,7 +366,7 @@ function confirmKiller() {
 
     <CardHand
       :cards="killerHand"
-      :label="`มือของ ${st.killer.name} — เลือกแล้ว ${killerPicks.filter(Boolean).length}/2`"
+      :label="`มือของ ${st.killer.name} — เลือกแล้ว ${killerPicks.filter(Boolean).length}/${slotCount}`"
       @pick="pickKiller"
       @hover="hover($event, 'killer')"
     />

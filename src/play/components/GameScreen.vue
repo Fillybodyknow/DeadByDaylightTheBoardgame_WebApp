@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
-import { anyMoves, boardOf, survivorInteractions, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showPerk, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
@@ -792,9 +792,10 @@ watch(timeLeft, (t) => {
 const terror = computed(() => {
   const st = view.value
   if (st.phase === 'over') return 0
-  const k = st.killer.room
-  const near = new Set(touchingPaths(st, k).flatMap((p) => [p.a, p.b]))
-  const level = (room: string) => (room === k ? 2 : near.has(room) ? 1 : 0)
+  // every mini that is "the killer" (The Unknown has up to four)
+  const ks = [st.killer.room, ...unknownRooms(st).filter((r): r is string => !!r)]
+  const near = new Set(ks.flatMap((k) => touchingPaths(st, k).flatMap((p) => [p.a, p.b])))
+  const level = (room: string) => (ks.includes(room) ? 2 : near.has(room) ? 1 : 0)
   const subjects =
     st.phase === 'survivors' && st.activeSurvivor !== null
       ? [st.activeSurvivor]
@@ -822,7 +823,8 @@ const chase = computed<ChaseLayer | null>(() => {
   const st = view.value
   if (st.phase === 'setup' || st.phase === 'over') return null
   // Victor is the killer too, so either mini standing on someone is a chase
-  const rooms = [charlotteRoom(st), victorRoom(st)].filter((r): r is string => !!r)
+  // (and every Unknown: all of them are the killer)
+  const rooms = [charlotteRoom(st), victorRoom(st), ...unknownRooms(st)].filter((r): r is string => !!r)
   const carried = st.survivors.flatMap((sv, i) => (sv.status === 'carried' ? [i] : []))
   const cornered = st.survivors.flatMap((sv, i) => (sv.status === 'board' && rooms.includes(sv.room) ? [i] : []))
   const subjects = carried.length ? carried : cornered
@@ -894,6 +896,9 @@ const secretFor = computed<'killer' | 'survivors' | null>(() => {
   const s = view.value.step
   // Lightborn shows both planned cards to pick one: only one of them is turned face up
   if (s.t === 'offer' && (s.perk === 'tinkerer' || s.perk === 'zanshin_tactics' || s.perk === 'lightborn')) return 'killer'
+  // Unforeseen for The Unknown: each one's card is shown, to pick which goes
+  const k = view.value.killer
+  if (s.t === 'offer' && s.perk === 'unforeseen' && k.unknowns && k.revealedCount < k.planned.length) return 'killer'
   // Redeemer: the card discarded face down is picked first.
   if (s.t === 'killerInteract' && powerMode.value && view.value.killer.characterId === 'deathslinger') return 'killer'
   if (s.t === 'replaceCard') return 'survivors'
@@ -903,6 +908,7 @@ const secretFor = computed<'killer' | 'survivors' | null>(() => {
 const secretWhat = computed(() => {
   const s = view.value.step
   if (s.t === 'offer' && s.perk === 'lightborn') return 'เลือกการ์ดที่วางไว้ใบที่จะเปิดหงาย (Lightborn)'
+  if (s.t === 'offer' && s.perk === 'unforeseen') return 'เลือก The Unknown ที่จะย้าย — ดูการ์ดที่คว่ำไว้ของแต่ละตัว (Unforeseen)'
   if (s.t === 'offer') return `เลือกเปลี่ยนการ์ดที่คว่ำไว้ (${s.perk === 'tinkerer' ? 'Tinkerer' : 'Zanshin Tactics'})`
   return 'เลือกการ์ดที่จะทิ้งแบบคว่ำ (Redeemer)'
 })

@@ -304,6 +304,48 @@ function placeDrones(st: GameState) {
   }
 }
 
+// ---------- The Unknown: four minis, one of them "the killer" at a time ----------
+
+/** The Unknowns on the board, by number - 1 (each one's room; the acting one stands in `room`). */
+export function unknownRooms(st: GameState): (string | null)[] {
+  const k = st.killer
+  if (!k.unknowns) return []
+  return k.unknowns.map((r, i) => (i === (k.unknownAt ?? 0) ? k.room : r))
+}
+
+/** How many Unknowns stand on the board (they are placed lowest number first: 1..n). */
+export function unknownCount(st: GameState): number {
+  return unknownRooms(st).filter((r) => r !== null).length
+}
+
+/**
+ * The killer stands in `room`: his mini (Charlotte for The Twins), or any Unknown — all of them
+ * are "the Killer" (The Unknown's passive). For what survivors ask of the killer's room.
+ */
+export function killerIn(st: GameState, room: string): boolean {
+  return room === charlotteRoom(st) || unknownRooms(st).includes(room)
+}
+
+/** The Unknown numbered `i + 1` becomes "the killer" (stands in `room`). */
+function actAs(st: GameState, i: number) {
+  const k = st.killer
+  if (!k.unknowns || (k.unknownAt ?? 0) === i || !k.unknowns[i]) return
+  k.unknowns[k.unknownAt ?? 0] = k.room
+  k.room = k.unknowns[i]!
+  k.unknownAt = i
+}
+
+/** Something a survivor does sends "the killer" in `room` somewhere: the Unknown standing there. */
+function actAtRoom(st: GameState, room: string) {
+  const i = unknownRooms(st).indexOf(room)
+  if (i >= 0) actAs(st, i)
+}
+
+/** Cards the killer plans: one per Unknown on the board for The Unknown, two for anyone else. */
+export function killerCardCount(st: GameState): number {
+  return st.killer.unknowns ? unknownCount(st) : 2
+}
+
 /** Drones on The Skull Merchant's board. */
 export function merchantDrones(st: GameState): Prop[] {
   return st.props.filter((p) => p.kind === 'drone' && p.merchant)
@@ -324,6 +366,9 @@ function rollStartRooms(st: GameState) {
   const kf = rollFace(st)
   st.killer.room = startRoom(kf)
   placeDrones(st)
+  // The Unknown's passive: setup is made with The Unknown labelled 1; the others wait off the board
+  if (st.killer.characterId === 'unknown' && !st.killer.unknowns)
+    Object.assign(st.killer, { unknowns: [st.killer.room, null, null, null], unknownAt: 0, bonusUsed: true })
   log(st, `${st.killer.name} ทอยได้ ${kf} เริ่มที่ ${roomName(st, st.killer.room)}`, 'killer')
 }
 
@@ -543,10 +588,10 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
   // The Twins: Victor can be removed by a survivor in his room.
   if (victorRoom(st) === sv.room) out.push({ k: 'removeVictor' })
   // Power Struggle (Élodie): with the killer (Charlotte for The Twins), before their first card.
-  if (charlotteRoom(st) === sv.room && st.killer.revealedCount === 0 && st.killer.planned.length && perkReady(st, s, 'power_struggle')) out.push({ k: 'powerStruggle' })
+  if (killerIn(st, sv.room) && st.killer.revealedCount === 0 && st.killer.planned.length && perkReady(st, s, 'power_struggle')) out.push({ k: 'powerStruggle' })
   // Diversion (Adam): send the killer in this room along any path but one with a pallet (a wall
   // he breaks on the way, as on any move of his).
-  if (st.killer.room === sv.room && perkReady(st, s, 'diversion'))
+  if (killerIn(st, sv.room) && victorRoom(st) !== sv.room && perkReady(st, s, 'diversion'))
     for (const p of touchingPaths(st, sv.room)) if (!palletOn(st, p.id)) out.push({ k: 'diversion', path: p.id })
   return out
 }
@@ -771,7 +816,7 @@ function handle(st: GameState, a: Action) {
       // way, so nobody learns anything new, and nobody waits for a turn to plan. His choice is
       // held until the survivors are in, and whoever confirms last starts the round.
       if (a.t === 'planKiller') {
-        if (a.cards.length !== 2 || !takeCards(st.killer.hand, a.cards)) fail('pick 2 cards from the hand')
+        if (a.cards.length !== killerCardCount(st) || !takeCards(st.killer.hand, a.cards)) fail(`pick ${killerCardCount(st)} cards from the hand`)
         // the survivors were all in already (their plans still drafts): the round starts now
         const drafted = st.planDraft
         if (drafted && survivorsPlanned(st, drafted)) {
@@ -841,11 +886,11 @@ function handle(st: GameState, a: Action) {
       if (a.t !== 'move') break
       const m = survivorMoves(st, step.s, step.card).find((e) => e.path.id === a.path) ?? fail('cannot move there')
       const leave: PerkWindow = { k: 'survivorLeave', s: step.s, to: m.to, path: m.path.id }
-      if (st.survivors[step.s].room === charlotteRoom(st) && perkCandidates(st, leave, []).length) {
+      if (killerIn(st, st.survivors[step.s].room) && perkCandidates(st, leave, []).length) {
         st.queue.unshift({ k: 'trigger', w: leave, done: [] }, { k: 'survivorGo', s: step.s, path: m.path.id, to: m.to })
         return
       }
-      if (m.to === charlotteRoom(st) && perkCandidates(st, { k: 'preEnter', s: step.s, to: m.to, path: m.path.id }, []).length) {
+      if (killerIn(st, m.to) && perkCandidates(st, { k: 'preEnter', s: step.s, to: m.to, path: m.path.id }, []).length) {
         st.queue.unshift({ k: 'trigger', w: { k: 'preEnter', s: step.s, to: m.to, path: m.path.id }, done: [] }, { k: 'survivorGo', s: step.s, path: m.path.id, to: m.to })
         return
       }
@@ -1291,6 +1336,9 @@ function runTask(st: GameState, task: Task) {
       st.queue.splice(2, 0, { k: 'phantasmHit', i: task.i })
       return
     }
+    case 'addGen':
+      addGenerator(st, st.props.find((p) => p.id === task.prop)!, task.add, task.s, true)
+      return
     case 'killerFollow': {
       // Deerstalker may have kept them in the room: then there is no one to follow
       if (st.survivors[task.s].room !== task.to) return
@@ -1477,6 +1525,8 @@ function runTask(st: GameState, task: Task) {
         wait(st, { t: 'twinChoice', turn: task.turn })
         return
       }
+      // The Unknown: the card is played by the Unknown it was set for (card 1 by Unknown 1…)
+      if (k.unknowns) actAs(st, task.turn)
       const card = k.planned[task.turn]
       k.revealedCount = task.turn + 1
       st.canInteract = true
@@ -1531,11 +1581,14 @@ function runTask(st: GameState, task: Task) {
         return
       }
       if (task.extra) return // Devour Hope's turn: cleanup is already queued
-      if (task.turn === 0) st.queue.unshift({ k: 'killerTurn', turn: 1 })
-      // Shadowborn placed a third card at the end of planning (or Coup de Grâce added one).
-      else if (task.turn + 1 < k.planned.length) st.queue.unshift({ k: 'killerTurn', turn: task.turn + 1 })
+      // the next card (The Unknown may have only one; Shadowborn or Coup de Grâce may have added a third)
+      if (task.turn + 1 < k.planned.length) st.queue.unshift({ k: 'killerTurn', turn: task.turn + 1 })
       else if (task.turn === 1 && !k.bonusUsed && k.bp >= bonusCost(st) && k.hand.length > 0) wait(st, { t: 'killerBonusOffer' })
-      else queueCleanup(st)
+      else {
+        // his turns over: Unknown 1 stands for him again
+        if (k.unknowns) actAs(st, 0)
+        queueCleanup(st)
+      }
       return
     }
     case 'cleanup':
@@ -1598,11 +1651,11 @@ function planSurvivors(st: GameState, cards: (MoveCard | null)[]) {
 
 /** The killer's two cards are set (in either planning order): the round can start. */
 function finishKillerPlan(st: GameState, cards: MoveCard[]) {
-  const [l, r] = cards
-  // two copies of one card only with The Blight's doubled hand
-  const left = cards.length === 2 ? takeCards(st.killer.hand, [l, r]) : null
-  if (!left) fail('pick 2 cards from the hand')
-  st.killer.planned = [l, r]
+  // two cards (The Unknown: one per Unknown on the board, Unknown 1 first); two copies of one card
+  // only from a hand that holds two (The Blight's doubled hand, Unbound)
+  const left = cards.length === killerCardCount(st) ? takeCards(st.killer.hand, cards) : null
+  if (!left) fail(`pick ${killerCardCount(st)} cards from the hand`)
+  st.killer.planned = [...cards]
   st.killer.hand = left
   log(st, 'วางแผนเสร็จ ทุกคนวางการ์ดคว่ำแล้ว', 'game')
   const first = turnOrder(st).find((i) => st.survivors[i].planned)
@@ -1635,7 +1688,7 @@ function leaveLocker(st: GameState, s: number) {
 function moveSurvivor(st: GameState, s: number, path: PathDef, to: string, asked = false) {
   const sv = st.survivors[s]
   const from = sv.room
-  if (!asked && from !== to && from === charlotteRoom(st)) {
+  if (!asked && from !== to && killerIn(st, from)) {
     const w: PerkWindow = { k: 'survivorLeave', s, to, path: path.id }
     if (perkCandidates(st, w, []).length) {
       st.queue.unshift({ k: 'trigger', w, done: [] }, { k: 'survivorStep', s, path: path.id, to })
@@ -1656,7 +1709,7 @@ function survivorArrives(st: GameState, s: number, from: string, to: string, pat
   // Dissolution: the ▲ on this path wounds whoever moves along it
   if (path && st.dissolution && tokenOf(boardOf(st), path) === st.dissolution && !sv.wounded) wound(st, s, 'perk', `${sv.name} เดินผ่าน Dissolution — บาดเจ็บ`)
   // Overzealous pays its owner by itself, walking into the killer's room
-  if (to === charlotteRoom(st) && sv.status === 'board' && perkReady(st, s, 'overzealous')) {
+  if (killerIn(st, to) && sv.status === 'board' && perkReady(st, s, 'overzealous')) {
     payPerk(st, s, 'overzealous', '+1 ▲')
     gainSurvivor(st, s, 1)
   }
@@ -1724,6 +1777,8 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       log(st, `${sv.name} ไล่ Victor ออกจากกระดาน`, s)
       return
     case 'diversion': {
+      // the Unknown in this room is the one sent off
+      actAtRoom(st, sv.room)
       const p = pathDef(st, i.path)
       const to = p.a === st.killer.room ? p.b : p.a
       payPerk(st, s, 'diversion', `ส่ง ${st.killer.name} ไป ${roomName(st, to)} (ฆาตกร +1 ▲)`)
@@ -2237,7 +2292,17 @@ function cleanup(st: GameState) {
     sv.acted = false
     sv.woundedThisRound = false
   }
-  Object.assign(st.killer, { hand: killerDeck(st.killer.characterId), planned: [], revealedCount: 0, plannedShown: false, powerUsed: false, bonusUsed: false, bonusAt: null, shown: [] })
+  // (The Unknown can't take killer bonus turns: its round starts with the bonus spent)
+  Object.assign(st.killer, {
+    hand: [...killerDeck(st.killer.characterId), ...(st.killer.extraCards ?? [])],
+    planned: [],
+    revealedCount: 0,
+    plannedShown: false,
+    powerUsed: false,
+    bonusUsed: !!st.killer.unknowns,
+    bonusAt: null,
+    shown: [],
+  })
   Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], genBy: {}, empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
@@ -2402,9 +2467,10 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
     case 'repair': {
       const gen = st.props.find((p) => p.id === ctx.prop)!
       const add = isGreat(dice[0]) ? 2 : ok ? 1 : 0
-      addGenerator(st, gen, add, s)
-      if (!ok) trigger(st, { k: 'repairFail', s, prop: gen.id })
-      else trigger(st, { k: 'repaired', s, prop: gen.id })
+      // (held for Undone: the windows of the repair come after the progress, as they would)
+      const at = addGenerator(st, gen, add, s) ? 2 : 0
+      if (!ok) trigger(st, { k: 'repairFail', s, prop: gen.id }, at)
+      else trigger(st, { k: 'repaired', s, prop: gen.id }, at)
       return
     }
     case 'phantasm':
@@ -2544,7 +2610,16 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
   }
 }
 
-function addGenerator(st: GameState, gen: Prop, add: number, s: number) {
+/**
+ * Progress onto a generator. Undone may take one off first: the progress is then held (an `addGen`
+ * task after the perk is asked) and the function says so (true).
+ */
+function addGenerator(st: GameState, gen: Prop, add: number, s: number, asked = false): boolean {
+  const w: PerkWindow = { k: 'genProgress', prop: gen.id, add, s }
+  if (!asked && add > 0 && perkCandidates(st, w, []).length) {
+    st.queue.unshift({ k: 'trigger', w, done: [] }, { k: 'addGen', prop: gen.id, add, s })
+    return true
+  }
   const before = gen.progress
   gen.progress = Math.min(PROGRESS_MAX, gen.progress + add)
   log(st, `Generator ${gen.progress}/${PROGRESS_MAX}`, 'game', { ev: { k: 'repair', s, prop: gen.id, add: gen.progress - before, progress: gen.progress } })
@@ -2559,8 +2634,9 @@ function addGenerator(st: GameState, gen: Prop, add: number, s: number) {
       gainSurvivor(st, i, 1)
     })
     // Tinkerer.
-    trigger(st, { k: 'genDone' })
+    trigger(st, { k: 'genDone', prop: gen.id })
   }
+  return false
 }
 
 // ---------- items ----------
@@ -3203,6 +3279,27 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     }
     case 'spirit_fury':
       return w.k === 'killerBreak' && w.what === 'pallet' ? NONE : []
+    // ----- The Unknown -----
+    case 'unbound': {
+      // a movement card he holds only one of: a second one, for good
+      if (w.k !== 'planningStart') return []
+      const single = [...new Set(k.hand)].filter((c) => k.hand.filter((x) => x === c).length === 1)
+      return single.map((card) => ({ card }))
+    }
+    case 'undone': {
+      // progress about to go onto a generator in his room (any Unknown's)
+      if (w.k !== 'genProgress') return []
+      const gen = st.props.find((p) => p.id === w.prop)
+      return gen?.room && killerIn(st, gen.room) ? NONE : []
+    }
+    case 'unforeseen': {
+      // a generator completed: straight to its room (The Unknown: one of them, of his choice)
+      if (w.k !== 'genDone' || !w.prop) return []
+      const room = st.props.find((p) => p.id === w.prop)?.room
+      if (!room) return []
+      if (!k.unknowns) return k.room === room ? [] : NONE
+      return unknownRooms(st).flatMap((r, index) => (r && r !== room ? [{ index }] : []))
+    }
     // ----- The Skull Merchant -----
     case 'game_afoot': {
       // an attack on someone healthy in his room on his bonus turn: a pick-up instead
@@ -3252,7 +3349,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // a survivor walking into his room, by any move
       if (w.k !== 'entered') return []
       const sv = st.survivors[w.s]
-      return sv.status === 'board' && sv.room === charlotteRoom(st) ? NONE : []
+      return sv.status === 'board' && killerIn(st, sv.room) ? NONE : []
     }
     // ----- The Clown -----
     case 'coulrophobia':
@@ -3453,7 +3550,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return st.props.flatMap((p) => (p.kind === 'hook' && p.revealed && p.room && !p.removed && p.occupant === null && !entityOn(st, { prop: p.id }) ? [{ prop: p.id }] : []))
     case 'distortion':
       // any move of his on his turn into the killer's room: again, along another path
-      if (w.k !== 'entered' || w.s !== o || st.activeSurvivor !== o || me!.room !== charlotteRoom(st)) return []
+      if (w.k !== 'entered' || w.s !== o || st.activeSurvivor !== o || !killerIn(st, me!.room)) return []
       return anyMoves(st, o as number)
         .filter((m) => m.path.id !== w.path)
         .map((m) => ({ path: m.path.id }))
@@ -3942,6 +4039,8 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     }
     case 'quick_gambit': {
       const { s, path, to } = w as Extract<PerkWindow, { k: 'survivorLeave' }>
+      // The Unknown: the one in the room they leave is the one that follows
+      actAtRoom(st, st.survivors[s].room)
       payPerk(st, o, perk, `${st.killer.name} เดินตามไป ${roomName(st, to)}`)
       // after their move (if Deerstalker doesn't keep them in the room), as Thrill of the Hunt
       const at = st.queue.findIndex((t) => (t.k === 'survivorGo' || t.k === 'survivorStep') && t.s === s)
@@ -4395,6 +4494,24 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       st.canInteract = false
       return
     }
+    case 'unbound':
+      payPerk(st, o, perk, `เพิ่ม ${CARD_NAMES[c.card!]} อีก 1 ใบเข้ามือ`)
+      k.hand.push(c.card!)
+      k.extraCards = [...(k.extraCards ?? []), c.card!]
+      return
+    case 'undone': {
+      const { prop } = w as Extract<PerkWindow, { k: 'genProgress' }>
+      const task = st.queue.find((t): t is Extract<Task, { k: 'addGen' }> => t.k === 'addGen' && t.prop === prop)!
+      payPerk(st, o, perk, `Generator ได้ความคืบหน้าน้อยลง 1 (${task.add} → ${task.add - 1})`)
+      task.add--
+      return
+    }
+    case 'unforeseen': {
+      const room = st.props.find((p) => p.id === (w as { prop: string }).prop)!.room!
+      if (k.unknowns) actAs(st, c.index!)
+      payPerk(st, o, perk, `ตรงไปที่ ${roomName(st, room)}`)
+      return killerEnter(st, '', room)
+    }
     case 'game_afoot': {
       const { target } = w as Extract<PerkWindow, { k: 'preKillerInteract' }>
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')!
@@ -4567,7 +4684,7 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
 // ---------- killer powers ----------
 
 export function isPower(i: KillerInteraction): boolean {
-  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'reign', 'birds', 'droneTake', 'droneDrop'].includes(i.k)
+  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'reign', 'birds', 'droneTake', 'droneDrop', 'hallucinate'].includes(i.k)
 }
 
 // ---------- The Twins ----------
@@ -4659,6 +4776,11 @@ export function powerOptions(st: GameState): KillerInteraction[] {
     case 'blight':
       // Blighted Corruption: needs a card to discard.
       return k.hand.length ? [{ k: 'rush' }] : []
+    case 'unknown': {
+      // Hallucination: the lowest-numbered Unknown not on the board, into a connected room
+      if (!k.unknowns || !k.unknowns.includes(null)) return []
+      return [...connectedRooms(st, k.room)].map((room) => ({ k: 'hallucinate' as const, room }))
+    }
     case 'skullmerchant':
       // Eyes in the Sky: a face-up Drone anywhere back to his board, or one of his face up into his room
       return [
@@ -4795,6 +4917,12 @@ function usePower(st: GameState, i: KillerInteraction) {
       return
     case 'rush':
       return blightRush(st)
+    case 'hallucinate': {
+      const n = k.unknowns!.indexOf(null)
+      k.unknowns![n] = i.room
+      log(st, `${k.name} ใช้ Hallucination — The Unknown ${n + 1} ปรากฏที่ ${roomName(st, i.room)}`, 'killer')
+      return
+    }
     case 'droneTake': {
       const p = st.props.find((x) => x.id === i.prop)!
       log(st, `${k.name} ใช้ Eyes in the Sky — เก็บ Drone ที่ ${roomName(st, p.room!)} กลับขึ้นบอร์ด`, 'killer')

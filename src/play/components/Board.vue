@@ -9,13 +9,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components } from '../../data'
 import { asset } from '../../i18n'
-import { boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, victorRoom } from '../engine/engine'
+import { boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, unknownRooms, victorRoom } from '../engine/engine'
 import type { GameEvent, GameState, Guard, Prop } from '../engine/types'
 import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini } from '../labels'
+import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini, unknownMini } from '../labels'
 import Mini from './Mini.vue'
 import PingLayer from './PingLayer.vue'
 import { canPing, pingArmed, sendPing, shownPings } from '../pings'
@@ -161,6 +161,8 @@ const rooms = computed(() => {
     killer: !props.st.startPending && !hidden.has('k') && charlotteRoom(props.st) === r.id,
     victor: !props.st.startPending && !hidden.has('k') && victorRoom(props.st) === r.id,
     guards: (Object.entries(props.st.guards ?? {}) as [Guard, string | undefined][]).flatMap(([g, room]) => (room === r.id ? [g] : [])),
+    // The Unknown: its other minis (the one standing for the killer is the killer's mini)
+    unknowns: props.st.startPending ? [] : unknownRooms(props.st).flatMap((room, i) => (room === r.id && i !== (props.st.killer.unknownAt ?? 0) ? [i] : [])),
   }))
 })
 
@@ -178,11 +180,12 @@ const rects = computed(() => {
     // the survivors standing take the slots in turn; one being carried rides on the killer
     let slot = 0
     const standing = r.survivors.filter((s) => props.st.survivors[s].status !== 'carried').length
-    const row = rowWithGuards(r.box, standing, r.guards.length, r.killer, r.victor)
+    const row = rowWithGuards(r.box, standing, r.guards.length + r.unknowns.length, r.killer, r.victor)
     for (const s of r.survivors) minis.set(`s${s}`, props.st.survivors[s].status === 'carried' ? carryRect(r.box) : row.survivors[slot++])
     if (r.killer) minis.set('k', miniRect(r.box, 0, true))
     if (r.victor) minis.set('v', victorRect(r.box, r.killer))
     r.guards.forEach((g, i) => minis.set(`g-${g}`, row.guards[i]))
+    r.unknowns.forEach((u, i) => minis.set(`u${u}`, row.guards[r.guards.length + i]))
   }
   return { minis, tiles, tokens }
 })
@@ -749,6 +752,7 @@ function guard(e: MouseEvent) {
         @pointerleave="pressEnd"
       >
         <img :src="asset(killerMini(st))" :alt="st.killer.name" draggable="false" />
+        <b v-if="st.killer.unknowns" class="unknown-no">{{ (st.killer.unknownAt ?? 0) + 1 }}</b>
       </component>
       <component
         :is="canAct('victor') || roomTarget(r.id) ? 'button' : 'div'"
@@ -762,6 +766,11 @@ function guard(e: MouseEvent) {
       >
         <img :src="asset(VICTOR_MINI)" alt="Victor" draggable="false" />
       </component>
+      <!-- The Unknown's other minis, numbered (each plays the card set for its number) -->
+      <div v-for="u in r.unknowns" :key="`u${u}`" :data-mini="`u${u}`" class="mini guard unknown" :style="rectStyle(rects.minis.get(`u${u}`)!)" :title="`The Unknown ${u + 1}`">
+        <img :src="asset(unknownMini(u))" :alt="`The Unknown ${u + 1}`" draggable="false" />
+        <b class="unknown-no">{{ u + 1 }}</b>
+      </div>
       <!-- The Knight's Guards: minis of their own, beside the killer's corner -->
       <div
         v-for="g in r.guards"
@@ -1162,6 +1171,22 @@ button.tile.picked::after {
   filter: drop-shadow(0 0 8px rgb(255 30 30 / 0.85));
 }
 /* The Knight's Guards: his pieces, in a duller red than his own ring */
+/* The Unknown's number on each of its minis */
+.unknown-no {
+  position: absolute;
+  right: -6%;
+  bottom: -6%;
+  min-width: 38%;
+  padding: 0 0.15em;
+  border-radius: 999px;
+  background: #b8332b;
+  color: #fff;
+  font-size: clamp(0.55rem, 0.9vw, 0.8rem);
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.8);
+  pointer-events: none;
+}
 .mini.guard {
   box-shadow:
     0 0 0 2px #b8332b,

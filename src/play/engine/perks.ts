@@ -57,6 +57,9 @@ export type PerkId =
   | 'face_the_darkness'
   | 'nowhere_to_hide'
   | 'hubris'
+  | 'unbound'
+  | 'undone'
+  | 'unforeseen'
   | 'game_afoot'
   | 'leverage'
   | 'thwack'
@@ -287,6 +290,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   pop_goes_the_weasel: def('pop_goes_the_weasel', 'Pop Goes the Weasel', 0, 'killer', 'clown', 2, 'ถามหลังทำให้ผู้รอดชีวิตบาดเจ็บ หรือแขวนบน Hook'),
   face_the_darkness: def('face_the_darkness', 'Face the Darkness', 1, 'killer', 'knight', 0, 'ถามตอนเริ่มเทิร์นฆาตกร ก่อนเปิดการ์ด'),
   nowhere_to_hide: def('nowhere_to_hide', 'Nowhere to Hide', 1, 'killer', 'knight', 1, 'ถามเมื่อคุณค้น Locker ที่มีคนซ่อน'),
+  unbound: def('unbound', 'Unbound', 3, 'killer', 'unknown', 0, 'ถามตอนเริ่มเฟสวางแผน: เพิ่มการ์ดเคลื่อนที่ที่มีใบเดียวอีก 1 ใบเข้ามือถาวร'),
+  undone: def('undone', 'Undone', 1, 'killer', 'unknown', 1, 'ถามเมื่อ Generator ในห้องของคุณจะได้ความคืบหน้า: ลดลง 1 แต้ม'),
+  unforeseen: def('unforeseen', 'Unforeseen', 1, 'killer', 'unknown', 2, 'ถามเมื่อ Generator ซ่อมเสร็จ: ตรงไปห้องของ Generator นั้น'),
   game_afoot: def('game_afoot', 'Game Afoot', 2, 'killer', 'skullmerchant', 0, 'ถามเมื่อคุณจะโจมตีผู้ที่ไม่บาดเจ็บใน Killer bonus turn'),
   leverage: def('leverage', 'Leverage', 1, 'killer', 'skullmerchant', 1, 'ถามตอนเริ่มเฟสวางแผน: ผู้รอดชีวิต 1 คนหายบาดเจ็บไม่ได้รอบนี้'),
   thwack: def('thwack', 'Thwack!', 1, 'killer', 'skullmerchant', 2, 'ถามหลังคุณเปิด prop สีฟ้าหรือสีเขียว'),
@@ -398,4 +404,4 @@ export const DECK_PERKS: PerkId[] = Object.values(PERKS)
   .map((p) => p.id)
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown']

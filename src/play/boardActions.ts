@@ -34,7 +34,7 @@ import {
 import { PERKS, type PerkId } from './engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -524,6 +524,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             // a room offers a Crow and a Dire Crow, when he has both: each with its picture
             add(`room:${i.room}`, label, run)
             out[out.length - 1].icon = i.dire ? DIRE_CROW_IMAGE : PROP_IMAGE.crow
+            break
+          case 'hallucinate':
+            // a connected room: the next Unknown's mini in the chooser
+            add(`room:${i.room}`, label, run)
+            out[out.length - 1].icon = unknownMini((st.killer.unknowns ?? []).indexOf(null))
             break
           case 'droneTake':
             add(`prop:${i.prop}`, label, run)

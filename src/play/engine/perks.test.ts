@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { DIRECT_CARDS, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { DIRECT_CARDS, killerIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { boards } from './boards'
 import { actorsOf } from './seats'
@@ -10,7 +10,7 @@ import type { Action, GameState, MoveCard, PerkWindow, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
 const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah', 'haddie', 'mikaela', 'vittorio', 'renato', 'thalita']
-const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant']
+const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown']
 
 function game(killer = 'trapper', seed = 1): GameState {
   let st = createGame({ board: 'macmillan', survivors: SURVIVORS.map((id) => ({ id, name: id })), killer: { id: killer, name: killer }, players: 5, seed })
@@ -52,7 +52,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(164)
+    expect(Object.keys(PERKS)).toHaveLength(167)
     // the cards that are on no board: their name, cost and text come from the deck data instead
     for (const p of DECK_PERKS) {
       expect(PERKS[p].character, p).toBe('')
@@ -419,7 +419,7 @@ describe('perks', () => {
         const eager = options.filter(
           (a: Action) =>
             (a.t === 'perk' && a.use) ||
-            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'droneTake', 'droneDrop', 'partner', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp', 'search'].includes(a.i.k)) ||
+            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'droneTake', 'droneDrop', 'hallucinate', 'partner', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp', 'search'].includes(a.i.k)) ||
             (a.t === 'useItem') ||
             // Game Afoot's moment is an attack on a bonus turn: that killer takes both when he can
             (only === 'game_afoot' && (a.t === 'bonus' || (a.t === 'interact' && a.i.k === 'attack'))),
@@ -2627,6 +2627,112 @@ describe('The Artist', () => {
   })
 })
 
+describe('The Unknown', () => {
+  /** The Unknown with only these perks, about to interact; the survivors in the shack. */
+  function unknown(...perks: PerkId[]) {
+    const st = game('unknown')
+    only(st, ...perks)
+    killerInteracting(st)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false }))
+    return st
+  }
+
+  it('setup puts The Unknown 1 in the killer\'s start room; it plans one card for its one mini', () => {
+    const st = game('unknown')
+    expect(st.killer.unknowns).toEqual([st.killer.room, null, null, null])
+    // no bonus turns for The Unknown
+    expect(st.killer.bonusUsed).toBe(true)
+  })
+
+  it('Hallucination: the lowest-numbered Unknown off the board into a connected room', () => {
+    const st = unknown()
+    const next = [...connectedRoomsOf(st, st.killer.room)][0]
+    expect(killerInteractions(st)).toContainEqual({ k: 'hallucinate', room: next })
+    const g = apply(st, { t: 'interact', i: { k: 'hallucinate', room: next } })
+    expect(unknownRooms(g)).toEqual([st.killer.room, next, null, null])
+    expect(g.killer.powerUsed).toBe(true)
+    // every Unknown is the killer, for what survivors ask of the killer's room
+    expect(killerIn(g, next)).toBe(true)
+  })
+
+  it('one card per Unknown, each played by its own Unknown from where it stands', () => {
+    let st = game('unknown')
+    const k = st.killer
+    const second = [...connectedRoomsOf(st, k.room)].find((r) => r !== k.room)!
+    k.unknowns = [k.room, second, null, null]
+    st.phase = 'killer'
+    k.planned = ['wait', 'wait']
+    k.hand = k.hand.filter((c) => c !== 'wait')
+    st.step = { t: 'idle' }
+    st.queue = [{ k: 'killerTurn', turn: 0 }]
+    const first = k.room
+    st = apply({ ...st, step: { t: 'turnStart', s: 0 } }, { t: 'continue' })
+    // the first card: Unknown 1, in its room
+    expect(st.killer.unknownAt).toBe(0)
+    expect(st.killer.room).toBe(first)
+    st = apply(st, { t: 'endTurn' })
+    // the second: Unknown 2, standing in its own room
+    expect(st.killer.unknownAt).toBe(1)
+    expect(st.killer.room).toBe(second)
+    expect(unknownRooms(st)).toEqual([first, second, null, null])
+  })
+
+  it('a survivor walking into a room with any Unknown walks into the killer\'s room', () => {
+    const st = unknown()
+    const next = [...connectedRoomsOf(st, st.killer.room)][0]
+    const g = apply(st, { t: 'interact', i: { k: 'hallucinate', room: next } })
+    expect(killerIn(g, g.killer.room)).toBe(true)
+    expect(killerIn(g, next)).toBe(true)
+    expect(killerIn(g, 'nowhere')).toBe(false)
+  })
+
+  it('Unbound: at the start of planning, a second copy of a single card, kept for good', () => {
+    const st = unknown('unbound')
+    const w = { k: 'planningStart' } as const
+    const choices = perkChoices(st, 'unbound', 'killer', w)
+    expect(choices.length).toBeGreaterThan(0)
+    st.step = { t: 'offer', perk: 'unbound', owner: 'killer', w }
+    const card = choices[0].card!
+    const before = st.killer.hand.filter((c) => c === card).length
+    const g = apply(st, { t: 'perk', perk: 'unbound', use: true, choice: { card } })
+    expect(g.killer.hand.filter((c) => c === card).length).toBe(before + 1)
+    expect(g.killer.extraCards).toEqual([card])
+  })
+
+  it('Undone: progress onto a generator in an Unknown\'s room is one less', () => {
+    const base = unknown('undone')
+    const gen = placeProp(base, 'generator', base.killer.room)
+    gen.progress = 0
+    Object.assign(base.survivors[0], { room: base.killer.room })
+    base.phase = 'survivors'
+    base.activeSurvivor = 0
+    base.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    base.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const rolled = (rng: number) => {
+      let x = apply({ ...structuredClone(base), rng }, { t: 'interact', i: { k: 'repair', prop: gen.id } })
+      while (x.step.t === 'roll') x = apply(x, { t: 'acceptRoll' })
+      return x
+    }
+    const asked = findOutcome(rolled, (g) => g.step.t === 'offer' && g.step.perk === 'undone')
+    const w = (asked.step as { w: PerkWindow }).w as Extract<PerkWindow, { k: 'genProgress' }>
+    const g = apply(asked, { t: 'perk', perk: 'undone', use: true, choice: {} })
+    expect(g.props.find((p) => p.id === gen.id)!.progress).toBe(w.add - 1)
+  })
+
+  it('Unforeseen: a generator done, the Unknown of his choice goes straight to its room', () => {
+    const st = unknown('unforeseen')
+    const next = [...connectedRoomsOf(st, st.killer.room)][0]
+    const g0 = apply(st, { t: 'interact', i: { k: 'hallucinate', room: next } })
+    const far = boardOf(g0).rooms.find((r) => r.id !== g0.killer.room && r.id !== next)!.id
+    const gen = placeProp(g0, 'generator', far)
+    const w = { k: 'genDone', prop: gen.id } as const
+    expect(perkChoices(g0, 'unforeseen', 'killer', w)).toEqual([{ index: 0 }, { index: 1 }])
+    g0.step = { t: 'offer', perk: 'unforeseen', owner: 'killer', w }
+    const g = apply(g0, { t: 'perk', perk: 'unforeseen', use: true, choice: { index: 1 } })
+    expect(unknownRooms(g)[1]).toBe(far)
+  })
+})
+
 describe('The Skull Merchant', () => {
   /** The Skull Merchant with only these perks, about to interact; the survivors in the shack. */
   function merchant(...perks: PerkId[]) {
@@ -3159,6 +3265,8 @@ describe('perk cards that are on no board (the edit-perks mode)', () => {
     st.survivors.forEach((sv) => Object.assign(sv, { room: 'backlot', status: 'board' }))
     Object.assign(st.survivors[0], { room: st.killer.room, status: 'carried', wounded: true })
     st.killer.bp = 4
+    // his first of two cards, as on any turn of his
+    Object.assign(st.killer, { planned: ['wait', 'wait'], revealedCount: 1 })
     st.phase = 'killer'
     st.step = { t: 'carryMove', s: 0, steps: 1 }
     st.queue = [{ k: 'endKillerTurn', turn: 0 }]

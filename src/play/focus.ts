@@ -2,7 +2,7 @@
 // to decide with: who is involved, where they are, where they would go, how far the killer is.
 
 import { ref } from 'vue'
-import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, directRoom, isDirect, isPathCard, killerInteractions, killerMoves, isPower, pathDef, perkChoices, propsIn, roomName, showstopperTargets, survivorMoves, touchingPaths } from './engine/engine'
+import { CARD_NAMES, ITEM_NAMES, PROGRESS_MAX, directRoom, isDirect, isPathCard, killerInteractions, killerMoves, isPower, pathDef, perkChoices, propsIn, roomName, showstopperTargets, survivorMoves, touchingPaths, unknownRooms } from './engine/engine'
 import { PERKS } from './engine/perks'
 import type { GameState, KillerInteraction, PerkChoice, PerkOwner, RollContext } from './engine/types'
 
@@ -373,6 +373,8 @@ export function addPower(st: GameState, f: Focus, i: KillerInteraction) {
   // Eyes in the Sky: the Drone's room, or his own
   if (i.k === 'droneTake') f.rooms.push(st.props.find((p) => p.id === i.prop)!.room!)
   if (i.k === 'droneDrop') f.dests.push(room)
+  // Hallucination: the room the next Unknown appears in
+  if (i.k === 'hallucinate') f.dests.push(i.room)
   // Showstopper: his room, the connected ones, and who gets a Knife
   if (i.k === 'showstopper') {
     f.rooms.push(room, ...touchingPaths(st, room).map((p) => (p.a === room ? p.b : p.a)))
@@ -417,6 +419,11 @@ export function choicePreview(st: GameState, c: PerkChoice, from: string, owner?
     out.dests = [end(st, c.path, from)]
   }
   if (c.target !== undefined) out.survivors = [c.target]
+  // Unforeseen: the Unknown picked, where it stands (the generator's room is the dest)
+  if (c.index !== undefined && st.killer.unknowns) {
+    const room = unknownRooms(st)[c.index]
+    if (room) out.rooms = [room]
+  }
   return out
 }
 

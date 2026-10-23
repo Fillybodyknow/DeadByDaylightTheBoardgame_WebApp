@@ -4,7 +4,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components, items, killerById } from '../../data'
 import { asset } from '../../i18n'
-import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
+import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, killerCardCount, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse, PathKind } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
@@ -117,7 +117,8 @@ const peekCards = computed(() => {
   const k = props.st.killer
   return k.planned.map((card, i) => ({
     card,
-    caption: `ใบที่ ${i + 1}${i === 0 ? ' (ซ้าย)' : i === 1 ? ' (ขวา)' : ' (โบนัส)'}`,
+    // The Unknown: each card is one Unknown's
+    caption: props.st.killer.unknowns ? `The Unknown ${i + 1}` : `ใบที่ ${i + 1}${i === 0 ? ' (ซ้าย)' : i === 1 ? ' (ขวา)' : ' (โบนัส)'}`,
     played: i < k.revealedCount,
   }))
 })
@@ -232,7 +233,7 @@ function onPowerSlot() {
           </button>
         </template>
         <!-- the two cards still to plan: dashed places, so the row keeps its size -->
-        <span v-for="n in Math.max(0, 2 - st.killer.planned.length)" :key="`e${n}`" class="pcard empty" title="ยังไม่ได้วางการ์ด" />
+        <span v-for="n in Math.max(0, killerCardCount(st) - st.killer.planned.length)" :key="`e${n}`" class="pcard empty" title="ยังไม่ได้วางการ์ด" />
         <PerkDiamonds :st="st" owner="killer" @open="emit('inspect', { k: 'perk', perk: $event, owner: 'killer' })" />
       </div>
     </div>

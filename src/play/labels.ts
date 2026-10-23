@@ -1,7 +1,7 @@
 // Thai labels for actions, steps and pieces.
 
 import { editPerkById, killerById, survivorById } from '../data'
-import { CARD_NAMES, GUARD_NAMES, palletOn, ITEM_NAMES, isDirect, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, wrathGain } from './engine/engine'
+import { CARD_NAMES, GUARD_NAMES, palletOn, ITEM_NAMES, isDirect, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, unknownRooms, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import type { Die, GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
 import type { Perk } from '../types'
@@ -73,7 +73,19 @@ export function survivorMini(st: GameState, s: number): string {
   return survivorById.get(st.survivors[s].characterId)?.images.mini ?? ''
 }
 
+/** The Unknown numbered `i + 1`: four minis of its own. */
+export const unknownMini = (i: number) => `assets/killers/mini/unknown${i ? i + 1 : ''}.webp`
+
+/** The Unknown numbered `i + 1`: its card this round, played or still face down (for the killer). */
+export function unknownCardNote(st: GameState, i: number): string {
+  const card = st.killer.planned[i]
+  if (!card) return 'ไม่มีการ์ดรอบนี้'
+  return i < st.killer.revealedCount ? `เล่น ${CARD_NAMES[card]} ไปแล้ว` : `การ์ด ${CARD_NAMES[card]} (ยังไม่เปิด)`
+}
+
 export function killerMini(st: GameState): string {
+  // The Unknown: the one standing for the killer now
+  if (st.killer.unknowns) return unknownMini(st.killer.unknownAt ?? 0)
   return killerById.get(st.killer.characterId)?.images.mini ?? ''
 }
 
@@ -214,6 +226,8 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `Pain Resonance: Interact กับ Hook — ${st.survivors[i.target].name} บาดเจ็บ (${PERKS.pain_resonance.cost} ▲)`
     case 'birds':
       return `${i.dire ? 'Dire Crow' : 'Crow'} → ${roomName(st, i.room)}`
+    case 'hallucinate':
+      return `Hallucination: The Unknown ${(st.killer.unknowns ?? []).indexOf(null) + 1} → ${roomName(st, i.room)}`
     case 'droneTake':
       return `Eyes in the Sky: เก็บ Drone ที่ ${roomName(st, prop(st, i.prop).room!)} กลับขึ้นบอร์ด`
     case 'droneDrop':
@@ -619,6 +633,18 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `${st.survivors[c.target!].wounded ? 'อุ้ม' : 'โจมตี'} ${name(c.target!)} ต่อ`
     case 'iron_grasp':
       return 'ทอยเต๋า Skill Check ใหม่ทั้งหมด'
+    case 'unbound':
+      return `เพิ่ม ${CARD_NAMES[c.card!]} อีก 1 ใบเข้ามือ (ถาวร)`
+    case 'undone': {
+      const add = (w as { add: number }).add
+      return `ความคืบหน้า Generator ${add} → ${add - 1}`
+    }
+    case 'unforeseen': {
+      const p = prop(st, (w as { prop: string }).prop)
+      if (!st.killer.unknowns) return `ตรงไป ${roomName(st, p.room!)}`
+      const from = unknownRooms(st)[c.index!]
+      return `The Unknown ${c.index! + 1} (อยู่ ${from ? roomName(st, from) : '—'} · ${unknownCardNote(st, c.index!)}) → ตรงไป ${roomName(st, p.room!)}`
+    }
     case 'insidious':
     case 'game_afoot':
       return `อุ้ม ${name((w as { target: number }).target)} แทนการโจมตี`
@@ -736,6 +762,10 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
       return 'มี Pallet ขวางทาง'
     case 'genDone':
       return 'Generator ซ่อมเสร็จ'
+    case 'genProgress': {
+      const p = prop(st, w.prop)
+      return `${st.survivors[w.s].name} กำลังจะเพิ่มความคืบหน้า +${w.add} ให้ Generator ที่ ${roomName(st, p.room!)}`
+    }
     case 'afterCardMove':
       return `${st.survivors[w.s].name} เดินไป ${roomName(st, w.to)}`
     case 'cleanupStart':

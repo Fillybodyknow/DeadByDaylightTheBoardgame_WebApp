@@ -5,7 +5,7 @@
 // and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
-import { reignCards, CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName } from '../engine/engine'
+import { reignCards, CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName, unknownRooms } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
 import { actionKey, perkPicked, perksToPick } from '../boardActions'
@@ -14,7 +14,7 @@ import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
-import { KILLER_CARD_BACK, VILE_PURGE_IMAGE, ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, pathLabel, perkText, playerOf, survivorMini, windowLabel, windowWho } from '../labels'
+import { KILLER_CARD_BACK, VILE_PURGE_IMAGE, ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, pathLabel, perkText, playerOf, survivorMini, unknownCardNote, unknownMini, windowLabel, windowWho } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
@@ -189,6 +189,8 @@ function confirmPurge() {
 }
 
 /** Killer perks moving a survivor along a path: the survivor first, then the path. */
+/** Unforeseen for The Unknown: a choice of which one goes, shown with its mini, room and card. */
+const unforeseenUnknown = computed(() => step.value.t === 'offer' && step.value.perk === 'unforeseen' && !!props.st.killer.unknowns)
 const movesSomeone = computed(() => step.value.t === 'offer' && !!activePerk.value && ['dark_devotion', 'infectious_fright', 'exponential'].includes(step.value.perk))
 const moveTargets = computed(() => (movesSomeone.value ? [...new Set(offerChoices.value.map((c) => c.target!))] : []))
 const moveWho = ref<number | null>(null)
@@ -641,7 +643,7 @@ const boardCount = computed(() => {
             <BpText :text="cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน'" />
           </button>
           <button
-            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression && !isLightborn && !movesSomeone)"
+            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression && !isLightborn && !movesSomeone && !unforeseenUnknown)"
             :key="i"
             class="primary"
             @mouseenter="hover(step.owner, c)"
@@ -652,6 +654,24 @@ const boardCount = computed(() => {
           >
             <FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, step.perk, step.owner, step.w, c)" />
           </button>
+          <!-- Unforeseen (The Unknown): which one goes — its mini, where it stands, its card this round -->
+          <template v-if="unforeseenUnknown">
+            <button
+              v-for="(c, i) in offerChoices"
+              :key="`u${i}`"
+              class="primary unknown-pick"
+              @mouseenter="hover(step.owner, c)"
+              @mouseleave="hover(step.owner, null)"
+              @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })"
+            >
+              <img :src="asset(unknownMini(c.index!))" alt="" />
+              <span>
+                <b>The Unknown {{ c.index! + 1 }}</b>
+                <small>อยู่ {{ roomName(st, unknownRooms(st)[c.index!] ?? '') }} · {{ unknownCardNote(st, c.index!) }}</small>
+              </span>
+              <img v-if="st.killer.planned[c.index!]" class="card" :src="asset(cardImage(st.killer.planned[c.index!]))" alt="" />
+            </button>
+          </template>
           <button @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้</button>
           <button class="quiet" @click="act({ t: 'perk', perk: step.perk, use: false, quiet: true })">ไม่ใช้ และไม่ต้องถามอีกในรอบนี้</button>
         </div>
@@ -1582,5 +1602,34 @@ h3 {
   .eyebrow {
     animation: none;
   }
+}
+/* Unforeseen: an Unknown to send, with its mini and its card this round */
+.unknown-pick {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  text-align: left;
+}
+.unknown-pick > img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.unknown-pick > img.card {
+  width: 44px;
+  height: 62px;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  border-radius: 4px;
+}
+.unknown-pick span {
+  display: grid;
+}
+.unknown-pick small {
+  font-weight: 400;
+  opacity: 0.85;
 }
 </style>

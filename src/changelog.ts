@@ -12,6 +12,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.9.0',
+    date: '2026-10-23',
+    items: [
+      'ฆาตกรใหม่: The Unknown — Hallucination วาง The Unknown ตัวที่ 2–4 ลงห้องข้าง ๆ ทุกตัวนับเป็นฆาตกร และวางการ์ดหนึ่งใบต่อหนึ่งตัว',
+      'Perk ของ The Unknown: Unbound, Undone และ Unforeseen (เลือกตัวที่จะย้ายได้ โดยเห็นห้องและการ์ดของแต่ละตัว)',
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-10-23',
     items: [

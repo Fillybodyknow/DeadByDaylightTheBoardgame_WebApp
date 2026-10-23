@@ -229,11 +229,11 @@ The Entity speaking (`src/play/tutorial/`).
   above their character picker (which is long enough to hide anything under it).
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist, The Skull Merchant** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist, The Skull Merchant, The Unknown** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
   Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano, Renato Lyra, Thalita Lyra**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (129 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (132 perks).
 - The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
   the printed ones; 35 are on no board. All 35 are in the engine (`DECK_PERKS` in
   `engine/perks.ts`). A card-only perk has no character and no index: its
@@ -491,6 +491,25 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Pain Resonance: his interaction, with an empty revealed hook in his room (no Entity on it); a
   healthy survivor on the board in a connected room is wounded (clicked on the map). Paid 3 ▲.
 - Pentimento: by itself, +2 ▲ after any successful cleanse; once a round.
+- The Unknown's passive: four minis (numbered 1–4); setup is made with The Unknown 1 alone (its start
+  room rolled as any killer's). He plans **one card per Unknown on the board**, card 1 for Unknown
+  1, card 2 for Unknown 2… (so one card a round until Hallucination adds one); each card is played
+  by its own Unknown, from where it stands (`unknowns`, `unknownAt`: the one playing stands in
+  the killer's `room`, as Victor does for The Twins). Between his turns Unknown 1 stands for him.
+  He takes **no killer bonus turn** (the round starts with it spent, so no perk gives him one).
+- Every Unknown is "the Killer" (the user's call: always): whatever a survivor asks of the
+  killer's room (Overzealous, Quick Gambit, Hubris, Distortion, Power Struggle, Diversion, the
+  terror radius and the chase music) counts any of them. A survivor's perk that sends the killer
+  somewhere (Diversion, Quick Gambit) sends the Unknown in that room.
+- Hallucination (his power): the lowest-numbered Unknown not on the board into a room connected
+  to the one playing; it has a card of its own from the next round. With all four out, the power
+  can't be used.
+- Unbound: asked at the start of planning; a card he holds only one of gets a second copy, kept
+  for good (`extraCards`, added to his hand every round).
+- Undone: asked (the user's call) before progress goes onto a generator in a room with any
+  Unknown, from any source; one less is added (it can be 0). The repair's own windows come after.
+- Unforeseen: asked when a generator is completed; the killer goes straight to its room (The
+  Unknown: the one of his choice), as Phantasm Trap's teleport does.
 - The Skull Merchant's passive: after setup (once the start rooms are rolled), a face-down Drone goes
   into every room, and the kinds of that room's face-down objective props are dealt among them again
   (the shuffle). A Drone is revealed as any prop. A skill check rolled by a survivor on the board in a

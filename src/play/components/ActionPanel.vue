@@ -18,6 +18,7 @@ import { boardOf,
   killerInteractions,
   killerMoves,
   merchantDrones,
+  unknownRooms,
   mustMove,
   perkButtons,
   perkChoices,
@@ -38,6 +39,7 @@ import {
   GUARD_IMAGE,
   PROP_IMAGE,
   TONIC_IMAGE,
+  unknownMini,
   orderedChoices,
   cardCaption,
   cardImage,
@@ -216,6 +218,7 @@ const POWER_HINT: Record<string, string> = {
   spirit: 'ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น — คลิกเป้าหมายบนแผนที่',
   legion: 'ผู้รอดชีวิตทุกคนในห้องนี้บาดเจ็บ — ถ้ามีคนบาดเจ็บอยู่แล้วอย่างน้อย 1 คน ได้ +1 ▲',
   plague: 'วาง Vile Purge ในห้องนี้และห้องที่เชื่อมกันที่เลือก — ผู้รอดชีวิตที่เดินเข้าไปต้องเก็บไปปิด Perk 1 อัน (อันที่ 3 = บาดเจ็บ)',
+  unknown: 'วาง The Unknown ตัวหมายเลขต่ำสุดที่ยังไม่อยู่บนกระดาน ลงห้องที่เชื่อมกับห้องของตัวที่เล่นอยู่ — คลิกห้องบนแผนที่ แต่ละตัวได้การ์ดของตัวเองตั้งแต่รอบหน้า',
   skullmerchant: 'เก็บ Drone หงายหน้าบนแผนที่กลับขึ้นบอร์ด (คลิก Drone) หรือวาง Drone จากบอร์ดหงายหน้าในห้องของคุณ (คลิกห้องตัวเอง)',
   artist: 'วาง Crow หรือ Dire Crow จากบอร์ดของคุณลงห้องใดก็ได้ — ถ้ามี Crow อยู่ในห้องคุณ +1 ▲ — คลิกห้องบนแผนที่ แล้วเลือกตัว',
   dredge: 'เลือกผู้รอดชีวิตในห้องนี้หรือห้องที่เชื่อมกัน (คลิกบนแผนที่) แล้วทิ้งการ์ดจากมือของเขาให้เขาเดินตามการ์ดนั้น — เข้ามาห้องคุณ = Interact กับเขาได้',
@@ -763,6 +766,13 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             <li><img :src="asset(GUARD_IMAGE.carnifex)" alt="" /><span><b>Carnifex</b> — เริ่มเก็บกวาด: นำ prop เขียว/น้ำเงินในห้องออก แล้วย้ายไปห้องข้าง ๆ · {{ guardWhere('carnifex') }}</span></li>
             <li><img :src="asset(GUARD_IMAGE.assassin)" alt="" /><span><b>Assassin</b> — ใครเดินเข้าห้องทอย Danger Die พลาด = บาดเจ็บ · {{ guardWhere('assassin') }}</span></li>
             <li><img :src="asset(GUARD_IMAGE.jailer)" alt="" /><span><b>Jailer</b> — Skill Check ในห้อง (ไม่รวมคนใน Locker) ใช้ Danger Die พลาด = บาดเจ็บ (Jailer กลับมาบนบอร์ด วางใหม่ได้) · {{ guardWhere('jailer') }}</span></li>
+          </ul>
+          <!-- The Unknown: where each one stands, and which is playing now -->
+          <ul v-if="st.killer.unknowns" class="afterpiece">
+            <li v-for="(room, u) in unknownRooms(st)" :key="u">
+              <img :src="asset(unknownMini(u))" alt="" />
+              <span><b>The Unknown {{ u + 1 }}</b> — {{ room ? roomName(st, room) : 'ยังไม่อยู่บนกระดาน' }}{{ u === (st.killer.unknownAt ?? 0) && room ? ' · ตัวที่เล่นอยู่' : '' }}</span>
+            </li>
           </ul>
           <!-- The Skull Merchant: the Drones on his board -->
           <ul v-if="st.killer.characterId === 'skullmerchant'" class="afterpiece">
