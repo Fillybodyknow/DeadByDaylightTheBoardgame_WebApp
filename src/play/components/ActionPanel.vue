@@ -20,8 +20,7 @@ import { boardOf,
   merchantDrones,
   unknownRooms,
   mustMove,
-  perkButtons,
-  perkChoices,
+  perkButtons,
   propsIn,
   rerollers,
   rollHelpers,
@@ -40,8 +39,6 @@ import {
   PROP_IMAGE,
   TONIC_IMAGE,
   unknownMini,
-  orderedChoices,
-  cardCaption,
   cardImage,
   cardLabel,
   itemImage,
@@ -53,17 +50,16 @@ import {
   pathLabel,
   pathName,
   perkChoiceLabel,
-  perkImage,
-  perkText,
   playerOf,
   powerName,
   survivorInteractionLabel,
   survivorMini,
-  windowLabel,
 } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
+import PerkCard from './PerkCard.vue'
+import { PERK_LEAD, pickedHint as perkPickedHint } from '../perkHints'
 import { choicePreview, decisionFocus, powerPreview, preview } from '../focus'
 import Mini from './Mini.vue'
 import BpIcon from '../../components/BpIcon.vue'
@@ -86,8 +82,6 @@ const here = (a: Action) => !props.onBoard.has(actionKey(a))
 const boardPallet = (perk: PerkId, c: PerkChoice) => perk === 'windows_of_opportunity' && !!c.path
 const perkAct = (perk: PerkId, c: PerkChoice): Action => ({ t: 'perk', perk, use: true, choice: c })
 const powerAct = (i: KillerInteraction): Action => ({ t: 'interact', i })
-/** A choice of the perk on offer that isn't on the board. */
-const offerHere = (c: PerkChoice) => (props.st.step.t === 'offer' ? here(perkAct(props.st.step.perk, c)) : true)
 const emit = defineEmits<{
   powerOn: [on: boolean]
   undyingOn: [on: boolean]
@@ -272,6 +266,19 @@ const undyingHere = computed(() =>
 const SWAPS: PerkId[] = ['ace_in_the_hole', 'iron_maiden']
 
 /** An interact-step perk, picked before its targets show on the board. */
+/** A pressed perk card's hint (perkHints.ts): swaps and No One Left Behind are two clicks on the map. */
+function pickedHint(b: { perk: PerkId; choices: PerkChoice[] }): string {
+  const how =
+    b.perk === 'iron_maiden'
+      ? 'คลิก Locker ว่างบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย'
+      : SWAPS.includes(b.perk)
+        ? 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย'
+        : b.perk === 'no_one_left_behind'
+          ? 'คลิกผู้รอดชีวิตบนแผนที่ แล้วเลือกเส้นทางที่จะให้เดิน'
+          : undefined
+  return perkPickedHint(b.choices, (c) => !here(perkAct(b.perk, c)), how)
+}
+
 function pickInteractPerk(perk: PerkId) {
   sfx.click()
   perkPicked.value = perkPicked.value === perk ? null : perk
@@ -287,11 +294,6 @@ function stopSteps() {
 /** Perk buttons in this step (start of turn, interact, a roll). */
 // online, a perk button shows only on its owner's device
 const buttons = computed(() => perkButtons(props.st).filter((b) => b.owner === 'killer' || controls(props.st, b.owner)))
-
-const offerChoices = computed(() => {
-  const s = step.value
-  return s.t === 'offer' ? orderedChoices(props.st, s.perk, s.w, perkChoices(props.st, s.perk, s.owner, s.w)) : []
-})
 
 /** All traps on the board, when the supply is empty and one must be moved. */
 const trapsOnBoard = computed(() => Object.keys(props.st.paths).filter((id) => props.st.paths[id].trap))
@@ -395,54 +397,10 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </div>
     </template>
 
-    <!-- a perk's moment -->
-    <template v-else-if="step.t === 'offer'">
-      <p class="eyebrow"><BpText :text="windowLabel(st, step.w)" /></p>
-      <div class="perk-offer">
-        <img v-if="perkImage(step.perk)" :src="asset(perkImage(step.perk))" alt="" />
-        <div>
-          <strong>ใช้ {{ PERKS[step.perk].name }}?</strong>
-          <span class="cost"><BpText :text="PERKS[step.perk].cost ? `${PERKS[step.perk].cost} ▲` : 'ฟรี'" /></span>
-          <p class="small"><BpText :text="perkText(step.perk)" /></p>
-        </div>
-      </div>
-      <p v-if="offerChoices.some((c) => !offerHere(c))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
-        <div v-if="offerChoices.some((c) => c.card)" class="card-row">
-          <button
-            v-for="(c, i) in offerChoices.filter((c) => c.card)"
-            :key="`card${i}`"
-            class="cardbtn cap"
-            :title="perkChoiceLabel(st, step.perk, step.owner, step.w, c)"
-            
-            
-            @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })"
-          >
-            <img :src="asset(cardImage(c.card!))" :alt="cardLabel(c.card!)" />
-            <span>{{ cardCaption(step.perk, c) }}</span>
-          </button>
-        </div>
-      <div class="buttons col">
-        <button v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !(step.t === 'offer' && step.perk === 'oppression'))" :key="i" class="primary" @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })">
-          <FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, step.perk, step.owner, step.w, c)" />
-        </button>
-        <button @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้</button>
-        <button class="ghost small" @click="act({ t: 'perk', perk: step.perk, use: false, quiet: true })">ไม่ใช้ และไม่ต้องถามอีกในรอบนี้</button>
-      </div>
-    </template>
-
-    <!-- start of a survivor's turn: Self-Care, Empathy, Botany Knowledge -->
-    <template v-else-if="step.t === 'turnStart'">
-      <p>เริ่มเทิร์น — ใช้ perk ก่อนเดินได้</p>
-      <p v-if="buttons.some((b) => b.perk !== 'breakout' && b.choices.some((c) => !here(perkAct(b.perk, c))))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
-      <div v-for="b in buttons" :key="b.perk" class="perk-group">
-        <span class="perk-name">{{ PERKS[b.perk].name }} <span class="cost"><BpText :text="PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี'" /></span></span>
-        <!-- Breakout: a person and then a path, both picked on the board (a pair per button would be a wall of them) -->
-        <span v-if="b.perk === 'breakout'" class="muted small">🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง</span>
-        <template v-else>
-          <button v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
-        </template>
-      </div>
-      <button class="primary" @click="act({ t: 'continue' })">เปิดการ์ด แล้วเดิน</button>
+    <!-- a perk's moment, the start of a turn: decided in the Perk panel (PerkPrompt) — on wide screens
+         in this panel's place, on narrow ones a sheet over it — so the two never show twice -->
+    <template v-else-if="step.t === 'offer' || step.t === 'turnStart'">
+      <p class="muted">⚡ ตัดสินใจเรื่อง Perk ที่แผง Perk</p>
     </template>
 
     <template v-else-if="step.t === 'sparkChoice' || step.t === 'phantasmChoice' || step.t === 'replaceCard'">
@@ -567,25 +525,20 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </details>
       </div>
       <!-- a perk is picked first (its targets then show on the board), again to put it back -->
-      <p v-if="buttons.length && !perkPicked" class="perk-lead">⚡ Perk ที่ใช้ได้ตอนนี้ — คลิกการ์ดเพื่อใช้ แล้วเลือกเป้าหมายบนแผนที่</p>
-      <div v-for="b in buttons" :key="b.perk" class="perk-group" :class="{ picked: perkPicked === b.perk }">
-        <!-- the perk's card: picture, name, cost and text — a click picks it -->
-        <button type="button" class="perk-name perk-card" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
-          <img v-if="perkImage(b.perk)" :src="asset(perkImage(b.perk))" alt="" />
-          <span class="perk-card-body">
-            <span class="perk-card-title">{{ PERKS[b.perk].name }} <span class="cost"><BpText :text="PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี'" /></span></span>
-            <span class="perk-card-text"><BpText :text="perkText(b.perk)" /></span>
-            <span class="perk-card-hint">{{ perkPicked === b.perk ? '🎯 เลือกเป้าหมาย — คลิกอีกครั้งเพื่อยกเลิก' : '👆 คลิกเพื่อใช้' }}</span>
-          </span>
-        </button>
+      <p v-if="buttons.length && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
+      <div v-for="b in buttons" :key="b.perk">
+        <PerkCard
+          :perk="b.perk"
+          :state="perkPicked === b.perk ? 'picked' : perkPicked ? 'dim' : 'ready'"
+          :hint="perkPicked === b.perk ? pickedHint(b) : undefined"
+          @pick="pickInteractPerk(b.perk)"
+        >
+        <!-- a swap (Ace in the Hole, Iron Maiden) is two props, one click each on the board; No One
+             Left Behind is whoever moves, then the path (as Breakout): the card's hint says how -->
         <template v-if="perkPicked === b.perk">
-          <!-- a swap (Ace in the Hole, Iron Maiden) is two props, one click each on the board -->
-          <span v-if="SWAPS.includes(b.perk)" class="muted small">🎯 {{ b.perk === 'iron_maiden' ? 'คลิก Locker ว่างบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย' }}</span>
-          <!-- No One Left Behind: whoever moves, then the path, both on the board (as Breakout) -->
-          <span v-if="b.perk === 'no_one_left_behind'" class="muted small">🎯 คลิกผู้รอดชีวิตบนแผนที่ แล้วเลือกเส้นทางที่จะให้เดิน</span>
           <button v-for="(c, i) in SWAPS.includes(b.perk) || b.perk === 'no_one_left_behind' ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)) && !boardPallet(b.perk, c))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
-          <span v-if="!SWAPS.includes(b.perk) && b.perk !== 'no_one_left_behind' && b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
         </template>
+        </PerkCard>
       </div>
       <button class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
     </template>
@@ -800,35 +753,31 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <div class="buttons col">
           <button v-for="(i, n) in perkPicked ? [] : kInteractions.plain.filter((i) => here({ t: 'interact', i }))" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
           <!-- Undying: its card, as the other perks of his turn show theirs -->
-          <button v-if="kInteractions.undying.length" type="button" class="undying perk-name perk-card" @click="emit('undyingOn', true), sfx.click()">
-            <img v-if="perkImage('undying')" :src="asset(perkImage('undying'))" alt="" />
-            <span class="perk-card-body">
-              <span class="perk-card-title">Undying <span class="cost"><BpText :text="`${PERKS.undying.cost} ▲`" /></span></span>
-              <span class="perk-card-text">ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</span>
-              <span class="perk-card-hint">👆 คลิกเพื่อใช้</span>
-            </span>
-          </button>
+          <PerkCard
+            v-if="kInteractions.undying.length"
+            class="undying"
+            perk="undying"
+            state="ready"
+            text="ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด"
+            @pick="emit('undyingOn', true), sfx.click()"
+          />
           <button v-if="kInteractions.powers.length" class="power" @click="emit('powerOn', true), sfx.click()">⚡ ใช้พลัง: {{ powerName(st) }}</button>
           <span v-else-if="st.killer.powerUsed" class="muted small">ใช้พลังไปแล้วรอบนี้</span>
           <span v-else class="muted small">ใช้พลังไม่ได้จากห้องนี้</span>
         </div>
         <!-- a perk is picked first (its targets then show on the board), again to put it back -->
-        <div v-for="b in buttons" :key="b.perk" class="perk-group" :class="{ picked: perkPicked === b.perk }">
-          <!-- the perk's card: picture, name, cost and text — a click picks it -->
-          <button type="button" class="perk-name perk-card" :aria-pressed="perkPicked === b.perk" @click="pickInteractPerk(b.perk)">
-            <img v-if="perkImage(b.perk)" :src="asset(perkImage(b.perk))" alt="" />
-            <span class="perk-card-body">
-              <span class="perk-card-title">{{ PERKS[b.perk].name }} <span class="cost"><BpText :text="PERKS[b.perk].cost ? `${PERKS[b.perk].cost} ▲` : 'ฟรี'" /></span></span>
-              <span class="perk-card-text"><BpText :text="perkText(b.perk)" /></span>
-              <span class="perk-card-hint">{{ perkPicked === b.perk ? '🎯 เลือกเป้าหมาย — คลิกอีกครั้งเพื่อยกเลิก' : '👆 คลิกเพื่อใช้' }}</span>
-            </span>
-          </button>
+        <p v-if="buttons.length && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
+        <div v-for="b in buttons" :key="b.perk">
+          <PerkCard
+            :perk="b.perk"
+            :state="perkPicked === b.perk ? 'picked' : perkPicked ? 'dim' : 'ready'"
+          :hint="perkPicked === b.perk ? pickedHint(b) : undefined"
+            @pick="pickInteractPerk(b.perk)"
+          >
           <template v-if="perkPicked === b.perk">
-            <!-- a swap (Ace in the Hole, Iron Maiden) is two props, one click each on the board -->
-            <span v-if="SWAPS.includes(b.perk)" class="muted small">🎯 {{ b.perk === 'iron_maiden' ? 'คลิก Locker ว่างบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย' }}</span>
             <button v-for="(c, i) in SWAPS.includes(b.perk) ? [] : b.choices.filter((c) => here(perkAct(b.perk, c)) && !boardPallet(b.perk, c))" :key="i" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })"><FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
-            <span v-if="!SWAPS.includes(b.perk) && b.choices.some((c) => !here(perkAct(b.perk, c)))" class="muted small">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</span>
           </template>
+          </PerkCard>
         </div>
       </template>
       <button v-if="!powerMode" class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
@@ -996,20 +945,6 @@ p {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.perk-offer {
-  display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 0.7rem;
-  align-items: start;
-}
-.perk-offer img {
-  width: 72px;
-  border-radius: 4px;
-}
-.perk-offer p {
-  margin: 0.2rem 0 0;
-  line-height: 1.45;
-}
 .cost {
   margin-left: 0.4rem;
   padding: 0 0.35rem;
@@ -1044,23 +979,6 @@ p {
   width: 22px;
   height: 22px;
 }
-.perk-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  align-items: center;
-  padding: 0.4rem;
-  border-left: 3px solid #9b6bd6;
-  background: rgb(120 70 200 / 0.08);
-}
-.perk-name {
-  width: 100%;
-  text-align: left;
-  font-family: var(--font-display);
-  font-size: 0.85rem;
-  color: #d8c2ff;
-  border-color: rgb(155 107 214 / 0.6);
-}
 /* the perk as its card: picture on the left, name, cost, text and what a click does */
 .afterpiece {
   list-style: none;
@@ -1082,39 +1000,6 @@ p {
   border-radius: 5px;
   vertical-align: middle;
 }
-.perk-card {
-  display: grid;
-  grid-template-columns: 64px 1fr;
-  gap: 0.6rem;
-  align-items: start;
-  padding: 0.45rem;
-  font-family: inherit;
-  font-weight: 400;
-  letter-spacing: 0;
-}
-.perk-card img {
-  width: 64px;
-  border-radius: 5px;
-  box-shadow: 0 0 0 1px rgb(155 107 214 / 0.7);
-}
-.perk-card-body {
-  display: grid;
-  gap: 0.2rem;
-}
-.perk-card-title {
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  color: #e8dbff;
-}
-.perk-card-text {
-  font-size: 0.8rem;
-  line-height: 1.45;
-  color: var(--text);
-}
-.perk-card-hint {
-  font-size: 0.76rem;
-  color: #d8c2ff;
-}
 /* the perk picked: its targets are on the board */
 /* a perk that can be used now: its card glows and pulses, and a line above says so — in the same
    dark button chrome as the rest it was easy to miss */
@@ -1123,38 +1008,6 @@ p {
   font-size: 0.82rem;
   font-weight: 700;
   color: #ffe9b0;
-}
-.perk-group:not(.picked) {
-  border-left-width: 4px;
-  background: rgb(120 70 200 / 0.16);
-}
-.perk-group:not(.picked) .perk-name {
-  border-color: #c9a2ff;
-  animation: perk-ready 1.8s ease-in-out infinite;
-}
-.perk-group:not(.picked) .perk-card-hint {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #fff;
-}
-@keyframes perk-ready {
-  50% {
-    box-shadow: 0 0 16px rgb(190 140 255 / 0.75);
-    border-color: #ffe9b0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .perk-group:not(.picked) .perk-name {
-    animation: none;
-  }
-}
-.perk-group.picked {
-  border-left-color: #ffe9b0;
-  background: rgb(255 214 140 / 0.1);
-}
-.perk-group.picked .perk-name {
-  border-color: #ffe9b0;
-  box-shadow: 0 0 10px rgb(255 214 140 / 0.4);
 }
 .calm summary {
   cursor: pointer;

@@ -18,6 +18,8 @@ import { KILLER_CARD_BACK, VILE_PURGE_IMAGE, ROLL_TITLE, orderedChoices, cardCap
 import CardHand, { type HandCard } from './CardHand.vue'
 import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
+import PerkCard from './PerkCard.vue'
+import { PERK_LEAD, pickedHint as perkPickedHint } from '../perkHints'
 import Mini from './Mini.vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
@@ -54,6 +56,9 @@ function choosePerk(perk: PerkId) {
   fxSound.flip()
   perkPicked.value = perkPicked.value === perk ? null : perk
 }
+
+/** A pressed perk card's hint (perkHints.ts), its map choices being the ones on the board. */
+const pickedHint = (perk: PerkId, choices: PerkChoice[]) => perkPickedHint(choices, (c) => !here(perkAct(perk, c)))
 
 /** The perk being decided: the one offered, or with several at once the one picked (null: none yet). */
 const activePerk = computed<PerkId | null>(() => {
@@ -341,9 +346,6 @@ function hoverHandCard(card: MoveCard | null) {
 // ---------- a perk's card, opened big (a click on it); a click anywhere or Esc puts it back ----------
 
 const zoomed = ref<string | null>(null)
-function zoom(e: MouseEvent) {
-  zoomed.value = (e.currentTarget as HTMLImageElement).src
-}
 // Esc closes the picture, not the decision behind it (caught before anything else hears the key).
 function onZoomKey(e: KeyboardEvent) {
   if (e.key !== 'Escape' || !zoomed.value) return
@@ -458,8 +460,6 @@ const who = computed(() => {
 })
 
 
-const cost = (p: PerkId) => (PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี')
-
 /** How many of this decision's choices are on the board (for the hint). */
 const boardCount = computed(() => {
   const s = step.value
@@ -504,32 +504,22 @@ const boardCount = computed(() => {
       </header>
 
 
-      <p v-if="boardCount" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ ({{ boardCount }} ตัวเลือก)</p>
+      <p v-if="boardCount && !pickPerk" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ ({{ boardCount }} ตัวเลือก)</p>
 
       <!-- several perks of one owner at the same moment: pick which to use first (p.16) -->
       <template v-if="step.t === 'offer' && offerList.length > 1">
         <p class="lead">มี {{ offerList.length }} Perk ที่ใช้ได้ในจังหวะนี้ — ใช้ใบไหนก่อนก็ได้ ใบที่เหลือจะถามต่อ (หน้า 16)</p>
-        <p class="small">{{ perkPicked ? 'เลือกของ Perk นี้ — คลิก Perk อีกครั้งเพื่อเปลี่ยน' : '👆 เลือก Perk ที่จะใช้ก่อน' }}</p>
-        <div
+        <p v-if="!perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
+        <PerkCard
           v-for="o in offerList"
           :key="o.perk"
-          class="perk boxed pickable"
-          :class="{ picked: perkPicked === o.perk, dim: perkPicked && perkPicked !== o.perk }"
-          role="button"
-          tabindex="0"
-          @click="choosePerk(o.perk)"
-          @keydown.enter="choosePerk(o.perk)"
+          :perk="o.perk"
+          :state="perkPicked === o.perk ? 'picked' : perkPicked ? 'dim' : 'ready'"
+          :hint="perkPicked === o.perk ? pickedHint(o.perk, o.choices) : undefined"
+          @pick="choosePerk(o.perk)"
+          @zoom="zoomed = $event"
         >
-          <img v-if="perkImage(o.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(o.perk))" :alt="PERKS[o.perk].name" />
-          <div>
-            <h3>
-              {{ PERKS[o.perk].name }} <span class="cost"><BpText :text="cost(o.perk)" /></span>
-            </h3>
-            <p class="text small"><BpText :text="perkText(o.perk)" /></p>
-            <!-- picked: a card from the hand below, or a survivor on the board (or a button here) -->
-            <p v-if="perkPicked === o.perk && o.choices.some((c) => c.card)" class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง แล้วกดยืนยัน</p>
-            <p v-if="perkPicked === o.perk && o.choices.some((c) => !c.card && !here(perkAct(o.perk, c)))" class="board-hint">🎯 คลิกเป้าหมายที่กระพริบบนแผนที่</p>
-            <div v-if="perkPicked === o.perk" class="choices inline" @click.stop>
+          <template v-if="perkPicked === o.perk">
               <button
                 v-for="(c, i) in o.choices.filter((c) => !c.card && here(perkAct(o.perk, c)))"
                 :key="i"
@@ -542,9 +532,8 @@ const boardCount = computed(() => {
               >
                 <FaceLabel :st="st" :who="c.target" :text="c.card ? cardCaption(o.perk, c) : perkChoiceLabel(st, o.perk, step.owner, step.w, c)" />
               </button>
-            </div>
-          </div>
-        </div>
+          </template>
+        </PerkCard>
         <div class="choices">
           <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
             <BpText :text="cardPick && activePerk ? `ยืนยัน: ${PERKS[activePerk].name} — ${perkChoiceLabel(st, activePerk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน'" />
@@ -556,21 +545,17 @@ const boardCount = computed(() => {
 
       <!-- a perk offered at its moment -->
       <template v-else-if="step.t === 'offer'">
-        <div class="perk">
-          <img v-if="perkImage(step.perk)" class="thumb zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(step.perk))" :alt="PERKS[step.perk].name" />
-          <div>
-            <h2>
-              ใช้ {{ PERKS[step.perk].name }}? <span class="cost"><BpText :text="cost(step.perk)" /></span>
-            </h2>
-            <p class="text"><BpText :text="perkText(step.perk)" /></p>
-          </div>
-        </div>
-        <!-- a survivor perk aimed on the map: armed here first, so a path or a generator clicked by
-             habit is an ordinary move, not this perk -->
-        <button v-if="armOffer" type="button" class="arm" :class="{ on: perkPicked === step.perk }" :aria-pressed="perkPicked === step.perk" @click="choosePerk(step.perk)">
-          <template v-if="perkPicked === step.perk">🎯 เลือกเป้าหมายบนแผนที่ — กดอีกครั้งเพื่อยกเลิก</template>
-          <template v-else>⚡ ใช้ {{ PERKS[step.perk].name }} <span class="arm-sub">กดก่อน แล้วเลือกเป้าหมายบนแผนที่</span></template>
-        </button>
+        <p class="lead">ใช้ Perk นี้ไหม?</p>
+        <!-- a survivor perk aimed on the map is pressed first (armed), so a path or a generator
+             clicked by habit is an ordinary move, not this perk; any other is explained, its uses
+             as buttons under it -->
+        <PerkCard
+          :perk="step.perk"
+          :state="armOffer ? (perkPicked === step.perk ? 'picked' : 'ready') : 'static'"
+          :hint="armOffer && perkPicked === step.perk ? pickedHint(step.perk, offerChoices) : undefined"
+          @pick="choosePerk(step.perk)"
+          @zoom="zoomed = $event"
+        />
         <!-- Tinkerer: the planned cards, then the hand -->
         <div v-if="isTinkerer" class="tinker">
           <p class="tinker-step">1. เลือกการ์ดที่วางไว้ที่จะเปลี่ยน</p>
@@ -679,28 +664,19 @@ const boardCount = computed(() => {
 
       <!-- start of a survivor's turn -->
       <template v-else-if="step.t === 'turnStart'">
-        <p class="lead">เริ่มเทิร์น — ใช้ perk ก่อนเปิดการ์ดเดินได้</p>
-        <p v-if="pickPerk" class="small">{{ perkPicked ? 'เลือกเป้าหมายของ Perk นี้ — คลิก Perk อีกครั้งเพื่อเปลี่ยน' : '👆 เลือก Perk ที่จะใช้ก่อน' }}</p>
-        <div
+        <p class="lead">เริ่มเทิร์น — ใช้ Perk ก่อนเปิดการ์ดเดินได้</p>
+        <p v-if="!perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
+        <PerkCard
           v-for="b in buttons"
           :key="b.perk"
-          class="perk boxed"
-          :class="{ pickable: pickPerk, picked: pickPerk && perkPicked === b.perk, dim: pickPerk && perkPicked && perkPicked !== b.perk }"
-          :role="pickPerk ? 'button' : undefined"
-          :tabindex="pickPerk ? 0 : undefined"
-          @click="choosePerk(b.perk)"
-          @keydown.enter="choosePerk(b.perk)"
+          :perk="b.perk"
+          :state="!pickPerk ? 'static' : perkPicked === b.perk ? 'picked' : perkPicked ? 'dim' : 'ready'"
+          :hint="pickPerk && perkPicked === b.perk ? (b.perk === 'breakout' ? '🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง — กดการ์ดอีกครั้งเพื่อยกเลิก' : pickedHint(b.perk, b.choices)) : undefined"
+          @pick="choosePerk(b.perk)"
+          @zoom="zoomed = $event"
         >
-          <img v-if="perkImage(b.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
-          <div>
-            <h3>
-              {{ PERKS[b.perk].name }} <span class="cost"><BpText :text="cost(b.perk)" /></span>
-            </h3>
-            <p class="text small"><BpText :text="perkText(b.perk)" /></p>
             <!-- Breakout is a person and then a path: both are picked on the board, one at a time -->
-            <template v-if="perkOpen(b.perk)">
-            <p v-if="b.perk === 'breakout'" class="board-hint">🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง</p>
-            <div v-else class="choices inline" @click.stop>
+            <template v-if="perkOpen(b.perk) && b.perk !== 'breakout'">
               <button
                 v-for="(c, i) in b.choices.filter((c) => here(perkAct(b.perk, c)))"
                 :key="i"
@@ -710,11 +686,10 @@ const boardCount = computed(() => {
               >
                 <FaceLabel :st="st" :who="c.target" :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" />
               </button>
-            </div>
             </template>
-          </div>
-        </div>
-        <button class="primary wide" @click="act({ t: 'continue' })">ไม่ใช้ perk — เปิดการ์ดแล้วเดิน</button>
+        </PerkCard>
+        <!-- not using one is never the loudest button: the perks that can be used are -->
+        <button class="wide" @click="act({ t: 'continue' })">ไม่ใช้ Perk — เปิดการ์ดแล้วเดิน</button>
       </template>
 
       <!-- Whispers: pay or set the card face up -->
@@ -911,16 +886,10 @@ const boardCount = computed(() => {
           <FaceLabel :st="st" :who="step.ctx.s" :text="`${st.survivors[step.ctx.s].name} ทอย ${ROLL_TITLE[step.ctx.k]}`" />
         </p>
         <RollDice :st="st" :key-holders="keyHolders" :can-keep="rollMine && !keyWaiting.length" @act="act" />
-        <div v-for="b in buttons" :key="b.perk" class="perk boxed">
-          <img v-if="perkImage(b.perk)" class="thumb small zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(b.perk))" :alt="PERKS[b.perk].name" />
-          <div>
-            <h3>
-              <FaceLabel :st="st" :who="b.owner" :text="`${ownerLabel(st, b.owner)}: ${PERKS[b.perk].name}`" /> <span class="cost"><BpText :text="cost(b.perk)" /></span>
-            </h3>
-            <p class="text small"><BpText :text="perkText(b.perk)" /></p>
-            <button v-for="(c, n) in b.choices" :key="n" class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">ใช้ — <BpText :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
-          </div>
-        </div>
+        <PerkCard v-for="b in buttons" :key="b.perk" :perk="b.perk" state="static" @zoom="zoomed = $event">
+          <template #title><FaceLabel :st="st" :who="b.owner" :text="`${ownerLabel(st, b.owner)}: ${PERKS[b.perk].name}`" /></template>
+          <button v-for="(c, n) in b.choices" :key="n" class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">ใช้ — <BpText :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+        </PerkCard>
         <div class="choices">
           <!-- someone else's roll: each helper on this device passes on it here -->
           <button v-for="s in passers" :key="`p${s}`" @click="act({ t: 'passRoll', s })">
@@ -990,7 +959,7 @@ const boardCount = computed(() => {
   align-content: start;
   padding: 1rem 1.1rem;
   border-radius: 10px;
-  background: rgb(14 15 19 / 0.97);
+  background: rgb(14 15 19);
   border: 2px solid rgb(var(--glow) / 0.85);
   box-shadow:
     0 0 0 4px rgb(var(--glow) / 0.15),
@@ -1070,96 +1039,6 @@ header {
 }
 
 
-.perk {
-  display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 0.7rem;
-  align-items: start;
-}
-/* several perks at once: each box is picked first */
-.perk.boxed.pickable {
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    opacity 0.15s,
-    transform 0.15s;
-}
-.perk.boxed.pickable:hover {
-  border-color: rgb(var(--glow) / 0.9);
-  transform: translateX(-2px);
-}
-.perk.boxed.picked {
-  border-color: #ffe9b0;
-  box-shadow: 0 0 14px rgb(255 214 140 / 0.45);
-}
-.perk.boxed.dim {
-  opacity: 0.5;
-}
-/* nothing armed yet: the perks that can be used now glow and pulse, so a player sees they are buttons */
-.perk.boxed.pickable:not(.picked):not(.dim) {
-  border-color: #c9a2ff;
-  animation: perk-ready 1.8s ease-in-out infinite;
-}
-.arm {
-  display: block;
-  width: 100%;
-  margin: 0.6rem 0 0.2rem;
-  padding: 0.65rem 0.8rem;
-  border-radius: 8px;
-  border: 2px solid #c9a2ff;
-  background: rgb(120 70 200 / 0.28);
-  color: #fff;
-  font-weight: 700;
-  font-size: 1rem;
-  text-align: left;
-  cursor: pointer;
-  animation: perk-ready 1.8s ease-in-out infinite;
-}
-.arm-sub {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 400;
-  color: #e6dcff;
-}
-.arm.on {
-  border-color: #ffe9b0;
-  background: rgb(255 214 140 / 0.14);
-  color: #ffe9b0;
-  animation: none;
-  box-shadow: 0 0 14px rgb(255 214 140 / 0.45);
-}
-@keyframes perk-ready {
-  50% {
-    box-shadow: 0 0 16px rgb(190 140 255 / 0.75);
-    border-color: #ffe9b0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .perk.boxed.pickable,
-  .arm {
-    animation: none !important;
-  }
-}
-.perk.boxed {
-  padding: 0.6rem;
-  border-radius: 8px;
-  background: rgb(var(--glow) / 0.07);
-  border: 1px solid rgb(var(--glow) / 0.35);
-}
-.thumb {
-  width: 76px;
-  border-radius: 6px;
-  box-shadow:
-    0 0 0 2px rgb(var(--glow) / 0.7),
-    0 0 18px rgb(var(--glow) / 0.4);
-  animation: card-in 0.45s cubic-bezier(0.2, 1.3, 0.4, 1);
-}
-.thumb.small {
-  width: 64px;
-}
-.zoomable {
-  cursor: zoom-in;
-}
 /* a perk's card opened big, over everything */
 .perk-zoom {
   position: fixed;
@@ -1242,6 +1121,13 @@ h3 {
 .lead {
   margin: 0;
   font-size: 1.02rem;
+}
+/* the line over usable perk cards (ActionPanel has the same) */
+.perk-lead {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #ffe9b0;
 }
 .choices {
   display: grid;

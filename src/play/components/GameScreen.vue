@@ -19,7 +19,7 @@ import { canPing, pingArmed, pingWait } from '../pings'
 import { timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { STEP_NAME, boardActionKeys, perkPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
+import { STEP_NAME, boardActionKeys, perkPicked, perksToPick, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, cardImage, killerMini, playerOf, survivorMini } from '../labels'
 import SoundSettings from '../../components/SoundSettings.vue'
 import ActionPanel from './ActionPanel.vue'
@@ -277,7 +277,11 @@ const boardFocus = computed(() => {
     const reach = cards.flatMap((c) => undyingPaths(st, c, kind))
     return { ...base, paths: reach.flatMap((r) => r.paths), dests: reach.map((r) => r.to) }
   }
-  return decisionFocus(view.value, powerMode.value)?.focus ?? null
+  const focus = decisionFocus(view.value, powerMode.value)?.focus ?? null
+  // a perk that has to be pressed first (perksToPick): until it is, no outline of where it would go
+  // — those looked like targets to click, and the board takes no click there yet
+  if (focus && view.value.step.t === 'offer' && perksToPick(view.value) && !perkPicked.value) return { ...focus, paths: [], dests: [] }
+  return focus
 })
 
 /**
@@ -1517,6 +1521,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   }
   .side :deep(.tab.on) {
     background: rgb(52 44 26 / 0.95);
+  }
+}
+@media (min-width: 981px) and (max-aspect-ratio: 1777/1000) and (hover: none) {
+  .side > :deep(.card) {
+    background: rgb(12 13 17 / 0.95);
   }
 }
 @media (min-width: 981px) and (max-aspect-ratio: 1777/1000) {

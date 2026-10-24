@@ -1208,13 +1208,8 @@ button.tile.act {
   cursor: pointer;
   z-index: 3;
 }
-.mini.act,
-.tile.act {
-  box-shadow:
-    0 0 0 3px #ff8a3d,
-    0 0 18px 5px rgb(255 120 40 / 0.75);
-  animation: pulse 1.2s ease-in-out infinite;
-}
+
+
 .mini.act:hover {
   transform: scale(1.15);
   animation: none;
@@ -1223,6 +1218,111 @@ button.tile.act {
   z-index: 6;
   transform: scale(1.6);
   animation: none;
+}
+
+/* ---------- a piece to click, or one a decision is about ----------
+   A ring at a little distance round the piece (a clear gap, so the piece itself stays as it is and
+   two lit pieces side by side stay two), following its shape: a circle round a mini, a hexagon
+   round a prop. A piece asking for a click also sends out a ripple, the same shape, again and
+   again: easy to see at a glance, and nothing on the piece blinks. Colours as before: orange =
+   click it, purple = what the decision is about (red for the killer), gold = a prop to flip,
+   green = picked, blue = someone in this locker, red = someone on this hook. */
+
+/* minis: the ring is an outline (it keeps a real gap and follows the round frame), past the
+   survivor's own light ring or the blood ring of a wounded one */
+.mini:is(.act, .focus) {
+  outline: 0.3cqi solid var(--hl);
+  outline-offset: 0.42cqi;
+}
+.mini.focus {
+  --hl: #c9a6ff;
+}
+.mini.killer.focus {
+  --hl: #ff5a52;
+}
+.mini.act {
+  --hl: #ff8a3d;
+}
+.mini:is(.act, .focus)::after {
+  content: '';
+  position: absolute;
+  inset: calc(-0.42cqi - 0.3cqi);
+  border-radius: 50%;
+  border: 0.3cqi solid var(--hl);
+  pointer-events: none;
+  animation: hl-ripple 1.4s ease-out infinite;
+}
+/* (only a piece to click sends out ripples; the purple one just wears its ring) */
+.mini.focus:not(.act)::after {
+  display: none;
+}
+
+/* props: every prop picture is the same hexagon (points left and right, flat edges at 7% and 93%
+   of its height). The ring is that hexagon drawn as a line 7% outside it, through a mask; the
+   ripple is the hexagon itself, coming out from under the picture. */
+.tile {
+  isolation: isolate;
+}
+.tile.hiding,
+.tile.hooked,
+.tile.target,
+.tile.act,
+.tile.picked,
+button.tile.picked {
+  box-shadow: none;
+}
+/* (the old fade of the whole tile goes; a tile flipping over keeps its flip) */
+.tile:is(.target, .act):not(.flip) {
+  animation: none;
+}
+.tile::before {
+  content: '';
+  position: absolute;
+  inset: -14%;
+  z-index: -1;
+  display: none;
+  background: var(--ring);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='5.1,50 27.5,11.5 72.5,11.5 94.9,50 72.5,88.5 27.5,88.5' fill='none' stroke='black' stroke-width='3.9' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpolygon points='5.1,50 27.5,11.5 72.5,11.5 94.9,50 72.5,88.5 27.5,88.5' fill='none' stroke='black' stroke-width='3.9' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+.tile:is(.hiding, .hooked, .target, .act, .picked)::before {
+  display: block;
+}
+.tile:is(.target, .act):not(.picked)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  clip-path: polygon(0 50%, 25% 7.1%, 75% 7.1%, 100% 50%, 75% 92.9%, 25% 92.9%);
+  background: var(--ring);
+  pointer-events: none;
+  animation: hl-ripple 1.4s ease-out infinite;
+}
+.tile.hiding {
+  --ring: #7fc8ff;
+}
+.tile.hooked {
+  --ring: var(--blood-bright);
+}
+.tile.target {
+  --ring: #ffe9b0;
+}
+.tile.act {
+  --ring: #ff8a3d;
+}
+.tile.picked {
+  --ring: var(--ok);
+}
+/* the ripple: out from the piece, fading as it goes */
+@keyframes hl-ripple {
+  0% {
+    scale: 1;
+    opacity: 0.85;
+  }
+  100% {
+    scale: 1.75;
+    opacity: 0;
+  }
 }
 
 .path-token {
@@ -1365,25 +1465,10 @@ button.tile.act {
   outline: 4px solid #e3cbff;
   box-shadow: 0 0 28px 4px rgb(190 140 255 / 0.7) inset;
 }
-.mini.focus {
-  box-shadow:
-    0 0 0 3px #c9a6ff,
-    0 0 18px 6px rgb(170 110 255 / 0.75);
-  animation: focus-pulse 1.1s ease-in-out infinite;
-}
-.mini.killer.focus {
-  box-shadow:
-    0 0 0 3px #ff5a52,
-    0 0 20px 7px rgb(255 40 40 / 0.75);
-}
+
 .mini.hot {
   transform: scale(1.25);
   z-index: 5;
-}
-@keyframes focus-pulse {
-  50% {
-    filter: drop-shadow(0 0 10px rgb(200 160 255 / 0.9)) brightness(1.15);
-  }
 }
 .path-preview {
   position: absolute;
@@ -1606,6 +1691,8 @@ button.tile.act {
   .tile.target,
   .tile.act,
   .mini.act,
+  .mini::after,
+  .tile::after,
   .path-target,
   .tile.flip,
   .mini.focus,

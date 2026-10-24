@@ -182,6 +182,12 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   online. Online, a survivor's item shows only to its holder; everyone else (the killer, a
   spectator, the other survivors) sees the back of the card (`itemHidden` in
   `src/play/game.ts`, a house rule); an item shows when it is used.
+- **Every perk shows as one card** (`PerkCard`), wherever it is (an offer, the start of a turn, the
+  interact step, a roll): picture, name, cost, text and a hint. Usable now = it glows ("ready"),
+  pressed = "picked" (pressed again to put back), the others "dim"; "static" only explains, its uses
+  as buttons under it. The words around it are in `perkHints.ts` (`PERK_LEAD`, `pickedHint`) for
+  every panel. "Don't use" is never the loudest button. Offers and the start of a turn are decided
+  only in `PerkPrompt`; ActionPanel just points there.
 - Perk decisions (`PerkPrompt`) are part of the side panel on wide screens: teleported into
   `#side-dock`, they take the panel's place while open and fold with it (narrow screens: a sheet
   along the bottom). Character choices
