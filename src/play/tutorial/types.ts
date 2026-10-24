@@ -1,8 +1,8 @@
 // A tutorial chapter: a scene on the real board (built from the engine), and the steps the guide
-// (The Entity) walks the learner through. The learner plays one survivor; everyone else is played
-// by the tutorial (runner.ts).
+// (The Entity) walks the learner through. The learner plays one survivor (or, on the killer's side,
+// the killer); everyone else is played by the tutorial (runner.ts).
 
-import type { Action, GameState } from '../engine/types'
+import type { Action, GameState, PerkOwner } from '../engine/types'
 
 /** What the guide points at on screen. */
 export interface Spot {
@@ -38,6 +38,8 @@ export interface Step {
 
 export interface Chapter {
   id: string
+  /** The side the learner plays: a survivor (the default) or the killer. */
+  side?: 'killer'
   title: string
   /** One line on the chapter's card. */
   blurb: string
@@ -51,3 +53,6 @@ export interface Chapter {
 
 /** The survivor the learner plays. */
 export const LEARNER = 0
+
+/** Who the learner is in a chapter. */
+export const learnerOf = (c: Chapter | null): PerkOwner => (c?.side === 'killer' ? 'killer' : LEARNER)

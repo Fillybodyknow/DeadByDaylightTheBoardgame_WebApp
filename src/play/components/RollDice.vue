@@ -38,7 +38,7 @@ const hint = computed(() => {
     const sv = props.st.survivors[keyMode.value]
     return `ทิ้ง ${ITEM_NAMES[sv.item!]} ของ ${sv.name} ทอยลูกนี้ใหม่`
   }
-  return keep.value ? 'Bond: เก็บลูกนี้' : ''
+  return keep.value ? 'พันธะ: เก็บลูกนี้' : ''
 })
 
 function pick(i: number) {

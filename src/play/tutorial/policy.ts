@@ -2,13 +2,16 @@
 
 import { legalActions } from '../engine/legal'
 import { stepOwner } from '../engine/seats'
-import type { Action, GameState } from '../engine/types'
+import type { Action, GameState, PerkOwner } from '../engine/types'
 import { LEARNER } from './types'
 
-/** The game waits on the learner (their survivor's step, or planning, which is theirs to do). */
-export function learnersTurn(st: GameState): boolean {
-  if (st.step.t === 'planSurvivors') return true
-  return stepOwner(st) === LEARNER
+/**
+ * The game waits on the learner (`who`): their own step, or the survivors' planning when they play
+ * a survivor (the killer's planning comes after it, a step of his own).
+ */
+export function learnersTurn(st: GameState, who: PerkOwner = LEARNER): boolean {
+  if (st.step.t === 'planSurvivors') return who !== 'killer'
+  return stepOwner(st) === who
 }
 
 /** The plainest move: plan to wait, end the turn, pass a perk; otherwise the first legal one. */

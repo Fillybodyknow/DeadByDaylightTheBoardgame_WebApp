@@ -7,7 +7,7 @@
 // listed in play/README.md.
 
 import { boards } from './boards'
-import { layLoadout } from './loadout'
+import { deckOf, layLoadout } from './loadout'
 import { PERKS, type PerkId } from './perks'
 import type {
   Action,
@@ -133,6 +133,7 @@ export const PROP_NAMES: Record<PropKind, string> = {
   hook: 'Hook',
   totem: 'Hex Totem',
   drone: 'Drone',
+  emp: 'EMP',
 }
 
 export const ITEM_NAMES: Record<string, string> = {
@@ -304,6 +305,23 @@ function placeDrones(st: GameState) {
   }
 }
 
+/**
+ * The Singularity's passive: after setup, a face-down EMP into each room, shuffled in with the room's
+ * face-down survival props (as Drones are with the objective ones).
+ */
+function placeEmps(st: GameState) {
+  if (st.killer.characterId !== 'singularity' || st.props.some((p) => p.kind === 'emp')) return
+  for (const room of boardOf(st).rooms) {
+    st.props.push({ id: `emp-${room.id}`, kind: 'emp', category: 'survival', room: room.id, path: null, revealed: false, removed: false, progress: 0, done: false, occupant: null })
+    const hidden = st.props.filter((p) => p.room === room.id && p.category === 'survival' && !p.revealed && !p.removed)
+    const kinds = shuffle(st, hidden.map((p) => p.kind))
+    hidden.forEach((p, i) => (p.kind = kinds[i]))
+  }
+}
+
+/** A face-up EMP in this room (The Singularity's passive). */
+export const empIn = (st: GameState, room: string) => propsIn(st, room).find((p) => p.kind === 'emp' && p.revealed)
+
 // ---------- The Unknown: four minis, one of them "the killer" at a time ----------
 
 /** The Unknowns on the board, by number - 1 (each one's room; the acting one stands in `room`). */
@@ -343,6 +361,8 @@ function actAtRoom(st: GameState, room: string) {
 
 /** Cards the killer plans: one per Unknown on the board for The Unknown, two for anyone else. */
 export function killerCardCount(st: GameState): number {
+  // The Singularity's passive: 3 cards, 3 turns
+  if (st.killer.characterId === 'singularity') return 3
   return st.killer.unknowns ? unknownCount(st) : 2
 }
 
@@ -366,6 +386,7 @@ function rollStartRooms(st: GameState) {
   const kf = rollFace(st)
   st.killer.room = startRoom(kf)
   placeDrones(st)
+  placeEmps(st)
   // The Unknown's passive: setup is made with The Unknown labelled 1; the others wait off the board
   if (st.killer.characterId === 'unknown' && !st.killer.unknowns)
     Object.assign(st.killer, { unknowns: [st.killer.room, null, null, null], unknownAt: 0, bonusUsed: true })
@@ -806,7 +827,7 @@ function handle(st: GameState, a: Action) {
       sv.planned = a.card
       sv.plannedRevealed = true
       sv.acted = false
-      log(st, `${step.s === st.stridor ? 'Stridor' : 'Dire Crow'}: ${sv.name} ต้องเปิดการ์ดก่อนใคร — ${CARD_NAMES[a.card]}`, step.s)
+      log(st, `${step.s === st.stridor ? 'เสียงแหบดัง' : 'Dire Crow'}: ${sv.name} ต้องเปิดการ์ดก่อนใคร — ${CARD_NAMES[a.card]}`, step.s)
       // the next one who must, or everyone else
       st.queue.unshift({ k: 'plan' })
       return
@@ -904,7 +925,7 @@ function handle(st: GameState, a: Action) {
       // a Firecracker in the room ahead may stop him, as on his card moves
       const holders = onBoardIn(st, m.to).filter((i) => st.survivors[i].item === 'firecracker' && st.itemLock !== i)
       if (holders.length > 0 && !a.reacted) return wait(st, { t: 'reaction', item: 'firecracker', holders, pending: { t: 'move', path: m.path.id }, antidote: true, ...(step.why ? { why: step.why } : {}) })
-      log(st, `${actorName(st)} เดินต่อด้วย ${step.why === 'darkness' ? 'Darkness Revealed' : 'Afterpiece Antidote'}`, 'killer')
+      log(st, `${actorName(st)} เดินต่อด้วย ${step.why === 'darkness' ? 'เผยความมืดมิด' : 'ยาแก้พิษส่งท้าย'}`, 'killer')
       return finishKillerMove(st, m.path, m.to)
     }
     case 'anyMove': {
@@ -934,6 +955,7 @@ function handle(st: GameState, a: Action) {
     case 'crowdPay': {
       if (a.t === 'crowdPledge') {
         const sv = st.survivors[a.s] ?? fail('no such survivor')
+        if (sv.status !== 'board') fail('only a survivor on the board pays')
         if (!Number.isInteger(a.n) || a.n < 0 || a.n > Math.min(2, sv.bp)) fail('cannot put in that much')
         const pledge = [...(step.pledge ?? crowdPledges(st))]
         pledge[a.s] = a.n
@@ -950,8 +972,29 @@ function handle(st: GameState, a: Action) {
       }
       for (const p of a.pay) st.survivors[p].bp--
       const who = [...new Set(a.pay)].map((p) => `${st.survivors[p].name} ${a.pay.filter((x) => x === p).length} ▲`)
-      log(st, `Crowd Control: ผู้รอดชีวิตจ่าย 2 ▲ (${who.join(', ')}) — ${st.survivors[step.s].name} เลือกการ์ดเอง`, 'game')
+      log(st, `ควบคุมฝูงชน: ผู้รอดชีวิตจ่าย 2 ▲ (${who.join(', ')}) — ${st.survivors[step.s].name} เลือกการ์ดเอง`, 'game')
       return
+    }
+    case 'weavePay': {
+      if (a.t === 'weavePledge') {
+        const sv = st.survivors[a.s] ?? fail('no such survivor')
+        if (!weavers(st, step.s).includes(a.s)) fail('not in her room')
+        if (!Number.isInteger(a.n) || a.n < 0 || a.n > sv.bp) fail('cannot put in that much')
+        const pledge = [...(step.pledge ?? weavePledges(st, step.s))]
+        pledge[a.s] = a.n
+        if (pledge.reduce<number>((t, p) => t + (p ?? 0), 0) > WEAVING_COST) fail(`${WEAVING_COST} ▲ at most`)
+        // each may still change theirs: paying or calling it off waits for her confirm
+        return wait(st, { ...step, pledge })
+      }
+      if (a.t !== 'weavePay') break
+      if (!a.pay.length) {
+        // called off: the perk is not used, and her interaction is still to come
+        log(st, `${st.survivors[step.s].name} ไม่ใช้ แมงมุมทอใย`, step.s)
+        return wait(st, { t: 'survivorInteract', s: step.s, canInteract: true })
+      }
+      const pay = pledgedPay(step.pledge ?? weavePledges(st, step.s))
+      if (pay.length !== WEAVING_COST || JSON.stringify(pay) !== JSON.stringify(a.pay)) fail(`pay the ${WEAVING_COST} ▲ put in`)
+      return weavingPaid(st, step.s, step.prop, pay)
     }
     case 'carnifexProp': {
       if (a.t !== 'guardProp') break
@@ -977,7 +1020,7 @@ function handle(st: GameState, a: Action) {
       const other = st.survivors[step.s]
       if (!a.yes) {
         st.empathyNo = [...(st.empathyNo ?? []), `${step.from}:${step.s}`]
-        return log(st, `${other.name} ไม่ยอม (Empathy)`, step.s)
+        return log(st, `${other.name} ไม่ยอม (เห็นใจ)`, step.s)
       }
       // still possible? (nothing else moves ▲ in between, but a cap or an empty pool would stop it)
       const ok = step.mode === 'take' ? other.bp >= 1 && me.bp < survivorMax(st, step.from) : me.bp >= 1 && other.bp < survivorMax(st, step.s)
@@ -1022,7 +1065,7 @@ function handle(st: GameState, a: Action) {
       sv.planned = a.card
       sv.plannedRevealed = true
       sv.acted = false
-      log(st, `Crowd Control: ${st.killer.name} ให้ ${sv.name} วาง ${CARD_NAMES[a.card]}`, 'killer')
+      log(st, `ควบคุมฝูงชน: ${st.killer.name} ให้ ${sv.name} วาง ${CARD_NAMES[a.card]}`, 'killer')
       return
     }
     case 'bonusOffer': {
@@ -1038,8 +1081,15 @@ function handle(st: GameState, a: Action) {
       const kept = step.drawn[a.item] ?? fail('no such item')
       const sv = st.survivors[step.s]
       const rest = step.drawn.filter((_, i) => i !== a.item)
-      log(st, `${sv.name} เลือก ${ITEM_NAMES[kept]} ทิ้ง ${rest.map((x) => ITEM_NAMES[x]).join(', ')} (Plunderer's Instinct)`, step.s)
+      log(st, `${sv.name} เลือก ${ITEM_NAMES[kept]} ทิ้ง ${rest.map((x) => ITEM_NAMES[x]).join(', ')} (สัญชาตญาณขโมย)`, step.s)
       return gotItem(st, step.s, kept, 'pick')
+    }
+    case 'machineLearning': {
+      if (a.t !== 'selfAware') break
+      if (!step.cards.includes(a.perk)) fail('not one of the cards drawn')
+      st.killer.perks.push(a.perk)
+      log(st, `${st.killer.name} ได้ ${PERKS[a.perk].name} — ใช้ได้ตั้งแต่ตอนนี้ (การเรียนรู้ของเครื่องจักร)`, 'killer')
+      return
     }
     case 'selfAware': {
       if (a.t !== 'selfAware') break
@@ -1052,7 +1102,7 @@ function handle(st: GameState, a: Action) {
         delete sv.covered.self_aware
         if (under) sv.covered[a.perk] = under
       }
-      log(st, `${sv.name} ได้ ${PERKS[a.perk].name} แทน Self-Aware — ทิ้ง Self-Aware และอีก ${step.cards.length - 1} ใบ`, step.s)
+      log(st, `${sv.name} ได้ ${PERKS[a.perk].name} แทน ยึดมั่น — ทิ้ง ยึดมั่น และอีก ${step.cards.length - 1} ใบ`, step.s)
       return
     }
     case 'keepItem': {
@@ -1095,22 +1145,25 @@ function handle(st: GameState, a: Action) {
       if (!legal.some((o) => same(o, i))) fail('not a legal interaction')
       const to = powerDest(st, i)
       if (to && askLeave(st, to, step, a, [{ k: 'resume', step }])) return
-      killerInteract(st, i, a.reacted === true, step.turn)
+      killerInteract(st, i, a.reacted === true, step.turn, false, a.emp === true)
       return
     }
     case 'killerBonusOffer': {
-      if (a.t === 'declineBonus') return queueCleanup(st)
+      if (a.t === 'declineBonus') {
+        if (step.free) fail('Slipstream: the bonus turn is taken')
+        return queueCleanup(st)
+      }
       if (a.t !== 'bonus') break
       const k = st.killer
       if (!k.hand.includes(a.card)) fail('card not in hand')
       k.hand.splice(k.hand.indexOf(a.card), 1)
       k.planned.push(a.card)
-      const cost = bonusCost(st)
+      const cost = step.free ? 0 : bonusCost(st)
       k.bp -= cost
       k.bonusUsed = true
       k.bonusAt = k.planned.length - 1
-      log(st, `${k.name} จ่าย ${cost} ▲ เล่น Bonus Turn`, 'killer')
-      st.queue.push({ k: 'killerTurn', turn: 2 })
+      log(st, step.free ? `${k.name} เล่น Bonus Turn (สลิปสตรีม) ด้วย ${CARD_NAMES[a.card]}` : `${k.name} จ่าย ${cost} ▲ เล่น Bonus Turn`, 'killer')
+      st.queue.push({ k: 'killerTurn', turn: k.planned.length - 1 })
       return
     }
     case 'carryDice': {
@@ -1144,13 +1197,25 @@ function handle(st: GameState, a: Action) {
       if (a.s === null) {
         // a perk's move (Starstruck, Diversion): it goes on
         if (step.then) return void st.queue.unshift(...step.then)
-        // Nobody reacts: replay the killer's action without asking again.
+        // Nobody reacts: replay the killer's action without asking again (an EMP kept: a
+        // Flashlight may still be asked)
         st.step = reactedStep(st, step)
-        handle(st, { ...step.pending, reacted: true } as Action)
+        handle(st, (step.item === 'emp' ? step.pending : { ...step.pending, reacted: true }) as Action)
         return
       }
       if (!step.holders.includes(a.s)) fail('cannot react')
       const sv = st.survivors[a.s]
+      // Overwhelming Presence: a Flashlight or Firecracker used is an item used (the user's call)
+      if (step.item !== 'emp' && !step.overwhelmed && perkCandidates(st, { k: 'preItem', s: a.s }, []).length) {
+        st.queue.unshift({ k: 'trigger', w: { k: 'preItem', s: a.s }, done: [] }, { k: 'reactItem', s: a.s, step })
+        return
+      }
+      if (step.item === 'emp') {
+        empIn(st, st.killer.room)!.removed = true
+        st.canInteract = false
+        log(st, `${sv.name} ทิ้ง EMP — ${st.killer.name} Interact ไม่ได้เทิร์นนี้`, a.s)
+        return
+      }
       const used = sv.item!
       emit(st, { k: 'item', s: a.s, item: used }, a.s)
       discardItem(st, a.s, used, true)
@@ -1182,7 +1247,7 @@ function handle(st: GameState, a: Action) {
         sv.bp--
         log(st, `${sv.name} จ่าย 1 ▲ กัน ${what}`, step.s)
       } else if (step.whispers) whispersFaceUp(st, step.s)
-      else if (step.grip) wound(st, step.s, 'power', `${sv.name} โดน Dragon's Grip — บาดเจ็บ`)
+      else if (step.grip) wound(st, step.s, 'power', `${sv.name} โดน อุ้งมือมังกร — บาดเจ็บ`)
       else sparkHit(st, step.s)
       if (step.whispers) return
       return sparkNext(st, step.rest, step.grip)
@@ -1193,7 +1258,7 @@ function handle(st: GameState, a: Action) {
       if (!a.teleport) {
         // "gain a ▲": one, whatever the die shows; the die is only the teleport's price
         gainKiller(st, 1)
-        log(st, `${k.name} รับ +1 ▲ จาก Phantasm Trap`, 'killer')
+        log(st, `${k.name} รับ +1 ▲ จาก กับดักหลอก`, 'killer')
         return
       }
       if (k.bp < step.face) fail('not enough ▲ to teleport')
@@ -1217,12 +1282,12 @@ function handle(st: GameState, a: Action) {
       // the Afterpiece Tonic's room: face up
       const tonic = st.afterpiece?.tonic === sv.room && sv.status === 'board'
       if (tonic) sv.plannedRevealed = true
-      log(st, tonic ? `${sv.name} วาง ${CARD_NAMES[a.card]} (หงาย — Afterpiece Tonic)` : `${sv.name} วางการ์ดใบใหม่ (คว่ำ)`, step.s)
+      log(st, tonic ? `${sv.name} วาง ${CARD_NAMES[a.card]} (หงาย — ยาบำรุงส่งท้าย)` : `${sv.name} วางการ์ดใบใหม่ (คว่ำ)`, step.s)
       return
     }
     case 'pickSurvivor': {
       if (a.t !== 'pick' || !step.options.includes(a.s)) break
-      wound(st, a.s, 'power', `${st.survivors[a.s].name} โดน Chainsaw — บาดเจ็บ`)
+      wound(st, a.s, 'power', `${st.survivors[a.s].name} โดน เลื่อยไฟฟ้า — บาดเจ็บ`)
       return
     }
     case 'redeemerGuess': {
@@ -1257,6 +1322,17 @@ function runTask(st: GameState, task: Task) {
   switch (task.k) {
     case 'survivorTurn': {
       const sv = st.survivors[task.s]
+      // Forced Hesitation took their card: no turn of their own, on to the next one's
+      if (!sv.planned) {
+        const order = turnOrder(st)
+        const next = order.slice(order.indexOf(task.s) + 1).find((i) => st.survivors[i].planned && !st.survivors[i].acted)
+        if (next !== undefined) st.queue.unshift({ k: 'survivorTurn', s: next })
+        else {
+          st.phase = 'killer'
+          st.queue.unshift({ k: 'killerTurn', turn: 0 })
+        }
+        return
+      }
       st.activeSurvivor = task.s
       st.lockerTurn = sv.status === 'locker' ? task.s : null
       st.turnHurt = []
@@ -1284,27 +1360,43 @@ function runTask(st: GameState, task: Task) {
       if (st.deception) {
         st.deception = false
         st.canInteract = false
-        log(st, `${st.survivors[task.s].name} อยู่ห้องเดิม (Deception) — Interact ไม่ได้เทิร์นนี้`, task.s)
+        log(st, `${st.survivors[task.s].name} อยู่ห้องเดิม (การหลอกลวง) — Interact ไม่ได้เทิร์นนี้`, task.s)
         return
       }
       if (st.moveBlocked) {
         st.moveBlocked = false
         st.canInteract = true
-        log(st, `${st.survivors[task.s].name} เดินไม่ได้ (Huntress Lullaby)`, task.s)
+        log(st, `${st.survivors[task.s].name} เดินไม่ได้ (เพลงขับกล่อมแห่งนักล่าสาว)`, task.s)
         return
       }
       if (st.sealedCard === task.card) {
         st.canInteract = false
-        log(st, `${st.survivors[task.s].name} เปิด ${CARD_NAMES[task.card]} แต่เดินไม่ได้ (The Third Seal) — เสียการ Interact`, task.s)
+        log(st, `${st.survivors[task.s].name} เปิด ${CARD_NAMES[task.card]} แต่เดินไม่ได้ (สัญลักษณ์ที่สาม) — เสียการ Interact`, task.s)
         return
       }
       startSurvivorMove(st, task.s, task.card)
       return
+    case 'reactItem': {
+      const sv = st.survivors[task.s]
+      if (st.itemBlocked) {
+        // wasted: it stops nothing; anyone else holding one may still use theirs
+        st.itemBlocked = false
+        log(st, `${sv.name} ทำ ${ITEM_NAMES[sv.item!]} เสียเปล่า (การปรากฏกายครอบงำใจ)`, task.s)
+        discardItem(st, task.s, sv.item!, false)
+        const rest = task.step.holders.filter((h) => h !== task.s)
+        if (rest.length) return wait(st, { ...task.step, holders: rest })
+        st.step = task.step
+        return handle(st, { t: 'react', s: null })
+      }
+      // passed: the item does what it does
+      st.step = { ...task.step, overwhelmed: true }
+      return handle(st, { t: 'react', s: task.s })
+    }
     case 'itemUse':
       if (st.itemBlocked) {
         st.itemBlocked = false
         const sv = st.survivors[task.s]
-        log(st, `${sv.name} ทำ ${ITEM_NAMES[sv.item!]} เสียเปล่า (Overwhelming Presence)`, task.s)
+        log(st, `${sv.name} ทำ ${ITEM_NAMES[sv.item!]} เสียเปล่า (การปรากฏกายครอบงำใจ)`, task.s)
         discardItem(st, task.s, sv.item!, false)
         return
       }
@@ -1330,7 +1422,7 @@ function runTask(st: GameState, task: Task) {
     case 'phantasmGo': {
       const k = st.killer
       k.bp -= task.face
-      log(st, `${k.name} จ่าย ${task.face} ▲ วาร์ปไป Phantasm Trap`, 'killer')
+      log(st, `${k.name} จ่าย ${task.face} ▲ วาร์ปไป กับดักหลอก`, 'killer')
       killerEnter(st, '', task.room)
       // After the reveal and Quick & Quiet, interact with a survivor there.
       st.queue.splice(2, 0, { k: 'phantasmHit', i: task.i })
@@ -1348,10 +1440,10 @@ function runTask(st: GameState, task: Task) {
         palletOn(st, task.path)!.removed = true
         trigger(st, { k: 'killerBreak', what: 'pallet' })
         if (st.phase === 'killer') st.canInteract = false
-        log(st, `${st.killer.name} ตามไปไม่ได้ — ทำลาย Pallet แล้วอยู่ที่เดิม (Thrill of the Hunt)`, 'killer', { ev: { k: 'palletBreak', path: task.path } })
+        log(st, `${st.killer.name} ตามไปไม่ได้ — ทำลาย Pallet แล้วอยู่ที่เดิม (ความตื่นเต้นในการไล่ล่า)`, 'killer', { ev: { k: 'palletBreak', path: task.path } })
         return
       }
-      log(st, `${st.killer.name} เดินตาม ${st.survivors[task.s].name} ไป ${roomName(st, task.to)} (Thrill of the Hunt)`, 'killer')
+      log(st, `${st.killer.name} เดินตาม ${st.survivors[task.s].name} ไป ${roomName(st, task.to)} (ความตื่นเต้นในการไล่ล่า)`, 'killer')
       return killerMovedBy(st, pathDef(st, task.path), task.to)
     }
     case 'trigger':
@@ -1371,7 +1463,7 @@ function runTask(st: GameState, task: Task) {
       const mods = st.rollMods
       st.rollMods = { danger: false, keep: false }
       // The Doctor's passive: survivors with Madness roll the danger die for skill checks.
-      const mad = SKILL_CHECKS.includes(task.ctx.k) && st.survivors[task.ctx.s].madness
+      const mad = MADNESS_CHECKS.includes(task.ctx.k) && st.survivors[task.ctx.s].madness
       // The Knight's Jailer: a skill check in its room is a danger-die roll — not for someone in a
       // locker, who is off the board (p.12): being searched stays a skill check
       const jailed = st.survivors[task.ctx.s]
@@ -1498,7 +1590,7 @@ function runTask(st: GameState, task: Task) {
       st.deception = false
       if (st.evadedWall) {
         pathState(st, st.evadedWall).wall = true
-        log(st, 'กำแพงกลับเข้าที่ (Urban Evasion)', 'game')
+        log(st, 'กำแพงกลับเข้าที่ (การหลบหลีกกลางกรุง)', 'game')
         st.evadedWall = null
       }
       const order = turnOrder(st)
@@ -1559,7 +1651,7 @@ function runTask(st: GameState, task: Task) {
     case 'killerInteract': {
       // Power Struggle: no interaction after moving with the first card.
       const struggled = task.turn === 0 && st.struggle === true
-      if (struggled && st.canInteract) log(st, `${actorName(st)} Interact ไม่ได้เทิร์นนี้ (Power Struggle)`, 'killer')
+      if (struggled && st.canInteract) log(st, `${actorName(st)} Interact ไม่ได้เทิร์นนี้ (ดิ้นรนสุดพลัง)`, 'killer')
       wait(st, { t: 'killerInteract', turn: task.turn, canInteract: st.canInteract && !struggled })
       return
     }
@@ -1581,9 +1673,15 @@ function runTask(st: GameState, task: Task) {
         return
       }
       if (task.extra) return // Devour Hope's turn: cleanup is already queued
+      // Slipstream: his cards are back in his hand; the bonus turn it gives comes now
+      if (k.slipstream) {
+        k.slipstream = false
+        return wait(st, { t: 'killerBonusOffer', free: true })
+      }
       // the next card (The Unknown may have only one; Shadowborn or Coup de Grâce may have added a third)
       if (task.turn + 1 < k.planned.length) st.queue.unshift({ k: 'killerTurn', turn: task.turn + 1 })
-      else if (task.turn === 1 && !k.bonusUsed && k.bp >= bonusCost(st) && k.hand.length > 0) wait(st, { t: 'killerBonusOffer' })
+      // (The Singularity can't pay for one: its only bonus turn is Slipstream's)
+      else if (task.turn === 1 && !k.bonusUsed && k.characterId !== 'singularity' && k.bp >= bonusCost(st) && k.hand.length > 0) wait(st, { t: 'killerBonusOffer' })
       else {
         // his turns over: Unknown 1 stands for him again
         if (k.unknowns) actAs(st, 0)
@@ -1646,7 +1744,7 @@ function planSurvivors(st: GameState, cards: (MoveCard | null)[]) {
   const tonic = st.afterpiece?.tonic
   const shown = st.survivors.filter((sv) => tonic && sv.room === tonic && sv.status === 'board' && sv.planned && !sv.plannedRevealed)
   for (const sv of shown) sv.plannedRevealed = true
-  if (shown.length) log(st, `Afterpiece Tonic: ${shown.map((sv) => `${sv.name} วาง ${CARD_NAMES[sv.planned!]}`).join(', ')} (หงาย)`, 'killer')
+  if (shown.length) log(st, `ยาบำรุงส่งท้าย: ${shown.map((sv) => `${sv.name} วาง ${CARD_NAMES[sv.planned!]}`).join(', ')} (หงาย)`, 'killer')
 }
 
 /** The killer's two cards are set (in either planning order): the round can start. */
@@ -1707,7 +1805,7 @@ function survivorArrives(st: GameState, s: number, from: string, to: string, pat
   sv.room = to
   log(st, `${sv.name} → ${roomName(st, to)}`, s, { ev: { k: 'move', who: s, from, to, path } })
   // Dissolution: the ▲ on this path wounds whoever moves along it
-  if (path && st.dissolution && tokenOf(boardOf(st), path) === st.dissolution && !sv.wounded) wound(st, s, 'perk', `${sv.name} เดินผ่าน Dissolution — บาดเจ็บ`)
+  if (path && st.dissolution && tokenOf(boardOf(st), path) === st.dissolution && !sv.wounded) wound(st, s, 'perk', `${sv.name} เดินผ่าน การสลายตัว — บาดเจ็บ`)
   // Overzealous pays its owner by itself, walking into the killer's room
   if (killerIn(st, to) && sv.status === 'board' && perkReady(st, s, 'overzealous')) {
     payPerk(st, s, 'overzealous', '+1 ▲')
@@ -1718,7 +1816,7 @@ function survivorArrives(st: GameState, s: number, from: string, to: string, pat
   let after = 1
   if (st.phantasm.includes(to) && sv.status === 'board') {
     st.phantasm = st.phantasm.filter((r) => r !== to)
-    log(st, `${sv.name} เดินเข้า Phantasm Trap — ทอยลูกเต๋า`, s)
+    log(st, `${sv.name} เดินเข้า กับดักหลอก — ทอยลูกเต๋า`, s)
     st.queue.splice(1, 0, { k: 'roll', ctx: { k: 'phantasm', s, room: to }, n: 1, kind: 'skill' })
     after = 2
   }
@@ -1731,7 +1829,7 @@ function survivorArrives(st: GameState, s: number, from: string, to: string, pat
   // For the People, once the room is revealed.
   if (sv.status === 'board') trigger(st, { k: 'entered', s, path }, after)
   if (path && pathState(st, path).trap) {
-    log(st, `${sv.name} เดินผ่าน Bear Trap — ทอย Danger Die`, s)
+    log(st, `${sv.name} เดินผ่าน กับดักหมี — ทอย Danger Die`, s)
     startRoll(st, { k: 'trap', s, path }, 1, 'danger')
   }
 }
@@ -1942,7 +2040,7 @@ export function reignCards(st: GameState, s: number): PathKind[] {
 
 /** Reign of Darkness moves them; brought into his room, he may then interact with them. */
 function reignMove(st: GameState, s: number, path: PathDef, to: string) {
-  log(st, `Reign of Darkness: ${st.survivors[s].name} ถูกพาไป ${roomName(st, to)}`, 'killer')
+  log(st, `รัชสมัยแห่งความมืดมิด: ${st.survivors[s].name} ถูกพาไป ${roomName(st, to)}`, 'killer')
   moveSurvivor(st, s, path, to)
   // after the move and all it sets off (the reveal there), before his turn ends
   const at = st.queue.findIndex((t) => t.k === 'endKillerTurn')
@@ -2032,7 +2130,8 @@ function killerEnter(st: GameState, path: string, to: string, broke = false) {
 }
 
 /** `asked`: Residual Manifest has had its chance at this interaction. */
-function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, turn: number, asked = false) {
+/** `emped`: the survivor he'd interact with has had their chance to discard an EMP. */
+function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, turn: number, asked = false, emped = false) {
   const k = st.killer
   // A power that takes him into a room (chainsaw, Blink, Wailing Bell): a Firecracker there may
   // stop it, as any move of his. It is stopped before it is spent.
@@ -2046,6 +2145,10 @@ function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, t
     st.queue.unshift({ k: 'trigger', w: { k: 'killerWouldInteract', room: k.room }, done: [] }, { k: 'killerAct', i, turn })
     return
   }
+  // The Singularity's passive: a face-up EMP in the room of the survivor he'd interact with; they may
+  // discard it to stop his interaction this turn
+  if (!reacted && !emped && (i.k === 'attack' || i.k === 'pickUp') && empIn(st, k.room))
+    return wait(st, { t: 'reaction', item: 'emp', holders: [i.target], pending: { t: 'interact', i, emp: true } })
   {
     const holders = onBoardIn(st, k.room).filter((s) => st.survivors[s].item === 'flashlight' && st.itemLock !== s)
     if (holders.length > 0 && !reacted) {
@@ -2060,8 +2163,13 @@ function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, t
 function killerActs(st: GameState, i: KillerInteraction, turn: number | null) {
   if (i.k === 'attack' || i.k === 'pickUp') {
     const w: PerkWindow = { k: 'preKillerInteract', target: i.target, pickUp: i.k === 'pickUp', turn }
-    if (!perkCandidates(st, w, []).length) return killerDo(st, i, turn)
-    st.queue.unshift({ k: 'trigger', w, done: [] }, { k: 'killerDo', i, turn })
+    // queued before the perks are asked: they look at it (and may find it gone, stopped by one asked first)
+    st.queue.unshift({ k: 'killerDo', i, turn })
+    if (!perkCandidates(st, w, []).length) {
+      st.queue.shift()
+      return killerDo(st, i, turn)
+    }
+    st.queue.unshift({ k: 'trigger', w, done: [] })
     return
   }
   killerDo(st, i, turn)
@@ -2126,7 +2234,7 @@ function doKillerInteraction(st: GameState, i: KillerInteraction) {
     case 'painResonance': {
       const hook = usableHook(st, k.room)!
       payPerk(st, 'killer', 'pain_resonance', `Interact กับ Hook ที่ ${roomName(st, hook.room!)}`)
-      return wound(st, i.target, 'perk', `${st.survivors[i.target].name} บาดเจ็บ (Pain Resonance)`)
+      return wound(st, i.target, 'perk', `${st.survivors[i.target].name} บาดเจ็บ (เสียงประสานของความเจ็บปวด)`)
     }
     case 'hoard':
       payPerk(st, 'killer', 'hoarder', 'นำ Chest ออก +2 ▲')
@@ -2186,7 +2294,7 @@ function hang(st: GameState, s: number, hook: Prop, asked = false) {
   if (sv.embrace && st.phase !== 'over') {
     const n = sv.embrace
     sv.embrace = 0
-    log(st, `Grim Embrace: เก็บ ${n} ▲ จากบอร์ดของ ${sv.name} — Sacrifice Progress +${n}`, 'killer')
+    log(st, `อ้อมกอดของความกลัว: เก็บ ${n} ▲ จากบอร์ดของ ${sv.name} — Sacrifice Progress +${n}`, 'killer')
     addSacrifice(st, n)
   }
   // Monstrous Shrine: nobody else left standing in the room he hung them in.
@@ -2303,7 +2411,7 @@ function cleanup(st: GameState) {
     bonusAt: null,
     shown: [],
   })
-  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], genBy: {}, empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
+  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], genBy: {}, empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, geneticLimits: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
   startPlanning(st)
@@ -2387,7 +2495,7 @@ const ROLL_LABEL: Record<RollContext['k'], string> = {
   overwhelm: 'Overwhelming Presence',
   noMither: 'No Mither',
   breakdown: 'Breakdown',
-  assassin: 'หลบ Assassin',
+  assassin: 'หลบ มือลอบสังหาร',
   deadHard: 'Dead Hard',
   spineChill: 'Spine Chill',
   deerstalker: 'Deerstalker',
@@ -2439,8 +2547,8 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
     st.jailerRoll = null
     if (!ok) {
       st.guards = { ...st.guards, jailer: undefined }
-      log(st, `Jailer กลับไปบนบอร์ดของ ${st.killer.name} — วางใหม่ได้`, 'killer')
-      wound(st, s, 'power', `${sv.name} ทอยพลาดต่อหน้า Jailer — บาดเจ็บ`)
+      log(st, `ผู้คุม กลับไปบนบอร์ดของ ${st.killer.name} — วางใหม่ได้`, 'killer')
+      wound(st, s, 'power', `${sv.name} ทอยพลาดต่อหน้า ผู้คุม — บาดเจ็บ`)
     }
   }
   // The Skull Merchant's Drones: a skill check in a room with one face up pays him a ▲ (success)
@@ -2458,9 +2566,9 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
   // Lucky Break: after a great success (the die kept; any die of the carry roll).
   if (isGreat(dice[0]) || (ctx.k === 'carry' && dice.some(isGreat))) trigger(st, { k: 'greatRoll', s, ctx: ctx.k })
   // Madness lasts until a failed (danger-die) skill check.
-  if (SKILL_CHECKS.includes(ctx.k) && sv.madness && dice[0].kind === 'danger' && !ok) {
+  if (MADNESS_CHECKS.includes(ctx.k) && sv.madness && dice[0].kind === 'danger' && !ok) {
     sv.madness = false
-    log(st, `${sv.name} หาย Madness`, s, { ev: { k: 'madness', s, on: false } })
+    log(st, `${sv.name} หาย บ้าคลั่ง`, s, { ev: { k: 'madness', s, on: false } })
   }
 
   switch (ctx.k) {
@@ -2510,10 +2618,10 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
       return
     }
     case 'botany':
-      if (ok) makeHealthy(st, ctx.target, `${st.survivors[ctx.target].name} หายบาดเจ็บ (Botany Knowledge)`, s)
+      if (ok) makeHealthy(st, ctx.target, `${st.survivors[ctx.target].name} หายบาดเจ็บ (ความรู้พฤกษศาสตร์)`, s)
       return
     case 'selfCare':
-      if (ok) makeHealthy(st, s, `${sv.name} หายบาดเจ็บ (Self-Care)`, s)
+      if (ok) makeHealthy(st, s, `${sv.name} หายบาดเจ็บ (ดูแลตัวเอง)`, s)
       return
     case 'hatchet':
       if (!ok) wound(st, s, 'power', `${sv.name} โดน Hatchet — บาดเจ็บ`)
@@ -2523,12 +2631,12 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
       // the attack doesn't land; the killer gains a ▲ for it
       const at = st.queue.findIndex((t) => t.k === 'killerDo' && t.i.k === 'attack' && t.i.target === ctx.target)
       if (at >= 0) st.queue.splice(at, 1)
-      log(st, `${st.survivors[ctx.target].name} ยังไม่บาดเจ็บ (No Mither) — ${st.killer.name} +1 ▲`, s)
+      log(st, `${st.survivors[ctx.target].name} ยังไม่บาดเจ็บ (ไม่โอดครวญ) — ${st.killer.name} +1 ▲`, s)
       gainKiller(st, 1)
       return
     }
     case 'assassin':
-      if (!ok) wound(st, s, 'power', `${sv.name} โดน Assassin — บาดเจ็บ`)
+      if (!ok) wound(st, s, 'power', `${sv.name} โดน มือลอบสังหาร — บาดเจ็บ`)
       return
     case 'deerstalker': {
       // a failure: they stay in his room, and can't interact this turn
@@ -2538,19 +2646,19 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
       // "can't interact this turn": on their own turn; on someone else's there is nothing to lose
       const own = st.phase !== 'killer' && st.activeSurvivor === s
       if (own) st.canInteract = false
-      log(st, `${sv.name} ออกจากห้องไม่ได้ (Deerstalker) — อยู่ที่เดิม${own ? ' Interact ไม่ได้เทิร์นนี้' : ''}`, s)
+      log(st, `${sv.name} ออกจากห้องไม่ได้ (นักสะกดรอยกวาง) — อยู่ที่เดิม${own ? ' Interact ไม่ได้เทิร์นนี้' : ''}`, s)
       return
     }
     case 'spineChill':
       // a success: away along any path, before he interacts (no staying put)
       if (!ok) return
-      log(st, `${sv.name} รู้ตัวทัน (Spine Chill) — เดินไปตามเส้นทางใดก็ได้`, s)
+      log(st, `${sv.name} รู้ตัวทัน (เสียวสันหลัง) — เดินไปตามเส้นทางใดก็ได้`, s)
       st.queue.unshift({ k: 'anyMove', s, why: 'spineChill' })
       return
     case 'breakdown':
       if (!ok || st.sacrifice <= 0) return
       st.sacrifice--
-      log(st, `Breakdown สำเร็จ — ${st.killer.name} เสีย Sacrifice Progress (${st.sacrifice}/${SACRIFICE_TO_WIN})`, s, { ev: { k: 'sacrifice', total: st.sacrifice } })
+      log(st, `สติแตก สำเร็จ — ${st.killer.name} เสีย Sacrifice Progress (${st.sacrifice}/${SACRIFICE_TO_WIN})`, s, { ev: { k: 'sacrifice', total: st.sacrifice } })
       return
     case 'deadHard': {
       if (!ok) return
@@ -2560,7 +2668,7 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
       const t = st.survivors[ctx.target]
       t.status = 'board'
       t.room = st.killer.room
-      log(st, `${t.name} หลุดจากการแบก (Dead Hard) — เดินไปตามเส้นทางใดก็ได้`, ctx.target, { ev: { k: 'carryEscape', s: ctx.target } })
+      log(st, `${t.name} หลุดจากการแบก (ตายยาก) — เดินไปตามเส้นทางใดก็ได้`, ctx.target, { ev: { k: 'carryEscape', s: ctx.target } })
       st.queue.unshift({ k: 'anyMove', s: ctx.target, why: 'deadHard' })
       return
     }
@@ -2569,13 +2677,13 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
       pathState(st, ctx.path).trap = false
       st.killer.trapsInSupply++
       if (sv.wounded) {
-        log(st, `${sv.name} ติด Bear Trap ขณะบาดเจ็บ — Sacrifice +1`, 'killer', { ev: { k: 'trapSprung', s, path: ctx.path } })
+        log(st, `${sv.name} ติด กับดักหมี ขณะบาดเจ็บ — Sacrifice +1`, 'killer', { ev: { k: 'trapSprung', s, path: ctx.path } })
         addSacrifice(st, 1)
       } else {
         sv.wounded = true
         sv.woundedThisRound = true
         hurt(st, s)
-        log(st, `${sv.name} ติด Bear Trap — บาดเจ็บ`, 'killer', { ev: { k: 'trapSprung', s, path: ctx.path } })
+        log(st, `${sv.name} ติด กับดักหมี — บาดเจ็บ`, 'killer', { ev: { k: 'trapSprung', s, path: ctx.path } })
         emit(st, { k: 'wound', s, by: 'trap' }, 'killer')
       }
       return
@@ -2779,10 +2887,19 @@ export function perkReady(st: GameState, o: PerkOwner, perk: PerkId): boolean {
   if (o !== 'killer' && (st.survivors[o].purged ?? []).includes(perk)) return false
   // Fearmonger: this survivor can't use perks for the rest of the round
   if (o !== 'killer' && st.fearmonger === o) return false
+  // Genetic Limits: nor this one
+  if (o !== 'killer' && st.geneticLimits === o) return false
   // Boil Over is about being picked up: Kate answers it for herself while carried; Slippery Meat
   // is used on the hook
   const status = o === 'killer' ? 'board' : st.survivors[o].status
   return status === 'board' || (perk === 'boil_over' && status === 'carried') || (perk === 'slippery_meat' && status === 'hooked')
+}
+
+/** Machine Learning's draw: the killer perk cards (the deck: p.19) he doesn't have. */
+function machinePool(st: GameState): PerkId[] {
+  const k = st.killer
+  const held = new Set(k.perks)
+  return deckOf('killer').filter((p) => p !== 'machine_learning' && !held.has(p))
 }
 
 /**
@@ -2831,6 +2948,11 @@ function inRange(st: GameState, a: string, b: string): boolean {
 
 /** Single-die skill checks a perk may change (not the carry roll, not danger-die rolls). */
 const SKILL_CHECKS: RollContext['k'][] = ['repair', 'openGate', 'cleanse', 'heal', 'search']
+/**
+ * The skill checks Madness turns into the danger die: not the roll of a survivor searched in a
+ * locker (Level 99's answer: Madness "only affects skill checks, not all rolls").
+ */
+const MADNESS_CHECKS: RollContext['k'][] = SKILL_CHECKS.filter((k) => k !== 'search')
 
 function generatorDoneThisRound(st: GameState): boolean {
   return st.log.some((e) => e.round === st.round && e.ev?.k === 'genDone')
@@ -2980,7 +3102,8 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // Yamaoka's Haunting's attack over a path counts: she doesn't go there (she hasn't moved),
       // the survivor is brought into her room, as every pick-up does
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
-      if (w.k !== 'preKillerInteract' || w.pickUp || (task && task.i.k !== 'attack') || st.killerMoved) return []
+      // (gone: a survivor's perk asked first has stopped it)
+      if (w.k !== 'preKillerInteract' || w.pickUp || !task || task.i.k !== 'attack' || st.killerMoved) return []
       const sv = st.survivors[w.target]
       return !sv.wounded && sv.status === 'board' && (sv.room === st.killer.room || connectedRooms(st, st.killer.room).has(sv.room)) ? NONE : []
     }
@@ -3027,9 +3150,20 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     // ----- The Hillbilly -----
     case 'lightborn':
       if (w.k !== 'planningEnd') return []
-      return [0, 1].filter((i) => !k.shown.includes(i)).map((index) => ({ index }))
+      return k.planned.map((_, i) => i).filter((i) => !k.shown.includes(i)).map((index) => ({ index }))
     case 'enduring':
       return w.k === 'palletBlock' ? NONE : []
+    // ----- The Singularity -----
+    case 'machine_learning':
+      return w.k === 'genDone' && machinePool(st).length ? NONE : []
+    case 'genetic_limits':
+      // a survivor with their sacrifice progress still on their board
+      if (w.k !== 'planningEnd') return []
+      return st.survivors.flatMap((sv, i) => (sv.sacrificeToken && st.geneticLimits !== i ? [{ target: i }] : []))
+    case 'forced_hesitation':
+      // Wait still in his hand (not set): a survivor on the board with a card set
+      if (w.k !== 'planningEnd' || !k.hand.includes('wait')) return []
+      return st.survivors.flatMap((sv, i) => (sv.status === 'board' && sv.planned ? [{ target: i }] : []))
     case 'tinkerer': {
       if (w.k !== 'genDone') return []
       const out: PerkChoice[] = []
@@ -3392,7 +3526,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // another survivor there is picked up instead, wounded or not
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
       // (Red Herring, asked first, may have turned it into damaging a generator)
-      if (w.k !== 'preKillerInteract' || !w.pickUp || (task && task.i.k !== 'pickUp') || k.asVictor) return []
+      if (w.k !== 'preKillerInteract' || !w.pickUp || !task || task.i.k !== 'pickUp' || k.asVictor) return []
       const out: PerkChoice[] = []
       for (const p of touchingPaths(st, k.room)) {
         if (palletOn(st, p.id)) continue
@@ -3446,6 +3580,40 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // the end of any turn of his (a bonus turn's too: a house rule), with no sacrifice progress on his board
       if ((w.k !== 'turnEnd' && w.k !== 'bonusEnd') || w.s !== o || me!.status !== 'board' || me!.sacrificeToken) return []
       return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
+    // ----- Gabriel -----
+    case 'scavenger':
+      // at the start of his turn, holding an item: a face-up generator in his room
+      if (w.k !== 'turnStart' || w.s !== o || !me!.item) return []
+      return propsIn(st, me!.room).flatMap((p) => (p.kind === 'generator' && p.revealed ? [{ prop: p.id }] : []))
+    case 'troubleshooter':
+      // after a move of his into a room: on along another path, into a room with a face-up generator
+      if (w.k !== 'entered' || w.s !== o) return []
+      return anyMoves(st, o as number)
+        .filter((m) => m.path.id !== w.path && propsIn(st, m.to).some((p) => p.kind === 'generator' && p.revealed))
+        .map((m) => ({ path: m.path.id }))
+    case 'made_for_this': {
+      // the killer about to pick him up (before any dice): the pick-up still to come
+      const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
+      if (w.k !== 'preKillerInteract' || !w.pickUp || w.target !== o || !task || task.i.k !== 'pickUp' || task.i.target !== o) return []
+      return NONE
+    }
+    // ----- Sable -----
+    case 'wicked':
+      // her interaction for the turn
+      return w.k === 'interact' && w.s === o && st.activeSurvivor === o && st.canInteract ? NONE : []
+    case 'strength_in_shadows':
+      // at the start of her turn: a wounded survivor on the board (anywhere) with no sacrifice
+      // progress left on their board
+      if (w.k !== 'turnStart' || w.s !== o) return []
+      return st.survivors.flatMap((sv, i) => (sv.status === 'board' && !sv.sacrificeToken && healable(st, i) ? [{ target: i }] : []))
+    case 'weaving_spiders': {
+      // her interaction for the turn: 6 ▲ from the survivors in her room, for a face-up generator
+      if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract) return []
+      const gens = st.props.filter((p) => p.kind === 'generator' && p.room && p.revealed && !p.done && !p.removed)
+      // enough ▲ between them; who puts in what is asked next (weavePay)
+      if (onBoardIn(st, me!.room).reduce((t, i) => t + st.survivors[i].bp, 0) < WEAVING_COST) return []
+      return gens.map((g) => ({ prop: g.id }))
+    }
     // ----- Thalita -----
     case 'friendly_competition': {
       // after her own repair (success or not) of a generator someone else worked on this round
@@ -3558,7 +3726,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     case 'no_mither': {
       // the killer about to attack a healthy survivor in David's room (himself too)
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
-      if (w.k !== 'preKillerInteract' || w.pickUp || (task && task.i.k !== 'attack')) return []
+      if (w.k !== 'preKillerInteract' || w.pickUp || !task || task.i.k !== 'attack') return []
       const t = st.survivors[w.target]
       return !t.wounded && t.room === me!.room ? NONE : []
     }
@@ -3655,9 +3823,9 @@ export function perkButtons(st: GameState): { perk: PerkId; owner: PerkOwner; w:
       if (choices.length) out.push({ perk, owner, w, choices })
     }
   }
-  if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout', 'inner_healing', 'self_aware', 'potential_energy', 'fogwise'])
+  if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout', 'inner_healing', 'self_aware', 'potential_energy', 'fogwise', 'strength_in_shadows', 'scavenger'])
   if (step.t === 'survivorInteract')
-    add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity', 'kinship', 'no_one_left_behind'])
+    add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity', 'kinship', 'no_one_left_behind', 'wicked', 'weaving_spiders'])
   if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact', 'corrective_action']))
   // Iron Grasp: his own button on the struggle roll, before it is settled
   if (step.t === 'roll' && step.ctx.k === 'carry') add('killer', { k: 'roll' }, ['iron_grasp'])
@@ -3784,7 +3952,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     case 'inner_healing':
       payPerk(st, o, perk, 'หายบาดเจ็บ')
       discardPerkCard(st, o as number, perk)
-      return makeHealthy(st, o as number, `${name(o as number)} หายบาดเจ็บเอง (Inner Healing)`, o as number)
+      return makeHealthy(st, o as number, `${name(o as number)} หายบาดเจ็บเอง (พละกำลังในจิตใจ)`, o as number)
     case 'situational_awareness':
       payPerk(st, o, perk, 'Bonus Turn')
       discardPerkCard(st, o as number, perk)
@@ -3885,7 +4053,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       placeEntity(st, { prop: hook.id })
       hook.occupant = null
       st.survivors[s].status = 'board'
-      log(st, `${name(s)} ลงจาก Hook เอง — อยู่ที่เดิม (Slippery Meat)`, s, { ev: { k: 'rescue', s, by: s } })
+      log(st, `${name(s)} ลงจาก Hook เอง — อยู่ที่เดิม (เนื้อลื่น ๆ)`, s, { ev: { k: 'rescue', s, by: s } })
       return
     }
     case 'self_aware':
@@ -3934,6 +4102,25 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, 'ใช้พลังเพิ่ม')
       const turn = (w as Extract<PerkWindow, { k: 'afterKillerInteract' }>).turn
       wait(st, { t: 'killerInteract', turn, canInteract: true, powerOnly: true })
+      return
+    }
+    case 'machine_learning':
+      payPerk(st, o, perk, 'จั่ว Perk ฆาตกร 2 ใบ')
+      return wait(st, { t: 'machineLearning', cards: shuffle(st, machinePool(st)).slice(0, 2) })
+    case 'genetic_limits':
+      payPerk(st, o, perk, `${name(c.target!)} ใช้ Perk ไม่ได้จนจบรอบ`)
+      st.geneticLimits = c.target!
+      return
+    case 'forced_hesitation': {
+      const t = c.target!
+      const sv = st.survivors[t]
+      payPerk(st, o, perk, `ทิ้ง Wait — ${sv.name} เสียการ์ด ${CARD_NAMES[sv.planned!]} แล้ว Interact ได้ทันที`)
+      k.hand.splice(k.hand.indexOf('wait'), 1)
+      // their card discarded: no turn of their own this round (survivorTurn passes them by)
+      Object.assign(sv, { planned: null, plannedRevealed: false, acted: true })
+      // "immediately": an interaction in their room, before the round goes on
+      st.canInteract = true
+      st.queue.unshift({ k: 'survivorInteract', s: t })
       return
     }
     case 'lightborn': {
@@ -4024,6 +4211,44 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, 'Bonus Turn + Sacrifice Progress บนบอร์ด')
       st.survivors[o as number].sacrificeToken = true
       return startBonusMove(st, o as number, c.card as PathKind)
+    case 'scavenger': {
+      const sv = st.survivors[o as number]
+      const gen = st.props.find((p) => p.id === c.prop)!
+      payPerk(st, o, perk, `ทิ้ง ${ITEM_NAMES[sv.item!]} — Generator ที่ ${roomName(st, gen.room!)} +1`)
+      discardItem(st, o as number, sv.item!, false)
+      return void addGenerator(st, gen, 1, o as number)
+    }
+    case 'troubleshooter': {
+      const m = anyMoves(st, o as number).find((x) => x.path.id === c.path)!
+      payPerk(st, o, perk, `เดินต่อไป ${roomName(st, m.to)}`)
+      return moveSurvivor(st, o as number, m.path, m.to)
+    }
+    case 'made_for_this': {
+      payPerk(st, o, perk, `${name(o as number)} ไม่ถูกอุ้ม — Sacrifice Progress +1 แทน`)
+      const at = st.queue.findIndex((t) => t.k === 'killerDo' && t.i.k === 'pickUp' && t.i.target === o)
+      if (at >= 0) st.queue.splice(at, 1)
+      return addSacrifice(st, 1)
+    }
+    case 'wicked': {
+      payPerk(st, o, perk, 'ผู้รอดชีวิตทุกคน +1 ▲ — ฆาตกรได้ Sacrifice Progress +1')
+      // the survivors on the board (not hooked, carried or in a locker): a house rule
+      st.survivors.forEach((sv, i) => sv.status === 'board' && gainSurvivor(st, i, 1))
+      // the interaction for the turn: Desperate Measures may follow it (unless the track is full)
+      const before = st.queue.length
+      addSacrifice(st, 1)
+      if (st.phase !== 'over') trigger(st, { k: 'afterSurvivorInteract', s: o as number }, st.queue.length - before)
+      return
+    }
+    case 'strength_in_shadows': {
+      const t = st.survivors[c.target!]
+      payPerk(st, o, perk, `${t.name} รับ Sacrifice Progress บนบอร์ด แล้วหายบาดเจ็บ`)
+      t.sacrificeToken = true
+      return makeHealthy(st, c.target!, `${t.name} หายบาดเจ็บ (ความแข็งแกร่งในเงามืด)`, o as number)
+    }
+    case 'weaving_spiders':
+      // each survivor in her room says what they put in; nothing is spent until she confirms
+      log(st, `${name(o as number)} จะใช้ แมงมุมทอใย — ผู้รอดชีวิตในห้องร่วมกันลง ${WEAVING_COST} ▲`, o)
+      return wait(st, { t: 'weavePay', s: o as number, prop: c.prop! })
     case 'friendly_competition': {
       const gen = st.props.find((p) => p.id === (w as { prop: string }).prop)!
       payPerk(st, o, perk, `Generator ที่ ${roomName(st, gen.room!)} +1`)
@@ -4053,7 +4278,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, `${t.name} หายบาดเจ็บ แทน ▲ ที่ได้`)
       // instead of the cleanse's ▲
       if (gained) st.survivors[s].bp -= gained
-      return makeHealthy(st, c.target!, `${t.name} หายบาดเจ็บ (Circle of Healing)`, o as number)
+      return makeHealthy(st, c.target!, `${t.name} หายบาดเจ็บ (วงแหวนการรักษา)`, o as number)
     }
     case 'shadow_step': {
       const { path } = w as Extract<PerkWindow, { k: 'entered' }>
@@ -4077,7 +4302,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       // off the hook, not a sabotage: the hook stays free, no Entity on it, no rescue perks
       st.props.find((p) => p.kind === 'hook' && p.occupant === c.target)!.occupant = null
       t.status = 'board'
-      log(st, `${t.name} ลงจาก Hook (Exponential)`, o, { ev: { k: 'rescue', s: c.target!, by: o as number } })
+      log(st, `${t.name} ลงจาก Hook (เอ็กซ์โพเนนเชียล)`, o, { ev: { k: 'rescue', s: c.target!, by: o as number } })
       return moveSurvivor(st, c.target!, m.path, m.to)
     }
     case 'corrective_action': {
@@ -4113,14 +4338,14 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       return startRoll(st, { k: 'botany', s: o as number, target: c.target! }, 1, 'danger')
     case 'empathy':
       // "a willing Survivor": the other one is asked first; the perk is used only on a yes
-      log(st, `${st.survivors[o as number].name} ขอ${c.mode === 'take' ? 'รับ' : 'ให้'} 1 ▲ ${c.mode === 'take' ? 'จาก' : 'แก่'} ${st.survivors[c.target!].name} (Empathy)`, o)
+      log(st, `${st.survivors[o as number].name} ขอ${c.mode === 'take' ? 'รับ' : 'ให้'} 1 ▲ ${c.mode === 'take' ? 'จาก' : 'แก่'} ${st.survivors[c.target!].name} (เห็นใจ)`, o)
       return wait(st, { t: 'empathyAsk', s: c.target!, from: o as number, mode: c.mode as 'take' | 'give' })
     case 'self_care':
       payPerk(st, o, perk, 'ทอย Danger Die')
       return startRoll(st, { k: 'selfCare', s: o as number }, 1, 'danger')
     case 'overcharge':
       payPerk(st, o, perk)
-      return wound(st, c.target!, 'power', `${name(c.target!)} โดน Overcharge — บาดเจ็บ`)
+      return wound(st, c.target!, 'power', `${name(c.target!)} โดน ชาร์จเกินขีด — บาดเจ็บ`)
     case 'overwhelming_presence': {
       const s = (w as Extract<PerkWindow, { k: 'preItem' }>).s
       payPerk(st, o, perk, `${name(s)} ทอย Danger Die`)
@@ -4185,7 +4410,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     }
     case 'mad_grit':
       payPerk(st, o, perk)
-      return wound(st, c.target!, 'perk', `${name(c.target!)} โดน Mad Grit — บาดเจ็บ`)
+      return wound(st, c.target!, 'perk', `${name(c.target!)} โดน ทรหดสุดขีด — บาดเจ็บ`)
     case 'discordance': {
       const room = st.survivors[(w as Extract<PerkWindow, { k: 'entered' }>).s].room
       const n = onBoardIn(st, room).length + (k.room === room ? 1 : 0)
@@ -4254,7 +4479,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     }
     case 'blood_echo':
       payPerk(st, o, perk)
-      return wound(st, c.target!, 'perk', `${name(c.target!)} บาดเจ็บ (Blood Echo)`)
+      return wound(st, c.target!, 'perk', `${name(c.target!)} บาดเจ็บ (โลหิตกังวาน)`)
     case 'zanshin_tactics':
       // Both cards stay secret: the old one is discarded unseen, the new one set face down.
       payPerk(st, o, perk, `ทิ้งการ์ดใบที่ ${c.index! + 1} วางใบใหม่`)
@@ -4295,7 +4520,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     }
     case 'lucky_break':
       payPerk(st, o, perk)
-      return makeHealthy(st, o as number, `${name(o as number)} หายบาดเจ็บ (Lucky Break)`, o as number)
+      return makeHealthy(st, o as number, `${name(o as number)} หายบาดเจ็บ (เบรกนำโชค)`, o as number)
     case 'any_means_necessary':
       payPerk(st, o, perk, 'ยอมบาดเจ็บ เล่น Bonus Turn')
       selfWound(st, o as number)
@@ -4312,7 +4537,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, c.prop ? 'ยอมบาดเจ็บ ซ่อม Generator +1' : `ยอมบาดเจ็บ รักษา ${name(c.target!)}`)
       selfWound(st, o as number)
       if (c.prop) return addGenerator(st, st.props.find((p) => p.id === c.prop)!, 1, o as number)
-      return makeHealthy(st, c.target!, `${name(c.target!)} หายบาดเจ็บ (For the People)`, o as number)
+      return makeHealthy(st, c.target!, `${name(c.target!)} หายบาดเจ็บ (เพื่อผู้คน)`, o as number)
     case 'off_the_record': {
       const task = st.queue.find((t): t is Extract<Task, { k: 'resolveRoll' }> => t.k === 'resolveRoll')!
       payPerk(st, o, perk, `รับ 1 ▲ แทน ${k.name}`)
@@ -4656,7 +4881,7 @@ function makeHealthy(st: GameState, s: number, text: string, by: number) {
   const sv = st.survivors[s]
   if (!sv.wounded) return
   if (!healable(st, s)) {
-    log(st, st.leverage === s ? `${sv.name} หายบาดเจ็บไม่ได้รอบนี้ (Leverage)` : `${sv.name} มี Knife 3 เล่ม — หายบาดเจ็บไม่ได้`, s)
+    log(st, st.leverage === s ? `${sv.name} หายบาดเจ็บไม่ได้รอบนี้ (ใช้ประโยชน์)` : `${sv.name} มี Knife 3 เล่ม — หายบาดเจ็บไม่ได้`, s)
     return
   }
   sv.wounded = false
@@ -4684,7 +4909,7 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
 // ---------- killer powers ----------
 
 export function isPower(i: KillerInteraction): boolean {
-  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'reign', 'birds', 'droneTake', 'droneDrop', 'hallucinate'].includes(i.k)
+  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'reign', 'birds', 'droneTake', 'droneDrop', 'hallucinate', 'slipstream'].includes(i.k)
 }
 
 // ---------- The Twins ----------
@@ -4776,6 +5001,9 @@ export function powerOptions(st: GameState): KillerInteraction[] {
     case 'blight':
       // Blighted Corruption: needs a card to discard.
       return k.hand.length ? [{ k: 'rush' }] : []
+    case 'singularity':
+      // Slipstream: not with a bonus turn already taken this round (one at most, p.10)
+      return k.bonusUsed ? [] : [{ k: 'slipstream' }]
     case 'unknown': {
       // Hallucination: the lowest-numbered Unknown not on the board, into a connected room
       if (!k.unknowns || !k.unknowns.includes(null)) return []
@@ -4858,10 +5086,10 @@ function blightRush(st: GameState) {
   const card = k.hand.splice(Math.floor(random(st) * k.hand.length), 1)[0] as PathKind
   const moves = killerMoves(st, card)
   if (!moves.length) {
-    log(st, `${k.name} ใช้ Blighted Corruption สุ่มได้ ${CARD_NAMES[card]} — ไม่มีเส้นทาง จบพลัง`, 'killer')
+    log(st, `${k.name} ใช้ ความเสื่อมทรามที่พังทลาย สุ่มได้ ${CARD_NAMES[card]} — ไม่มีเส้นทาง จบพลัง`, 'killer')
     return
   }
-  log(st, `${k.name} ใช้ Blighted Corruption สุ่มได้ ${CARD_NAMES[card]}`, 'killer')
+  log(st, `${k.name} ใช้ ความเสื่อมทรามที่พังทลาย สุ่มได้ ${CARD_NAMES[card]}`, 'killer')
   st.rushCard = card
   st.queue.unshift({ k: 'rushArrive', turn: k.revealedCount - 1, from: k.room })
   wait(st, { t: 'killerMove', turn: k.revealedCount - 1, card, rush: true })
@@ -4873,7 +5101,7 @@ function usePower(st: GameState, i: KillerInteraction) {
   switch (i.k) {
     case 'haunt': {
       k.hand.splice(k.hand.indexOf(i.card), 1)
-      log(st, `${k.name} ใช้ Yamaoka's Haunting — ทิ้ง ${CARD_NAMES[i.card]} แล้ว Interact ที่ ${roomName(st, i.room)}`, 'killer')
+      log(st, `${k.name} ใช้ ความหลอกหลอนของยามาโอกะ — ทิ้ง ${CARD_NAMES[i.card]} แล้ว Interact ที่ ${roomName(st, i.room)}`, 'killer')
       // an ordinary interaction over there: Red Herring, Brutal Strength… still answer it, and so does
       // Residual Manifest, from someone in that room (the interaction is in their space)
       if (perkCandidates(st, { k: 'killerWouldInteract', room: i.room }, []).length) {
@@ -4886,30 +5114,30 @@ function usePower(st: GameState, i: KillerInteraction) {
       if (i.remove) pathState(st, i.remove).trap = false
       else k.trapsInSupply--
       pathState(st, i.path).trap = true
-      log(st, `${k.name} วาง Bear Trap${i.remove ? ' (ย้ายจากเส้นทางเดิม)' : ''}`, 'killer', { ev: { k: 'trapSet', path: i.path } })
+      log(st, `${k.name} วาง กับดักหมี${i.remove ? ' (ย้ายจากเส้นทางเดิม)' : ''}`, 'killer', { ev: { k: 'trapSet', path: i.path } })
       return
     }
     case 'blink': {
       const p = pathDef(st, i.path)
-      log(st, `${k.name} ใช้ Spencer's Last Breath`, 'killer')
+      log(st, `${k.name} ใช้ ลมหายใจเฮือกสุดท้ายของสเปนเซอร์`, 'killer')
       return killerEnter(st, p.id, p.a === k.room ? p.b : p.a)
     }
     case 'hatchet':
       log(st, `${k.name} ขว้าง Hatchet ใส่ ${st.survivors[i.target].name} — ทอย Danger Die`, 'killer')
       return startRoll(st, { k: 'hatchet', s: i.target }, 1, 'danger')
     case 'spark': {
-      log(st, `${k.name} ใช้ Carter's Spark ที่ ${roomName(st, i.room)}`, 'killer')
+      log(st, `${k.name} ใช้ ประกายไฟคาร์เตอร์ ที่ ${roomName(st, i.room)}`, 'killer')
       const order = turnOrder(st)
       return sparkNext(st, onBoardIn(st, i.room).sort((a2, b) => order.indexOf(a2) - order.indexOf(b)))
     }
     case 'phantasm': {
       st.phantasm.push(k.room)
-      log(st, `${k.name} วาง Phantasm Trap ที่ ${roomName(st, k.room)}`, 'killer', { ev: { k: 'phantasmSet', room: k.room } })
+      log(st, `${k.name} วาง กับดักหลอก ที่ ${roomName(st, k.room)}`, 'killer', { ev: { k: 'phantasmSet', room: k.room } })
       if (propsIn(st, k.room).some((p) => p.kind === 'totem' && p.revealed)) gainKiller(st, 1)
       return
     }
     case 'bell':
-      log(st, `${k.name} ตี Wailing Bell`, 'killer')
+      log(st, `${k.name} ตี กระดิ่งครวญ`, 'killer')
       return killerEnter(st, '', i.room)
     case 'victor':
       log(st, `${k.name} ${k.victorRoom ? 'ย้าย' : 'วาง'} Victor ไปที่ ${roomName(st, k.room)}`, 'killer')
@@ -4917,27 +5145,34 @@ function usePower(st: GameState, i: KillerInteraction) {
       return
     case 'rush':
       return blightRush(st)
+    case 'slipstream': {
+      // every card he has set, revealed or not, back to his hand; the bonus turn comes as this turn ends
+      k.hand.push(...k.planned)
+      Object.assign(k, { planned: [], revealedCount: 0, shown: [], slipstream: true })
+      log(st, `${k.name} ใช้ สลิปสตรีม — เก็บการ์ดทั้งหมดกลับเข้ามือ แล้วเล่น Bonus Turn`, 'killer')
+      return
+    }
     case 'hallucinate': {
       const n = k.unknowns!.indexOf(null)
       k.unknowns![n] = i.room
-      log(st, `${k.name} ใช้ Hallucination — The Unknown ${n + 1} ปรากฏที่ ${roomName(st, i.room)}`, 'killer')
+      log(st, `${k.name} ใช้ ภาพหลอน — The Unknown ${n + 1} ปรากฏที่ ${roomName(st, i.room)}`, 'killer')
       return
     }
     case 'droneTake': {
       const p = st.props.find((x) => x.id === i.prop)!
-      log(st, `${k.name} ใช้ Eyes in the Sky — เก็บ Drone ที่ ${roomName(st, p.room!)} กลับขึ้นบอร์ด`, 'killer')
+      log(st, `${k.name} ใช้ ดวงตาบนท้องฟ้า — เก็บ Drone ที่ ${roomName(st, p.room!)} กลับขึ้นบอร์ด`, 'killer')
       return void Object.assign(p, { removed: true, merchant: true, room: null })
     }
     case 'droneDrop': {
       const p = merchantDrones(st)[0]
       Object.assign(p, { removed: false, merchant: false, room: k.room, revealed: true })
-      log(st, `${k.name} ใช้ Eyes in the Sky — วาง Drone หงายหน้าที่ ${roomName(st, k.room)}`, 'killer', { ev: { k: 'reveal', prop: p.id, kind: p.kind, room: k.room } })
+      log(st, `${k.name} ใช้ ดวงตาบนท้องฟ้า — วาง Drone หงายหน้าที่ ${roomName(st, k.room)}`, 'killer', { ev: { k: 'reveal', prop: p.id, kind: p.kind, room: k.room } })
       return
     }
     case 'birds': {
       const p = st.props.find((x) => x.artist && !!x.dire === i.dire)!
       Object.assign(p, { artist: false, removed: false, room: i.room, path: null, revealed: true })
-      log(st, `${k.name} ใช้ Birds of Torment — วาง ${i.dire ? 'Dire Crow' : 'Crow'} ที่ ${roomName(st, i.room)}`, 'killer', { ev: { k: 'reveal', prop: p.id, kind: p.kind, room: i.room } })
+      log(st, `${k.name} ใช้ ปักษาทรมาน — วาง ${i.dire ? 'Dire Crow' : 'Crow'} ที่ ${roomName(st, i.room)}`, 'killer', { ev: { k: 'reveal', prop: p.id, kind: p.kind, room: i.room } })
       // a crow (any) in his room now: 1 ▲
       if (propsIn(st, k.room).some((x) => x.kind === 'crow' && x.revealed)) {
         gainKiller(st, 1)
@@ -4946,7 +5181,7 @@ function usePower(st: GameState, i: KillerInteraction) {
       return
     }
     case 'reign':
-      log(st, `${k.name} ใช้ Reign of Darkness กับ ${st.survivors[i.target].name} — ดูการ์ดในมือ`, 'killer')
+      log(st, `${k.name} ใช้ รัชสมัยแห่งความมืดมิด กับ ${st.survivors[i.target].name} — ดูการ์ดในมือ`, 'killer')
       return wait(st, { t: 'reignCard', s: i.target })
     case 'guard':
       log(st, `${k.name} ใช้ Guard`, 'killer')
@@ -4965,36 +5200,36 @@ function usePower(st: GameState, i: KillerInteraction) {
         st.purge = [...(st.purge ?? []), room]
         placed.push(roomName(st, room))
       }
-      log(st, `${k.name} ใช้ Vile Purge — วางที่ ${placed.join(' และ ')}`, 'killer')
+      log(st, `${k.name} ใช้ การชำระมลทินต่ำช้า — วางที่ ${placed.join(' และ ')}`, 'killer')
       return
     }
     case 'showstopper': {
-      log(st, `${k.name} ใช้ Showstopper`, 'killer')
+      log(st, `${k.name} ใช้ ผู้ยับยั้งการแสดง`, 'killer')
       for (const s of showstopperTargets(st)) if (st.phase !== 'over') giveKnife(st, s)
       return
     }
     case 'frenzy': {
       const here = onBoardIn(st, k.room)
       const already = here.some((s) => st.survivors[s].wounded)
-      log(st, `${k.name} ใช้ Feral Frenzy ที่ ${roomName(st, k.room)}${already ? ' (+1 ▲)' : ''}`, 'killer')
-      for (const s of here) wound(st, s, 'power', `${st.survivors[s].name} โดน Feral Frenzy — บาดเจ็บ`)
+      log(st, `${k.name} ใช้ บ้าดีเดือด ที่ ${roomName(st, k.room)}${already ? ' (+1 ▲)' : ''}`, 'killer')
+      for (const s of here) wound(st, s, 'power', `${st.survivors[s].name} โดน บ้าดีเดือด — บาดเจ็บ`)
       if (already) gainKiller(st, 1)
       return
     }
     case 'wrath': {
       const n = wrathGain(st)
-      log(st, `${k.name} ใช้ Yamaoka's Wrath (+${n} ▲)`, 'killer')
+      log(st, `${k.name} ใช้ โทสะแห่งยามาโอกะ (+${n} ▲)`, 'killer')
       return gainKiller(st, n)
     }
     case 'redeemer':
       k.hand.splice(k.hand.indexOf(i.card), 1)
       st.redeemer = i.card
-      log(st, `${k.name} ทิ้งการ์ด 1 ใบแบบคว่ำ ยิง Redeemer ใส่ ${st.survivors[i.target].name} — ให้ทายการ์ด`, 'killer')
+      log(st, `${k.name} ทิ้งการ์ด 1 ใบแบบคว่ำ ยิง พระผู้ไถ่ ใส่ ${st.survivors[i.target].name} — ให้ทายการ์ด`, 'killer')
       return wait(st, { t: 'redeemerGuess', s: i.target })
     case 'chainsaw': {
       const to = exits(st, k.room, i.card as PathKind).find((e) => e.path.id === i.path)!.to
       k.hand.splice(k.hand.indexOf(i.card), 1)
-      log(st, `${k.name} ทิ้ง ${CARD_NAMES[i.card]} ใช้ Chainsaw`, 'killer')
+      log(st, `${k.name} ทิ้ง ${CARD_NAMES[i.card]} ใช้ เลื่อยไฟฟ้า`, 'killer')
       killerEnter(st, i.path, to)
       // After the reveal and Quick & Quiet: who is still standing there gets cut.
       st.queue.splice(2, 0, { k: 'chainsawHit', room: to })
@@ -5010,7 +5245,7 @@ function sparkNext(st: GameState, list: number[], grip = false) {
   while (rest.length) {
     const s = rest.shift()!
     if (st.survivors[s].bp >= 1) return wait(st, { t: 'sparkChoice', s, rest, ...(grip ? { grip } : {}) })
-    if (grip) wound(st, s, 'power', `${st.survivors[s].name} โดน Dragon's Grip — บาดเจ็บ`)
+    if (grip) wound(st, s, 'power', `${st.survivors[s].name} โดน อุ้งมือมังกร — บาดเจ็บ`)
     else sparkHit(st, s)
   }
 }
@@ -5018,15 +5253,15 @@ function sparkNext(st: GameState, list: number[], grip = false) {
 /** Whispers: refusing to pay sets that survivor's card face up, as Stridor's is (one slot). */
 function whispersFaceUp(st: GameState, s: number) {
   st.stridor = s
-  log(st, `${st.survivors[s].name} ไม่จ่าย — ต้องวางการ์ดเคลื่อนที่หงายหน้า (Whispers)`, s)
+  log(st, `${st.survivors[s].name} ไม่จ่าย — ต้องวางการ์ดเคลื่อนที่หงายหน้า (เสียงกระซิบ)`, s)
 }
 
 function sparkHit(st: GameState, s: number) {
   const sv = st.survivors[s]
   if (!sv.madness) {
     sv.madness = true
-    log(st, `${sv.name} ติด Madness`, 'killer', { ev: { k: 'madness', s, on: true } })
-  } else wound(st, s, 'power', `${sv.name} โดน Carter's Spark — บาดเจ็บ`)
+    log(st, `${sv.name} ติด บ้าคลั่ง`, 'killer', { ev: { k: 'madness', s, on: true } })
+  } else wound(st, s, 'power', `${sv.name} โดน ประกายไฟคาร์เตอร์ — บาดเจ็บ`)
 }
 
 /** What The Hag may do after teleporting to a Phantasm Trap: attack or pick up someone there. */
@@ -5040,7 +5275,7 @@ export function phantasmInteractions(st: GameState, room: string): KillerInterac
 
 function chainsawHit(st: GameState, room: string) {
   const healthy = onBoardIn(st, room).filter((s) => !st.survivors[s].wounded)
-  if (healthy.length === 1) return wound(st, healthy[0], 'power', `${st.survivors[healthy[0]].name} โดน Chainsaw — บาดเจ็บ`)
+  if (healthy.length === 1) return wound(st, healthy[0], 'power', `${st.survivors[healthy[0]].name} โดน เลื่อยไฟฟ้า — บาดเจ็บ`)
   if (healthy.length > 1) wait(st, { t: 'pickSurvivor', why: 'chainsaw', options: healthy })
 }
 
@@ -5051,7 +5286,7 @@ function redeemerGuess(st: GameState, s: number, guess: MoveCard) {
   const card = st.redeemer ?? fail('no Redeemer card')
   st.redeemer = null
   if (guess === card) {
-    log(st, `${sv.name} ทาย ${CARD_NAMES[guess]} — ถูก! การ์ดคือ ${CARD_NAMES[card]} หลุดจาก Redeemer`, s)
+    log(st, `${sv.name} ทาย ${CARD_NAMES[guess]} — ถูก! การ์ดคือ ${CARD_NAMES[card]} หลุดจาก พระผู้ไถ่`, s)
     return
   }
   log(st, `${sv.name} ทาย ${CARD_NAMES[guess]} — ผิด การ์ดคือ ${CARD_NAMES[card]}`, s)
@@ -5085,7 +5320,8 @@ function windowInteraction(p: Prop, path?: string): SurvivorInteraction {
   return { k: 'dropPallet', prop: p.id, path: path! }
 }
 
-export const GUARD_NAMES: Record<Guard, string> = { carnifex: 'Carnifex', assassin: 'Assassin', jailer: 'Jailer' }
+/** The Knight's Guards by their Thai names (the PC game's: The Carnifex, The Assassin, The Jailer). */
+export const GUARD_NAMES: Record<Guard, string> = { carnifex: 'เพชฌฆาต', assassin: 'มือลอบสังหาร', jailer: 'ผู้คุม' }
 
 /** Where the Knight's Guards can go now: his room or a connected one, wherever it isn't already. */
 export function guardOptions(st: GameState): { guard: Guard; room: string }[] {
@@ -5111,7 +5347,7 @@ export function carnifexProps(st: GameState): Prop[] {
 function carnifexTake(st: GameState, id: string) {
   const p = st.props.find((x) => x.id === id)!
   p.removed = true
-  log(st, `Carnifex นำ ${PROP_NAMES[p.kind]} ที่ ${roomName(st, p.room!)} ออก`, 'killer')
+  log(st, `เพชฌฆาต นำ ${PROP_NAMES[p.kind]} ที่ ${roomName(st, p.room!)} ออก`, 'killer')
 }
 
 /** The Afterpiece Antidote's extra move for the killer: any path but one with a pallet (a wall he breaks). */
@@ -5150,12 +5386,12 @@ function takePurge(st: GameState, s: number) {
   const sv = st.survivors[s]
   if ((sv.purged ?? []).length >= 2) {
     sv.purged = []
-    log(st, `${sv.name} ได้ Vile Purge อันที่ 3 — ทิ้งทั้งหมด`, 'killer', { ev: { k: 'purge', s, n: 3 } })
+    log(st, `${sv.name} ได้ การชำระมลทินต่ำช้า อันที่ 3 — ทิ้งทั้งหมด`, 'killer', { ev: { k: 'purge', s, n: 3 } })
     if (sv.wounded) {
       log(st, `${sv.name} บาดเจ็บอยู่แล้ว — ${st.killer.name} ได้ Sacrifice Progress`, 'killer')
       return addSacrifice(st, 1)
     }
-    return wound(st, s, 'power', `${sv.name} ได้ Vile Purge อันที่ 3 — บาดเจ็บ`)
+    return wound(st, s, 'power', `${sv.name} ได้ การชำระมลทินต่ำช้า อันที่ 3 — บาดเจ็บ`)
   }
   const options = purgeOptions(st, s, 'cover')
   if (options.length > 1) return wait(st, { t: 'purgeChoice', s, mode: 'cover' })
@@ -5165,7 +5401,7 @@ function takePurge(st: GameState, s: number) {
 function coverPerk(st: GameState, s: number, perk: PerkId) {
   const sv = st.survivors[s]
   sv.purged = [...(sv.purged ?? []), perk]
-  log(st, `${sv.name} ได้ Vile Purge (${sv.purged.length}/3) — ปิด ${PERKS[perk].name}`, 'killer', { ev: { k: 'purge', s, n: sv.purged.length } })
+  log(st, `${sv.name} ได้ การชำระมลทินต่ำช้า (${sv.purged.length}/3) — ปิด ${PERKS[perk].name}`, 'killer', { ev: { k: 'purge', s, n: sv.purged.length } })
 }
 
 /** In a locker: one Vile Purge comes off (they choose which perk it frees). */
@@ -5184,7 +5420,7 @@ function dropPurge(st: GameState, s: number, perk: PerkId) {
   const room = sv.room
   const here = (st.purge ?? []).includes(room)
   if (!here) st.purge = [...(st.purge ?? []), room]
-  log(st, `${sv.name} เอา Vile Purge ออกจาก ${PERKS[perk].name} — ${here ? 'ห้องนี้มีอยู่แล้ว เก็บเข้ากอง' : `วางไว้ที่ ${roomName(st, room)}`}`, s, { ev: { k: 'purge', s, n: (sv.purged ?? []).length } })
+  log(st, `${sv.name} เอา การชำระมลทินต่ำช้า ออกจาก ${PERKS[perk].name} — ${here ? 'ห้องนี้มีอยู่แล้ว เก็บเข้ากอง' : `วางไว้ที่ ${roomName(st, room)}`}`, s, { ev: { k: 'purge', s, n: (sv.purged ?? []).length } })
 }
 
 /** Showstopper: survivors on the board in The Trickster's room and the rooms connected to it. */
@@ -5221,9 +5457,40 @@ function dropKnives(st: GameState, s: number) {
   sv.knives = 0
 }
 
-/** Crowd Control online, before anyone has said: survivors without ▲ have nothing to put in. */
+/** Weaving Spiders: what the survivors pay between them, and the progress it buys. */
+export const WEAVING_COST = 6
+export const WEAVING_PROGRESS = 3
+
+/** Weaving Spiders: who may put in ▲, the survivors on the board in Sable's room (her too). */
+export function weavers(st: GameState, s: number): number[] {
+  return onBoardIn(st, st.survivors[s].room)
+}
+
+/** Weaving Spiders, before anyone has said: those in her room with ▲ are still to; the rest put in 0. */
+export function weavePledges(st: GameState, s: number): (number | null)[] {
+  const here = weavers(st, s)
+  return st.survivors.map((sv, i) => (here.includes(i) && sv.bp > 0 ? null : 0))
+}
+
+/** Weaving Spiders paid: a face-up generator +3, then the killer a sacrifice progress. */
+function weavingPaid(st: GameState, s: number, prop: string, pay: number[]) {
+  const gen = st.props.find((p) => p.id === prop)!
+  const who = [...new Set(pay)].map((p) => `${st.survivors[p].name} ${pay.filter((x) => x === p).length} ▲`)
+  payPerk(st, s, 'weaving_spiders', `จ่าย ${WEAVING_COST} ▲ (${who.join(', ')}) — Generator ที่ ${roomName(st, gen.room!)}`)
+  for (const p of pay) st.survivors[p].bp--
+  const before = st.queue.length
+  // "up to 3": what the generator still needs, at most 3
+  addGenerator(st, gen, Math.min(WEAVING_PROGRESS, PROGRESS_MAX - gen.progress), s)
+  addSacrifice(st, 1)
+  if (st.phase !== 'over') trigger(st, { k: 'afterSurvivorInteract', s }, st.queue.length - before)
+}
+
+/**
+ * Crowd Control online, before anyone has said: survivors without ▲, or not on the board (in a
+ * locker, on a hook, carried), have nothing to put in.
+ */
 export function crowdPledges(st: GameState): (number | null)[] {
-  return st.survivors.map((sv) => (sv.bp > 0 ? null : 0))
+  return st.survivors.map((sv) => (sv.status === 'board' && sv.bp > 0 ? null : 0))
 }
 
 /** The pledges as a payment (each entry 1 ▲), once they come to 2. */
@@ -5234,7 +5501,8 @@ export function pledgedPay(pledge: (number | null)[]): number[] {
 /** Crowd Control: the ways the survivors can pay 2 ▲ between them (each entry pays 1); [] refuses. */
 export function crowdPayments(st: GameState): number[][] {
   const out: number[][] = [[]]
-  const live = st.survivors.map((_, i) => i)
+  // only those on the board pay (the user's call)
+  const live = st.survivors.flatMap((sv, i) => (sv.status === 'board' ? [i] : []))
   for (const a of live) if (st.survivors[a].bp >= 2) out.push([a, a])
   for (const a of live) for (const b of live) if (a < b && st.survivors[a].bp >= 1 && st.survivors[b].bp >= 1) out.push([a, b])
   return out

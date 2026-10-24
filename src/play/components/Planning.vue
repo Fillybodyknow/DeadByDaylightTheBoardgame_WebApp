@@ -36,7 +36,7 @@ const tonicNames = computed(() => {
 /** Stridor (or a Dire Crow in their room): that survivor sets their card first, face up, before anyone else plans. */
 const stridorStep = computed(() => (props.st.step.t === 'planStridor' ? props.st.step.s : null))
 /** Why they plan first: Stridor's survivor, or the Artist's Dire Crow in their room. */
-const firstWhy = computed(() => (stridorStep.value !== null && stridorStep.value !== props.st.stridor ? 'Dire Crow' : 'Stridor'))
+const firstWhy = computed(() => (stridorStep.value !== null && stridorStep.value !== props.st.stridor ? 'Dire Crow' : 'เสียงแหบดัง'))
 /** The cards already set face up first (Stridor, Dire Crows), for everyone who plans after them. */
 const faceUpFirst = computed(() =>
   props.st.step.t === 'planStridor' ? [] : props.st.survivors.flatMap((sv) => (sv.plannedRevealed && sv.planned ? [{ name: sv.name, card: sv.planned }] : [])),
@@ -280,7 +280,7 @@ function confirmKiller() {
   <section v-else-if="stridorStep !== null" class="card panel">
     <h2>{{ firstWhy }}: {{ st.survivors[stridorStep].name }} ต้องเปิดการ์ดก่อน</h2>
     <p class="muted">
-      {{ firstWhy === 'Stridor' ? `ฆาตกรใช้ Stridor กับ ${st.survivors[stridorStep].name}` : `${st.survivors[stridorStep].name} อยู่ห้องเดียวกับ Dire Crow` }} — เลือกการ์ด 1 ใบแล้ว<b>หงายหน้า</b>ให้ทุกคนเห็น ก่อนที่ผู้รอดชีวิตคนอื่นและฆาตกรจะวางแผน
+      {{ firstWhy === 'เสียงแหบดัง' ? `ฆาตกรใช้ เสียงแหบดัง กับ ${st.survivors[stridorStep].name}` : `${st.survivors[stridorStep].name} อยู่ห้องเดียวกับ Dire Crow` }} — เลือกการ์ด 1 ใบแล้ว<b>หงายหน้า</b>ให้ทุกคนเห็น ก่อนที่ผู้รอดชีวิตคนอื่นและฆาตกรจะวางแผน
     </p>
     <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทางบนแผนที่ · คลิกเพื่อเลือก</p>
     <button class="primary" :disabled="!stridorPick" @click="confirmStridor">
@@ -301,7 +301,7 @@ function confirmKiller() {
     <p class="muted">คุยกันได้ แต่ต้องพูดให้ฆาตกรได้ยิน (หน้า 8) — การ์ดจะคว่ำไว้จนถึงเทิร์นของแต่ละคน</p>
     <p v-for="c in faceUpFirst" :key="c.name" class="stridor-note">👁 {{ c.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[c.card] }}</b></p>
     <!-- The Clown's Afterpiece Tonic: who in its room will set their card face up -->
-    <p v-if="tonicNames.length" class="stridor-note">🧪 Afterpiece Tonic: {{ tonicNames.join(', ') }} อยู่ห้องเดียวกับ Tonic — การ์ดจะวาง<b>หงาย</b></p>
+    <p v-if="tonicNames.length" class="stridor-note">🧪 ยาบำรุงส่งท้าย: {{ tonicNames.join(', ') }} อยู่ห้องเดียวกับ Tonic — การ์ดจะวาง<b>หงาย</b></p>
 
     <!-- whose card is being picked: a tab per survivor -->
     <div class="tabs" role="tablist">
@@ -344,12 +344,12 @@ function confirmKiller() {
     <h2>{{ st.killer.name }}: เลือกการ์ด {{ slotCount }} ใบ</h2>
     <p v-if="unknown" class="muted">การ์ดหนึ่งใบต่อ The Unknown หนึ่งตัวบนกระดาน — ใบที่ 1 ของตัวหมายเลข 1, ใบที่ 2 ของตัวหมายเลข 2… แต่ละตัวเดินจากห้องของตัวเอง · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
     <p v-else-if="directHand" class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · การ์ดตรงพาไปห้องเริ่มต้นที่มีเลขเดียวกับการ์ด (ไอคอนมุมซ้ายบนของห้อง) — อยู่ห้องนั้นแล้ว = เคลื่อนที่ไม่ได้และเสียการ Interact</p>
-    <p v-else class="muted">ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
+    <p v-else class="muted">{{ slotCount === 2 ? 'ใบซ้ายเล่นเทิร์นแรก แล้วใบขวา' : 'เล่นทีละใบจากซ้ายไปขวา' }} · Wait = อยู่กับที่แต่ยัง Interact ได้</p>
     <p v-if="st.step.t === 'planSurvivors'" class="muted small">วางแผนพร้อมกับผู้รอดชีวิต — การ์ดของพวกเขาคว่ำอยู่ รอบจะเริ่มเมื่อทุกคนยืนยันครบ</p>
     <p v-for="c in faceUpFirst" :key="c.name" class="stridor-note">👁 {{ c.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[c.card] }}</b></p>
     <div class="slots">
       <button v-for="(_, i) in killerSlots" :key="i" type="button" class="slot" :class="{ filled: killerPicks[i] }" :disabled="!killerPicks[i]" :title="killerPicks[i] ? 'คลิกเพื่อเอาใบนี้ออก' : ''" @click="clearSlot(i)">
-        <span class="muted small">{{ unknown ? `The Unknown ${i + 1}` : i === 0 ? 'เทิร์น 1 (ซ้าย)' : 'เทิร์น 2 (ขวา)' }}</span>
+        <span class="muted small">{{ unknown ? `The Unknown ${i + 1}` : slotCount === 2 ? (i === 0 ? 'เทิร์น 1 (ซ้าย)' : 'เทิร์น 2 (ขวา)') : `เทิร์น ${i + 1}` }}</span>
         <img v-if="killerPicks[i]" :src="asset(cardImage(killerPicks[i]!))" :alt="cardLabel(killerPicks[i]!)" />
         <img v-else class="empty" :src="asset(KILLER_CARD_BACK)" alt="" />
         <span v-if="killerPicks[i]" class="remove" aria-hidden="true">✕</span>

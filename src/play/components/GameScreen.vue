@@ -103,7 +103,7 @@ watch(
       const sig = JSON.stringify(step.dice)
       if (sig !== pendingShown) {
         pendingShown = sig
-        const res = step.keep ? { outcome: 'Bond — เลือกเก็บ 1 ลูก', tone: 'good' as const } : diceResult(step.ctx.k, step.dice)
+        const res = step.keep ? { outcome: 'พันธะ — เลือกเก็บ 1 ลูก', tone: 'good' as const } : diceResult(step.ctx.k, step.dice)
         showDice({
           dice: step.dice,
           title: st.survivors[step.ctx.s].name,
@@ -391,15 +391,15 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 /** The mode the board is in, for the bar above it (with a way out). */
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
-  if (calmCrow.value) return { text: 'Calm Spirit: คลิกห้องที่จะส่ง Crow ไป', cancel: () => (calmCrow.value = null) }
+  if (calmCrow.value) return { text: 'วิญญาณสงบ: คลิกห้องที่จะส่ง Crow ไป', cancel: () => (calmCrow.value = null) }
   if (aceFirst.value)
     return view.value.step.t === 'killerInteract'
-      ? { text: 'Iron Maiden: คลิก Hook ที่จะสลับกับ Locker นี้', cancel: () => (aceFirst.value = null) }
-      : { text: 'Ace in the Hole: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
-  if (fogwiseFrom.value) return { text: 'Fogwise: คลิกเส้นทางว่างที่เรืองแสงเพื่อวางกำแพง/Pallet', cancel: () => (fogwiseFrom.value = null) }
+      ? { text: 'เครื่องทรมานสตรีเหล็ก: คลิก Hook ที่จะสลับกับ Locker นี้', cancel: () => (aceFirst.value = null) }
+      : { text: 'ไพ่ตาย: คลิก prop ในห้องติดกันที่จะสลับด้วย', cancel: () => (aceFirst.value = null) }
+  if (fogwiseFrom.value) return { text: 'ภูมิปัญญาแห่งสายหมอก: คลิกเส้นทางว่างที่เรืองแสงเพื่อวางกำแพง/Pallet', cancel: () => (fogwiseFrom.value = null) }
   if (perkPicked.value && (view.value.step.t === 'survivorInteract' || view.value.step.t === 'killerInteract'))
     return {
-      text: perkPicked.value === 'iron_maiden' ? 'Iron Maiden: คลิก Locker ว่างที่กระพริบบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`,
+      text: perkPicked.value === 'iron_maiden' ? 'เครื่องทรมานสตรีเหล็ก: คลิก Locker ว่างที่กระพริบบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`,
       cancel: () => (perkPicked.value = null),
     }
   if (breakoutTarget.value !== null) {
@@ -408,7 +408,7 @@ const modeBar = computed(() => {
     const name = s.t === 'offer' ? PERKS[s.perk].name : 'Breakout'
     return { text: `${name}: ย้าย ${view.value.survivors[breakoutTarget.value].name} — คลิกเส้นทางบนแผนที่`, cancel: () => (breakoutTarget.value = null) }
   }
-  if (trapPath.value) return { text: 'Bear Trap หมดมือ: คลิก Bear Trap บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
+  if (trapPath.value) return { text: 'กับดักหมี หมดมือ: คลิก กับดักหมี บนแผนที่ที่จะย้ายมา', cancel: () => (trapPath.value = null) }
   if (itemPick.value !== null) return { text: 'เลือกเป้าหมายของ item บนแผนที่', cancel: () => (itemPick.value = null) }
   if (forkMoves.value)
     return {
@@ -416,7 +416,7 @@ const modeBar = computed(() => {
       cancel: () => (forkMoves.value = null),
     }
   // after the fork: picking its room comes first, and its way out goes back to the paths
-  if (diversion.value) return { text: `Diversion: คลิกเส้นทางที่จะส่ง ${view.value.killer.name} ไป (ทางแยกจะให้เลือกห้องต่อ)`, cancel: () => (diversion.value = false) }
+  if (diversion.value) return { text: `หันเหความสนใจ: คลิกเส้นทางที่จะส่ง ${view.value.killer.name} ไป (ทางแยกจะให้เลือกห้องต่อ)`, cancel: () => (diversion.value = false) }
   // Undying: card → path → (room, at a fork) → prop; each step says what to do and goes back one
   const kind = stepKind(view.value, modes)
   if (kind) {
@@ -543,7 +543,7 @@ function diceResult(ctx: RollContext['k'], dice: Die[]): Pick<DiceShow, 'outcome
     case 'noMither':
       return fail ? { outcome: 'ไม่สำเร็จ — โดนโจมตี', tone: 'bad' } : { outcome: 'ไม่บาดเจ็บ! ฆาตกร +1 ▲', tone: 'great' }
     case 'assassin':
-      return fail ? { outcome: 'โดน Assassin!', tone: 'bad' } : { outcome: 'หลบได้!', tone: 'great' }
+      return fail ? { outcome: 'โดน มือลอบสังหาร!', tone: 'bad' } : { outcome: 'หลบได้!', tone: 'great' }
     case 'breakdown':
       return fail ? { outcome: 'ไม่สำเร็จ', tone: 'bad' } : { outcome: 'ฆาตกรเสีย Sacrifice Progress!', tone: 'great' }
     case 'deadHard':
@@ -657,21 +657,25 @@ const askWhat = computed(() => {
     case 'offer':
       return `ใช้ Perk ${PERKS[s.perk].name} ไหม?`
     case 'reaction':
-      return `ใช้ ${s.item === 'flashlight' ? 'Flashlight' : 'Firecracker'} ไหม?`
+      return s.item === 'emp' ? 'ทิ้ง EMP เพื่อกัน Interaction ของฆาตกรไหม?' : `ใช้ ${s.item === 'flashlight' ? 'Flashlight' : 'Firecracker'} ไหม?`
     case 'roll':
       return controls(st, s.ctx.s) ? 'ผลทอยของคุณ — ตัดสินใจ' : `${st.survivors[s.ctx.s].name} ทอยลูกเต๋า — จะช่วยไหม?`
     case 'crowdPay':
-      return `Crowd Control: ${st.survivors[s.s].name} — ลง ▲ ช่วยจ่ายไหม?`
+      return `ควบคุมฝูงชน: ${st.survivors[s.s].name} — ลง ▲ ช่วยจ่ายไหม?`
+    case 'machineLearning':
+      return 'การเรียนรู้ของเครื่องจักร: เลือก Perk 1 ใบ'
+    case 'weavePay':
+      return `แมงมุมทอใย: ${st.survivors[s.s].name} — ลง ▲ ช่วยจ่ายไหม?`
     case 'crowdPick':
-      return `Crowd Control: เลือกการ์ดให้ ${st.survivors[s.s].name}`
+      return `ควบคุมฝูงชน: เลือกการ์ดให้ ${st.survivors[s.s].name}`
     case 'reignCard':
-      return `Reign of Darkness: เลือกการ์ดของ ${st.survivors[s.s].name}`
+      return `รัชสมัยแห่งความมืดมิด: เลือกการ์ดของ ${st.survivors[s.s].name}`
     case 'reignPath':
-      return `Reign of Darkness: เลือกเส้นทางของ ${st.survivors[s.s].name}`
+      return `รัชสมัยแห่งความมืดมิด: เลือกเส้นทางของ ${st.survivors[s.s].name}`
     case 'innerFocus':
-      return 'Inner Focus: เลือกห้องเริ่มต้นที่จะไป'
+      return 'สมาธิห้วงลึก: เลือกห้องเริ่มต้นที่จะไป'
     case 'empathyAsk':
-      return `Empathy: ${st.survivors[s.from].name} ขอ${s.mode === 'take' ? 'รับ ▲ จากคุณ' : 'ให้ ▲ คุณ'} — ยอมไหม?`
+      return `เห็นใจ: ${st.survivors[s.from].name} ขอ${s.mode === 'take' ? 'รับ ▲ จากคุณ' : 'ให้ ▲ คุณ'} — ยอมไหม?`
     default:
       return st.phase === 'killer' ? `ตาของ ${st.killer.name}` : st.activeSurvivor !== null ? `ตาของ ${st.survivors[st.activeSurvivor].name}` : 'ถึงตาคุณ'
   }
@@ -911,10 +915,10 @@ const secretFor = computed<'killer' | 'survivors' | null>(() => {
 /** What the killer is about to do alone, for the curtain. */
 const secretWhat = computed(() => {
   const s = view.value.step
-  if (s.t === 'offer' && s.perk === 'lightborn') return 'เลือกการ์ดที่วางไว้ใบที่จะเปิดหงาย (Lightborn)'
-  if (s.t === 'offer' && s.perk === 'unforeseen') return 'เลือก The Unknown ที่จะย้าย — ดูการ์ดที่คว่ำไว้ของแต่ละตัว (Unforeseen)'
-  if (s.t === 'offer') return `เลือกเปลี่ยนการ์ดที่คว่ำไว้ (${s.perk === 'tinkerer' ? 'Tinkerer' : 'Zanshin Tactics'})`
-  return 'เลือกการ์ดที่จะทิ้งแบบคว่ำ (Redeemer)'
+  if (s.t === 'offer' && s.perk === 'lightborn') return 'เลือกการ์ดที่วางไว้ใบที่จะเปิดหงาย (กำเนิดแต่แสง)'
+  if (s.t === 'offer' && s.perk === 'unforeseen') return 'เลือก The Unknown ที่จะย้าย — ดูการ์ดที่คว่ำไว้ของแต่ละตัว (ไม่นึกฝัน)'
+  if (s.t === 'offer') return `เลือกเปลี่ยนการ์ดที่คว่ำไว้ (${s.perk === 'tinkerer' ? 'นักประดิษฐ์' : 'กลยุทธ์ซันชิน'})`
+  return 'เลือกการ์ดที่จะทิ้งแบบคว่ำ (พระผู้ไถ่)'
 })
 // Online every player has their own screen: no hand-off curtain needed.
 // (a tutorial plays the other sides itself: nothing to hand over)
@@ -1035,8 +1039,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
             <button @click="modeBar.cancel()">ยกเลิก</button>
           </div>
           <div v-if="oppressing" class="reveal-bar card">
-            <span v-if="!multiPick.length">Oppression: คลิก Generator ที่กระพริบบนแผนที่ 1–2 เครื่อง (แต่ละเครื่อง −1)</span>
-            <span v-else>Oppression ({{ multiPick.length }}/2): <b>{{ oppressionPicks }}</b> — คลิกซ้ำเพื่อเอาออก</span>
+            <span v-if="!multiPick.length">การกดขี่: คลิก Generator ที่กระพริบบนแผนที่ 1–2 เครื่อง (แต่ละเครื่อง −1)</span>
+            <span v-else>การกดขี่ ({{ multiPick.length }}/2): <b>{{ oppressionPicks }}</b> — คลิกซ้ำเพื่อเอาออก</span>
             <button class="primary" :disabled="!oppressionChoice" @click="confirmOppression">ยืนยัน −1</button>
             <button @click="multiPick = []">ล้าง</button>
           </div>
@@ -1132,7 +1136,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         </template>
         <template v-else>
           <strong>ส่งเครื่องให้ฝ่ายผู้รอดชีวิต</strong>
-          <span>ฆาตกรห้ามดูจอ — เลือกการ์ดใบใหม่ (Predator) · แตะเพื่อเริ่ม</span>
+          <span>ฆาตกรห้ามดูจอ — เลือกการ์ดใบใหม่ (นักล่า) · แตะเพื่อเริ่ม</span>
         </template>
       </button>
     </Teleport>

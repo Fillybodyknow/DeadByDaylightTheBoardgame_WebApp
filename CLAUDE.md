@@ -57,7 +57,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 | `src/play/focus.ts` | Board highlights and the facts listed for a decision |
 | `src/play/labels.ts` | Thai labels for actions, perk choices, windows |
 | `src/play/fx/` | Sound effects (`audio.ts`) and the animation queue (`bus.ts`) |
-| `src/play/tutorial/` | Tutorial mode (`#/tutorial`): chapters (`chapters.ts`) on scenes built from the engine (`scene.ts`), The Entity's guide (`GuideBox`), the runner gating the learner's actions and playing everyone else |
+| `src/play/tutorial/` | Tutorial mode (`#/tutorial`): chapters for both sides (`chapters.ts` the survivors', `killer.ts` the killer's) on scenes built from the engine (`scene.ts`), The Entity's guide (`GuideBox`), the runner gating the learner's actions and playing everyone else |
 | `src/play/online/` | Firebase and local (multi-tab) backends, room session. The room carries **moves**, not states: each device replays them on the last checkpoint (`transport.ts`) |
 | `src/data/` | Character, item and map data (Thai + English text, image paths) |
 | `public/assets/` | Card art, maps, minis, sounds (`app/sound/game/` = game sound clips) |
@@ -112,7 +112,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 ### Adding a character
 
 1. `perks.ts`: the 3 perks (`PerkId`, `def(...)` with the Thai "when" text); killers also go in
-   `PLAYABLE_KILLERS`. Survivors without perks stay locked in the picker.
+   `PLAYABLE_KILLERS`. Survivors without perks stay locked in the picker. Their Thai names (and the
+   power's) go in `src/data/thaiNames.ts`, and on their Thai perk card images (see Perk names).
 2. `engine.ts`: `perkChoices` + `usePerk` cases, new windows with `trigger(...)` where they
    happen, and for killers `powerOptions` + `usePower` (and `isPower`).
 3. New steps or actions: `types.ts`, `handle()`, `legal.ts` (every step needs legal actions),
@@ -207,6 +208,14 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   what is left, as at the table; a card still face down in planning shows as unused. Player tiles don't list perks: clicking a tile opens the
   character details, with the perks and whether they were used this round. There is no game
   log on screen. Pointing at a revealed prop enlarges it.
+- **Perk names are Thai** (the PC game's Thai names, `src/data/thaiNames.ts`): `PERKS[p].name` is the
+  Thai name and `PERKS[p].en` the English one, shown small beside it on perk cards and details;
+  `powerName` and the Guards are Thai too, and Thai UI strings name perks in Thai. The Thai card
+  images (`perks-th`) had their English name painted over with the Thai one (Kanit 600, white).
+- **Perk text is lit the same everywhere** (`src/perkHighlight.ts`, shown by `src/components/PerkRichText`):
+  the game's panels, the companion and the Thai perk card images (drawn from the same rules). Terms,
+  English names and numbers in bold white, props in their category's colour, failure / wounded red,
+  success / healthy green, great success gold. A new place showing a perk's text uses PerkRichText.
 - Fixed overlays inside a `.card` must `<Teleport to="body">`: `.card` has `backdrop-filter`,
   which traps `position: fixed` children.
 - The full game runs on computers and tablets only. Phones get a notice (`src/play/device.ts`:

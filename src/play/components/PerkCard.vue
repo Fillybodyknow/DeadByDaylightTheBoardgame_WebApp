@@ -3,13 +3,15 @@
 // (an offer, the start of a turn, the interact step, a roll). One that can be used now glows and
 // is pressed to use ("ready"), pressed again to put back ("picked"); the others step back
 // ("dim"); a perk only explained, with its uses as buttons under it, is "static". What a press
-// then asks for (buttons, a card) goes in the slot, under the card.
-import { computed } from 'vue'
+// then asks for (buttons, a card) goes in the slot, under the card. A click on its picture opens
+// the card big (a click anywhere or Esc puts it back), wherever the card is.
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import { PERKS, type PerkId } from '../engine/perks'
 import { perkImage, perkText } from '../labels'
 import { PICKED_HINT, READY_HINT } from '../perkHints'
 import BpText from '../../components/BpText.vue'
+import PerkRichText from '../../components/PerkRichText.vue'
 
 const props = defineProps<{
   perk: PerkId
@@ -21,13 +23,22 @@ const props = defineProps<{
   /** What pressing it does, when not the usual. */
   hint?: string
 }>()
-const emit = defineEmits<{ pick: []; zoom: [src: string] }>()
-
+const emit = defineEmits<{ pick: [] }>()
 
 const image = computed(() => perkImage(props.perk))
 const cost = computed(() => (PERKS[props.perk].cost ? `${PERKS[props.perk].cost} ▲` : 'ฟรี'))
 const pressable = computed(() => props.state !== 'static')
 const hint = computed(() => props.hint ?? (props.state === 'picked' ? PICKED_HINT : props.state === 'static' ? '' : READY_HINT))
+
+const zoomed = ref(false)
+// Esc closes the picture, not the decision behind it (caught before anything else hears the key).
+function onZoomKey(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  e.stopImmediatePropagation()
+  zoomed.value = false
+}
+watch(zoomed, (z) => (z ? window.addEventListener('keydown', onZoomKey, true) : window.removeEventListener('keydown', onZoomKey, true)))
+onBeforeUnmount(() => window.removeEventListener('keydown', onZoomKey, true))
 </script>
 
 <template>
@@ -45,24 +56,38 @@ const hint = computed(() => props.hint ?? (props.state === 'picked' ? PICKED_HIN
         :src="asset(image)"
         :alt="PERKS[perk].name"
         title="คลิกเพื่อขยาย"
-        @click.stop="emit('zoom', ($event.currentTarget as HTMLImageElement).src)"
+        @click.stop="zoomed = true"
       />
       <span class="body">
         <span class="title">
-          <slot name="title">{{ title ?? PERKS[perk].name }}</slot>
+          <slot name="title">{{ title ?? PERKS[perk].name }}<small v-if="!title && PERKS[perk].en !== PERKS[perk].name" class="en">{{ PERKS[perk].en }}</small></slot>
           <span class="cost"><BpText :text="cost" /></span>
         </span>
-        <span class="text"><BpText :text="text ?? perkText(perk)" /></span>
+        <span class="text"><BpText v-if="text" :text="text" /><PerkRichText v-else :text="perkText(perk)" /></span>
         <span v-if="hint" class="hint">{{ hint }}</span>
       </span>
     </component>
     <div v-if="$slots.default" class="more" @click.stop>
       <slot />
     </div>
-  </div>
+    <Teleport to="body">
+      <div v-if="zoomed && image" class="perk-zoom" role="dialog" aria-modal="true" @click="zoomed = false">
+        <img :src="asset(image)" alt="" />
+        <p>คลิกที่ไหนก็ได้เพื่อย่อกลับ</p>
+      </div>
+    </Teleport>
+    </div>
 </template>
 
 <style scoped>
+/* the English name beside the Thai one, as on the English cards */
+.en {
+  margin-left: 0.4em;
+  font-size: 0.72em;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
 .perk-card {
   display: grid;
   gap: 0.4rem;
@@ -167,5 +192,32 @@ button.face {
   .ready .face {
     animation: none;
   }
+}
+/* the picture opened big */
+.perk-zoom {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  background: rgb(4 5 7 / 0.92);
+  cursor: zoom-out;
+}
+.perk-zoom img {
+  max-width: min(92vw, 520px);
+  max-height: 84vh;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 2px rgb(255 233 176 / 0.6),
+    0 24px 60px rgb(0 0 0 / 0.85);
+}
+.perk-zoom p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 </style>

@@ -7,6 +7,9 @@ import {
   carnifexProps,
   connectedRoomsOf,
   crowdPledges,
+  pledgedPay,
+  weavePledges,
+  WEAVING_COST,
   purgeOptions,
   antidoteKillerMoves,
   darkMoves,
@@ -75,6 +78,7 @@ export function legalActions(st: GameState): Action[] {
     case 'pickItem':
       step.drawn.forEach((_, item) => out.push({ t: 'pickItem', item }))
       break
+    case 'machineLearning':
     case 'selfAware':
       for (const perk of step.cards) out.push({ t: 'selfAware', perk })
       break
@@ -130,6 +134,17 @@ export function legalActions(st: GameState): Action[] {
         })
       }
       break
+    case 'weavePay': {
+      // each survivor in her room still to say puts in what they can; at 6 she pays, or calls it off
+      const pledge = step.pledge ?? weavePledges(st, step.s)
+      const total = pledge.reduce<number>((t, p) => t + (p ?? 0), 0)
+      pledge.forEach((p, s) => {
+        if (p === null) for (let n = 0; n <= Math.min(st.survivors[s].bp, WEAVING_COST - total); n++) out.push({ t: 'weavePledge', s, n })
+      })
+      if (total === WEAVING_COST) out.push({ t: 'weavePay', pay: pledgedPay(pledge) })
+      out.push({ t: 'weavePay', pay: [] })
+      break
+    }
     case 'empathyAsk':
       out.push({ t: 'empathyAnswer', yes: true }, { t: 'empathyAnswer', yes: false })
       break
@@ -164,7 +179,8 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'killerBonusOffer':
       for (const c of st.killer.hand) out.push({ t: 'bonus', card: c })
-      out.push({ t: 'declineBonus' })
+      // Slipstream's bonus turn is taken
+      if (!step.free) out.push({ t: 'declineBonus' })
       break
     case 'carryDice':
       for (const n of [1, 2, 3, 4]) out.push({ t: 'carryDice', n })

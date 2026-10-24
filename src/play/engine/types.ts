@@ -10,7 +10,7 @@ export type MoveCard = PathKind | 'wait' | DirectCard
 
 export type PropCategory = 'objective' | 'survival' | 'altruism' | 'boldness'
 /** `drone`: The Skull Merchant's Drone, an objective prop of his (one per room). */
-export type PropKind = 'generator' | 'exitGate' | 'chest' | 'locker' | 'crow' | 'pallet' | 'hook' | 'totem' | 'drone'
+export type PropKind = 'generator' | 'exitGate' | 'chest' | 'locker' | 'crow' | 'pallet' | 'hook' | 'totem' | 'drone' | 'emp'
 
 // ---------- static board ----------
 
@@ -142,6 +142,8 @@ export interface KillerState {
    */
   unknowns?: (string | null)[]
   unknownAt?: number
+  /** Slipstream used this turn: when it ends, a bonus turn (no ▲) with a card of his choice. */
+  slipstream?: boolean
   /** Unbound: copies of movement cards added to his hand for good. */
   extraCards?: MoveCard[]
   /** Bear traps not on the board (The Trapper has 4). */
@@ -284,6 +286,8 @@ export type KillerInteraction =
   | { k: 'droneTake'; prop: string }
   /** The Unknown's Hallucination: the lowest-numbered Unknown off the board into a connected room. */
   | { k: 'hallucinate'; room: string }
+  /** The Singularity's Slipstream: every card back to his hand, then a bonus turn. */
+  | { k: 'slipstream' }
   | { k: 'droneDrop' }
   /** Pain Resonance: an empty hook in his room, and a survivor next door is wounded. */
   | { k: 'painResonance'; target: number }
@@ -461,6 +465,8 @@ export type Step =
   | { t: 'pickItem'; s: number; drawn: string[] }
   /** Self-Aware: the perk cards drawn, one to take its place. */
   | { t: 'selfAware'; s: number; cards: PerkId[] }
+  /** Machine Learning: two killer perk cards drawn, one kept (answered with a selfAware action). */
+  | { t: 'machineLearning'; cards: PerkId[] }
   /**
    * `keep`: Bond rolled two dice and one must be kept. `passed`: survivors who said they
    * won't use their key on this roll (online, each key holder decides on their own device).
@@ -476,7 +482,8 @@ export type Step =
   | { t: 'killerInteract'; turn: number; canInteract: boolean; powerOnly?: boolean; rush?: boolean; only?: number }
   /** The Twins: take this turn with Charlotte or with Victor. */
   | { t: 'twinChoice'; turn: number }
-  | { t: 'killerBonusOffer' }
+  /** `free`: Slipstream's bonus turn — no ▲, and taken. */
+  | { t: 'killerBonusOffer'; free?: boolean }
   | { t: 'carryDice'; s: number }
   | { t: 'carryMove'; s: number; steps: number }
   /** A survivor may discard an item to stop what the killer is doing. */
@@ -486,7 +493,8 @@ export type Step =
    * comes from a perk (Starstruck, Diversion) — with nobody reacting these tasks make it, instead
    * of `pending` being replayed.
    */
-  | { t: 'reaction'; item: 'flashlight' | 'firecracker'; holders: number[]; pending: Action; carry?: { s: number; steps: number }; antidote?: boolean; why?: 'darkness'; then?: Task[] }
+  /** `overwhelmed`: the survivor using theirs has had Overwhelming Presence's roll, and passed. */
+  | { t: 'reaction'; item: 'flashlight' | 'firecracker' | 'emp'; holders: number[]; pending: Action; carry?: { s: number; steps: number }; antidote?: boolean; why?: 'darkness'; then?: Task[]; overwhelmed?: boolean }
   /** Use this perk now? `done` is set when the offer comes from a trigger with more to ask. */
   | {
       t: 'offer'
@@ -523,6 +531,8 @@ export type Step =
    * isn't 2.
    */
   | { t: 'crowdPay'; s: number; pledge?: (number | null)[] }
+  /** Weaving Spiders: the survivors in her room put in their ▲ (6 between them), then she confirms. */
+  | { t: 'weavePay'; s: number; prop: string; pledge?: (number | null)[] }
   | { t: 'crowdPick'; s: number }
   /** Reign of Darkness: the killer picks a card of survivor `s`'s hand, then (if several) its path. */
   | { t: 'reignCard'; s: number }
@@ -611,6 +621,8 @@ export type Task =
   | { k: 'chainsawHit'; room: string }
   /** An item use that waited for Overwhelming Presence. */
   | { k: 'itemUse'; s: number; use: ItemUse }
+  /** A Flashlight or Firecracker used against the killer, after Overwhelming Presence was asked. */
+  | { k: 'reactItem'; s: number; step: Extract<Step, { t: 'reaction' }> }
   /** The Hag teleported: interact once the room is revealed. */
   | { k: 'phantasmHit'; i: KillerInteraction | null }
   /** The teleport to a Phantasm Trap, once a Firecracker has not stopped it: pays, goes, interacts. */
@@ -649,7 +661,8 @@ export type Action =
   | { t: 'stop' }
   /** Hang the carried survivor on the free hook in this room. */
   | { t: 'hang' }
-  | { t: 'interact'; i: SurvivorInteraction | KillerInteraction; reacted?: boolean; left?: boolean }
+  /** `emp`: the survivor he'd interact with has had their chance to discard an EMP. */
+  | { t: 'interact'; i: SurvivorInteraction | KillerInteraction; reacted?: boolean; left?: boolean; emp?: boolean }
   | { t: 'endTurn' }
   | { t: 'bonus'; card: MoveCard }
   | { t: 'declineBonus' }
@@ -657,6 +670,9 @@ export type Action =
   | { t: 'crowdPay'; pay: number[] }
   /** Crowd Control online: survivor `s` puts in `n` of their own ▲ (0: nothing). */
   | { t: 'crowdPledge'; s: number; n: number }
+  | { t: 'weavePledge'; s: number; n: number }
+  /** Weaving Spiders: pay what was put in (6 ▲), or [] to call it off. */
+  | { t: 'weavePay'; pay: number[] }
   | { t: 'crowdPick'; card: MoveCard }
   | { t: 'reignCard'; card: MoveCard }
   /** The perk a Vile Purge covers or comes off. */
@@ -827,6 +843,8 @@ export interface GameState {
   killerMoved?: boolean
   /** Fearmonger: this survivor can't use perks this round. */
   fearmonger?: number | null
+  /** Genetic Limits: this survivor can't use perks for the rest of the round. */
+  geneticLimits?: number | null
   /** Plunderer's Instinct: this survivor's next draw is three items, one kept. */
   plunder?: number | null
   /** Built to Last: this survivor's kept item can't be used again this turn. */

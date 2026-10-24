@@ -192,14 +192,19 @@ and the host starts the game.
 
 ## Tutorial
 
-`#/tutorial` (a card on the menu): the survivors' side taught a chapter at a time on the real board,
-The Entity speaking (`src/play/tutorial/`).
+`#/tutorial` (a card on the menu): both sides taught a chapter at a time on the real board, The
+Entity speaking (`src/play/tutorial/`). The list has a tab per side (remembered per device,
+`dbdl-tutorial-side`), each numbered on its own.
 
 - **A chapter** (`chapters.ts`) is a scene and its steps. The scene (`scene.ts`) is a real game on
   MacMillan Estate laid out by hand: rooms, props face up or down, cards planned, the step to
   start at; a roll the lesson needs is rigged by trying seeds (`rigged`). The learner plays survivor
   0 (Dwight); the tutorial plays everyone else, the plainest move after a short pause
   (`policy.ts`), and holds them still while The Entity explains.
+- **The killer's side** (`killer.ts`, chapters marked `side: 'killer'`): the learner plays The
+  Hillbilly (his Chainsaw is the power taught) and the tutorial plays the four survivors. To keep
+  them still while a lesson needs them in place, they plan cards with no path from their room
+  (p.8: they stay and lose the interaction).
 - **A step** says something (`**key words**` lit, pictures beside) and may point at something
   (`spot`: a room, prop, path icon or any element). A step with a `task` asks for something on the
   board: only the actions it allows go through (`tutorial.allow` in `game.ts`; anything else gets
@@ -229,11 +234,11 @@ The Entity speaking (`src/play/tutorial/`).
   above their character picker (which is long enough to hide anything under it).
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist, The Skull Merchant, The Unknown** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist, The Skull Merchant, The Unknown, The Singularity** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano, Renato Lyra, Thalita Lyra**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano, Renato Lyra, Thalita Lyra, Sable Ward, Gabriel Soma**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
-- Mode **Adept**: each character plays the 3 perks printed on their board (132 perks).
+- Mode **Adept**: each character plays the 3 perks printed on their board (141 perks).
 - The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
   the printed ones; 35 are on no board. All 35 are in the engine (`DECK_PERKS` in
   `engine/perks.ts`). A card-only perk has no character and no index: its
@@ -281,6 +286,8 @@ needs its graph in `boards.ts`), the 2-player rule, then bots from the automated
 
 ## House rules
 
+- Wicked (Sable) pays its ▲ only to the survivors on the board: not to one on a hook, carried or in a
+  locker (the user's call; the card says "each Survivor").
 - Background Player, Blood Rush (Renato), Situational Awareness and Renewal are asked at the end of
   a bonus turn too (from a crow, a perk, or one of these), not only of the survivor phase's turn
   (the user's call): the owner's own for the first three, anyone's for Renewal. Each is still
@@ -379,13 +386,15 @@ Perks:
 
 The Doctor, The Hag, The Wraith:
 
-- Madness changes single-die skill checks (as above) to the danger die, not the carry roll or a
-  Phantasm Trap roll. A survivor in a locker isn't in the room for Carter's Spark.
+- Madness changes single-die skill checks (as above) to the danger die, not the carry roll, a
+  Phantasm Trap roll or the roll of a survivor searched in a locker (Level 99's answer on their
+  Discord: Madness "only affects skill checks, not all rolls"); that roll doesn't end Madness either. A survivor in a locker isn't in the room for Carter's Spark.
 - A Phantasm Trap roll is a skill check die: keys can re-roll it, Iron Will doesn't apply, and a
   0 still gives The Hag 1 ▲. Teleporting reveals a prop like any move; attacking or picking up
   someone there is optional.
-- Overwhelming Presence covers items used from the item menu, not key re-rolls or the
-  Flashlight / Firecracker reactions.
+- Overwhelming Presence covers items used from the item menu and the Flashlight / Firecracker
+  used against the killer (the user's call: they are items used), not key re-rolls. A Flashlight or
+  Firecracker lost to it stops nothing; another survivor holding one may still use theirs.
 - The Third Seal discards a path card (not Wait). Devour Hope's extra turn counts as the round's
   bonus turn. Shadowborn's third card is face down; no bonus turn that round.
 - Predator: the discarded card is gone for the round; the survivor picks the new one in secret.
@@ -510,6 +519,26 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   Unknown, from any source; one less is added (it can be 0). The repair's own windows come after.
 - Unforeseen: asked when a generator is completed; the killer goes straight to its room (The
   Unknown: the one of his choice), as Phantasm Trap's teleport does.
+- The Singularity's passive: he plans **3 cards** and takes 3 turns, and never pays 4 ▲ for a bonus
+  turn (Slipstream is his only one, and one a round at most, p.10). After setup a face-down EMP
+  (a survival prop) goes into every room, and the kinds of that room's face-down survival props are
+  dealt among them again (as the Drones). An EMP is revealed as any prop; nobody interacts with it.
+- EMP: when he would attack or pick up a survivor on the board in a room with a face-up EMP, that
+  survivor is asked (as a Flashlight is) whether to discard it; discarded, he loses the interaction
+  of that turn. Kept, a Flashlight in the room may still be used. Only his interactions with a
+  survivor (attack, pick-up) are stopped, not a prop or his power.
+- Slipstream (his power, instead of interacting, once a round): every card he has set, revealed or
+  not, goes back to his hand; the turns still set are lost. As that turn ends he takes a bonus turn
+  with any card of his hand (no ▲, and not declined: "take a bonus turn"); it is his last turn of
+  the round. Not with a bonus turn already taken that round.
+- Machine Learning: asked when a generator is completed. Two killer perk cards are drawn from the
+  deck (every green killer perk and the killer cards on no board, p.19) that he doesn't have; he
+  keeps one as a perk more, usable at once (its own once a round), the other is discarded.
+- Genetic Limits: asked at the end of planning; a survivor whose sacrifice progress token is still on
+  their board (they haven't been hooked yet) can't use perks for the rest of the round.
+- Forced Hesitation: asked at the end of planning while Wait is still in his hand (not set). Wait
+  is discarded, a survivor on the board loses the card they set (discarded), and interacts at once
+  in their room (they may not). With no card they have no turn of their own that round.
 - The Skull Merchant's passive: after setup (once the start rooms are rolled), a face-down Drone goes
   into every room, and the kinds of that room's face-down objective props are dealt among them again
   (the shuffle). A Drone is revealed as any prop. A skill check rolled by a survivor on the board in a
@@ -581,8 +610,9 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - No Way Out: asked before any interaction with a generator or an exit gate (Fast Track's too)
   by a survivor with fewer ▲ than him; the interaction is lost. "Fewer" is checked as the moment
   comes, before he pays: 3 ▲ against 2 may use it (and he is left with 2).
-- Crowd Control: a survivor on the board who sets a card this planning. The survivors pay the 2 ▲
-  between them (1 + 1 or 2 from one). Online every player puts in their own survivors' ▲ (or
+- Crowd Control: a survivor on the board who sets a card this planning. The survivors on the board
+  pay the 2 ▲ between them (1 + 1 or 2 from one); one in a locker, on a hook or carried doesn't
+  (the user's call). Online every player puts in their own survivors' ▲ (or
   nothing), each screen showing the tally. Nothing goes through by itself: the chosen survivor's
   player confirms, paying at 2 ▲ or refusing once everyone has said and it is short; until then
   anyone may change what they put in. Refused (or not 2 ▲ among them), the killer picks from that
@@ -629,6 +659,30 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   survivor repaired this round (any of their attempts, before hers), while it is still unfinished.
 - Cut Loose: asked when Thalita's card set in planning turns out to be Vault, as she is about to move
   (not a bonus turn's Vault). Only the colours with a path she can take are offered.
+- Scavenger (Gabriel): a button at the start of his turn while he holds an item; the item is
+  discarded (not used: nothing that follows an item used is asked) and a face-up generator in his
+  room gains 1. It is not a repair: no skill check, no perks that follow a repair.
+- Troubleshooter: asked after any move of his into a room (a bonus turn or a perk's too); he moves
+  on along another path (any colour, not back the way he came) into a room with a face-up
+  generator, revealing a prop there as any move does.
+- Made for This: asked when the killer is about to pick him up from the board (before any carry
+  dice); the sacrifice track gains 1 instead (it can fill it and win the
+  killer the game) and the pick-up is gone. Not when a search of his locker fails: that is no
+  pick-up the killer chooses.
+- Wicked (Sable): a button in place of her interaction. Every survivor on the board gains 1 ▲ (up to
+  their maximum; see House rules), then the killer gains a sacrifice progress, which can fill the
+  track and win him the game.
+- Strength in Shadows: a button at the start of Sable's turn. The survivor chosen is on the board,
+  anywhere (herself too), wounded, and has no sacrifice progress left on their board (it went to the
+  track on their first hook). The token goes back on their board, so their next hook adds to the
+  track again; a survivor who can't be healed (Leverage, 3 Knives) is no choice.
+- Weaving Spiders: a button in place of her interaction. "All Survivors in your space may
+  collectively pay": the survivors on the board in her room, Sable included, pay 6 ▲ between them.
+  She picks the generator first; then, as for Crowd Control, each of them puts in their own ▲ (on
+  their own device online; `weavePay`), and she pays once it comes to 6 or calls it off. Called off,
+  nothing is paid, the perk is not used, and she is back to her interaction. Any face-up generator on the board, unfinished, gains 3 ("up to 3": what
+  it still needs, if less). This is not a repair: no skill check, and perks that follow a repair
+  are not asked. Then the killer gains a sacrifice progress.
 - Empathy: "a willing Survivor": the other survivor is asked (on their own device online) and
   answers yes or no. Only a yes uses the perk; after a no, Claudette may ask someone else, but
   not the same survivor again that round.

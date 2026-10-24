@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { asset, lang, tr } from '../i18n'
+import { asset, lang, tr, trName } from '../i18n'
 import type { Killer, Perk, Survivor } from '../types'
-import RichText from './RichText.vue'
+import PerkRichText from './PerkRichText.vue'
 import BpIcon from './BpIcon.vue'
 import BpText from './BpText.vue'
 
@@ -83,8 +83,8 @@ const t = computed(() =>
             :alt="`${t.power}: ${killer.power.name} — ${tr(killer.power.text)}`"
           />
           <div v-else class="card block power">
-            <h3>⚡ {{ t.power }}: {{ killer.power.name }}</h3>
-            <RichText :text="tr(killer.power.text)" />
+            <h3>⚡ {{ t.power }}: {{ trName(killer.power.name) }}</h3>
+            <PerkRichText :text="tr(killer.power.text)" />
           </div>
           <template v-if="killer.passive">
             <img
@@ -97,7 +97,7 @@ const t = computed(() =>
             />
             <div v-else class="card block">
               <h3>{{ t.passive }}</h3>
-              <RichText :text="tr(killer.passive)" />
+              <PerkRichText :text="tr(killer.passive)" />
             </div>
           </template>
         </div>
@@ -117,9 +117,9 @@ const t = computed(() =>
             loading="lazy"
           />
           <article v-else class="card perk">
-            <h3><span class="cost"><BpText :text="p.cost" /></span> {{ p.name }}</h3>
+            <h3><span class="cost"><BpText :text="p.cost" /></span> {{ trName(p.name) }}</h3>
             <p class="muted flavor">{{ tr(p.flavor) }}</p>
-            <RichText :text="tr(p.text)" />
+            <PerkRichText :text="tr(p.text)" />
           </article>
         </template>
       </div>

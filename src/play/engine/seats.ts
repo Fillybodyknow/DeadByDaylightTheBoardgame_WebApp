@@ -4,7 +4,7 @@
 // `actorsOf` says which players the game is waiting on; `mayAct` checks that a player is allowed
 // to send an action. The engine itself still decides whether the action is legal.
 
-import { crowdPledges, pledgedPay, rollHelpers } from './engine'
+import { crowdPledges, pledgedPay, rollHelpers, weavePledges, weavers, WEAVING_COST } from './engine'
 import type { Action, GameState, PerkOwner } from './types'
 
 export const KILLER_PLAYER = 1
@@ -38,6 +38,7 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'replaceCard':
     case 'redeemerGuess':
     case 'crowdPay':
+    case 'weavePay':
     case 'purgeChoice':
       return s.s
     case 'revealProp':
@@ -51,6 +52,7 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'killerAnyMove':
     case 'killerInteract':
     case 'killerBonusOffer':
+    case 'machineLearning':
     case 'carryDice':
     case 'carryMove':
     case 'pickSurvivor':
@@ -94,6 +96,8 @@ export function actorsOf(st: GameState): number[] {
   // Crowd Control: every survivor's player, until the chosen survivor's player confirms — each
   // may still change what they put in
   if (s.t === 'crowdPay') return [...new Set(st.survivors.map((_, i) => playerOfSurvivor(st, i)))].sort((a, b) => a - b)
+  // Weaving Spiders: the players of everyone in her room, until she confirms
+  if (s.t === 'weavePay') return [...new Set([s.s, ...weavers(st, s.s)].map((i) => playerOfSurvivor(st, i)))].sort((a, b) => a - b)
   const owner = stepOwner(st)
   return owner === null ? [] : [playerOfOwner(st, owner)]
 }
@@ -122,6 +126,16 @@ export function mayAct(st: GameState, player: number, action: Action): boolean {
     // refusing: only once everyone has said and it came short of 2
     if (!action.pay.length) return pay.length < 2 && pledge.every((p) => p !== null)
     return pay.length === 2 && JSON.stringify(pay) === JSON.stringify(action.pay)
+  }
+  // Weaving Spiders: a survivor's ▲ are put in by their own player; Sable's player pays what was
+  // put in (6 ▲), or calls it off at any time
+  if (action.t === 'weavePledge') return st.step.t === 'weavePay' && playerOfSurvivor(st, action.s) === player
+  if (action.t === 'weavePay') {
+    const s = st.step
+    if (s.t !== 'weavePay' || playerOfSurvivor(st, s.s) !== player) return false
+    if (!action.pay.length) return true
+    const pay = pledgedPay(s.pledge ?? weavePledges(st, s.s))
+    return pay.length === WEAVING_COST && JSON.stringify(pay) === JSON.stringify(action.pay)
   }
   // The whole-table planning action only makes sense on one shared device.
   if (action.t === 'planSurvivors') return false

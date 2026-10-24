@@ -7,12 +7,13 @@ import { ITEM_NAMES, PROP_NAMES, KILLER_BP, roomName, survivorMax } from '../eng
 import type { GameState, PerkOwner } from '../engine/types'
 import { CATEGORY_TH, PROP_RULES, type InspectTarget } from '../inspect'
 import { PERKS } from '../engine/perks'
-import { BEAR_TRAP_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf } from '../labels'
+import { BEAR_TRAP_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf, powerName } from '../labels'
 import { perkUsed } from '../engine/engine'
 import { itemHidden } from '../game'
 import Mini from './Mini.vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
+import PerkRichText from '../../components/PerkRichText.vue'
 
 const props = defineProps<{ st: GameState; target: InspectTarget }>()
 const emit = defineEmits<{ close: [] }>()
@@ -109,8 +110,8 @@ const item = computed(() => {
           <img v-if="killer.power.image?.th" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(killer.power.image.th)" :alt="killer.power.name" />
           <img v-if="killer.passiveImage?.th" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(killer.passiveImage.th)" alt="Passive" />
         </div>
-        <p class="rule"><b>Power — {{ killer.power.name }}:</b> <BpText :text="tr(killer.power.text)" /></p>
-        <p v-if="killer.passive" class="rule"><b>Passive:</b> {{ tr(killer.passive) }}</p>
+        <p class="rule"><b>พลัง — {{ powerName(st) }}<small v-if="powerName(st) !== killer.power.name" class="en">{{ killer.power.name }}</small>:</b> <PerkRichText :text="tr(killer.power.text)" /></p>
+        <p v-if="killer.passive" class="rule"><b>Passive:</b> <PerkRichText :text="tr(killer.passive)" /></p>
       </template>
 
       <!-- a character's perks, used or not this round -->
@@ -120,11 +121,11 @@ const item = computed(() => {
           <img v-if="perkImage(p)" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(p))" :alt="PERKS[p].name" />
           <div>
             <div class="perk-head">
-              <strong>{{ PERKS[p].name }}</strong>
+              <strong>{{ PERKS[p].name }}<small v-if="PERKS[p].en !== PERKS[p].name" class="en">{{ PERKS[p].en }}</small></strong>
               <span class="cost"><BpText :text="PERKS[p].cost ? `${PERKS[p].cost} ▲` : 'ฟรี'" /></span>
-              <span class="state" :class="used || covered ? 'bad' : 'good'">{{ covered ? 'ถูก Vile Purge ปิด (ซ่อนใน Locker เพื่อเอาออก)' : used ? 'ใช้แล้วรอบนี้' : 'ยังใช้ได้รอบนี้' }}</span>
+              <span class="state" :class="used || covered ? 'bad' : 'good'">{{ covered ? 'ถูก การชำระมลทินต่ำช้า ปิด (ซ่อนใน Locker เพื่อเอาออก)' : used ? 'ใช้แล้วรอบนี้' : 'ยังใช้ได้รอบนี้' }}</span>
             </div>
-            <p class="rule small"><BpText :text="perkText(p)" /></p>
+            <p class="rule small"><PerkRichText :text="perkText(p)" /></p>
             <p class="muted small"><BpText :text="PERKS[p].when" /></p>
           </div>
         </div>
@@ -152,7 +153,7 @@ const item = computed(() => {
       <template v-else-if="perk">
         <header>
           <div>
-            <h2>{{ PERKS[perk.perk].name }}</h2>
+            <h2>{{ PERKS[perk.perk].name }}<small v-if="PERKS[perk.perk].en !== PERKS[perk.perk].name" class="en">{{ PERKS[perk.perk].en }}</small></h2>
             <p class="muted">perk ของ {{ ownerLabel(st, perk.owner) }} · <BpText :text="PERKS[perk.perk].cost ? `${PERKS[perk.perk].cost} ▲` : 'ฟรี'" /> · ใช้ได้ 1 ครั้ง/รอบ</p>
           </div>
         </header>
@@ -162,7 +163,7 @@ const item = computed(() => {
         </ul>
         <div class="item-wrap">
           <img v-if="perkImage(perk.perk)" class="item-img zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(perk.perk))" :alt="PERKS[perk.perk].name" />
-          <p class="rule"><BpText :text="perkText(perk.perk)" /></p>
+          <p class="rule"><PerkRichText :text="perkText(perk.perk)" /></p>
         </div>
       </template>
 
@@ -190,6 +191,14 @@ const item = computed(() => {
 </template>
 
 <style scoped>
+/* the English name beside the Thai one, as on the English cards */
+.en {
+  margin-left: 0.4em;
+  font-size: 0.72em;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
 .zoomable {
   cursor: zoom-in;
   transition: transform 0.15s, box-shadow 0.15s;

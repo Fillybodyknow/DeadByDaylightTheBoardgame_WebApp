@@ -7,7 +7,7 @@ import { asset } from '../../i18n'
 import { perkUsed } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { GameState, PerkOwner } from '../engine/types'
-import { VILE_PURGE_IMAGE, perkImage } from '../labels'
+import { VILE_PURGE_IMAGE, perkImage, roundEffects } from '../labels'
 
 const props = defineProps<{ st: GameState; owner: PerkOwner }>()
 const emit = defineEmits<{ open: [perk: PerkId] }>()
@@ -19,6 +19,8 @@ const perks = computed(() => {
   return list.slice(0, 3).map((p) => ({ p, used: perkUsed(props.st, props.owner, p), covered: covered.includes(p), image: perkImage(p) }))
 })
 const killer = computed(() => props.owner === 'killer')
+/** Genetic Limits or Fearmonger on this survivor: none of their perks can be used this round. */
+const locked = computed(() => (props.owner === 'killer' ? null : (roundEffects(props.st, props.owner).find((e) => e.noPerks) ?? null)))
 </script>
 
 <template>
@@ -28,12 +30,13 @@ const killer = computed(() => props.owner === 'killer')
       :key="x.p"
       type="button"
       class="diamond"
-      :class="[`at-${i}`, { used: x.used, covered: x.covered }]"
-      :title="`${PERKS[x.p].name}${PERKS[x.p].cost ? ` (${PERKS[x.p].cost} ▲)` : ' (ฟรี)'}${x.covered ? ' — ถูก Vile Purge ปิด ใช้ไม่ได้' : x.used ? ' — ใช้แล้วรอบนี้' : ''} · คลิกเพื่อดู`"
+      :class="[`at-${i}`, { used: x.used, covered: x.covered, locked: !!locked }]"
+      :title="`${PERKS[x.p].name}${PERKS[x.p].cost ? ` (${PERKS[x.p].cost} ▲)` : ' (ฟรี)'}${locked ? ` — ${locked.text}` : x.covered ? ' — ถูก การชำระมลทินต่ำช้า ปิด ใช้ไม่ได้' : x.used ? ' — ใช้แล้วรอบนี้' : ''} · คลิกเพื่อดู`"
       @click.stop="emit('open', x.p)"
     >
       <span class="face" :style="x.image ? { backgroundImage: `url(${asset(x.image)})` } : {}" />
       <img v-if="x.covered" class="purge" :src="asset(VILE_PURGE_IMAGE)" alt="Vile Purge" />
+      <span v-else-if="locked" class="lock" aria-hidden="true">⛔</span>
     </button>
   </div>
 </template>
@@ -107,6 +110,21 @@ const killer = computed(() => props.owner === 'killer')
   width: 56%;
   height: 56%;
   border-radius: 3px;
+  pointer-events: none;
+}
+/* stopped for the round (Genetic Limits, Fearmonger): red, dark, a no-entry sign on it */
+.diamond.locked {
+  background: linear-gradient(135deg, #ff8a80, #7a0b10);
+}
+.diamond.locked .face {
+  filter: grayscale(1) brightness(0.3);
+}
+.lock {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.8em;
   pointer-events: none;
 }
 /* used this round: dim and grey, as the PC game greys a perk on cooldown */

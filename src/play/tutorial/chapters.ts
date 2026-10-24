@@ -7,6 +7,7 @@ import type { Action, GameState } from '../engine/types'
 import { PROP_IMAGE, cardImage } from '../labels'
 import { learnersTurn, plainest } from './policy'
 import { baseScene, generatorsRepaired, killerInteracting, killerPlans, learnerInteracting, learnerMoving, place as placeAll, play, propIn, propsOf, rigged, roomProps, settle } from './scene'
+import { KILLER_CHAPTERS } from './killer'
 import type { Chapter } from './types'
 
 const BACK = (c: 'objective' | 'survival' | 'altruism' | 'boldness') => `assets/props/back-${c}.webp`
@@ -746,4 +747,7 @@ const rules: Chapter = {
   ],
 }
 
-export const CHAPTERS: Chapter[] = [goal, movement, reveal, repair, survival, bonus, killerArrives, helping, escape, rules]
+export const SURVIVOR_CHAPTERS: Chapter[] = [goal, movement, reveal, repair, survival, bonus, killerArrives, helping, escape, rules]
+
+/** Every chapter, both sides (each side numbered on its own). */
+export const CHAPTERS: Chapter[] = [...SURVIVOR_CHAPTERS, ...KILLER_CHAPTERS]

@@ -145,7 +145,7 @@ export function roundSummary(st: GameState, round: number): RoundSummary {
 function describe(st: GameState, ev: GameEvent, name: (s: number) => string): RoundSummary['lines'][number] | null {
   switch (ev.k) {
     case 'wound':
-      return { text: `${name(ev.s)} บาดเจ็บ${ev.by === 'trap' ? ' (Bear Trap)' : ''}`, tone: 'killer' }
+      return { text: `${name(ev.s)} บาดเจ็บ${ev.by === 'trap' ? ' (กับดักหมี)' : ''}`, tone: 'killer' }
     case 'hook':
       return { text: `${name(ev.s)} ถูกแขวนบน Hook`, tone: 'killer' }
     case 'rescue':

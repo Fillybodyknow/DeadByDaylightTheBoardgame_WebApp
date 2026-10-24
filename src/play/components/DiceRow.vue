@@ -12,7 +12,7 @@ defineProps<{ dice: Die[]; big?: boolean; pickable?: boolean[]; pickHint?: strin
 const emit = defineEmits<{ pick: [index: number] }>()
 
 const image = (d: Die) => (d.kind === 'skill' ? skillFaceImage(d.face) : components.dangerDieFaces[d.face])
-const label = (d: Die) => (d.asSuccess ? 'ล้มเหลว → สำเร็จ (Iron Will)' : isFailure(d) ? 'ล้มเหลว' : isGreat(d) ? 'สำเร็จยอดเยี่ยม' : 'สำเร็จ')
+const label = (d: Die) => (d.asSuccess ? 'ล้มเหลว → สำเร็จ (ใจแกร่ง)' : isFailure(d) ? 'ล้มเหลว' : isGreat(d) ? 'สำเร็จยอดเยี่ยม' : 'สำเร็จ')
 </script>
 
 <template>

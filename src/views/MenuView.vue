@@ -40,7 +40,7 @@ const modes = computed(() => [
     icon: '🕯️',
     title: 'Tutorial',
     sub: 'สอนเล่นทีละบท',
-    text: 'ไม่เคยเล่นมาก่อน? The Entity จะพาเล่นบนกระดานจริงทีละขั้น ตั้งแต่การเดินจนถึงการหนี',
+    text: 'ไม่เคยเล่นมาก่อน? The Entity จะพาเล่นบนกระดานจริงทีละขั้น ทั้งฝั่งผู้รอดชีวิตและฝั่งฆาตกร',
     image: 'assets/app/background-img/background_autohaven.webp',
     resume: '',
   },

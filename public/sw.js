@@ -9,7 +9,8 @@
 // Bump VERSION to drop the old caches when the caching rules change.
 
 // v2: the sounds moved from MP3 to OGG, so the cached MP3s are dropped.
-const VERSION = 'v3'
+// v4: the Thai perk cards have Thai names now (same file names): the old images are dropped.
+const VERSION = 'v4'
 const SHELL = `dbdl-shell-${VERSION}`
 const ASSETS = `dbdl-assets-${VERSION}`
 

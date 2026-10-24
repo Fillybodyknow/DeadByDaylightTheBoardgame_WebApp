@@ -1,3 +1,5 @@
+import { thaiName } from '../../data/thaiNames'
+
 // The perks the engine implements: the printed perks (Adept mode, p.19) of the rulebook's
 // automated-mode cast (p.20–23: The Trapper, The Nurse, The Huntress, The Hillbilly, Dwight,
 // Meg, Jake, Claudette), plus The Doctor, The Hag, The Wraith, The Oni, The Deathslinger, The Twins,
@@ -124,6 +126,15 @@ export type PerkId =
   | 'power_of_two'
   | 'friendly_competition'
   | 'cut_loose'
+  | 'wicked'
+  | 'strength_in_shadows'
+  | 'weaving_spiders'
+  | 'machine_learning'
+  | 'scavenger'
+  | 'troubleshooter'
+  | 'made_for_this'
+  | 'genetic_limits'
+  | 'forced_hesitation'
   | 'overzealous'
   | 'residual_manifest'
   | 'inner_focus'
@@ -178,7 +189,10 @@ export type PerkId =
 
 export interface PerkDef {
   id: PerkId
+  /** The Thai name, as in the PC game (`src/data/thaiNames.ts`); the English one where none is known. */
   name: string
+  /** The English name, as printed on the English cards. */
+  en: string
   cost: number
   side: 'killer' | 'survivor'
   /** Character whose board prints it, and its position there (0–2), to find its text. */
@@ -195,7 +209,8 @@ export interface PerkDef {
 
 const def = (id: PerkId, name: string, cost: number, side: PerkDef['side'], character: string, index: number, when: string): PerkDef => ({
   id,
-  name,
+  name: thaiName(name) ?? name,
+  en: name,
   cost,
   side,
   character,
@@ -206,7 +221,8 @@ const def = (id: PerkId, name: string, cost: number, side: PerkDef['side'], char
 /** A perk that is only a card in the box (the edit-perks mode), on no character's board. */
 const deck = (id: PerkId, name: string, cost: number, side: PerkDef['side'], card: string, when: string): PerkDef => ({
   id,
-  name,
+  name: thaiName(name) ?? name,
+  en: name,
   cost,
   side,
   character: '',
@@ -331,6 +347,15 @@ export const PERKS: Record<PerkId, PerkDef> = {
   blood_rush: def('blood_rush', 'Blood Rush', 0, 'survivor', 'renato', 2, 'ถามตอนจบทุกเทิร์นของคุณ (รวม Bonus Turn) ถ้าบอร์ดคุณไม่มี Sacrifice Progress: Bonus Turn แล้วรับ Sacrifice Progress'),
   power_of_two: def('power_of_two', 'Power of Two', 0, 'survivor', 'thalita', 0, 'ผู้รอดชีวิตอื่นในห้องคุณ Interact กับคุณได้ (คลิกตัวคุณ): ฆาตกร +1 ▲ แล้วเขาได้ Bonus Turn'),
   friendly_competition: def('friendly_competition', 'Friendly Competition', 2, 'survivor', 'thalita', 1, 'ถามหลังคุณซ่อม Generator ที่คนอื่นซ่อมไปแล้วรอบนี้: +1 ความคืบหน้า'),
+  wicked: def('wicked', 'Wicked', 0, 'survivor', 'sable', 0, 'ปุ่มแทนการ Interact: ผู้รอดชีวิตทุกคน +1 ▲ แล้วฆาตกรได้ Sacrifice Progress +1'),
+  strength_in_shadows: def('strength_in_shadows', 'Strength in Shadows', 1, 'survivor', 'sable', 1, 'ปุ่มตอนเริ่มเทิร์น: ผู้รอดชีวิตที่บาดเจ็บและบอร์ดไม่มี Sacrifice Progress หายบาดเจ็บ แล้วรับ Sacrifice Progress บนบอร์ด'),
+  scavenger: def('scavenger', 'Scavenger', 2, 'survivor', 'gabriel', 0, 'ปุ่มตอนเริ่มเทิร์น ถ้ามี item: ทิ้ง item แล้ว Generator ที่หงายในห้องคุณ +1'),
+  troubleshooter: def('troubleshooter', 'Troubleshooter', 1, 'survivor', 'gabriel', 1, 'ถามหลังคุณเดินเข้าห้อง: เดินต่อตามเส้นทางอื่นเข้าห้องที่มี Generator'),
+  made_for_this: def('made_for_this', 'Made for This', 2, 'survivor', 'gabriel', 2, 'ถามเมื่อฆาตกรจะอุ้มคุณ: Sacrifice Progress +1 แทน และคุณไม่ถูกอุ้ม'),
+  machine_learning: def('machine_learning', 'Machine Learning', 1, 'killer', 'singularity', 0, 'ถามเมื่อ Generator ซ่อมเสร็จ: จั่ว Perk ฆาตกร 2 ใบ เก็บไว้ใช้ 1 ใบ'),
+  genetic_limits: def('genetic_limits', 'Genetic Limits', 1, 'killer', 'singularity', 1, 'ถามตอนจบเฟสวางแผน: ผู้รอดชีวิตที่บอร์ดยังมี Sacrifice Progress ใช้ Perk ไม่ได้จนจบรอบ'),
+  forced_hesitation: def('forced_hesitation', 'Forced Hesitation', 2, 'killer', 'singularity', 2, 'ถามตอนจบเฟสวางแผน ถ้า Wait ยังอยู่ในมือ: ทิ้ง Wait แล้วทิ้งการ์ดที่วางไว้ของผู้รอดชีวิต 1 คน — เขา Interact ในห้องได้ทันที แต่ไม่ได้เล่นเทิร์นรอบนี้'),
+  weaving_spiders: def('weaving_spiders', 'Weaving Spiders', 0, 'survivor', 'sable', 2, 'ปุ่มแทนการ Interact: ผู้รอดชีวิตในห้องคุณร่วมกันจ่าย 6 ▲ — Generator ที่หงายอยู่ +3 แล้วฆาตกรได้ Sacrifice Progress +1'),
   cut_loose: def('cut_loose', 'Cut Loose', 1, 'survivor', 'thalita', 2, 'ถามเมื่อการ์ดที่คุณวางไว้คือ Vault: ใช้เป็น Sneak / Crouch / Sprint แทน'),
   overzealous: def('overzealous', 'Overzealous', 0, 'survivor', 'haddie', 0, 'ทำงานเองเมื่อคุณเข้าห้องของฆาตกร'),
   residual_manifest: def('residual_manifest', 'Residual Manifest', 2, 'survivor', 'haddie', 1, 'ถามเมื่อฆาตกรจะ Interact ในห้องของคุณ (ทิ้ง item กันไว้)'),
@@ -404,4 +429,4 @@ export const DECK_PERKS: PerkId[] = Object.values(PERKS)
   .map((p) => p.id)
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown', 'singularity']

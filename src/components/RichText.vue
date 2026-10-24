@@ -1,20 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { asset } from '../i18n'
+import { TOKEN_ICONS as ICONS } from '../tokenIcons'
 
 // Card text marks inline icons as {NAME}; {BP} is the bloodpoint triangle.
 const props = defineProps<{ text: string }>()
-
-const ICONS: Record<string, string> = {
-  BP: 'assets/tokens/bloodpoint.webp',
-  AFTERPIECE_TONIC: 'assets/killers/tokens/clown-afterpiece-tonic.webp',
-  AFTERPIECE_ANTIDOTE: 'assets/killers/tokens/clown-afterpiece-antidote.webp',
-  EMP: 'assets/props/singularity-emp.webp',
-  DRONE: 'assets/props/skullmerchant-drone.webp',
-  CARNIFEX: 'assets/killers/tokens/knight-carnifex.webp',
-  ASSASSIN: 'assets/killers/tokens/knight-assassin.webp',
-  JAILER: 'assets/killers/tokens/knight-jailer.webp',
-}
 
 const parts = computed(() =>
   props.text.split(/(\{[A-Z_]+\})/).map((chunk) => {

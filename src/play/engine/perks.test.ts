@@ -1,16 +1,16 @@
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { DIRECT_CARDS, killerIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { DIRECT_CARDS, crowdPledges, empIn, killerIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { boards } from './boards'
-import { actorsOf } from './seats'
+import { actorsOf, mayAct, playerOfSurvivor } from './seats'
 import { DECK_PERKS, PERKS, PRINTED_PERKS, type PerkId } from './perks'
 import { perkCard, perkImage, perkText } from '../labels'
 import type { Action, GameState, MoveCard, PerkWindow, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
-const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah', 'haddie', 'mikaela', 'vittorio', 'renato', 'thalita']
-const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown']
+const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah', 'haddie', 'mikaela', 'vittorio', 'renato', 'thalita', 'sable', 'gabriel']
+const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown', 'singularity']
 
 function game(killer = 'trapper', seed = 1): GameState {
   let st = createGame({ board: 'macmillan', survivors: SURVIVORS.map((id) => ({ id, name: id })), killer: { id: killer, name: killer }, players: 5, seed })
@@ -52,11 +52,11 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(167)
+    expect(Object.keys(PERKS)).toHaveLength(176)
     // the cards that are on no board: their name, cost and text come from the deck data instead
     for (const p of DECK_PERKS) {
       expect(PERKS[p].character, p).toBe('')
-      expect(perkCard(p)?.name, p).toBe(PERKS[p].name)
+      expect(perkCard(p)?.name, p).toBe(PERKS[p].en)
       expect(perkCard(p)?.cost, p).toBe(PERKS[p].cost)
       expect(perkText(p), p).not.toBe('')
       expect(perkImage(p), p).not.toBe('')
@@ -109,6 +109,31 @@ describe('killer powers', () => {
 })
 
 describe('The Doctor, The Hag, The Wraith', () => {
+  it('Overwhelming Presence on a Flashlight used against him: a failed danger die wastes it and he interacts', () => {
+    const st = game('doctor')
+    only(st, 'overwhelming_presence')
+    killerInteracting(st)
+    Object.assign(st.survivors[1], { room: st.killer.room, status: 'board', wounded: false, item: 'flashlight' })
+    const asked = apply(st, { t: 'interact', i: { k: 'attack', target: 1 } })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'flashlight', holders: [1] })
+    const offered = apply(asked, { t: 'react', s: 1 })
+    expect(offered.step).toMatchObject({ t: 'offer', perk: 'overwhelming_presence', owner: 'killer' })
+    const used = (rng: number) => {
+      let g = apply({ ...structuredClone(offered), rng }, { t: 'perk', perk: 'overwhelming_presence', use: true, choice: {} })
+      for (let n = 0; n < 4 && g.step.t === 'roll'; n++) g = apply(g, { t: 'acceptRoll' })
+      return g
+    }
+    // failed: the Flashlight is gone with no effect, and the attack lands
+    const wasted = findOutcome(used, (g) => g.survivors[1].item === null && g.survivors[1].wounded)
+    expect(wasted.log.some((e) => e.text.includes('เสียเปล่า'))).toBe(true)
+    // passed: the Flashlight stops him
+    const stopped = findOutcome(used, (g) => !g.survivors[1].wounded)
+    expect(stopped.log.some((e) => e.text.includes('ใช้ Flashlight — กัน Interaction'))).toBe(true)
+    // declined: the Flashlight works as ever
+    const declined = apply(offered, { t: 'perk', perk: 'overwhelming_presence', use: false })
+    expect(declined.survivors[1].wounded).toBe(false)
+  })
+
   it('Overwhelming Presence on a Rainbow Map reveal: both answers work, also with props picked in the UI (a Vue proxy)', () => {
     for (const use of [true, false]) {
       const st = game('doctor')
@@ -150,6 +175,32 @@ describe('The Doctor, The Hag, The Wraith', () => {
     killerInteracting(after)
     after = apply(after, { t: 'interact', i: { k: 'spark', room: 'shack' } })
     expect(after.survivors[1].wounded).toBe(true)
+  })
+
+  it('Madness leaves the roll of a survivor searched in a locker a skill check die (Level 99)', () => {
+    const st = game('doctor')
+    only(st)
+    killerInteracting(st)
+    const locker = placeProp(st, 'locker', st.killer.room)
+    locker.occupant = 1
+    Object.assign(st.survivors[1], { room: st.killer.room, status: 'locker' })
+    const search = (mad: boolean, rng: number) => {
+      const g = structuredClone(st)
+      Object.assign(g, { rng })
+      g.survivors[1].madness = mad
+      let after = apply(g, { t: 'interact', i: { k: 'search', prop: locker.id } })
+      for (let n = 0; n < 4 && after.step.t === 'roll'; n++) after = apply(after, { t: 'acceptRoll' })
+      return after
+    }
+    for (let rng = 1; rng <= 40; rng++) {
+      const mad = search(true, rng)
+      const sane = search(false, rng)
+      // the same die, so the same result
+      expect(mad.survivors[1].status, `rng ${rng}`).toBe(sane.survivors[1].status)
+      expect(mad.props.find((p) => p.id === locker.id)!.removed).toBe(sane.props.find((p) => p.id === locker.id)!.removed)
+      // and the roll doesn't end Madness
+      expect(mad.survivors[1].madness).toBe(true)
+    }
   })
 
   it('a Phantasm Trap makes the survivor roll, then The Hag may teleport', () => {
@@ -419,7 +470,7 @@ describe('perks', () => {
         const eager = options.filter(
           (a: Action) =>
             (a.t === 'perk' && a.use) ||
-            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'droneTake', 'droneDrop', 'hallucinate', 'partner', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp', 'search'].includes(a.i.k)) ||
+            (a.t === 'interact' && ['power', 'blink', 'hatchet', 'chainsaw', 'calmSpirit', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'droneTake', 'droneDrop', 'hallucinate', 'slipstream', 'partner', 'hoard', 'undying', 'powerStruggle', 'diversion', 'removeVictor', 'rummage', 'pickUp', 'search'].includes(a.i.k)) ||
             (a.t === 'useItem') ||
             // Game Afoot's moment is an attack on a bonus turn: that killer takes both when he can
             (only === 'game_afoot' && (a.t === 'bonus' || (a.t === 'interact' && a.i.k === 'attack'))),
@@ -444,11 +495,12 @@ describe('perks', () => {
     for (let seed = 1; seed <= 240; seed++)
       // every killer in turn, and 4 of the survivors, rotating so everyone plays
       play(seed, ALL_KILLERS[seed % ALL_KILLERS.length], [0, 1, 2, 3].map((i) => ALL_SURVIVORS[(seed + i * 2) % ALL_SURVIVORS.length]))
-    // A perk whose moment didn't come: more games with its character, until it does (or 60 more).
+    // A perk whose moment didn't come: more games with its character, until it does (or 120 more:
+    // Game Afoot's moment, an attack in the killer's bonus turn, can take that long).
     for (const p of Object.keys(PERKS) as PerkId[]) {
       // a card-only perk goes to whoever is playing; `play` deals it out
       const who = PERKS[p].character || (PERKS[p].side === 'killer' ? ALL_KILLERS[0] : ALL_SURVIVORS[0])
-      for (let n = 0; n < 60 && !used.has(p); n++) {
+      for (let n = 0; n < 120 && !used.has(p); n++) {
         const seed = 1000 + n * 7 + Object.keys(PERKS).indexOf(p) * 101
         const crew = [0, 1, 2, 3].map((i) => ALL_SURVIVORS[(seed + i * 2) % ALL_SURVIVORS.length])
         if (PERKS[p].side === 'killer') play(seed, who, crew, p)
@@ -1495,6 +1547,22 @@ describe('The Trickster', () => {
     expect(set.step.t).toBe('planSurvivors')
   })
 
+  it('Crowd Control: only survivors on the board help pay, not one in a locker or on a hook', () => {
+    let st = createGame({ board: 'macmillan', survivors: SURVIVORS.map((id) => ({ id, name: id })), killer: { id: 'trickster', name: 'trickster' }, players: 5, seed: 1 })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    st = structuredClone(st)
+    st.survivors[0].status = 'locker'
+    st.survivors[2].status = 'hooked'
+    const asked = apply(st, { t: 'perk', perk: 'crowd_control', use: true, choice: { target: 1 } })
+    const pays = legalActions(asked).flatMap((a) => (a.t === 'crowdPay' ? [a.pay] : []))
+    // survivors 1 and 3 only (1 + 1, or 2 from one of them)
+    expect(pays.flat().every((p) => p === 1 || p === 3)).toBe(true)
+    expect(() => apply(asked, { t: 'crowdPay', pay: [0, 2] })).toThrow()
+    // online: the two off the board have nothing to put in, so nobody waits on them
+    expect(crowdPledges(asked)).toEqual([0, null, 0, null])
+    expect(() => apply(asked, { t: 'crowdPledge', s: 0, n: 1 })).toThrow()
+  })
+
   it('Starstruck: instead of picking someone up, he moves and picks up another, healthy or not', () => {
     const st = trickster('starstruck')
     st.killer.room = 'shack'
@@ -2030,10 +2098,10 @@ describe('David King', () => {
     const offered = apply(base, { t: 'interact', i: { k: 'attack', target: 1 } })
     expect(offered.step).toMatchObject({ t: 'offer', perk: 'no_mither' })
     const used = (rng: number) => apply({ ...structuredClone(offered), rng }, { t: 'perk', perk: 'no_mither', use: true, choice: {} })
-    const kept = findOutcome(used, (g) => g.log.some((e) => e.text.includes('(No Mither)')))
+    const kept = findOutcome(used, (g) => g.log.some((e) => e.text.includes('(ไม่โอดครวญ)')))
     expect(kept.survivors[1].wounded).toBe(false)
     const hit = findOutcome(used, (g) => g.survivors[1].wounded)
-    expect(hit.log.some((e) => e.text.includes('(No Mither)'))).toBe(false)
+    expect(hit.log.some((e) => e.text.includes('(ไม่โอดครวญ)'))).toBe(false)
   })
 
   it('Dead Hard: a success takes the survivor off his shoulder, and they must move', () => {
@@ -2264,6 +2332,92 @@ describe('Vittorio Toscano', () => {
     for (let n = 0; n < 6 && g.step.t === 'revealProp'; n++) g = apply(g, legalActions(g)[0])
     expect(g.survivors[0].room).toBe(m.to)
     expect(g.killer.room).toBe(m.to)
+  })
+})
+
+describe('Sable Ward', () => {
+  /** Sable is survivor 0 with Meg (1) in the shack, her turn, about to interact; Claudette, Jake elsewhere. */
+  function sable(...perks: PerkId[]) {
+    let g = createGame({ board: 'macmillan', survivors: ['sable', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (g.step.t === 'setupReveal') g = apply(g, legalActions(g)[0])
+    only(g, ...perks)
+    g.survivors.forEach((sv, i) => Object.assign(sv, { status: 'board', wounded: false, room: i < 2 ? 'shack' : 'backlot', bp: 2 }))
+    g.killer.room = 'mine-depths'
+    g.phase = 'survivors'
+    g.activeSurvivor = 0
+    g.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    g.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    return g
+  }
+
+  it('Wicked: in place of her interaction, every survivor on the board +1 ▲, then the killer a sacrifice progress', () => {
+    const st = sable('wicked')
+    // on a hook: not paid (a house rule)
+    st.survivors[3].status = 'hooked'
+    expect(perkButtons(st).map((b) => b.perk)).toContain('wicked')
+    const g = apply(st, { t: 'perk', perk: 'wicked', use: true, choice: {} })
+    expect(g.survivors.map((sv) => sv.bp)).toEqual([3, 3, 3, 2])
+    expect(g.sacrifice).toBe(st.sacrifice + 1)
+    // the interaction is spent: the turn goes on to its end
+    expect(g.step.t).not.toBe('survivorInteract')
+  })
+
+  it('Strength in Shadows: a wounded survivor without sacrifice progress on their board is healed and takes one', () => {
+    const st = sable('strength_in_shadows')
+    const w = { k: 'turnStart', s: 0 } as const
+    Object.assign(st.survivors[3], { wounded: true, sacrificeToken: false })
+    // wounded but still holding their progress: not a choice
+    Object.assign(st.survivors[1], { wounded: true, sacrificeToken: true })
+    expect(perkChoices(st, 'strength_in_shadows', 0, w)).toEqual([{ target: 3 }])
+    st.step = { t: 'turnStart', s: 0 }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const g = apply(st, { t: 'perk', perk: 'strength_in_shadows', use: true, choice: { target: 3 } })
+    expect(g.survivors[3]).toMatchObject({ wounded: false, sacrificeToken: true })
+    expect(g.survivors[0].bp).toBe(1)
+  })
+
+  it('Weaving Spiders: the survivors in her room each put in their ▲, 6 between them; she pays: a face-up generator +3, the killer a sacrifice progress', () => {
+    const st = sable('weaving_spiders')
+    const w = { k: 'interact', s: 0 } as const
+    // 2 + 2 ▲ in the room: not enough
+    expect(perkChoices(st, 'weaving_spiders', 0, w)).toEqual([])
+    Object.assign(st.survivors[0], { bp: 4 })
+    Object.assign(st.survivors[1], { bp: 3 })
+    const gen = placeProp(st, 'generator', 'foundry-ground')
+    Object.assign(gen, { revealed: true, progress: 1 })
+    expect(perkChoices(st, 'weaving_spiders', 0, w)).toContainEqual({ prop: gen.id })
+    let g = apply(st, { t: 'perk', perk: 'weaving_spiders', use: true, choice: { prop: gen.id } })
+    // only those in her room are asked; nothing is spent yet
+    expect(g.step).toMatchObject({ t: 'weavePay', s: 0, prop: gen.id })
+    expect(g.perksUsed).not.toContain('0:weaving_spiders')
+    expect(legalActions(g).some((a) => a.t === 'weavePledge' && a.s === 2)).toBe(false)
+    // online: each pledge is its own player's, the payment Sable's
+    expect(mayAct(g, playerOfSurvivor(g, 1), { t: 'weavePledge', s: 1, n: 3 })).toBe(true)
+    expect(mayAct(g, playerOfSurvivor(g, 1), { t: 'weavePledge', s: 0, n: 3 })).toBe(false)
+    g = apply(g, { t: 'weavePledge', s: 0, n: 3 })
+    g = apply(g, { t: 'weavePledge', s: 1, n: 3 })
+    expect(() => apply(g, { t: 'weavePay', pay: [0, 0, 0, 0, 1, 1] })).toThrow()
+    expect(mayAct(g, playerOfSurvivor(g, 1), { t: 'weavePay', pay: [0, 0, 0, 1, 1, 1] })).toBe(playerOfSurvivor(g, 1) === playerOfSurvivor(g, 0))
+    g = apply(g, { t: 'weavePay', pay: [0, 0, 0, 1, 1, 1] })
+    expect(g.survivors[0].bp).toBe(1)
+    expect(g.survivors[1].bp).toBe(0)
+    // 1 + 3, as far as the generator goes
+    expect(g.props.find((p) => p.id === gen.id)!).toMatchObject({ progress: 3, done: true })
+    expect(g.sacrifice).toBe(st.sacrifice + 1)
+    expect(g.perksUsed).toContain('0:weaving_spiders')
+  })
+
+  it('Weaving Spiders called off: nothing paid, and her interaction is still to come', () => {
+    const st = sable('weaving_spiders')
+    Object.assign(st.survivors[0], { bp: 6 })
+    const gen = placeProp(st, 'generator', 'foundry-ground')
+    gen.revealed = true
+    let g = apply(st, { t: 'perk', perk: 'weaving_spiders', use: true, choice: { prop: gen.id } })
+    g = apply(g, { t: 'weavePledge', s: 0, n: 6 })
+    g = apply(g, { t: 'weavePay', pay: [] })
+    expect(g.survivors[0].bp).toBe(6)
+    expect(g.step).toMatchObject({ t: 'survivorInteract', s: 0 })
+    expect(perkButtons(g).map((b) => b.perk)).toContain('weaving_spiders')
   })
 })
 
@@ -2624,6 +2778,185 @@ describe('The Artist', () => {
     )
     expect(g.perksUsed).toContain('k:pentimento')
     expect(g.killer.bp).toBeGreaterThanOrEqual(bp + 2)
+  })
+})
+
+describe('Gabriel Soma', () => {
+  /** Gabriel is survivor 0, in the shack with the killer; the others elsewhere. */
+  function gabriel(...perks: PerkId[]) {
+    let g = createGame({ board: 'macmillan', survivors: ['gabriel', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 1 })
+    while (g.step.t === 'setupReveal') g = apply(g, legalActions(g)[0])
+    only(g, ...perks)
+    g.survivors.forEach((sv, i) => Object.assign(sv, { status: 'board', wounded: false, room: i === 0 ? 'shack' : 'backlot' }))
+    g.killer.room = 'shack'
+    return g
+  }
+
+  it('Scavenger: at the start of his turn his item goes, and a face-up generator in his room gains 1', () => {
+    const st = gabriel('scavenger')
+    const gen = placeProp(st, 'generator', 'shack')
+    gen.progress = 1
+    const w = { k: 'turnStart', s: 0 } as const
+    // no item: nothing
+    expect(perkChoices(st, 'scavenger', 0, w)).toEqual([])
+    st.survivors[0].item = 'flashlight'
+    expect(perkChoices(st, 'scavenger', 0, w)).toEqual([{ prop: gen.id }])
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.step = { t: 'turnStart', s: 0 }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const g = apply(st, { t: 'perk', perk: 'scavenger', use: true, choice: { prop: gen.id } })
+    expect(g.survivors[0].item).toBeNull()
+    expect(g.props.find((p) => p.id === gen.id)!.progress).toBe(2)
+  })
+
+  it('Troubleshooter: after a move, on along another path into a room with a face-up generator', () => {
+    const st = gabriel('troubleshooter')
+    const exits = anyMoves(st, 0)
+    const came = exits[0].path.id
+    const target = exits.find((m) => m.path.id !== came)!
+    // no generator there yet: nothing
+    st.props.filter((p) => p.kind === 'generator' && p.room === target.to).forEach((p) => (p.room = 'mine-depths'))
+    const w = { k: 'entered', s: 0, path: came, room: 'shack' } as unknown as PerkWindow
+    expect(perkChoices(st, 'troubleshooter', 0, w).some((c) => c.path === target.path.id)).toBe(false)
+    placeProp(st, 'generator', target.to)
+    const choices = perkChoices(st, 'troubleshooter', 0, w)
+    expect(choices).toContainEqual({ path: target.path.id })
+    expect(choices.some((c) => c.path === came)).toBe(false)
+  })
+
+  it('Made for This: the killer about to pick him up gains a sacrifice progress instead, and he stays down', () => {
+    const st = gabriel('made_for_this')
+    killerInteracting(st)
+    st.survivors[0].wounded = true
+    const before = st.sacrifice
+    const asked = apply(st, { t: 'interact', i: { k: 'pickUp', target: 0 } })
+    expect(asked.step).toMatchObject({ t: 'offer', perk: 'made_for_this', owner: 0 })
+    const g = apply(asked, { t: 'perk', perk: 'made_for_this', use: true, choice: {} })
+    expect(g.survivors[0].status).toBe('board')
+    expect(g.sacrifice).toBe(before + 1)
+    // declined: he is picked up as usual
+    const picked = apply(asked, { t: 'perk', perk: 'made_for_this', use: false })
+    expect(picked.survivors[0].status).not.toBe('board')
+  })
+})
+
+describe('The Singularity', () => {
+  /** The Singularity with only these perks, about to interact on his first turn (3 cards set). */
+  function singularity(...perks: PerkId[]) {
+    const st = game('singularity')
+    only(st, ...perks)
+    killerInteracting(st)
+    st.killer.planned = ['wait', 'sneak', 'sprint']
+    st.killer.hand = ['crouch', 'vault']
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false }))
+    return st
+  }
+
+  it('setup: an EMP in every room, among its survival props; he plans 3 cards', () => {
+    const st = game('singularity')
+    const emps = st.props.filter((p) => p.kind === 'emp')
+    expect(emps).toHaveLength(boardOf(st).rooms.length)
+    expect(emps.every((p) => p.category === 'survival')).toBe(true)
+    expect(new Set(emps.map((p) => p.room)).size).toBe(boardOf(st).rooms.length)
+    const planning = { ...st, step: { t: 'planKiller' } as const }
+    expect(legalActions(planning).every((a) => a.t !== 'planKiller' || a.cards.length === 3)).toBe(true)
+  })
+
+  it('three turns, and no bonus turn bought with 4 ▲ after the second', () => {
+    let st = singularity()
+    st.killer.bp = 12
+    st.killer.planned = ['wait', 'wait', 'wait']
+    st = apply(st, { t: 'endTurn' })
+    expect(st.step).toMatchObject({ t: 'killerInteract', turn: 1 })
+    st = apply(st, { t: 'endTurn' })
+    // a third turn, not a bonus offer
+    expect(st.step).toMatchObject({ t: 'killerInteract', turn: 2 })
+    st = apply(st, { t: 'endTurn' })
+    expect(st.step.t).not.toBe('killerBonusOffer')
+  })
+
+  it('Slipstream: every set card back to his hand, then a free bonus turn with any of them', () => {
+    const st = singularity()
+    expect(killerInteractions(st)).toContainEqual({ k: 'slipstream' })
+    const bp = st.killer.bp
+    let g = apply(st, { t: 'interact', i: { k: 'slipstream' } })
+    expect(g.step).toMatchObject({ t: 'killerBonusOffer', free: true })
+    expect([...g.killer.hand].sort()).toEqual(['crouch', 'sneak', 'sprint', 'vault', 'wait'])
+    // taken: no declining it
+    expect(legalActions(g)).not.toContainEqual({ t: 'declineBonus' })
+    g = apply(g, { t: 'bonus', card: 'wait' })
+    expect(g.killer.bp).toBe(bp)
+    expect(g.killer.planned).toEqual(['wait'])
+    expect(g.step).toMatchObject({ t: 'killerInteract', turn: 0 })
+    // the bonus turn is his last: no Slipstream again, and the round ends after it
+    expect(killerInteractions(g)).not.toContainEqual({ k: 'slipstream' })
+    g = apply(g, { t: 'endTurn' })
+    expect(g.phase).toBe('planning')
+  })
+
+  it('EMP: the survivor he would attack may discard a face-up EMP in the room; he loses the interaction', () => {
+    const st = singularity()
+    const emp = st.props.find((p) => p.kind === 'emp')!
+    Object.assign(emp, { room: st.killer.room, revealed: true })
+    st.survivors[0].room = st.killer.room
+    expect(empIn(st, st.killer.room)?.id).toBe(emp.id)
+    const asked = apply(st, { t: 'interact', i: { k: 'attack', target: 0 } })
+    expect(asked.step).toMatchObject({ t: 'reaction', item: 'emp', holders: [0] })
+    const kept = apply(asked, { t: 'react', s: 0 })
+    expect(kept.survivors[0].wounded).toBe(false)
+    expect(kept.props.find((p) => p.id === emp.id)!.removed).toBe(true)
+    // kept: the attack goes through
+    const hit = apply(asked, { t: 'react', s: null })
+    expect(hit.survivors[0].wounded).toBe(true)
+    expect(hit.props.find((p) => p.id === emp.id)!.removed).toBe(false)
+  })
+
+  it('Genetic Limits: a survivor with their sacrifice progress on their board can\'t use perks this round', () => {
+    const st = singularity('genetic_limits')
+    st.survivors[1].sacrificeToken = false
+    const w = { k: 'planningEnd' } as const
+    expect(perkChoices(st, 'genetic_limits', 'killer', w).map((c) => c.target)).toEqual([0, 2, 3])
+    st.step = { t: 'offer', perk: 'genetic_limits', owner: 'killer', w }
+    const g = apply(st, { t: 'perk', perk: 'genetic_limits', use: true, choice: { target: 0 } })
+    expect(g.geneticLimits).toBe(0)
+    expect(perkReady(g, 0, g.survivors[0].perks[0])).toBe(false)
+  })
+
+  it('Forced Hesitation: Wait discarded from his hand; a survivor loses their card, interacts now, and has no turn', () => {
+    const st = singularity('forced_hesitation')
+    const w = { k: 'planningEnd' } as const
+    // Wait set, not in hand: nothing
+    expect(perkChoices(st, 'forced_hesitation', 'killer', w)).toEqual([])
+    st.killer.hand = ['wait', 'crouch']
+    st.survivors.forEach((sv) => Object.assign(sv, { planned: 'sneak', acted: false }))
+    expect(perkChoices(st, 'forced_hesitation', 'killer', w)).toHaveLength(4)
+    st.phase = 'survivors'
+    st.step = { t: 'offer', perk: 'forced_hesitation', owner: 'killer', w }
+    st.queue = [{ k: 'survivorTurn', s: 1 }]
+    let g = apply(st, { t: 'perk', perk: 'forced_hesitation', use: true, choice: { target: 1 } })
+    expect(g.killer.hand).toEqual(['crouch'])
+    expect(g.survivors[1].planned).toBeNull()
+    expect(g.step).toMatchObject({ t: 'survivorInteract', s: 1, canInteract: true })
+    // done interacting: survivor 1's own turn is passed by, the next one plays
+    g = apply(g, { t: 'endTurn' })
+    expect(g.activeSurvivor).not.toBe(1)
+  })
+
+  it('Machine Learning: a generator done, two killer perk cards drawn, one kept and usable', () => {
+    const st = singularity('machine_learning')
+    const gen = placeProp(st, 'generator', 'backlot')
+    const w = { k: 'genDone', prop: gen.id } as const
+    expect(perkChoices(st, 'machine_learning', 'killer', w)).toEqual([{}])
+    st.step = { t: 'offer', perk: 'machine_learning', owner: 'killer', w }
+    const g = apply(st, { t: 'perk', perk: 'machine_learning', use: true, choice: {} })
+    expect(g.step.t).toBe('machineLearning')
+    const cards = (g.step as { cards: PerkId[] }).cards
+    expect(cards).toHaveLength(2)
+    expect(cards.every((p) => PERKS[p].side === 'killer')).toBe(true)
+    const kept = apply(g, { t: 'selfAware', perk: cards[0] })
+    expect(kept.killer.perks).toContain(cards[0])
+    expect(kept.killer.perks).not.toContain(cards[1])
   })
 })
 

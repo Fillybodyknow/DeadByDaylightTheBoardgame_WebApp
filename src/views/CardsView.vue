@@ -2,9 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { editPerkCards, items, killers, survivors } from '../data'
-import { asset, lang, tr } from '../i18n'
+import { asset, lang, tr, trName } from '../i18n'
 import BpIcon from '../components/BpIcon.vue'
-import RichText from '../components/RichText.vue'
+import PerkRichText from '../components/PerkRichText.vue'
 
 type Tab = 'survivor' | 'killer' | 'item' | 'perk'
 const TABS: Tab[] = ['survivor', 'killer', 'item', 'perk']
@@ -122,12 +122,12 @@ const labels = computed(() =>
           <img :src="asset(cardImage(open))" :alt="open.name" />
           <div class="zoom-text">
             <p class="zoom-side" :class="open.side">{{ labels[open.side] }}</p>
-            <h2>{{ open.name }}</h2>
+            <h2>{{ trName(open.name) }}</h2>
             <p class="zoom-cost">
               <template v-if="open.cost">{{ open.cost }} <BpIcon /></template>
               <template v-else>{{ labels.free }}</template>
             </p>
-            <p class="zoom-rules"><RichText :text="tr(open.text)" /></p>
+            <p class="zoom-rules"><PerkRichText :text="tr(open.text)" /></p>
             <p class="zoom-flavor muted">{{ tr(open.flavor) }}</p>
             <p class="zoom-owner">{{ ownerOf(open.name) ? `${labels.onBoard} ${ownerOf(open.name)}` : labels.noBoard }}</p>
             <button type="button" @click="open = null">{{ labels.close }}</button>

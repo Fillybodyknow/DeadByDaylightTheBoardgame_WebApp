@@ -3,7 +3,7 @@
 // bonus turn, a roll taken as rolled, nothing put in for Crowd Control. A move, an interaction or
 // the planning is the player's own: running out of time on those only tells the room.
 
-import { pledgedPay, crowdPledges, rollHelpers, tryApply } from '../engine/engine'
+import { pledgedPay, crowdPledges, rollHelpers, tryApply, weavePledges, WEAVING_COST } from '../engine/engine'
 import { mayAct, playerOfOwner, playerOfSurvivor } from '../engine/seats'
 import type { Action, GameState } from '../engine/types'
 
@@ -44,6 +44,15 @@ function answer(st: GameState, seat: number): Action | null {
       const pay = pledgedPay(pledge)
       return { t: 'crowdPay', pay: pay.length === 2 ? pay : [] }
     }
+    case 'weavePay': {
+      // nothing put in for those out of time; Sable pays what came in, or calls it off
+      const pledge = s.pledge ?? weavePledges(st, s.s)
+      const open = pledge.findIndex((p, i) => p === null && mine(i))
+      if (open >= 0) return { t: 'weavePledge', s: open, n: 0 }
+      if (!mine(s.s) || pledge.some((p) => p === null)) return null
+      const pay = pledgedPay(pledge)
+      return { t: 'weavePay', pay: pay.length === WEAVING_COST ? pay : [] }
+    }
     default:
       return null
   }
@@ -64,7 +73,7 @@ export function timeoutActions(st: GameState, seat: number): Action[] {
     if (!next) break
     out.push(a)
     cur = next
-    if (st.step.t !== 'roll' && st.step.t !== 'crowdPay') break
+    if (st.step.t !== 'roll' && st.step.t !== 'crowdPay' && st.step.t !== 'weavePay') break
   }
   return out
 }

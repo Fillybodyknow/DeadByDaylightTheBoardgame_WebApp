@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { devoutPool, killerById, perkOption, printedPerks, survivorById, type PerkRef } from '../data'
-import { asset, lang, tr } from '../i18n'
+import { asset, lang, tr, trName } from '../i18n'
 import { useLobbyStore, type MiniKey } from '../stores/lobby'
 import { sfx } from '../sound'
-import RichText from './RichText.vue'
+import PerkRichText from './PerkRichText.vue'
 
 // Devout (rulebook p.19): each player picks 3 perks — their printed ones or any shareable perk
 // of their side, no duplicates. One device: the picks are made in turn behind a hand-off
@@ -183,10 +183,10 @@ const pickedCount = computed(() => ORDER.filter((k) => s.value.perkPicks[k]).len
           <span class="info">
             <span class="title">
               <span class="cost">{{ o.perk.cost }}</span>
-              <b>{{ o.perk.name }}</b>
+              <b>{{ trName(o.perk.name) }}</b>
               <small class="muted">{{ o.ownerId === characterId ? 'ของตัวเอง' : o.ownerName }}</small>
             </span>
-            <RichText class="text" :text="tr(o.perk.text)" />
+            <PerkRichText class="text" :text="tr(o.perk.text)" />
           </span>
           <span class="tick">{{ draft.includes(o.ref) ? '✓' : '+' }}</span>
         </button>

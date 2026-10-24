@@ -4,6 +4,7 @@ import { legalActions } from '../engine/legal'
 import type { GameState } from '../engine/types'
 import { CHAPTERS } from './chapters'
 import { learnersTurn, plainest } from './policy'
+import { learnerOf } from './types'
 
 /** Play a chapter as a learner who does what each step asks (the tutorial playing the others). */
 function playThrough(id: string): GameState {
@@ -19,7 +20,7 @@ function playThrough(id: string): GameState {
     if (!task) continue
     for (let guard = 0; !task.done(st); guard++) {
       expect(guard, `${id} step ${n + 1}: never done`).toBeLessThan(40)
-      if (learnersTurn(st)) {
+      if (learnersTurn(st, learnerOf(ch))) {
         const ok = legalActions(st).filter((a) => task.allow(st, a))
         expect(ok.length, `${id} step ${n + 1}: nothing the step allows (at ${st.step.t})`).toBeGreaterThan(0)
         st = apply(st, ok[0])
@@ -88,5 +89,33 @@ describe('tutorial (survivors)', () => {
   it('escape: the fourth generator, then the gate opens and the survivors win', () => {
     const st = playThrough('escape')
     expect(st.phase).toBe('over')
+  })
+})
+
+describe('tutorial (killer)', () => {
+  it('plan: Meg wounded, then the generator damaged back to 0', () => {
+    const st = playThrough('k-plan')
+    expect(st.killer.room).toBe('foundry-ground')
+    expect(st.survivors[1].wounded).toBe(true)
+    expect(st.props.find((p) => p.room === 'foundry-ground' && p.kind === 'generator')!.progress).toBe(0)
+  })
+
+  it('hook: Meg picked up, carried one room and hung (+1 on the track)', () => {
+    const st = playThrough('k-hook')
+    expect(st.survivors[1].status).toBe('hooked')
+    expect(st.killer.room).toBe('shack')
+    expect(st.sacrifice).toBeGreaterThanOrEqual(1)
+  })
+
+  it('obstacles: the pallet broken (he stays), then Meg found in the locker and picked up', () => {
+    const st = playThrough('k-obstacles')
+    expect(st.survivors[1].status).toBe('carried')
+  })
+
+  it('power: the chainsaw wounds Meg, the third turn paid, the totem venerated', () => {
+    const st = playThrough('k-power')
+    expect(st.survivors[1].wounded).toBe(true)
+    expect(st.killer.room).toBe('foundry-basement')
+    expect(st.killer.bp).toBe(5 - 4 + 2)
   })
 })

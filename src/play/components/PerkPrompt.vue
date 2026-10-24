@@ -5,7 +5,7 @@
 // and hovering a choice previews it on the map.
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
-import { reignCards, CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName, unknownRooms } from '../engine/engine'
+import { reignCards, CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, weavePledges, weavers, WEAVING_COST, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName, unknownRooms } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
 import { actionKey, perkPicked, perksToPick } from '../boardActions'
@@ -23,6 +23,7 @@ import { PERK_LEAD, pickedHint as perkPickedHint } from '../perkHints'
 import Mini from './Mini.vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
+import PerkRichText from '../../components/PerkRichText.vue'
 
 const props = defineProps<{ st: GameState; hidden: boolean; onBoard: Set<string> }>()
 
@@ -114,9 +115,9 @@ const offerList = computed(() => {
 const kind = computed<'offer' | 'turnStart' | 'roll' | 'spark' | 'phantasm' | 'replace' | 'guess' | 'crowd' | 'purge' | 'aware' | null>(() => {
   const s = step.value
   if (s.t === 'offer') return 'offer'
-  if (s.t === 'selfAware') return 'aware'
+  if (s.t === 'selfAware' || s.t === 'machineLearning') return 'aware'
   if (s.t === 'purgeChoice') return 'purge'
-  if (s.t === 'crowdPay' || s.t === 'crowdPick' || s.t === 'reignCard') return 'crowd'
+  if (s.t === 'crowdPay' || s.t === 'crowdPick' || s.t === 'reignCard' || s.t === 'weavePay') return 'crowd'
   if (s.t === 'sparkChoice') return 'spark'
   if (s.t === 'phantasmChoice') return 'phantasm'
   if (s.t === 'replaceCard') return 'replace'
@@ -133,8 +134,8 @@ const decider = computed<PerkOwner | null>(() => {
   if (s.t === 'turnStart') return s.s
   // online, a helper's device names the helper: it's their key or perk being asked about
   if (s.t === 'roll') return buttons.value[0]?.owner ?? (rollMine.value ? s.ctx.s : (passers.value[0] ?? s.ctx.s))
-  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess' || s.t === 'crowdPay' || s.t === 'purgeChoice' || s.t === 'selfAware') return s.s
-  if (s.t === 'phantasmChoice' || s.t === 'crowdPick' || s.t === 'reignCard') return 'killer'
+  if (s.t === 'sparkChoice' || s.t === 'replaceCard' || s.t === 'redeemerGuess' || s.t === 'crowdPay' || s.t === 'weavePay' || s.t === 'purgeChoice' || s.t === 'selfAware') return s.s
+  if (s.t === 'phantasmChoice' || s.t === 'crowdPick' || s.t === 'reignCard' || s.t === 'machineLearning') return 'killer'
   return null
 })
 
@@ -150,7 +151,7 @@ watch(
 const canPay = computed(() => crowdPayments(props.st).length > 1)
 function addPay(s: number) {
   const n = payPick.value.filter((x) => x === s).length
-  if (payPick.value.length >= 2 || props.st.survivors[s].bp <= n) return
+  if (payPick.value.length >= 2 || props.st.survivors[s].bp <= n || props.st.survivors[s].status !== 'board') return
   fxSound.flip()
   payPick.value = [...payPick.value, s].sort((a, b) => a - b)
 }
@@ -163,7 +164,30 @@ const pledges = computed(() => {
 })
 const pledgeTotal = computed(() => pledges.value.reduce<number>((t, p) => t + (p ?? 0), 0))
 const pledgesIn = computed(() => pledges.value.every((p) => p !== null))
+/**
+ * Weaving Spiders: each survivor in Sable's room puts in their own ▲ (on their own device online),
+ * 6 between them; then Sable pays, or calls it off.
+ */
+const weave = computed(() => {
+  const s = step.value
+  if (s.t !== 'weavePay') return null
+  const pledge = s.pledge ?? weavePledges(props.st, s.s)
+  const total = pledge.reduce<number>((t, p) => t + (p ?? 0), 0)
+  const gen = props.st.props.find((p) => p.id === s.prop)!
+  return { who: weavers(props.st, s.s), pledge, total, gen }
+})
+function weaveLabel(s: number): string {
+  const p = weave.value?.pledge[s]
+  if (p === null || p === undefined) return 'ยังไม่ตัดสินใจ'
+  if (p === 0) return props.st.survivors[s].bp ? 'ไม่ลง' : 'ไม่มี ▲'
+  return `ลง ${p} ▲`
+}
+
+/** Crowd Control: in a locker, on a hook or carried, a survivor doesn't pay. */
+const offBoard = (s: number) => props.st.survivors[s].status !== 'board'
+
 function pledgeLabel(s: number): string {
+  if (offBoard(s)) return 'ไม่อยู่บนกระดาน — จ่ายไม่ได้'
   const p = pledges.value[s]
   if (p === null) return 'ยังไม่ตัดสินใจ'
   if (p === 0) return props.st.survivors[s].bp ? 'ไม่ลง' : 'ไม่มี ▲'
@@ -313,9 +337,9 @@ const perkHand = computed<HandCard[]>(() => {
 
 const handLabel = computed(() => {
   const s = step.value
-  if (s.t === 'replaceCard') return `Predator — มือของ ${props.st.survivors[s.s].name}`
-  if (s.t === 'crowdPick') return `Crowd Control — มือของ ${props.st.survivors[s.s].name}`
-  if (s.t === 'reignCard') return `Reign of Darkness — มือของ ${props.st.survivors[s.s].name}`
+  if (s.t === 'replaceCard') return `นักล่า — มือของ ${props.st.survivors[s.s].name}`
+  if (s.t === 'crowdPick') return `ควบคุมฝูงชน — มือของ ${props.st.survivors[s.s].name}`
+  if (s.t === 'reignCard') return `รัชสมัยแห่งความมืดมิด — มือของ ${props.st.survivors[s.s].name}`
   if (s.t === 'redeemerGuess') return `ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
   return s.t === 'offer' && activePerk.value ? `${PERKS[activePerk.value].name} — เลือกการ์ดจากมือ` : ''
 })
@@ -323,10 +347,10 @@ const handLabel = computed(() => {
 /** What is asking for a card, shown on the hand itself (it is easy to miss in the corner). */
 const handPrompt = computed(() => {
   const s = step.value
-  if (s.t === 'replaceCard') return 'Predator — เลือกการ์ดใบใหม่'
-  if (s.t === 'crowdPick') return `Crowd Control — เลือกการ์ดให้ ${props.st.survivors[s.s].name}`
-  if (s.t === 'reignCard') return `Reign of Darkness — เลือกการ์ดที่จะทิ้ง`
-  if (s.t === 'redeemerGuess') return `Redeemer — ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
+  if (s.t === 'replaceCard') return 'นักล่า — เลือกการ์ดใบใหม่'
+  if (s.t === 'crowdPick') return `ควบคุมฝูงชน — เลือกการ์ดให้ ${props.st.survivors[s.s].name}`
+  if (s.t === 'reignCard') return `รัชสมัยแห่งความมืดมิด — เลือกการ์ดที่จะทิ้ง`
+  if (s.t === 'redeemerGuess') return `พระผู้ไถ่ — ทายการ์ดที่ ${props.st.killer.name} ทิ้ง`
   return s.t === 'offer' && activePerk.value ? `${PERKS[activePerk.value].name} — เลือกการ์ด` : ''
 })
 
@@ -343,17 +367,6 @@ function hoverHandCard(card: MoveCard | null) {
   preview.value = choicePreview(props.st, { card }, owner === 'killer' ? props.st.killer.room : props.st.survivors[owner].room, owner)
 }
 
-// ---------- a perk's card, opened big (a click on it); a click anywhere or Esc puts it back ----------
-
-const zoomed = ref<string | null>(null)
-// Esc closes the picture, not the decision behind it (caught before anything else hears the key).
-function onZoomKey(e: KeyboardEvent) {
-  if (e.key !== 'Escape' || !zoomed.value) return
-  e.stopImmediatePropagation()
-  zoomed.value = null
-}
-watch(zoomed, (z) => (z ? window.addEventListener('keydown', onZoomKey, true) : window.removeEventListener('keydown', onZoomKey, true)))
-onBeforeUnmount(() => window.removeEventListener('keydown', onZoomKey, true))
 
 /** Reign of Darkness: the whole hand the killer looks at, in words (only the cards that move them are in the hand below). */
 const reignHand = computed(() => {
@@ -426,7 +439,7 @@ const summary = computed(() => {
   if (kind.value === 'turnStart') return 'Perk ตอนเริ่มเทิร์น'
   if (kind.value === 'roll') return 'ตัดสินใจเรื่องผลทอย'
   if (kind.value === 'replace') return 'เปลี่ยนการ์ดเคลื่อนที่'
-  if (kind.value === 'guess') return 'ทายการ์ดของ Redeemer'
+  if (kind.value === 'guess') return 'ทายการ์ดของ พระผู้ไถ่'
   return 'ใช้พลัง?'
 })
 
@@ -482,7 +495,7 @@ const boardCount = computed(() => {
       <header @click="collapsed && (collapsed = false)">
         <Mini class="face" :class="killerSide ? 'aura-killer' : 'aura-survivor'" :src="asset(face)" />
         <div class="head-text">
-          <p class="eyebrow">⚡ {{ kind === 'spark' || kind === 'phantasm' || kind === 'guess' ? 'Power' : kind === 'purge' ? 'Passive' : kind === 'replace' ? 'Predator' : 'Perk' }} — ถึงคราวตัดสินใจ</p>
+          <p class="eyebrow">⚡ {{ kind === 'spark' || kind === 'phantasm' || kind === 'guess' ? 'Power' : kind === 'purge' ? 'Passive' : kind === 'replace' ? 'นักล่า' : 'Perk' }} — ถึงคราวตัดสินใจ</p>
           <strong class="who">{{ who }}</strong>
           <p v-if="collapsed" class="why"><BpText :text="summary" /></p>
           <!-- the moment, with the mini of whom it is about (not when that is the one deciding) -->
@@ -517,7 +530,6 @@ const boardCount = computed(() => {
           :state="perkPicked === o.perk ? 'picked' : perkPicked ? 'dim' : 'ready'"
           :hint="perkPicked === o.perk ? pickedHint(o.perk, o.choices) : undefined"
           @pick="choosePerk(o.perk)"
-          @zoom="zoomed = $event"
         >
           <template v-if="perkPicked === o.perk">
               <button
@@ -554,7 +566,6 @@ const boardCount = computed(() => {
           :state="armOffer ? (perkPicked === step.perk ? 'picked' : 'ready') : 'static'"
           :hint="armOffer && perkPicked === step.perk ? pickedHint(step.perk, offerChoices) : undefined"
           @pick="choosePerk(step.perk)"
-          @zoom="zoomed = $event"
         />
         <!-- Tinkerer: the planned cards, then the hand -->
         <div v-if="isTinkerer" class="tinker">
@@ -673,7 +684,6 @@ const boardCount = computed(() => {
           :state="!pickPerk ? 'static' : perkPicked === b.perk ? 'picked' : perkPicked ? 'dim' : 'ready'"
           :hint="pickPerk && perkPicked === b.perk ? (b.perk === 'breakout' ? '🎯 คลิกเพื่อนที่บาดเจ็บบนแผนที่ แล้วเลือกเส้นทาง — กดการ์ดอีกครั้งเพื่อยกเลิก' : pickedHint(b.perk, b.choices)) : undefined"
           @pick="choosePerk(b.perk)"
-          @zoom="zoomed = $event"
         >
             <!-- Breakout is a person and then a path: both are picked on the board, one at a time -->
             <template v-if="perkOpen(b.perk) && b.perk !== 'breakout'">
@@ -694,7 +704,7 @@ const boardCount = computed(() => {
 
       <!-- Whispers: pay or set the card face up -->
       <template v-else-if="step.t === 'sparkChoice' && step.whispers">
-        <p class="lead"><b>Whispers!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือวางการ์ดเคลื่อนที่หงายหน้า</p>
+        <p class="lead"><b>เสียงกระซิบ!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือวางการ์ดเคลื่อนที่หงายหน้า</p>
         <p class="text small">วางหงายหน้า = ทุกคน (รวมฆาตกร) เห็นการ์ดของคุณก่อนวางแผนของตัวเอง</p>
         <div class="choices">
           <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 <BpIcon /> (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
@@ -704,7 +714,7 @@ const boardCount = computed(() => {
 
       <!-- Carter's Spark: pay or take it -->
       <template v-else-if="step.t === 'sparkChoice' && step.grip">
-        <p class="lead"><b>Dragon's Grip!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือบาดเจ็บ</p>
+        <p class="lead"><b>อุ้งมือมังกร!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือบาดเจ็บ</p>
         <div class="choices">
           <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 <BpIcon /> (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
           <button @click="act({ t: 'spark', pay: false })">ไม่จ่าย — บาดเจ็บ</button>
@@ -712,19 +722,19 @@ const boardCount = computed(() => {
       </template>
       <template v-else-if="step.t === 'sparkChoice'">
         <p class="lead">
-          <b>Carter's Spark!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือ{{ st.survivors[step.s].madness ? 'บาดเจ็บ (มี Madness อยู่แล้ว)' : 'ติด Madness' }}
+          <b>ประกายไฟคาร์เตอร์!</b> {{ st.survivors[step.s].name }} จ่าย 1 <BpIcon /> หรือ{{ st.survivors[step.s].madness ? 'บาดเจ็บ (มี บ้าคลั่ง อยู่แล้ว)' : 'ติด บ้าคลั่ง' }}
         </p>
-        <p class="text small">Madness: ทอย Danger Die แทน Skill Check จนกว่าจะทอยล้มเหลว และทำให้ Bonus Turn ของ Doctor ถูกลง</p>
+        <p class="text small">บ้าคลั่ง: ทอย Danger Die แทน Skill Check จนกว่าจะทอยล้มเหลว และทำให้ Bonus Turn ของ Doctor ถูกลง</p>
         <div class="choices">
           <button class="primary" @click="act({ t: 'spark', pay: true })">จ่าย 1 <BpIcon /> (มี {{ st.survivors[step.s].bp }} → เหลือ {{ st.survivors[step.s].bp - 1 }})</button>
-          <button @click="act({ t: 'spark', pay: false })">ไม่จ่าย — {{ st.survivors[step.s].madness ? 'บาดเจ็บ' : 'ติด Madness' }}</button>
+          <button @click="act({ t: 'spark', pay: false })">ไม่จ่าย — {{ st.survivors[step.s].madness ? 'บาดเจ็บ' : 'ติด บ้าคลั่ง' }}</button>
         </div>
       </template>
 
       <!-- a Phantasm Trap went off -->
       <template v-else-if="step.t === 'phantasmChoice'">
         <p class="lead">
-          <b>Phantasm Trap!</b> {{ st.survivors[step.s].name }} ทอยได้ <b>{{ step.face }}</b> ที่ {{ roomName(st, step.room) }}
+          <b>กับดักหลอก!</b> {{ st.survivors[step.s].name }} ทอยได้ <b>{{ step.face }}</b> ที่ {{ roomName(st, step.room) }}
         </p>
         <div class="choices">
           <button @click="act({ t: 'phantasm', teleport: false })">ไม่วาร์ป — รับ +1 <BpIcon /></button>
@@ -747,7 +757,7 @@ const boardCount = computed(() => {
 
       <!-- Predator: pick a new card -->
       <template v-else-if="step.t === 'replaceCard'">
-        <p class="lead">Predator ทิ้งการ์ดของ {{ st.survivors[step.s].name }} — เลือกการ์ดใบใหม่ (คว่ำไว้)</p>
+        <p class="lead">นักล่า ทิ้งการ์ดของ {{ st.survivors[step.s].name }} — เลือกการ์ดใบใหม่ (คว่ำไว้)</p>
         <p class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง — ชี้เพื่อดูเส้นทาง</p>
         <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: วาง ${CARD_NAMES[cardPick.card!]} (คว่ำ)` : 'เลือกการ์ดจากมือก่อน' }}</button>
       </template>
@@ -756,8 +766,8 @@ const boardCount = computed(() => {
       <template v-else-if="step.t === 'purgeChoice'">
         <p class="lead">
           <img class="purge-token" :src="asset(VILE_PURGE_IMAGE)" alt="" />
-          <template v-if="step.mode === 'cover'"><b>Vile Purge!</b> {{ st.survivors[step.s].name }} ต้องเอาไปปิด Perk 1 อัน — Perk ที่ถูกปิดใช้ไม่ได้</template>
-          <template v-else><b>ซ่อนใน Locker</b> — {{ st.survivors[step.s].name }} เอา Vile Purge ออกได้ 1 อัน: เลือก Perk ที่จะเปิดคืน</template>
+          <template v-if="step.mode === 'cover'"><b>การชำระมลทินต่ำช้า!</b> {{ st.survivors[step.s].name }} ต้องเอาไปปิด Perk 1 อัน — Perk ที่ถูกปิดใช้ไม่ได้</template>
+          <template v-else><b>ซ่อนใน Locker</b> — {{ st.survivors[step.s].name }} เอา การชำระมลทินต่ำช้า ออกได้ 1 อัน: เลือก Perk ที่จะเปิดคืน</template>
         </p>
         <p class="text small">มี {{ (st.survivors[step.s].purged ?? []).length }}/3 — อันที่ 3 ทิ้งทั้งหมดและบาดเจ็บ (บาดเจ็บอยู่แล้ว = ฆาตกรได้ Sacrifice Progress)</p>
         <div class="purge-perks">
@@ -769,9 +779,11 @@ const boardCount = computed(() => {
         </div>
       </template>
 
-      <!-- Self-Aware: four survivor perk cards drawn, one takes its place -->
-      <template v-else-if="step.t === 'selfAware'">
-        <p class="lead"><b>Self-Aware</b> — เลือก 1 ใบมาแทนการ์ดนี้ ที่เหลือทิ้ง (ใช้ใบใหม่ได้ตั้งแต่รอบนี้)</p>
+      <!-- Self-Aware: four survivor perk cards drawn, one takes its place; Machine Learning: two killer
+           perk cards drawn, one kept as a perk more -->
+      <template v-else-if="step.t === 'selfAware' || step.t === 'machineLearning'">
+        <p v-if="step.t === 'machineLearning'" class="lead"><b>การเรียนรู้ของเครื่องจักร</b> — เก็บไว้ 1 ใบ อีกใบทิ้ง (ใช้ได้ตั้งแต่ตอนนี้ เพิ่มจาก Perk ที่มี)</p>
+        <p v-else class="lead"><b>ยึดมั่น</b> — เลือก 1 ใบมาแทนการ์ดนี้ ที่เหลือทิ้ง (ใช้ใบใหม่ได้ตั้งแต่รอบนี้)</p>
         <div class="purge-perks">
           <button v-for="p in step.cards" :key="p" type="button" class="purge-perk" :class="{ on: awarePick === p }" @click="(awarePick = p), fxSound.flip()">
             <img v-if="perkImage(p)" :src="asset(perkImage(p))" :alt="PERKS[p].name" />
@@ -780,7 +792,7 @@ const boardCount = computed(() => {
           </button>
         </div>
         <template v-if="awarePick">
-          <p class="text small"><BpText :text="perkText(awarePick)" /></p>
+          <p class="text small"><PerkRichText :text="perkText(awarePick)" /></p>
           <p class="muted small"><BpText :text="PERKS[awarePick].when" /></p>
         </template>
         <button class="primary" :disabled="!awarePick" @click="awarePick && act({ t: 'selfAware', perk: awarePick })">
@@ -788,10 +800,53 @@ const boardCount = computed(() => {
         </button>
       </template>
 
+      <!-- Weaving Spiders: the survivors in her room put in 6 ▲ between them, each their own -->
+      <template v-else-if="step.t === 'weavePay' && weave">
+        <p class="lead">
+          <b>แมงมุมทอใย</b> — Generator ที่ <b>{{ roomName(st, weave.gen.room!) }}</b> ({{ weave.gen.progress }}/3 → {{ Math.min(3, weave.gen.progress + 3) }})
+        </p>
+        <p class="text small">
+          ผู้รอดชีวิตในห้องของ {{ st.survivors[step.s].name }} ร่วมกันลง {{ WEAVING_COST }} <BpIcon /> — แต่ละคนกดส่วนของตัวเอง แล้ว {{ st.survivors[step.s].name }} กดยืนยัน · จ่ายแล้ว {{ st.killer.name }} ได้ Sacrifice Progress +1
+        </p>
+        <div class="pledges">
+          <div v-for="s in weave.who" :key="s" class="pledge" :class="{ on: (weave.pledge[s] ?? 0) > 0, waiting: weave.pledge[s] === null }">
+            <Mini class="face" :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name" />
+            <span class="pledge-who">{{ st.survivors[s].name }} <span class="muted">({{ st.survivors[s].bp }} <BpIcon />)</span></span>
+            <span v-if="!controls(st, s) || !st.survivors[s].bp" class="pledge-state"><BpText :text="weaveLabel(s)" /></span>
+            <!-- − n +: each click is their pledge; "ไม่ลง" says no at once -->
+            <span v-else class="pledge-btns weave-btns">
+              <button type="button" :disabled="!weave.pledge[s]" @click="act({ t: 'weavePledge', s, n: (weave.pledge[s] ?? 0) - 1 })">−</button>
+              <b>{{ weave.pledge[s] ?? '–' }}</b>
+              <button
+                type="button"
+                :disabled="(weave.pledge[s] ?? 0) >= st.survivors[s].bp || weave.total >= WEAVING_COST"
+                @click="act({ t: 'weavePledge', s, n: (weave.pledge[s] ?? 0) + 1 })"
+              >
+                +
+              </button>
+              <button v-if="weave.pledge[s] === null" type="button" @click="act({ t: 'weavePledge', s, n: 0 })">ไม่ลง</button>
+            </span>
+          </div>
+        </div>
+        <p class="pledge-total" :class="{ full: weave.total === WEAVING_COST }">รวม {{ weave.total }}/{{ WEAVING_COST }} <BpIcon /></p>
+        <div class="choices">
+          <!-- nothing goes through by itself: Sable's player pays what came in, or calls it off -->
+          <button v-if="!controls(st, step.s)" class="primary" disabled>
+            <BpText :text="weave.total === WEAVING_COST ? `ครบ ${WEAVING_COST} ▲ — รอ ${st.survivors[step.s].name} ยืนยัน` : `รอทุกคนลง ▲ (รวม ${weave.total}/${WEAVING_COST} ▲)`" />
+          </button>
+          <template v-else>
+            <button class="primary" :disabled="weave.total !== WEAVING_COST" @click="act({ t: 'weavePay', pay: pledgedPay(weave.pledge) })">
+              <BpText :text="weave.total === WEAVING_COST ? `ยืนยัน: จ่าย ${WEAVING_COST} ▲ — Generator +3` : `อีก ${WEAVING_COST - weave.total} ▲ ถึงจะจ่ายได้`" />
+            </button>
+            <button type="button" @click="act({ t: 'weavePay', pay: [] })">ยกเลิก — ไม่ใช้ แมงมุมทอใย (กลับไป Interact)</button>
+          </template>
+        </div>
+      </template>
+
       <!-- Crowd Control: the survivors buy it off together, or the killer sets the card -->
       <template v-else-if="step.t === 'crowdPay'">
         <p class="lead">
-          <b>Crowd Control!</b> {{ st.killer.name }} เลือก <b>{{ st.survivors[step.s].name }}</b>
+          <b>ควบคุมฝูงชน!</b> {{ st.killer.name }} เลือก <b>{{ st.survivors[step.s].name }}</b>
         </p>
         <p class="text small">ผู้รอดชีวิตรวมกันจ่าย 2 <BpIcon /> (ใครจ่ายก็ได้) — ถ้าไม่จ่าย {{ st.killer.name }} จะเลือกการ์ดเคลื่อนที่ที่ {{ st.survivors[step.s].name }} ต้องวางรอบนี้ (เปิดหน้า)</p>
         <!-- online: each player puts in their own ▲; at 2, anyone confirms -->
@@ -800,7 +855,7 @@ const boardCount = computed(() => {
             <div v-for="(sv, s) in st.survivors" :key="s" class="pledge" :class="{ on: (pledges[s] ?? 0) > 0, waiting: pledges[s] === null }">
               <Mini class="face" :src="asset(survivorMini(st, s))" :alt="sv.name" />
               <span class="pledge-who">{{ sv.name }} <span class="muted">({{ sv.bp }} <BpIcon />)</span></span>
-              <span v-if="!controls(st, s) || !sv.bp" class="pledge-state"><BpText :text="pledgeLabel(s)" /></span>
+              <span v-if="!controls(st, s) || !sv.bp || offBoard(s)" class="pledge-state"><BpText :text="pledgeLabel(s)" /></span>
               <span v-else class="pledge-btns">
                 <button
                   v-for="n in [0, 1, 2]"
@@ -836,7 +891,8 @@ const boardCount = computed(() => {
               type="button"
               class="payer"
               :class="{ on: paid(s) > 0 }"
-              :disabled="sv.bp <= paid(s) || payPick.length >= 2"
+              :disabled="sv.bp <= paid(s) || payPick.length >= 2 || offBoard(s)"
+              :title="offBoard(s) ? 'ไม่อยู่บนกระดาน (ในตู้ / บนตะขอ / ถูกแบก) — จ่ายไม่ได้' : undefined"
               @click="addPay(s)"
             >
               <Mini class="face" :src="asset(survivorMini(st, s))" :alt="sv.name" />
@@ -856,7 +912,7 @@ const boardCount = computed(() => {
         </div>
       </template>
       <template v-else-if="step.t === 'crowdPick'">
-        <p class="lead"><b>Crowd Control</b> — เลือกการ์ดที่ {{ st.survivors[step.s].name }} ต้องวางรอบนี้</p>
+        <p class="lead"><b>ควบคุมฝูงชน</b> — เลือกการ์ดที่ {{ st.survivors[step.s].name }} ต้องวางรอบนี้</p>
         <p class="text small">การ์ดจะวางแบบเปิดหน้า ผู้รอดชีวิตคนนี้ไม่ต้องวางแผนเอง</p>
         <p class="hand-hint">👇 เลือกจากมือของ {{ st.survivors[step.s].name }} ด้านล่าง — ชี้เพื่อดูเส้นทาง</p>
         <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: ให้วาง ${CARD_NAMES[cardPick.card!]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
@@ -864,7 +920,7 @@ const boardCount = computed(() => {
 
       <!-- The Dredge's Reign of Darkness: a card of their hand, discarded, moves them -->
       <template v-else-if="step.t === 'reignCard'">
-        <p class="lead"><b>Reign of Darkness</b> — ทิ้งการ์ด 1 ใบจากมือของ {{ st.survivors[step.s].name }} แล้วเขาต้องเดินตามเส้นทางของการ์ดนั้น</p>
+        <p class="lead"><b>รัชสมัยแห่งความมืดมิด</b> — ทิ้งการ์ด 1 ใบจากมือของ {{ st.survivors[step.s].name }} แล้วเขาต้องเดินตามเส้นทางของการ์ดนั้น</p>
         <p class="text small">มือของเขา: {{ reignHand }} · ถ้าเขาเดินเข้าห้องของคุณ คุณ Interact กับเขาได้</p>
         <p class="hand-hint">👇 เลือกจากมือของ {{ st.survivors[step.s].name }} ด้านล่าง — ชี้เพื่อดูว่าจะไปทางไหน</p>
         <button class="primary" :disabled="!cardPick" @click="confirmCard">{{ cardPick ? `ยืนยัน: ทิ้ง ${CARD_NAMES[cardPick.card!]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
@@ -873,7 +929,7 @@ const boardCount = computed(() => {
       <!-- The Deathslinger's Redeemer: guess the card he discarded face down -->
       <template v-else-if="step.t === 'redeemerGuess'">
         <p class="lead">
-          <b>Redeemer!</b> {{ st.killer.name }} ทิ้งการ์ด 1 ใบแบบคว่ำ — {{ st.survivors[step.s].name }} ทายว่าเป็นการ์ดอะไร
+          <b>พระผู้ไถ่!</b> {{ st.killer.name }} ทิ้งการ์ด 1 ใบแบบคว่ำ — {{ st.survivors[step.s].name }} ทายว่าเป็นการ์ดอะไร
         </p>
         <p class="text small">ทายถูก: หลุดรอด · ทายผิด: ถูกดึงเข้าห้องของ {{ st.killer.name }} ({{ roomName(st, st.killer.room) }}) แล้วถูกอุ้ม</p>
         <p class="hand-hint">👇 เลือกการ์ดที่ทายจากไพ่ด้านล่าง แล้วกดยืนยัน</p>
@@ -886,7 +942,7 @@ const boardCount = computed(() => {
           <FaceLabel :st="st" :who="step.ctx.s" :text="`${st.survivors[step.ctx.s].name} ทอย ${ROLL_TITLE[step.ctx.k]}`" />
         </p>
         <RollDice :st="st" :key-holders="keyHolders" :can-keep="rollMine && !keyWaiting.length" @act="act" />
-        <PerkCard v-for="b in buttons" :key="b.perk" :perk="b.perk" state="static" @zoom="zoomed = $event">
+        <PerkCard v-for="b in buttons" :key="b.perk" :perk="b.perk" state="static">
           <template #title><FaceLabel :st="st" :who="b.owner" :text="`${ownerLabel(st, b.owner)}: ${PERKS[b.perk].name}`" /></template>
           <button v-for="(c, n) in b.choices" :key="n" class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">ใช้ — <BpText :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
         </PerkCard>
@@ -899,7 +955,7 @@ const boardCount = computed(() => {
             <p v-if="keyWaiting.length" class="small waiting-key">
               ⏳ รอ {{ keyWaiting.map((s) => st.survivors[s].name).join(', ') }} ตัดสินใจว่าจะช่วย (กุญแจ / Perk) หรือไม่
             </p>
-            <p v-if="step.keep" class="small">Bond: คลิกลูกเต๋าที่จะเก็บ 1 ลูก</p>
+            <p v-if="step.keep" class="small">พันธะ: คลิกลูกเต๋าที่จะเก็บ 1 ลูก</p>
             <button v-else :disabled="keyWaiting.length > 0" @click="act({ t: 'acceptRoll' })">ไม่ใช้ — รับผลนี้</button>
           </template>
           <p v-else class="small muted">รอ {{ st.survivors[step.ctx.s].name }} รับผลทอย</p>
@@ -914,11 +970,11 @@ const boardCount = computed(() => {
       <div class="purge-box">
         <img v-if="perkImage(purgePick)" :src="asset(perkImage(purgePick))" :alt="PERKS[purgePick].name" />
         <div class="purge-info">
-          <p class="eyebrow"><img class="purge-token" :src="asset(VILE_PURGE_IMAGE)" alt="" />Vile Purge — {{ step.mode === 'cover' ? 'Perk ที่จะถูกปิด' : 'Perk ที่จะเปิดคืน' }}</p>
+          <p class="eyebrow"><img class="purge-token" :src="asset(VILE_PURGE_IMAGE)" alt="" />การชำระมลทินต่ำช้า — {{ step.mode === 'cover' ? 'Perk ที่จะถูกปิด' : 'Perk ที่จะเปิดคืน' }}</p>
           <h2>{{ PERKS[purgePick].name }} <span class="cost"><BpText :text="PERKS[purgePick].cost ? `${PERKS[purgePick].cost} ▲` : 'ฟรี'" /></span></h2>
-          <p class="text"><BpText :text="perkText(purgePick)" /></p>
+          <p class="text"><PerkRichText :text="perkText(purgePick)" /></p>
           <p class="muted small"><BpText :text="PERKS[purgePick].when" /></p>
-          <p class="small warn-line">{{ step.mode === 'cover' ? 'ปิดแล้วใช้ Perk นี้ไม่ได้ จนกว่าจะซ่อนใน Locker เพื่อเอา Vile Purge ออก' : 'Perk นี้จะใช้ได้อีกครั้ง' }}</p>
+          <p class="small warn-line">{{ step.mode === 'cover' ? 'ปิดแล้วใช้ Perk นี้ไม่ได้ จนกว่าจะซ่อนใน Locker เพื่อเอา การชำระมลทินต่ำช้า ออก' : 'Perk นี้จะใช้ได้อีกครั้ง' }}</p>
           <div class="choices">
             <button class="primary" @click="confirmPurge">{{ step.mode === 'cover' ? `ยืนยัน: ปิด ${PERKS[purgePick].name}` : `ยืนยัน: เปิด ${PERKS[purgePick].name} คืน` }}</button>
             <button @click="purgePick = null">เลือกใบอื่น</button>
@@ -927,18 +983,12 @@ const boardCount = computed(() => {
       </div>
     </div>
   </Teleport>
-  <Teleport to="body">
-    <div v-if="zoomed" class="perk-zoom" role="dialog" aria-modal="true" @click="zoomed = null">
-      <img :src="zoomed" alt="" />
-      <p>คลิกที่ไหนก็ได้เพื่อย่อกลับ</p>
-    </div>
-  </Teleport>
   <CardHand v-if="open && !collapsed && perkHand.length" :cards="perkHand" :label="handLabel" :prompt="handPrompt" @pick="pickHandCard" @hover="hoverHandCard" />
   <CardHand
     v-if="open && !collapsed && gripHand.length"
     :cards="gripHand"
-    label="Dragon's Grip — เลือกการ์ดที่จะทิ้ง"
-    prompt="Dragon's Grip — ทิ้งการ์ด 1–2 ใบ"
+    label="อุ้งมือมังกร — เลือกการ์ดที่จะทิ้ง"
+    prompt="อุ้งมือมังกร — ทิ้งการ์ด 1–2 ใบ"
     @pick="pickGrip"
     @hover="() => {}"
   />
@@ -1040,32 +1090,6 @@ header {
 
 
 /* a perk's card opened big, over everything */
-.perk-zoom {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 0.6rem;
-  padding: 1.5rem;
-  background: rgb(4 5 7 / 0.92);
-  cursor: zoom-out;
-}
-.perk-zoom img {
-  max-width: min(92vw, 520px);
-  max-height: 84vh;
-  object-fit: contain;
-  border-radius: 12px;
-  box-shadow:
-    0 0 0 2px rgb(255 233 176 / 0.6),
-    0 24px 60px rgb(0 0 0 / 0.85);
-}
-.perk-zoom p {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
 @keyframes card-in {
   from {
     transform: rotateY(-90deg) scale(0.7);
@@ -1273,6 +1297,11 @@ h3 {
 .pledge-btns button.picked {
   background: var(--blood);
   color: #fff;
+}
+/* Weaving Spiders: − n + (and "ไม่ลง" until said) */
+.weave-btns b {
+  min-width: 1.4rem;
+  text-align: center;
 }
 .pledge-total {
   margin: 0.3rem 0;

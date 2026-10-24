@@ -9,7 +9,7 @@ import { dispatch, game, leaveTutorial, playTutorial, tutorial } from '../game'
 import { SEEN, firstTime, gameKey } from '../intro'
 import { CHAPTERS } from './chapters'
 import { learnersTurn, plainest } from './policy'
-import type { Chapter, Step } from './types'
+import { learnerOf, type Chapter, type Step } from './types'
 
 export const run = reactive({
   chapter: null as Chapter | null,
@@ -58,8 +58,11 @@ function nudge(text: string) {
 /** Set while the tutorial plays someone else's move: only then does a move that isn't the learner's go. */
 let autoActing = false
 
+/** Is the game waiting on the learner of the chapter on screen? */
+const learners = (st: GameState) => learnersTurn(st, learnerOf(run.chapter))
+
 function allow(st: GameState, a: Action): boolean {
-  if (!learnersTurn(st)) {
+  if (!learners(st)) {
     if (!autoActing) nudge('ตอนนี้เป็นตาของคนอื่น — รอสักครู่')
     return autoActing
   }
@@ -154,11 +157,11 @@ function pump() {
   if (!run.finished && step?.task?.done(st)) advance()
   // while The Entity explains (or the chapter is over), everyone else holds still
   if (run.finished || !currentStep()?.task) return
-  if (learnersTurn(st) || st.step.t === 'gameOver' || st.step.t === 'idle') return
+  if (learners(st) || st.step.t === 'gameOver' || st.step.t === 'idle') return
   const chapter = run.chapter
   autoTimer = window.setTimeout(() => {
     const cur = game.value
-    if (!cur || run.chapter !== chapter || learnersTurn(cur)) return
+    if (!cur || run.chapter !== chapter || learners(cur)) return
     const a = chapter.auto?.(cur) ?? plainest(cur)
     if (!a) return
     autoActing = true

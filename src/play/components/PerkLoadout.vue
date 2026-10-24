@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
 import { killerById, survivorById } from '../../data'
+import { thaiName } from '../../data/thaiNames'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { fxSound } from '../fx/audio'
@@ -15,7 +16,7 @@ import { ownPerk, printedOf, type GameMode, type Side } from '../engine/loadout'
 import { PERKS, type PerkId } from '../engine/perks'
 import { perkImage, perkText } from '../labels'
 import Mini from './Mini.vue'
-import PerkRichText from './PerkRichText.vue'
+import PerkRichText from '../../components/PerkRichText.vue'
 
 const props = defineProps<{
   side: Side
@@ -79,7 +80,7 @@ const page = ref(0)
 const list = computed(() => {
   const q = query.value.trim().toLowerCase()
   if (!q) return props.choices
-  return props.choices.filter((p) => [PERKS[p].name, ownerName(p), perkText(p)].some((t) => t.toLowerCase().includes(q)))
+  return props.choices.filter((p) => [PERKS[p].name, PERKS[p].en, ownerName(p), perkText(p)].some((t) => t.toLowerCase().includes(q)))
 })
 const pages = computed(() => Math.max(1, Math.ceil(list.value.length / PAGE)))
 // back to the first page only when what may be picked really changes: online the list is built
@@ -134,7 +135,7 @@ const kit = computed(() => {
   const k = killerById.get(props.characterId)
   if (!k) return []
   return [
-    { label: 'POWER', name: k.power.name, src: k.power.image?.th ?? k.power.image?.en },
+    { label: 'POWER', name: thaiName(k.power.name) ?? k.power.name, src: k.power.image?.th ?? k.power.image?.en },
     { label: 'PASSIVE', name: 'Passive', src: k.passiveImage?.th ?? k.passiveImage?.en },
   ].filter((c): c is { label: string; name: string; src: string } => !!c.src)
 })
@@ -273,7 +274,7 @@ const face = (p: PerkId) => {
       <img :src="asset(zoomed)" alt="" />
     </div>
     <div v-if="tip" class="perk-tip" :class="[kind(tip.p), side]" :style="{ left: `${tip.x}px`, top: `${tip.y}px` }" role="tooltip">
-      <div class="tip-title">{{ PERKS[tip.p].name }}</div>
+      <div class="tip-title">{{ PERKS[tip.p].name }}<small v-if="PERKS[tip.p].en !== PERKS[tip.p].name" class="en">{{ PERKS[tip.p].en }}</small></div>
       <div class="tip-band">
         <span>{{ ownerName(tip.p) }}</span>
         <span>{{ KIND_TH[kind(tip.p)] }} · <BpText :text="PERKS[tip.p].cost ? `${PERKS[tip.p].cost} ▲` : 'ฟรี'" /></span>
@@ -287,6 +288,14 @@ const face = (p: PerkId) => {
 </template>
 
 <style scoped>
+/* the English name beside the Thai one, as on the English cards */
+.en {
+  margin-left: 0.4em;
+  font-size: 0.72em;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
 .loadout {
   --frame-own: linear-gradient(135deg, #e7d4ff, #7a4fc4);
   --frame-shared: linear-gradient(135deg, #d9f7a8, #4f7d1e);

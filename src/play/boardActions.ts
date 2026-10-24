@@ -224,7 +224,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     for (const c of woo?.choices ?? [])
       if (c.prop === modes.palletMode.value && c.path) {
         const room = st.props.find((p) => p.id === c.prop)!.room!
-        add(`path:${c.path}`, `Windows of Opportunity: ทิ้ง Pallet ${iconLabel(st, c.path, room)}`, () => {
+        add(`path:${c.path}`, `ประตูแห่งโอกาส: ทิ้ง Pallet ${iconLabel(st, c.path, room)}`, () => {
           modes.palletMode.value = null
           perkPicked.value = null
           go({ t: 'perk', perk: 'windows_of_opportunity', use: true, choice: c }, sfx.drop)()
@@ -278,7 +278,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     const to = modes.trapPath.value
     for (const id of Object.keys(st.paths))
       if (st.paths[id].trap)
-        add(`path:${id}`, `ย้าย Bear Trap จาก ${pathName(st, id)}`, () => {
+        add(`path:${id}`, `ย้าย กับดักหมี จาก ${pathName(st, id)}`, () => {
           modes.trapPath.value = null
           go({ t: 'interact', i: { k: 'power', path: to, remove: id } }, sfx.drop)()
         })
@@ -364,12 +364,12 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           } else if (i.k === 'calmSpirit') {
             if (crows.has(i.prop)) continue
             crows.add(i.prop)
-            add(spotOf(i), 'Calm Spirit: ย้าย Crow (แล้วเลือกห้อง)', () => ((modes.calmCrow.value = i.prop), sfx.click()))
+            add(spotOf(i), 'วิญญาณสงบ: ย้าย Crow (แล้วเลือกห้อง)', () => ((modes.calmCrow.value = i.prop), sfx.click()))
           } else if (i.k === 'diversion') {
             // Diversion: the killer first, then his paths (in its own mode, above). Once, however
             // many paths; with Power Struggle on him too, a click asks which.
             if (!out.some((a) => a.key === 'killer' && a.label.startsWith('Diversion')))
-              add('killer', `Diversion: ส่ง ${st.killer.name} (แล้วเลือกเส้นทาง)`, () => ((modes.diversion.value = true), sfx.click()))
+              add('killer', `หันเหความสนใจ: ส่ง ${st.killer.name} (แล้วเลือกเส้นทาง)`, () => ((modes.diversion.value = true), sfx.click()))
           } else add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
         }
       }
@@ -486,7 +486,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         // The killer's own mini: the power and Undying both live there, so clicking it asks which.
         if (all.some(isPower)) add('killer', `ใช้พลัง: ${powerName(st)}`, () => ((modes.powerOn.value = true), sfx.click()))
         if (all.some((i) => i.k === 'undying'))
-          add('killer', `ใช้ Perk: Undying (${PERKS.undying.cost} ▲)`, () => ((modes.undyingOn.value = true), sfx.click()))
+          add('killer', `ใช้ Perk: ไม่รู้จักตาย (${PERKS.undying.cost} ▲)`, () => ((modes.undyingOn.value = true), sfx.click()))
         break
       }
       for (const i of killerInteractions(st).filter(isPower)) {
@@ -554,7 +554,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             break
           case 'redeemer':
             // the card is chosen first, in the panel (secretly)
-            if (modes.powerCard.value === i.card) add(`s:${i.target}`, `Redeemer: ยิง ${st.survivors[i.target].name}`, run, 'act', i.target)
+            if (modes.powerCard.value === i.card) add(`s:${i.target}`, `พระผู้ไถ่: ยิง ${st.survivors[i.target].name}`, run, 'act', i.target)
             break
         }
       }
@@ -562,7 +562,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       if (st.killer.characterId === 'trapper' && st.killer.trapsInSupply === 0)
         for (const i of killerInteractions(st))
           if (i.k === 'power' && i.remove && !out.some((a) => a.key === `path:${i.path}`))
-            add(`path:${i.path}`, `Bear Trap: ${iconLabel(st, i.path, st.killer.room)} (แล้วเลือกอันที่จะย้าย)`, () => ((modes.trapPath.value = i.path), sfx.click()))
+            add(`path:${i.path}`, `กับดักหมี: ${iconLabel(st, i.path, st.killer.room)} (แล้วเลือกอันที่จะย้าย)`, () => ((modes.trapPath.value = i.path), sfx.click()))
       break
     }
 
@@ -580,13 +580,13 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       break
 
     case 'carnifexProp':
-      for (const p of carnifexProps(st)) add(`prop:${p.id}`, 'Carnifex: นำ prop นี้ออก', go({ t: 'guardProp', prop: p.id }, sfx.select))
+      for (const p of carnifexProps(st)) add(`prop:${p.id}`, 'เพชฌฆาต: นำ prop นี้ออก', go({ t: 'guardProp', prop: p.id }, sfx.select))
       break
     case 'carnifexMove':
       for (const room of connectedRoomsOf(st, st.guards!.carnifex!)) add(`room:${room}`, `Carnifex → ${roomName(st, room)}`, go({ t: 'guardRoom', room }, sfx.drop))
       break
     case 'pickSurvivor':
-      for (const t of s.options) add(`s:${t}`, `${st.survivors[t].name} โดน Chainsaw`, go({ t: 'pick', s: t }, sfx.select), 'act', t)
+      for (const t of s.options) add(`s:${t}`, `${st.survivors[t].name} โดน เลื่อยไฟฟ้า`, go({ t: 'pick', s: t }, sfx.select), 'act', t)
       break
   }
   return out

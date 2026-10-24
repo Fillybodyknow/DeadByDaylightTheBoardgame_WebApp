@@ -15,7 +15,7 @@ import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini, unknownMini } from '../labels'
+import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini, unknownMini, roundEffects } from '../labels'
 import Mini from './Mini.vue'
 import PingLayer from './PingLayer.vue'
 import { canPing, pingArmed, sendPing, shownPings } from '../pings'
@@ -209,7 +209,9 @@ const paths = computed(() =>
             : props.st.dissolution === p.id
               ? DISSOLUTION_IMAGE
               : null
-    return { ...p, token, target: p.id in props.pathTargets }
+    // the Entity on a path that already shows another token (Shadow Step over a pallet): drawn faint on top of it
+    const entity = !!e && 'path' in e && e.path === p.id && token !== components.entity.image
+    return { ...p, token, entity, target: p.id in props.pathTargets }
   }),
 )
 
@@ -230,18 +232,18 @@ const roomTokens = computed(() => {
   const st = props.st
   const out: RoomToken[] = []
   for (const room of st.phantasm) out.push({ key: `ph-${room}`, room, image: PHANTASM_IMAGE, kind: 'phantasm', title: 'Phantasm Trap' })
-  for (const room of st.purge ?? []) out.push({ key: `vp-${room}`, room, image: VILE_PURGE_IMAGE, kind: 'purge', title: 'Vile Purge — ผู้รอดชีวิตที่เดินเข้ามาต้องเก็บไปปิด Perk 1 อัน' })
+  for (const room of st.purge ?? []) out.push({ key: `vp-${room}`, room, image: VILE_PURGE_IMAGE, kind: 'purge', title: 'การชำระมลทินต่ำช้า — ผู้รอดชีวิตที่เดินเข้ามาต้องเก็บไปปิด Perk 1 อัน' })
   const a = st.afterpiece ?? {}
-  if (a.tonic) out.push({ key: 'ap-tonic', room: a.tonic, image: TONIC_IMAGE, kind: 'tonic', title: 'Afterpiece Tonic — ผู้รอดชีวิตในห้องนี้วางการ์ดหงาย' })
-  if (a.antidote) out.push({ key: 'ap-antidote', room: a.antidote, image: ANTIDOTE_IMAGE, kind: 'antidote', title: 'Afterpiece Antidote — ใครเข้าห้องนี้เดินต่อได้อีก 1 ทาง' })
+  if (a.tonic) out.push({ key: 'ap-tonic', room: a.tonic, image: TONIC_IMAGE, kind: 'tonic', title: 'ยาบำรุงส่งท้าย — ผู้รอดชีวิตในห้องนี้วางการ์ดหงาย' })
+  if (a.antidote) out.push({ key: 'ap-antidote', room: a.antidote, image: ANTIDOTE_IMAGE, kind: 'antidote', title: 'ยาแก้พิษส่งท้าย — ใครเข้าห้องนี้เดินต่อได้อีก 1 ทาง' })
   return out
 })
 
 /** What each of The Knight's Guards does, on its mini. */
 const GUARD_TITLE: Record<Guard, string> = {
-  carnifex: 'Carnifex — เริ่มเก็บกวาด: นำ prop เขียว/น้ำเงินออก แล้วย้ายไปห้องข้าง ๆ',
-  assassin: 'Assassin — เดินเข้าห้องนี้ต้องทอย Danger Die (พลาด = บาดเจ็บ)',
-  jailer: 'Jailer — Skill Check ในห้องนี้ใช้ Danger Die (พลาด = บาดเจ็บ)',
+  carnifex: 'เพชฌฆาต — เริ่มเก็บกวาด: นำ prop เขียว/น้ำเงินออก แล้วย้ายไปห้องข้าง ๆ',
+  assassin: 'มือลอบสังหาร — เดินเข้าห้องนี้ต้องทอย Danger Die (พลาด = บาดเจ็บ)',
+  jailer: 'ผู้คุม — Skill Check ในห้องนี้ใช้ Danger Die (พลาด = บาดเจ็บ)',
 }
 
 const entityProp = computed(() => {
@@ -490,7 +492,7 @@ function play(ev: GameEvent, delay: number): number {
       return delay
     case 'madness': {
       const at = whereIs(ev.s)
-      if (at) addFx('float', at, { text: ev.on ? 'Madness!' : 'หาย Madness', tone: ev.on ? 'red' : 'green' }, delay)
+      if (at) addFx('float', at, { text: ev.on ? 'บ้าคลั่ง!' : 'หาย บ้าคลั่ง', tone: ev.on ? 'red' : 'green' }, delay)
       return delay + 100
     }
     case 'trapSet':
@@ -731,7 +733,9 @@ function guard(e: MouseEvent) {
         <img :src="asset(survivorMini(st, s))" :alt="st.survivors[s].name" draggable="false" />
         <WoundRing v-if="st.survivors[s].wounded" />
         <!-- Madness is a badge, not a ring: the ring says healthy (white) or wounded (red) -->
-        <img v-if="st.survivors[s].madness" class="madness-tag" :src="asset(MADNESS_IMAGE)" alt="Madness" title="Madness: ทอย Danger Die แทน Skill Check" draggable="false" />
+        <img v-if="st.survivors[s].madness" class="madness-tag" :src="asset(MADNESS_IMAGE)" alt="บ้าคลั่ง" title="บ้าคลั่ง: ทอย Danger Die แทน Skill Check" draggable="false" />
+        <!-- a killer perk on them for the round (Leverage, Genetic Limits, Fearmonger), on the lower left -->
+        <span v-if="roundEffects(st, s).length" class="effect-tag" :title="roundEffects(st, s).map((e) => e.text).join(' · ')">⛔</span>
         <!-- The Trickster's Knives: the token and how many, on the top-left -->
         <span v-if="st.survivors[s].knives" class="knife-tag" :class="{ full: st.survivors[s].knives === 3 }" :title="`Knife ${st.survivors[s].knives}/3`">
           <img :src="asset(KNIFE_IMAGE)" alt="Knife" draggable="false" /><b>{{ st.survivors[s].knives }}</b>
@@ -791,6 +795,7 @@ function guard(e: MouseEvent) {
       <!-- where the path's icon is on the map art, for the tutorial's guide to point at -->
       <span class="path-anchor" :data-path="p.id" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" aria-hidden="true" />
       <img v-if="p.token" class="path-token" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" :src="asset(p.token)" alt="" />
+      <img v-if="p.entity" class="path-token path-entity" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" :src="asset(components.entity.image)" alt="Entity" title="Entity — ไม่มีใครเดินผ่านเส้นทางนี้ได้" />
       <span
         v-if="focusPaths.has(p.id) || hotPaths.has(p.id)"
         class="path-preview"
@@ -1332,6 +1337,10 @@ button.tile.picked {
   pointer-events: none;
   filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.95));
 }
+/* over another token on the same path: the same size and faint, so the token under it still shows */
+.path-entity {
+  opacity: 0.5;
+}
 .path-anchor {
   position: absolute;
   width: 6%;
@@ -1393,6 +1402,23 @@ button.tile.picked {
 }
 /* above the mini rather than beside it: minis stand side by side, so the room's top is free */
 /* the Madness token on the mini's top-right: the Doctor's brain, ringed in his green */
+.mini .effect-tag {
+  position: absolute;
+  left: -12%;
+  bottom: -12%;
+  display: grid;
+  place-items: center;
+  width: 42%;
+  height: 42%;
+  border-radius: 50%;
+  background: #7a0b10;
+  box-shadow:
+    0 0 0 2px #ff4d4d,
+    0 1px 6px rgb(0 0 0 / 0.85);
+  font-size: 0.7em;
+  line-height: 1;
+  pointer-events: none;
+}
 .mini .madness-tag {
   position: absolute;
   right: -14%;

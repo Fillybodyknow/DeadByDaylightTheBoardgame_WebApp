@@ -1,6 +1,7 @@
 // Thai labels for actions, steps and pieces.
 
 import { editPerkById, killerById, survivorById } from '../data'
+import { thaiName } from '../data/thaiNames'
 import { CARD_NAMES, GUARD_NAMES, palletOn, ITEM_NAMES, isDirect, PROGRESS_MAX, boardOf, pathDef, roomName, showstopperTargets, tokenOf, unknownRooms, wrathGain } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import type { Die, GameState, ItemUse, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, PropKind, RollContext, SurvivorInteraction } from './engine/types'
@@ -37,6 +38,7 @@ export const PROP_IMAGE: Record<PropKind, string> = {
   hook: 'assets/props/hook.webp',
   totem: 'assets/props/totem.webp',
   drone: 'assets/props/skullmerchant-drone.webp',
+  emp: 'assets/props/singularity-emp.webp',
 }
 
 /** The Sacrifice Progress token (a red disc with the hook): the HUD's icon and the reveal's. */
@@ -132,6 +134,7 @@ const PROP_NAMES_TH: Record<PropKind, string> = {
   hook: 'Hook',
   totem: 'Hex Totem',
   drone: 'Drone',
+  emp: 'EMP',
 }
 
 function prop(st: GameState, id: string) {
@@ -152,8 +155,8 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
     case 'partner': {
       const t = st.survivors[i.target].name
       return i.perk === 'collective_stealth'
-        ? `Collective Stealth: Interact กับ ${t} — ${t} เดินก่อน แล้วคุณเดิน (เส้นทางใดก็ได้)`
-        : `Power of Two: Interact กับ ${t} — ฆาตกร +1 ▲ แล้วคุณได้ Bonus Turn`
+        ? `อำพรางหมู่: Interact กับ ${t} — ${t} เดินก่อน แล้วคุณเดิน (เส้นทางใดก็ได้)`
+        : `สองคนเพื่อนตาย: Interact กับ ${t} — ฆาตกร +1 ▲ แล้วคุณได้ Bonus Turn`
     }
     case 'dropPallet':
       return `ทิ้ง Pallet บนทาง ${iconLabel(st, i.path, room)}`
@@ -170,13 +173,13 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
     case 'heal':
       return `รักษา ${st.survivors[i.target].name}`
     case 'calmSpirit':
-      return `Calm Spirit: ย้าย Crow ไป ${roomName(st, i.room)}`
+      return `วิญญาณสงบ: ย้าย Crow ไป ${roomName(st, i.room)}`
     case 'removeVictor':
       return 'ไล่ Victor ออกจากกระดาน'
     case 'powerStruggle':
-      return `Power Struggle: เปิดการ์ดใบแรกของ ${st.killer.name} (ฆาตกร +2 ▲)`
+      return `ดิ้นรนสุดพลัง: เปิดการ์ดใบแรกของ ${st.killer.name} (ฆาตกร +2 ▲)`
     case 'diversion':
-      return `Diversion: ส่ง ${st.killer.name} ไปทาง ${pathLabel(st, i.path, room)} (ฆาตกร +1 ▲)`
+      return `หันเหความสนใจ: ส่ง ${st.killer.name} ไปทาง ${pathLabel(st, i.path, room)} (ฆาตกร +1 ▲)`
   }
 }
 
@@ -205,54 +208,56 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
     case 'reign':
       return `Reign of Darkness → ${st.survivors[i.target].name}`
     case 'chainsaw':
-      return `Chainsaw: ทิ้ง ${CARD_NAMES[i.card]} → ${pathLabel(st, i.path, st.killer.room)}`
+      return `เลื่อยไฟฟ้า: ทิ้ง ${CARD_NAMES[i.card]} → ${pathLabel(st, i.path, st.killer.room)}`
     case 'spark':
-      return `Carter's Spark → ${roomName(st, i.room)}${i.room === st.killer.room ? ' (ห้องนี้)' : ''}`
+      return `ประกายไฟคาร์เตอร์ → ${roomName(st, i.room)}${i.room === st.killer.room ? ' (ห้องนี้)' : ''}`
     case 'phantasm':
-      return `วาง Phantasm Trap ที่ ${roomName(st, st.killer.room)}`
+      return `วาง กับดักหลอก ที่ ${roomName(st, st.killer.room)}`
     case 'bell':
       return `Wailing Bell → ${roomName(st, i.room)}`
     case 'wrath':
       return `Yamaoka's Wrath (+${wrathGain(st)} ▲)`
     case 'redeemer':
-      return `Redeemer → ${st.survivors[i.target].name} (ทิ้ง ${CARD_NAMES[i.card]} แบบคว่ำ)`
+      return `พระผู้ไถ่ → ${st.survivors[i.target].name} (ทิ้ง ${CARD_NAMES[i.card]} แบบคว่ำ)`
     case 'victor':
-      return `Blood Bond: ${st.killer.victorRoom ? 'ย้าย' : 'วาง'} Victor มาที่ ${roomName(st, st.killer.room)}`
+      return `พันธะเลือด: ${st.killer.victorRoom ? 'ย้าย' : 'วาง'} Victor มาที่ ${roomName(st, st.killer.room)}`
     case 'rush':
-      return `Blighted Corruption: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
+      return `ความเสื่อมทรามที่พังทลาย: สุ่มทิ้งการ์ด 1 ใบ (เหลือ ${st.killer.hand.length} ใบ) แล้วพุ่ง`
     case 'hoard':
-      return 'Hoarder: นำ Chest ออก (+2 ▲)'
+      return 'คนบ้าเก็บ: นำ Chest ออก (+2 ▲)'
     case 'painResonance':
-      return `Pain Resonance: Interact กับ Hook — ${st.survivors[i.target].name} บาดเจ็บ (${PERKS.pain_resonance.cost} ▲)`
+      return `เสียงประสานของความเจ็บปวด: Interact กับ Hook — ${st.survivors[i.target].name} บาดเจ็บ (${PERKS.pain_resonance.cost} ▲)`
     case 'birds':
       return `${i.dire ? 'Dire Crow' : 'Crow'} → ${roomName(st, i.room)}`
     case 'hallucinate':
-      return `Hallucination: The Unknown ${(st.killer.unknowns ?? []).indexOf(null) + 1} → ${roomName(st, i.room)}`
+      return `ภาพหลอน: The Unknown ${(st.killer.unknowns ?? []).indexOf(null) + 1} → ${roomName(st, i.room)}`
+    case 'slipstream':
+      return 'สลิปสตรีม: เก็บการ์ดทั้งหมดกลับเข้ามือ แล้วเล่น Bonus Turn (ไม่เสีย ▲)'
     case 'droneTake':
-      return `Eyes in the Sky: เก็บ Drone ที่ ${roomName(st, prop(st, i.prop).room!)} กลับขึ้นบอร์ด`
+      return `ดวงตาบนท้องฟ้า: เก็บ Drone ที่ ${roomName(st, prop(st, i.prop).room!)} กลับขึ้นบอร์ด`
     case 'droneDrop':
-      return `Eyes in the Sky: วาง Drone หงายหน้าที่ ${roomName(st, st.killer.room)}`
+      return `ดวงตาบนท้องฟ้า: วาง Drone หงายหน้าที่ ${roomName(st, st.killer.room)}`
     case 'guard':
       return `${GUARD_NAMES[i.guard]} → ${roomName(st, i.room)}${st.guards?.[i.guard] ? ' (ย้าย)' : ''}`
     case 'afterpiece':
-      return `${i.which === 'tonic' ? 'Afterpiece Tonic' : 'Afterpiece Antidote'} → ${roomName(st, i.room)}${st.afterpiece?.[i.which] ? ' (ย้าย)' : ''}`
+      return `${i.which === 'tonic' ? 'ยาบำรุงส่งท้าย' : 'ยาแก้พิษส่งท้าย'} → ${roomName(st, i.room)}${st.afterpiece?.[i.which] ? ' (ย้าย)' : ''}`
     case 'purge': {
       const rooms = [st.killer.room, i.room].filter((r) => !(st.purge ?? []).includes(r)).map((r) => roomName(st, r))
       return `Vile Purge → ${rooms.join(' + ')}`
     }
     case 'showstopper': {
       const who = showstopperTargets(st).map((s) => st.survivors[s])
-      return `Showstopper: Knife ให้ ${who.map((sv) => `${sv.name} (${sv.knives ?? 0}→${Math.min(3, (sv.knives ?? 0) + 1)})`).join(', ')}`
+      return `ผู้ยับยั้งการแสดง: Knife ให้ ${who.map((sv) => `${sv.name} (${sv.knives ?? 0}→${Math.min(3, (sv.knives ?? 0) + 1)})`).join(', ')}`
     }
     case 'frenzy': {
       const here = st.survivors.filter((sv) => sv.status === 'board' && sv.room === st.killer.room)
-      return `Feral Frenzy: ${here.map((sv) => sv.name).join(', ')} บาดเจ็บ${here.some((sv) => sv.wounded) ? ' (+1 ▲)' : ''}`
+      return `บ้าดีเดือด: ${here.map((sv) => sv.name).join(', ')} บาดเจ็บ${here.some((sv) => sv.wounded) ? ' (+1 ▲)' : ''}`
     }
     case 'haunt':
-      return `Yamaoka's Haunting: ทิ้ง ${CARD_NAMES[i.card]} → ${killerInteractionLabel(st, i.i)} ที่ ${roomName(st, i.room)}`
+      return `ความหลอกหลอนของยามาโอกะ: ทิ้ง ${CARD_NAMES[i.card]} → ${killerInteractionLabel(st, i.i)} ที่ ${roomName(st, i.room)}`
     case 'undying': {
       const p = 'prop' in i.i ? prop(st, i.i.prop) : null
-      return `Undying: ทิ้ง ${CARD_NAMES[i.card]} → ${killerInteractionLabel(st, i.i)}${p?.room ? ` ที่ ${roomName(st, p.room)}` : ''}`
+      return `ไม่รู้จักตาย: ทิ้ง ${CARD_NAMES[i.card]} → ${killerInteractionLabel(st, i.i)}${p?.room ? ` ที่ ${roomName(st, p.room)}` : ''}`
     }
   }
 }
@@ -273,7 +278,7 @@ export const ROLL_TITLE: Record<RollContext['k'], string> = {
   overwhelm: 'Overwhelming Presence',
   noMither: 'No Mither',
   breakdown: 'Breakdown',
-  assassin: 'หลบ Assassin',
+  assassin: 'หลบ มือลอบสังหาร',
   deadHard: 'Dead Hard',
   spineChill: 'Spine Chill',
   deerstalker: 'Deerstalker',
@@ -289,12 +294,33 @@ export function interactionWho(st: GameState, i: SurvivorInteraction | KillerInt
 
 /** The killer's power name, from the character board. */
 export function powerName(st: GameState): string {
-  return killerById.get(st.killer.characterId)?.power.name ?? 'Power'
+  const en = killerById.get(st.killer.characterId)?.power.name
+  return en ? (thaiName(en) ?? en) : 'Power'
 }
 
 // ---------- perks ----------
 
 /** The perk card (name, cost, Thai text, image): from the character board, or from the deck. */
+/**
+ * A killer perk's effect on a survivor for the rest of the round, to show on their tile and mini:
+ * which perk, what it stops (short), and in a sentence.
+ */
+export interface RoundEffect {
+  perk: PerkId
+  short: string
+  text: string
+  /** It stops their perks (their diamonds show locked). */
+  noPerks?: boolean
+}
+
+export function roundEffects(st: GameState, s: number): RoundEffect[] {
+  const out: RoundEffect[] = []
+  if (st.leverage === s) out.push({ perk: 'leverage', short: 'รักษาไม่ได้', text: `${PERKS.leverage.name}: หายบาดเจ็บไม่ได้จนจบรอบ` })
+  if (st.geneticLimits === s) out.push({ perk: 'genetic_limits', short: 'ใช้ Perk ไม่ได้', text: `${PERKS.genetic_limits.name}: ใช้ Perk ไม่ได้จนจบรอบ`, noPerks: true })
+  if (st.fearmonger === s) out.push({ perk: 'fearmonger', short: 'ใช้ Perk ไม่ได้', text: `${PERKS.fearmonger.name}: ใช้ Perk ไม่ได้จนจบรอบ`, noPerks: true })
+  return out
+}
+
 export function perkCard(perk: PerkId): Perk | undefined {
   const d = PERKS[perk]
   if (d.card) return editPerkById.get(d.card)
@@ -604,6 +630,28 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `Bonus Turn ด้วย ${CARD_NAMES[c.card!]}`
     case 'blood_rush':
       return `Bonus Turn ด้วย ${CARD_NAMES[c.card!]} แล้วรับ Sacrifice Progress บนบอร์ดคุณ`
+    case 'scavenger': {
+      const p = prop(st, c.prop!)
+      return `ทิ้ง item — Generator ที่ ${roomName(st, p.room!)} +1 (${p.progress}/${PROGRESS_MAX} → ${Math.min(PROGRESS_MAX, p.progress + 1)})`
+    }
+    case 'troubleshooter':
+      return `เดินต่อไปทาง ${pathLabel(st, c.path!, st.survivors[o as number].room)}`
+    case 'made_for_this':
+      return 'ไม่ถูกอุ้ม — ฆาตกรได้ Sacrifice Progress +1 แทน'
+    case 'machine_learning':
+      return 'จั่ว Perk ฆาตกร 2 ใบ เก็บไว้ใช้ 1 ใบ'
+    case 'genetic_limits':
+      return `${name(c.target!)} ใช้ Perk ไม่ได้จนจบรอบ`
+    case 'forced_hesitation':
+      return `ทิ้ง Wait — ${name(c.target!)} เสียการ์ดที่วางไว้ (ไม่ได้เล่นเทิร์นรอบนี้) แล้ว Interact ได้ทันที`
+    case 'wicked':
+      return 'ผู้รอดชีวิตทุกคน +1 ▲ แล้วฆาตกรได้ Sacrifice Progress +1 (ใช้แทนการ Interact)'
+    case 'strength_in_shadows':
+      return `${name(c.target!)} หายบาดเจ็บ แล้วรับ Sacrifice Progress บนบอร์ด`
+    case 'weaving_spiders': {
+      const p = prop(st, c.prop!)
+      return `Generator ที่ ${roomName(st, p.room!)} (${p.progress}/${PROGRESS_MAX} → ${Math.min(PROGRESS_MAX, p.progress + 3)}) — แล้วร่วมกันลง 6 ▲`
+    }
     case 'friendly_competition': {
       const p = prop(st, (w as { prop: string }).prop)
       return `Generator ที่ ${roomName(st, p.room!)} +1 (${p.progress}/${PROGRESS_MAX} → ${Math.min(PROGRESS_MAX, p.progress + 1)})`
@@ -714,6 +762,24 @@ export function cardCaption(perk: PerkId, c: PerkChoice): string {
       return 'ใช้แทน Vault'
     case 'blood_rush':
       return 'Bonus Turn + Sacrifice'
+    case 'wicked':
+      return 'ทุกคน +1 ▲'
+    case 'machine_learning':
+      return 'จั่ว 2 เก็บ 1'
+    case 'scavenger':
+      return 'Generator +1'
+    case 'troubleshooter':
+      return 'เดินต่อ'
+    case 'made_for_this':
+      return 'ไม่ถูกอุ้ม'
+    case 'genetic_limits':
+      return 'ปิด Perk'
+    case 'forced_hesitation':
+      return 'ทิ้งการ์ด'
+    case 'strength_in_shadows':
+      return 'หายบาดเจ็บ'
+    case 'weaving_spiders':
+      return 'Generator +3'
     default:
       return 'Bonus Turn'
   }

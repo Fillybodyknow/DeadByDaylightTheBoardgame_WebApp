@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The tutorial: the chapters to choose from (PC game style cards), or the chapter in play — the
 // real game screen with The Entity's guide over it.
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import GameScreen from '../components/GameScreen.vue'
@@ -11,6 +11,29 @@ import GuideBox from './GuideBox.vue'
 import { doneChapters, exitChapter, run, startChapter } from './runner'
 
 const done = ref(doneChapters())
+
+/** The side whose chapters are listed (remembered on this device). */
+type Side = 'survivor' | 'killer'
+const SIDE_KEY = 'dbdl-tutorial-side'
+function storedSide(): Side {
+  try {
+    return localStorage.getItem(SIDE_KEY) === 'killer' ? 'killer' : 'survivor'
+  } catch {
+    return 'survivor'
+  }
+}
+const side = ref<Side>(storedSide())
+function pickSide(s: Side) {
+  if (side.value === s) return
+  sfx.click()
+  side.value = s
+  try {
+    localStorage.setItem(SIDE_KEY, s)
+  } catch {
+    // storage blocked: the side just isn't remembered
+  }
+}
+const chapters = computed(() => CHAPTERS.filter((c) => (c.side ?? 'survivor') === side.value))
 
 function start(id: string) {
   sfx.select()
@@ -36,14 +59,23 @@ onBeforeUnmount(exitChapter)
       <header class="head">
         <img :src="asset('assets/tokens/entity.webp')" alt="" />
         <div>
-          <p class="eyebrow">Tutorial · ฝั่งผู้รอดชีวิต</p>
+          <p class="eyebrow">Tutorial · {{ side === 'killer' ? 'ฝั่งฆาตกร' : 'ฝั่งผู้รอดชีวิต' }}</p>
           <h1>เรียนรู้ Trial</h1>
           <p class="muted">The Entity จะพาเล่นบนกระดานจริงทีละบท ตามกติกาใน Rulebook — เหมาะกับคนที่ไม่เคยเล่นบอร์ดเกมนี้มาก่อน</p>
         </div>
       </header>
 
+      <div class="sides" role="tablist">
+        <button type="button" role="tab" :aria-selected="side === 'survivor'" :class="{ on: side === 'survivor' }" @click="pickSide('survivor')">
+          ผู้รอดชีวิต <small>{{ CHAPTERS.filter((c) => !c.side && done.includes(c.id)).length }}/{{ CHAPTERS.filter((c) => !c.side).length }}</small>
+        </button>
+        <button type="button" role="tab" :aria-selected="side === 'killer'" :class="{ on: side === 'killer' }" @click="pickSide('killer')">
+          ฆาตกร <small>{{ CHAPTERS.filter((c) => c.side === 'killer' && done.includes(c.id)).length }}/{{ CHAPTERS.filter((c) => c.side === 'killer').length }}</small>
+        </button>
+      </div>
+
       <ol class="chapters">
-        <li v-for="(c, i) in CHAPTERS" :key="c.id">
+        <li v-for="(c, i) in chapters" :key="c.id">
           <button type="button" class="chapter" :class="{ done: done.includes(c.id) }" @click="start(c.id)">
             <span class="art" :style="{ backgroundImage: `url(${asset(c.image)})` }" aria-hidden="true" />
             <span class="num">{{ i + 1 }}</span>
@@ -55,7 +87,6 @@ onBeforeUnmount(exitChapter)
           </button>
         </li>
       </ol>
-      <p class="muted small">ฝั่งฆาตกรจะตามมาทีหลัง</p>
     </div>
   </div>
 </template>
@@ -90,6 +121,26 @@ onBeforeUnmount(exitChapter)
 }
 .head p {
   margin: 0;
+}
+.sides {
+  display: flex;
+  gap: 0.5rem;
+}
+.sides button {
+  padding: 0.5rem 1.1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgb(14 15 19 / 0.9);
+  font-weight: 700;
+}
+.sides button small {
+  margin-left: 0.3rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.sides button.on {
+  border-color: var(--blood-bright);
+  background: rgb(140 20 20 / 0.45);
 }
 .chapters {
   list-style: none;

@@ -1,4 +1,5 @@
 import { ref, watch } from 'vue'
+import { thaiName } from './data/thaiNames'
 import type { Bilingual, Lang } from './types'
 
 function readLang(): Lang {
@@ -23,6 +24,11 @@ watch(lang, (value) => {
 export function tr(text: Partial<Record<keyof Bilingual, string | null>> | null | undefined): string {
   if (!text) return ''
   return text[lang.value] || text.en || text.th || ''
+}
+
+/** A perk or power name in the current language: the Thai name (PC game's) in Thai, where known. */
+export function trName(en: string): string {
+  return (lang.value === 'th' && thaiName(en)) || en
 }
 
 /** Resolve a public asset path against Vite's base URL. */

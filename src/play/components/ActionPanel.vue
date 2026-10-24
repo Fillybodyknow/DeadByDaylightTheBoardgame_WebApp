@@ -204,20 +204,21 @@ const powerMode = computed(() => {
 const POWER_HINT: Record<string, string> = {
   nurse: 'เลือกห้องที่เชื่อมกัน (ผ่าน Pallet / กำแพง / ทวน Vault ได้)',
   huntress: 'เลือกผู้รอดชีวิตในห้องที่เชื่อมกัน (คลิกบนแผนที่หรือปุ่ม)',
-  doctor: 'เลือกห้องนี้หรือห้องที่เชื่อมกัน — ทุกคนในห้องนั้นจ่าย 1 ▲ หรือติด Madness (มีแล้ว = บาดเจ็บ)',
-  hag: 'วาง Phantasm Trap ในห้องนี้ (ห้องละ 1) — มี Hex Totem ในห้องได้ +1 ▲',
+  doctor: 'เลือกห้องนี้หรือห้องที่เชื่อมกัน — ทุกคนในห้องนั้นจ่าย 1 ▲ หรือติด บ้าคลั่ง (มีแล้ว = บาดเจ็บ)',
+  hag: 'วาง กับดักหลอก ในห้องนี้ (ห้องละ 1) — มี Hex Totem ในห้องได้ +1 ▲',
   wraith: 'วาร์ปไปห้องที่ไม่เชื่อมกับห้องนี้',
   oni: 'รับ ▲ เท่ากับจำนวนผู้รอดชีวิตที่บาดเจ็บ และ Hex Totem ในห้องนี้กับห้องที่เชื่อมกัน',
   twins: 'วาง Victor ในห้องนี้ (ถ้าอยู่ที่อื่นจะย้ายมา) — เทิร์นต่อไปเลือกเล่นด้วย Victor ได้',
   spirit: 'ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น — คลิกเป้าหมายบนแผนที่',
   legion: 'ผู้รอดชีวิตทุกคนในห้องนี้บาดเจ็บ — ถ้ามีคนบาดเจ็บอยู่แล้วอย่างน้อย 1 คน ได้ +1 ▲',
-  plague: 'วาง Vile Purge ในห้องนี้และห้องที่เชื่อมกันที่เลือก — ผู้รอดชีวิตที่เดินเข้าไปต้องเก็บไปปิด Perk 1 อัน (อันที่ 3 = บาดเจ็บ)',
+  plague: 'วาง การชำระมลทินต่ำช้า ในห้องนี้และห้องที่เชื่อมกันที่เลือก — ผู้รอดชีวิตที่เดินเข้าไปต้องเก็บไปปิด Perk 1 อัน (อันที่ 3 = บาดเจ็บ)',
+  singularity: 'เก็บการ์ดเคลื่อนที่ทุกใบที่วางไว้ (เปิดแล้วหรือยัง) กลับเข้ามือ แล้วเล่น Bonus Turn ด้วยการ์ดใบไหนก็ได้ — เทิร์นที่เหลือที่วางไว้หายไป (Bonus Turn ได้ 1 ครั้งต่อรอบ)',
   unknown: 'วาง The Unknown ตัวหมายเลขต่ำสุดที่ยังไม่อยู่บนกระดาน ลงห้องที่เชื่อมกับห้องของตัวที่เล่นอยู่ — คลิกห้องบนแผนที่ แต่ละตัวได้การ์ดของตัวเองตั้งแต่รอบหน้า',
   skullmerchant: 'เก็บ Drone หงายหน้าบนแผนที่กลับขึ้นบอร์ด (คลิก Drone) หรือวาง Drone จากบอร์ดหงายหน้าในห้องของคุณ (คลิกห้องตัวเอง)',
   artist: 'วาง Crow หรือ Dire Crow จากบอร์ดของคุณลงห้องใดก็ได้ — ถ้ามี Crow อยู่ในห้องคุณ +1 ▲ — คลิกห้องบนแผนที่ แล้วเลือกตัว',
   dredge: 'เลือกผู้รอดชีวิตในห้องนี้หรือห้องที่เชื่อมกัน (คลิกบนแผนที่) แล้วทิ้งการ์ดจากมือของเขาให้เขาเดินตามการ์ดนั้น — เข้ามาห้องคุณ = Interact กับเขาได้',
-  knight: 'วาง Guard (Carnifex / Assassin / Jailer) ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกตัว',
-  clown: 'วาง Afterpiece Tonic หรือ Antidote ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกว่าอันไหน',
+  knight: 'วาง Guard (เพชฌฆาต / มือลอบสังหาร / ผู้คุม) ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกตัว',
+  clown: 'วาง ยาบำรุงส่งท้าย หรือ Antidote ในห้องนี้หรือห้องที่เชื่อมกัน (ย้ายได้ถ้าวางไว้แล้ว) — คลิกห้องบนแผนที่ แล้วเลือกว่าอันไหน',
   trickster: 'ผู้รอดชีวิตในห้องนี้และห้องที่เชื่อมกันได้ Knife คนละ 1 เล่ม — เล่มที่ 3 บาดเจ็บ, เกิน 3 = Sacrifice +1',
   blight: 'สุ่มทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามเส้นทางสีนั้น — เข้าห้องใหม่ได้: Interact ที่นั่น หรือพุ่งต่อ',
 }
@@ -275,7 +276,9 @@ function pickedHint(b: { perk: PerkId; choices: PerkChoice[] }): string {
         ? 'คลิก prop ในห้องคุณ แล้วคลิก prop ในห้องติดกันที่จะสลับด้วย'
         : b.perk === 'no_one_left_behind'
           ? 'คลิกผู้รอดชีวิตบนแผนที่ แล้วเลือกเส้นทางที่จะให้เดิน'
-          : undefined
+          : b.perk === 'weaving_spiders'
+            ? 'คลิก Generator ที่หงายอยู่บนแผนที่ — แล้วผู้รอดชีวิตในห้องคุณร่วมกันลง 6 ▲'
+            : undefined
   return perkPickedHint(b.choices, (c) => !here(perkAct(b.perk, c)), how)
 }
 
@@ -424,12 +427,12 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
     <!-- The Knight's Carnifex at the start of cleanup: both picked on the map -->
     <template v-else-if="step.t === 'carnifexProp' || step.t === 'carnifexMove'">
-      <p><img class="token-inline" :src="asset(GUARD_IMAGE.carnifex)" alt="" /> <b>Carnifex</b> — {{ step.t === 'carnifexProp' ? 'เลือก prop สีเขียว / น้ำเงินในห้องของมันที่จะนำออก' : 'เลือกห้องที่เชื่อมกันที่มันจะย้ายไป' }}</p>
+      <p><img class="token-inline" :src="asset(GUARD_IMAGE.carnifex)" alt="" /> <b>เพชฌฆาต</b> — {{ step.t === 'carnifexProp' ? 'เลือก prop สีเขียว / น้ำเงินในห้องของมันที่จะนำออก' : 'เลือกห้องที่เชื่อมกันที่มันจะย้ายไป' }}</p>
       <p class="board-hint">🎯 คลิกบนแผนที่ — {{ step.t === 'carnifexProp' ? 'prop ที่กระพริบ' : 'ห้องที่กระพริบ' }}</p>
     </template>
 
     <template v-else-if="step.t === 'pickSurvivor'">
-      <p>Chainsaw — เลือกผู้รอดชีวิตในห้องที่จะบาดเจ็บ</p>
+      <p>เลื่อยไฟฟ้า — เลือกผู้รอดชีวิตในห้องที่จะบาดเจ็บ</p>
       <p v-if="step.options.some((s) => !here({ t: 'pick', s }))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกผู้รอดชีวิตที่กระพริบ</p>
       <div class="buttons">
         <button v-for="s in step.options.filter((s) => here({ t: 'pick', s }))" :key="s" class="primary" @click="act({ t: 'pick', s })"><FaceLabel :st="st" :who="s" :text="st.survivors[s].name" /></button>
@@ -441,7 +444,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <div class="flip">
         <img :src="asset(cardImage(step.card))" :alt="cardLabel(step.card)" />
         <p>
-          <template v-if="step.t === 'killerMove' && step.rush">Blighted Corruption สุ่มได้ <b>{{ cardLabel(step.card) }}</b></template>
+          <template v-if="step.t === 'killerMove' && step.rush">ความเสื่อมทรามที่พังทลาย สุ่มได้ <b>{{ cardLabel(step.card) }}</b></template>
           <template v-else>เปิดการ์ด <b>{{ cardLabel(step.card) }}</b></template>
           <br /><span class="muted">เลือกเส้นทางที่ไฮไลต์บนแผนที่</span>
         </p>
@@ -466,7 +469,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     </template>
 
     <template v-else-if="step.t === 'innerFocus'">
-      <p><b>Inner Focus</b> — {{ st.survivors[step.s].name }} เลือกผลเต๋า 1 ลูก แล้วไปห้องเริ่มต้นของเลขนั้น จากนั้น Interact ตามปกติ</p>
+      <p><b>สมาธิห้วงลึก</b> — {{ st.survivors[step.s].name }} เลือกผลเต๋า 1 ลูก แล้วไปห้องเริ่มต้นของเลขนั้น จากนั้น Interact ตามปกติ</p>
       <ul class="focus-faces">
         <li v-for="f in step.faces" :key="f">
           <b>{{ f === 0 ? '💀' : f }}</b> → {{ roomName(st, boardOf(st).rooms.find((r) => r.startFace === f)!.id) }}{{ boardOf(st).rooms.find((r) => r.startFace === f)!.id === st.survivors[step.s].room ? ' (ห้องนี้ — อยู่ที่เดิม)' : '' }}
@@ -476,26 +479,26 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     </template>
 
     <template v-else-if="step.t === 'reignPath'">
-      <p><b>Reign of Darkness</b> — เลือกเส้นทาง {{ CARD_NAMES[step.card] }} ที่ {{ st.survivors[step.s].name }} ต้องเดิน</p>
+      <p><b>รัชสมัยแห่งความมืดมิด</b> — เลือกเส้นทาง {{ CARD_NAMES[step.card] }} ที่ {{ st.survivors[step.s].name }} ต้องเดิน</p>
       <p class="board-hint">🎯 คลิกเส้นทางที่กระพริบบนแผนที่</p>
     </template>
 
     <template v-else-if="step.t === 'anyMove' || step.t === 'killerAnyMove'">
       <p v-if="step.t === 'killerAnyMove' && step.why === 'darkness'">
-        <b>Darkness Revealed</b> — Locker ถูกคว่ำแล้ว {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact (หรืออยู่ห้องเดิม)
+        <b>เผยความมืดมิด</b> — Locker ถูกคว่ำแล้ว {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact (หรืออยู่ห้องเดิม)
       </p>
       <p v-else-if="step.t === 'killerAnyMove'">
-        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>Afterpiece Antidote</b> — {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
+        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>ยาแก้พิษส่งท้าย</b> — {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
       </p>
       <p v-else-if="step.why === 'antidote'">
-        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>Afterpiece Antidote</b> — <b>{{ st.survivors[step.s].name }}</b> เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
+        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>ยาแก้พิษส่งท้าย</b> — <b>{{ st.survivors[step.s].name }}</b> เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
       </p>
-      <p v-else-if="step.why === 'deadHard'"><b>Dead Hard!</b> <b>{{ st.survivors[step.s].name }}</b> หลุดจากการแบก — ต้องเดินไปตามเส้นทางใดก็ได้ 1 ครั้ง</p>
+      <p v-else-if="step.why === 'deadHard'"><b>ตายยาก!</b> <b>{{ st.survivors[step.s].name }}</b> หลุดจากการแบก — ต้องเดินไปตามเส้นทางใดก็ได้ 1 ครั้ง</p>
       <p v-else-if="step.why === 'collective'">
-        <b>Collective Stealth</b> — <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง หรือจะอยู่ห้องเดิมก็ได้
+        <b>อำพรางหมู่</b> — <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง หรือจะอยู่ห้องเดิมก็ได้
         <span class="muted small">(Renato เดินก่อน แล้วคนที่ Interact กับเขาเดินต่อ)</span>
       </p>
-      <p v-else-if="step.why === 'spineChill'"><b>Spine Chill!</b> <b>{{ st.survivors[step.s].name }}</b> รู้ตัวทัน — ต้องเดินไปตามเส้นทางใดก็ได้ 1 ครั้งก่อนฆาตกร Interact</p>
+      <p v-else-if="step.why === 'spineChill'"><b>เสียวสันหลัง!</b> <b>{{ st.survivors[step.s].name }}</b> รู้ตัวทัน — ต้องเดินไปตามเส้นทางใดก็ได้ 1 ครั้งก่อนฆาตกร Interact</p>
       <p v-else>ช่วยลงจาก Hook แล้ว: <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง (หน้า 13) หรือจะอยู่ห้องเดิมก็ได้</p>
       <p class="muted small">{{ step.t === 'anyMove' && mustMove(step.why) ? 'คลิกเส้นทางบนแผนที่' : 'คลิกเส้นทางบนแผนที่ — คลิกห้องที่อยู่เพื่ออยู่ห้องเดิม' }}</p>
       <div class="buttons">
@@ -516,9 +519,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <button v-for="(i, n) in perkPicked ? [] : panelInteractions" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="survivorInteractionLabel(st, step.s, i)" /></button>
         <p v-if="hasPallet && !perkPicked" class="board-hint">🎯 ทิ้ง Pallet: คลิก Pallet บนแผนที่ แล้วเลือกเส้นทาง</p>
         <!-- Diversion is played on the board: the killer, then the path -->
-        <p v-if="hasDiversion" class="board-hint">🎯 Diversion: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
+        <p v-if="hasDiversion" class="board-hint">🎯 หันเหความสนใจ: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
         <details v-for="c in calmSpirit" :key="c.prop" class="calm">
-          <summary>Calm Spirit: ย้าย Crow ไปห้องอื่น (ฟรี)</summary>
+          <summary>วิญญาณสงบ: ย้าย Crow ไปห้องอื่น (ฟรี)</summary>
           <div class="buttons">
             <button v-for="o in c.options" :key="o.room" @click="act({ t: 'interact', i: o })">{{ roomName(st, o.room) }}</button>
           </div>
@@ -546,14 +549,15 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <!-- bonus turns -->
     <template v-else-if="step.t === 'bonusOffer' || step.t === 'killerBonusOffer'">
       <p v-if="step.t === 'bonusOffer' && step.why === 'power_of_two'">
-        <b>Power of Two</b> — {{ st.killer.name }} ได้ +1 ▲ แล้ว ตอนนี้ <b>{{ st.survivors[step.s].name }}</b> เล่น Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง
+        <b>สองคนเพื่อนตาย</b> — {{ st.killer.name }} ได้ +1 ▲ แล้ว ตอนนี้ <b>{{ st.survivors[step.s].name }}</b> เล่น Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง
       </p>
       <p v-else-if="step.t === 'bonusOffer'">Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง (หน้า 9)</p>
+      <p v-else-if="step.free"><b>สลิปสตรีม</b> — การ์ดทั้งหมดกลับเข้ามือแล้ว เลือกการ์ด 1 ใบเล่น Bonus Turn (ไม่เสีย ▲)</p>
       <p v-else>จ่าย {{ bonusCost(st) }} <BpIcon /> (มี {{ st.killer.bp }}) เพื่อเล่นเทิร์นที่ 3? (หน้า 10)</p>
       <p class="muted small">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทาง · คลิกเพื่อเลือก แล้วกดยืนยัน</p>
       <div class="buttons col">
         <button class="primary" :disabled="!bonusPick" @click="confirmBonus">{{ bonusPick ? `ยืนยัน: Bonus Turn ด้วย ${CARD_NAMES[bonusPick]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
-        <button @click="act({ t: 'declineBonus' })">ไม่เล่น</button>
+        <button v-if="step.t !== 'killerBonusOffer' || !step.free" @click="act({ t: 'declineBonus' })">ไม่เล่น</button>
       </div>
       <CardHand
         :cards="bonusHand"
@@ -565,7 +569,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
     <!-- Plunderer's Instinct: three items drawn, one kept (the other two are discarded) -->
     <template v-else-if="step.t === 'pickItem'">
-      <p>Plunderer's Instinct — เลือกเก็บ 1 ใบ อีก {{ step.drawn.length - 1 }} ใบทิ้ง</p>
+      <p>สัญชาตญาณขโมย — เลือกเก็บ 1 ใบ อีก {{ step.drawn.length - 1 }} ใบทิ้ง</p>
       <div class="buttons">
         <button v-for="(item, i) in step.drawn" :key="i" class="itembtn" @click="act({ t: 'pickItem', item: i })">
           <img :src="asset(itemImage(item))" alt="" />{{ ITEM_NAMES[item] }}
@@ -585,7 +589,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
     <!-- dice with a possible key re-roll -->
     <template v-else-if="step.t === 'roll'">
-      <p v-if="step.keep">Bond: ทอย 2 ลูก — คลิกลูกที่จะเก็บ 1 ลูก</p>
+      <p v-if="step.keep">พันธะ: ทอย 2 ลูก — คลิกลูกที่จะเก็บ 1 ลูก</p>
       <p v-else>ผลทอย — ใช้กุญแจทอยใหม่ หรือ perk ได้</p>
       <RollDice :st="st" :key-holders="rollers" :can-keep="rollMine && !keyWaiting.length" @act="act" />
       <div class="buttons col">
@@ -613,8 +617,8 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
       <!-- Undying / Yamaoka's Haunting, a step at a time: the card (hand or path), the room, the target -->
       <template v-else-if="stepKind">
-        <p v-if="stepKind === 'undying'"><b>Undying</b> (<BpText :text="PERKS.undying.cost" /> <BpIcon />) — ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</p>
-        <p v-else><b>ใช้พลัง: Yamaoka's Haunting</b> — ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น</p>
+        <p v-if="stepKind === 'undying'"><b>ไม่รู้จักตาย</b> (<BpText :text="PERKS.undying.cost" /> <BpIcon />) — ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด</p>
+        <p v-else><b>ใช้พลัง: ความหลอกหลอนของยามาโอกะ</b> — ทิ้งการ์ด 1 ใบ (ไม่ใช่ Wait) แล้วโจมตีผู้รอดชีวิตที่ไม่บาดเจ็บ หรือ Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีนั้น</p>
 
         <template v-if="!undyingCard">
           <p class="muted small">👇 1. เลือกการ์ดที่จะทิ้ง — จากไพ่บนมือด้านล่าง หรือคลิกเส้นทางบนแผนที่</p>
@@ -643,7 +647,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           </div>
         </template>
 
-        <button @click="stopSteps">{{ stepKind === 'haunt' ? 'ยกเลิก ไม่ใช้พลัง' : 'ยกเลิก ไม่ใช้ Undying' }}</button>
+        <button @click="stopSteps">{{ stepKind === 'haunt' ? 'ยกเลิก ไม่ใช้พลัง' : 'ยกเลิก ไม่ใช้ ไม่รู้จักตาย' }}</button>
       </template>
 
       <!-- choosing where the power goes, after "use power" -->
@@ -653,11 +657,11 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             <span class="icon">{{ f.icon }}</span><FaceLabel :st="st" :who="f.who" :text="f.text" />
           </li>
         </ul>
-        <p v-if="step.powerOnly"><b>Territorial Imperative</b> — ใช้พลังอีกครั้ง</p>
+        <p v-if="step.powerOnly"><b>สิ่งจำเป็นบนผืนดิน</b> — ใช้พลังอีกครั้ง</p>
         <p v-if="kInteractions.powers.some((i) => !here(powerAct(i)))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกวงที่กระพริบ</p>
         <template v-if="st.killer.characterId === 'trapper'">
           <p>
-            <b>ใช้พลัง: Bear Trap</b> — เลือกเส้นทางที่เชื่อมกับห้อง (คลิกบนแผนที่หรือปุ่ม) เหลือในมือ {{ st.killer.trapsInSupply }} อัน{{
+            <b>ใช้พลัง: กับดักหมี</b> — เลือกเส้นทางที่เชื่อมกับห้อง (คลิกบนแผนที่หรือปุ่ม) เหลือในมือ {{ st.killer.trapsInSupply }} อัน{{
               mustMoveTrap ? ' — หมดแล้ว ต้องย้ายอันที่วางไว้' : ''
             }}
           </p>
@@ -670,14 +674,14 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             </template>
           </div>
           <div v-else class="buttons">
-            <span class="small">ย้าย Bear Trap อันไหนมา? (คลิกบนแผนที่หรือปุ่ม)</span>
+            <span class="small">ย้าย กับดักหมี อันไหนมา? (คลิกบนแผนที่หรือปุ่ม)</span>
             <button v-for="r in trapsOnBoard" :key="r" @click="act({ t: 'interact', i: { k: 'power', path: trapPath, remove: r } }), emit('trapPath', null)">
               {{ pathName(st, r) }}
             </button>
           </div>
         </template>
         <template v-else-if="st.killer.characterId === 'hillbilly'">
-          <p><b>ใช้พลัง: Chainsaw</b> — ทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามสีนั้น (ห้ามผ่าน Pallet / กำแพง / ของบนทาง) ผู้รอดชีวิตในห้องที่เข้าไปบาดเจ็บ</p>
+          <p><b>ใช้พลัง: เลื่อยไฟฟ้า</b> — ทิ้งการ์ด 1 ใบจากมือ แล้วเดินตามสีนั้น (ห้ามผ่าน Pallet / กำแพง / ของบนทาง) ผู้รอดชีวิตในห้องที่เข้าไปบาดเจ็บ</p>
           <div v-if="!powerCard" class="buttons">
             <button v-for="c in powerCards" :key="c" class="cardbtn" :title="cardLabel(c)" @click="emit('powerCard', c)">
               <img :src="asset(cardImage(c))" :alt="cardLabel(c)" />
@@ -693,7 +697,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </template>
         <template v-else-if="st.killer.characterId === 'deathslinger'">
           <p>
-            <b>ใช้พลัง: Redeemer</b> — ทิ้งการ์ด 1 ใบแบบคว่ำ แล้วยิงผู้รอดชีวิตที่บาดเจ็บในห้องที่เชื่อมกัน (ทางนั้นไม่มี Pallet / กำแพง และไม่ได้เพิ่งบาดเจ็บในรอบนี้) ถ้าเขาทายการ์ดผิด จะถูกดึงเข้ามาและถูกอุ้ม
+            <b>ใช้พลัง: พระผู้ไถ่</b> — ทิ้งการ์ด 1 ใบแบบคว่ำ แล้วยิงผู้รอดชีวิตที่บาดเจ็บในห้องที่เชื่อมกัน (ทางนั้นไม่มี Pallet / กำแพง และไม่ได้เพิ่งบาดเจ็บในรอบนี้) ถ้าเขาทายการ์ดผิด จะถูกดึงเข้ามาและถูกอุ้ม
           </p>
           <div v-if="!powerCard" class="buttons">
             <span class="small">1. เลือกการ์ดที่จะทิ้งแบบคว่ำ (อย่าให้ผู้รอดชีวิตเห็น)</span>
@@ -716,9 +720,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           </p>
           <!-- The Knight: what each Guard does, and where it stands now -->
           <ul v-if="st.killer.characterId === 'knight'" class="afterpiece">
-            <li><img :src="asset(GUARD_IMAGE.carnifex)" alt="" /><span><b>Carnifex</b> — เริ่มเก็บกวาด: นำ prop เขียว/น้ำเงินในห้องออก แล้วย้ายไปห้องข้าง ๆ · {{ guardWhere('carnifex') }}</span></li>
-            <li><img :src="asset(GUARD_IMAGE.assassin)" alt="" /><span><b>Assassin</b> — ใครเดินเข้าห้องทอย Danger Die พลาด = บาดเจ็บ · {{ guardWhere('assassin') }}</span></li>
-            <li><img :src="asset(GUARD_IMAGE.jailer)" alt="" /><span><b>Jailer</b> — Skill Check ในห้อง (ไม่รวมคนใน Locker) ใช้ Danger Die พลาด = บาดเจ็บ (Jailer กลับมาบนบอร์ด วางใหม่ได้) · {{ guardWhere('jailer') }}</span></li>
+            <li><img :src="asset(GUARD_IMAGE.carnifex)" alt="" /><span><b>เพชฌฆาต</b> — เริ่มเก็บกวาด: นำ prop เขียว/น้ำเงินในห้องออก แล้วย้ายไปห้องข้าง ๆ · {{ guardWhere('carnifex') }}</span></li>
+            <li><img :src="asset(GUARD_IMAGE.assassin)" alt="" /><span><b>มือลอบสังหาร</b> — ใครเดินเข้าห้องทอย Danger Die พลาด = บาดเจ็บ · {{ guardWhere('assassin') }}</span></li>
+            <li><img :src="asset(GUARD_IMAGE.jailer)" alt="" /><span><b>ผู้คุม</b> — Skill Check ในห้อง (ไม่รวมคนใน Locker) ใช้ Danger Die พลาด = บาดเจ็บ (ผู้คุม กลับมาบนบอร์ด วางใหม่ได้) · {{ guardWhere('jailer') }}</span></li>
           </ul>
           <!-- The Unknown: where each one stands, and which is playing now -->
           <ul v-if="st.killer.unknowns" class="afterpiece">
@@ -747,7 +751,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <template v-else>
         <p>
           Interact 1 อย่าง หรือใช้พลังแทน (1 ครั้ง/รอบ) ที่ {{ roomName(st, st.killer.room) }}<br /><span class="muted small"
-            >คลิกของหรือผู้รอดชีวิตที่เรืองแสงบนแผนที่ — คลิกตัว {{ st.killer.name }} เพื่อใช้พลัง{{ kInteractions.undying.length ? ' หรือ Undying' : '' }}</span
+            >คลิกของหรือผู้รอดชีวิตที่เรืองแสงบนแผนที่ — คลิกตัว {{ st.killer.name }} เพื่อใช้พลัง{{ kInteractions.undying.length ? ' หรือ ไม่รู้จักตาย' : '' }}</span
           >
         </p>
         <div class="buttons col">
@@ -817,14 +821,17 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p v-else-if="step.item === 'firecracker'">
         {{ st.killer.name }} กำลังจะเข้าห้องของคุณ — ใช้ <b>Firecracker</b> กันไว้ไหม?
       </p>
+      <p v-else-if="step.item === 'emp'">
+        {{ st.killer.name }} กำลังจะ Interact กับ <b>{{ st.survivors[step.holders[0]].name }}</b> — ในห้องมี <b>EMP</b> หงายอยู่: ทิ้ง EMP เพื่อให้ {{ st.killer.name }} Interact ไม่ได้เทิร์นนี้ไหม?
+      </p>
       <p v-else>{{ st.killer.name }} กำลังจะ Interact ในห้องของคุณ — ใช้ <b>Flashlight</b> กันไว้ไหม?</p>
       <!-- an item kept by Built to Last on an earlier turn: the card forbids only that turn -->
       <p v-for="s in step.holders.filter(keptBefore)" :key="`kept-${s}`" class="board-hint">
-        Built to Last: {{ st.survivors[s].name }} เก็บ {{ ITEM_NAMES[st.survivors[s].item!] ?? st.survivors[s].item }} ไว้ในเทิร์นก่อน — ห้ามใช้ซ้ำแค่ในเทิร์นนั้น เทิร์นนี้ใช้ได้อีก
+        ทนไม้ทนมือ: {{ st.survivors[s].name }} เก็บ {{ ITEM_NAMES[st.survivors[s].item!] ?? st.survivors[s].item }} ไว้ในเทิร์นก่อน — ห้ามใช้ซ้ำแค่ในเทิร์นนั้น เทิร์นนี้ใช้ได้อีก
       </p>
       <div class="buttons">
-        <button v-for="s in step.holders" :key="s" class="primary" @click="act({ t: 'react', s })"><FaceLabel :st="st" :who="s" :text="`${st.survivors[s].name} ใช้`" /></button>
-        <button @click="act({ t: 'react', s: null })">ไม่ใช้</button>
+        <button v-for="s in step.holders" :key="s" class="primary" @click="act({ t: 'react', s })"><FaceLabel :st="st" :who="s" :text="step.item === 'emp' ? `${st.survivors[s].name} ทิ้ง EMP` : `${st.survivors[s].name} ใช้`" /></button>
+        <button @click="act({ t: 'react', s: null })">{{ step.item === 'emp' ? 'เก็บ EMP ไว้' : 'ไม่ใช้' }}</button>
       </div>
     </template>
   </section>

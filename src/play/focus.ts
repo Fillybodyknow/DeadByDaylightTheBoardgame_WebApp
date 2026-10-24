@@ -73,21 +73,21 @@ const ROLL_WHAT: Record<RollContext['k'], (st: GameState, ctx: RollContext) => s
   openGate: (st, c) => `เปิด Exit Gate ${progress(st, c)} — สำเร็จ +1 (ครบ 3 = หนีรอด)`,
   cleanse: () => 'ชำระ Hex Totem — สำเร็จ ได้ +2 ▲',
   heal: (st, c) => `รักษา ${c.k === 'heal' ? st.survivors[c.target].name : ''}`,
-  trap: () => 'Bear Trap — ล้มเหลว = บาดเจ็บ',
+  trap: () => 'กับดักหมี — ล้มเหลว = บาดเจ็บ',
   search: () => 'ถูกค้น Locker — ล้มเหลว = ถูกอุ้ม',
   carry: () => 'ดิ้นหลุดจากการแบก — ได้ 5 = หลุด',
   hatchet: () => 'หลบ Hatchet — ล้มเหลว = บาดเจ็บ',
-  botany: () => 'Botany Knowledge — สำเร็จ = หายบาดเจ็บ',
-  selfCare: () => 'Self-Care — สำเร็จ = หายบาดเจ็บ',
-  phantasm: () => 'Phantasm Trap — แต้มที่ได้ = ▲ ที่ Hag รับ หรือจ่ายเพื่อวาร์ป',
-  overwhelm: () => 'Overwhelming Presence — ล้มเหลว = item เสียเปล่า',
-  noMither: (st, c) => `No Mither — สำเร็จ = ${c.k === 'noMither' ? st.survivors[c.target].name : ''} ไม่บาดเจ็บ`,
-  assassin: () => 'หลบ Assassin — ล้มเหลว = บาดเจ็บ',
-  breakdown: () => 'Breakdown — สำเร็จ = ฆาตกรเสีย Sacrifice Progress 1 แต้ม',
-  deadHard: (st, c) => `Dead Hard — สำเร็จ = ${c.k === 'deadHard' ? st.survivors[c.target].name : ''} หนีแทนถูกแขวน`,
-  spineChill: () => 'Spine Chill — สำเร็จ = เดินหนีไปตามเส้นทางใดก็ได้',
-  deerstalker: () => 'Deerstalker — ล้มเหลว = ออกจากห้องไม่ได้ และ Interact ไม่ได้เทิร์นนี้',
-  innerFocus: () => 'Inner Focus — เลือก 1 ลูก: ไปห้องเริ่มต้นของเลขนั้น',
+  botany: () => 'ความรู้พฤกษศาสตร์ — สำเร็จ = หายบาดเจ็บ',
+  selfCare: () => 'ดูแลตัวเอง — สำเร็จ = หายบาดเจ็บ',
+  phantasm: () => 'กับดักหลอก — แต้มที่ได้ = ▲ ที่ Hag รับ หรือจ่ายเพื่อวาร์ป',
+  overwhelm: () => 'การปรากฏกายครอบงำใจ — ล้มเหลว = item เสียเปล่า',
+  noMither: (st, c) => `ไม่โอดครวญ — สำเร็จ = ${c.k === 'noMither' ? st.survivors[c.target].name : ''} ไม่บาดเจ็บ`,
+  assassin: () => 'หลบ มือลอบสังหาร — ล้มเหลว = บาดเจ็บ',
+  breakdown: () => 'สติแตก — สำเร็จ = ฆาตกรเสีย Sacrifice Progress 1 แต้ม',
+  deadHard: (st, c) => `ตายยาก — สำเร็จ = ${c.k === 'deadHard' ? st.survivors[c.target].name : ''} หนีแทนถูกแขวน`,
+  spineChill: () => 'เสียวสันหลัง — สำเร็จ = เดินหนีไปตามเส้นทางใดก็ได้',
+  deerstalker: () => 'นักสะกดรอยกวาง — ล้มเหลว = ออกจากห้องไม่ได้ และ Interact ไม่ได้เทิร์นนี้',
+  innerFocus: () => 'สมาธิห้วงลึก — เลือก 1 ลูก: ไปห้องเริ่มต้นของเลขนั้น',
 }
 
 function progress(st: GameState, c: RollContext): string {
@@ -297,7 +297,7 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
     f.killer = true
     const sv = st.survivors[step.s]
     facts.push({ who: step.s, icon: '📍', text: where(st, step.s) })
-    facts.push({ who: step.s, icon: '▲', text: `มี ${sv.bp} ▲ · ${sv.madness ? 'มี Madness แล้ว — ไม่จ่าย = บาดเจ็บ' : 'ยังไม่มี Madness — ไม่จ่าย = ติด Madness'}` })
+    facts.push({ who: step.s, icon: '▲', text: `มี ${sv.bp} ▲ · ${sv.madness ? 'มี บ้าคลั่ง แล้ว — ไม่จ่าย = บาดเจ็บ' : 'ยังไม่มี บ้าคลั่ง — ไม่จ่าย = ติด บ้าคลั่ง'}` })
     return { focus: dedupe(f), facts }
   }
 

@@ -12,6 +12,7 @@ import { ITEM_NAMES } from '../engine/engine'
 import { itemImage, killerMini, ownerLabel, perkImage, perkText, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import BpText from '../../components/BpText.vue'
+import PerkRichText from '../../components/PerkRichText.vue'
 
 const props = defineProps<{ st: GameState }>()
 
@@ -82,7 +83,7 @@ const face = computed(() => {
           <img v-if="card.image" class="card" :class="{ 'item-card': isItem }" :src="asset(card.image)" :alt="card.name" />
           <div v-else class="card text-card">
             <strong>{{ card.name }}</strong>
-            <p><BpText :text="card.text" /></p>
+            <p><PerkRichText :text="card.text" /></p>
           </div>
           <span class="shine" aria-hidden="true" />
         </div>
@@ -171,7 +172,8 @@ const face = computed(() => {
 }
 .card {
   display: block;
-  height: min(54vh, 440px);
+  /* big enough to read the card's own text (its picture is 780 px high) */
+  height: min(68vh, 640px);
   aspect-ratio: 548 / 780;
   border-radius: 12px;
   box-shadow:
@@ -191,6 +193,7 @@ const face = computed(() => {
   align-content: center;
   gap: 0.8rem;
   padding: 1.5rem;
+  font-size: 1.15rem;
   background: #111317;
   text-align: center;
 }

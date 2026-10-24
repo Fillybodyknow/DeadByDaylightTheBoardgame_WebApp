@@ -9,7 +9,7 @@ import type { GameState, ItemUse, PathKind } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
 import type { InspectTarget } from '../inspect'
-import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini } from '../labels'
+import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini, roundEffects, perkImage } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import ObjectiveHud from './ObjectiveHud.vue'
@@ -202,13 +202,13 @@ function onPowerSlot() {
         <span class="ptag" :class="{ me: mine.includes('killer') }" :title="`ผู้เล่น 1${mine.includes('killer') ? ' (คุณ)' : ''}`">{{ mine.includes('killer') ? 'คุณ' : 'P1' }}</span>
         <span class="bp">{{ st.killer.bp }}/{{ KILLER_BP.max }} <BpIcon /></span>
         <span v-if="st.killer.characterId === 'trapper'" class="traps"><img :src="asset(BEAR_TRAP_IMAGE)" alt="" /> ×{{ st.killer.trapsInSupply }}</span>
-        <span v-if="st.killer.characterId === 'hag'" class="traps" title="Phantasm Trap ที่ยังวางได้"
+        <span v-if="st.killer.characterId === 'hag'" class="traps" title="กับดักหลอก ที่ยังวางได้"
           ><img :src="asset('assets/killers/tokens/hag-phantasm-trap.webp')" alt="" /> ×{{ 7 - st.phantasm.length }}</span
         >
-        <span v-if="st.killer.characterId === 'plague'" class="traps" title="Vile Purge ที่ยังวางได้"
+        <span v-if="st.killer.characterId === 'plague'" class="traps" title="การชำระมลทินต่ำช้า ที่ยังวางได้"
           ><img :src="asset(VILE_PURGE_IMAGE)" alt="" /> ×{{ purgeSupply(st) }}</span
         >
-        <span v-if="st.sealedCard" class="warn" title="The Third Seal">ห้ามใช้ {{ st.sealedCard }}</span>
+        <span v-if="st.sealedCard" class="warn" title="สัญลักษณ์ที่สาม">ห้ามใช้ {{ st.sealedCard }}</span>
         <span v-if="st.killer.powerUsed" class="muted">ใช้พลังแล้ว</span>
         <span v-if="victorRoom(st)" class="victor-at" :title="`Victor อยู่ที่ ${roomName(st, victorRoom(st)!)}`">V · {{ roomName(st, victorRoom(st)!) }}</span>
       </div>
@@ -262,7 +262,7 @@ function onPowerSlot() {
           <span v-if="st.firstPlayer === s" class="first" title="First Player — เล่นก่อนในรอบนี้">
             <img :src="asset(components.firstPlayer.image)" alt="First Player" />
           </span>
-          <img v-if="st.survivors[s].madness" class="madness" :src="asset(MADNESS_IMAGE)" alt="Madness" title="Madness: ทอย Danger Die แทน Skill Check" />
+          <img v-if="st.survivors[s].madness" class="madness" :src="asset(MADNESS_IMAGE)" alt="บ้าคลั่ง" title="บ้าคลั่ง: ทอย Danger Die แทน Skill Check" />
           <img v-if="st.survivors[s].sacrificeToken" class="token" :src="asset(components.sacrificeProgress.image)" alt="" title="ยังมี sacrifice token บนกระดาน" />
         </div>
         <div class="names">
@@ -281,6 +281,13 @@ function onPowerSlot() {
           <span v-for="c in handCards(s)" :key="c.card" class="hcard" :class="{ used: c.used }">
             <img :src="asset(cardImage(c.card))" alt="" />
           </span>
+        </span>
+      </div>
+      <!-- a killer perk on them for the rest of the round (Leverage, Genetic Limits, Fearmonger) -->
+      <div v-if="roundEffects(st, s).length" class="effects">
+        <span v-for="e in roundEffects(st, s)" :key="e.perk" class="effect" :title="e.text" @click.stop="emit('inspect', { k: 'perk', perk: e.perk, owner: 'killer' })">
+          <span class="effect-face" :style="perkImage(e.perk) ? { backgroundImage: `url(${asset(perkImage(e.perk))})` } : {}" />
+          ⛔ {{ e.short }}
         </span>
       </div>
       <div class="cards">
@@ -852,6 +859,38 @@ button.slot:hover .slot-crop {
   line-height: 1;
   color: #ff4d4d;
   text-shadow: 0 0 2px #000;
+}
+/* a killer perk's effect for the round: red, with the perk's icon */
+.effects {
+  /* a row of its own under the cards, the tile's full width */
+  grid-column: 1 / -1;
+  grid-row: 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.effect {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 2px;
+  border-radius: 999px;
+  border: 1px solid rgb(255 77 77 / 0.75);
+  background: rgb(120 10 18 / 0.55);
+  color: #ffd6d6;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.effect-face {
+  width: 18px;
+  height: 18px;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  background-color: #222;
+  background-size: 230% auto;
+  background-position: 50% 14%;
+  background-repeat: no-repeat;
 }
 .knives {
   display: inline-flex;

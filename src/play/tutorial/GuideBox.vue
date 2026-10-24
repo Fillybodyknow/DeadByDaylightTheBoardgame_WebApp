@@ -15,8 +15,10 @@ import type { Spot } from './types'
 const emit = defineEmits<{ list: [] }>()
 
 const step = computed(() => currentStep())
-const chapterNo = computed(() => CHAPTERS.findIndex((c) => c.id === run.chapter?.id) + 1)
-const nextChapter = computed(() => CHAPTERS[chapterNo.value] ?? null)
+/** The chapters of the side being learnt: numbered, and "next", within it. */
+const side = computed(() => CHAPTERS.filter((c) => c.side === run.chapter?.side))
+const chapterNo = computed(() => side.value.findIndex((c) => c.id === run.chapter?.id) + 1)
+const nextChapter = computed(() => side.value[chapterNo.value] ?? null)
 
 /** `**words**` lit, the rest plain. */
 const parts = computed(() => (step.value?.say ?? '').split(/(\*\*[^*]+\*\*)/).map((t) => (t.startsWith('**') ? { b: true, t: t.slice(2, -2) } : { b: false, t })))
