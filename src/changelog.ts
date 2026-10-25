@@ -12,6 +12,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.11.0',
+    date: '2026-10-25',
+    items: [
+      'หน้าการ์ดมีแท็บ Offering: การ์ด Offering ฝั่งละ 5 ใบ ทั้งภาษาไทยและอังกฤษ คลิกเพื่อดูใหญ่พร้อมกติกา',
+      'หน้าเลือกโหมดใหญ่ขึ้น และจัดให้อยู่กลางจอ',
+    ],
+  },
+  {
     version: '1.10.1',
     date: '2026-10-25',
     items: [

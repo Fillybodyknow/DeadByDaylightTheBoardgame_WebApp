@@ -1,6 +1,7 @@
 import type { Item, Killer, Perk, Survivor } from '../types'
 import componentsJson from './components.json'
 import editPerksJson from './editPerks.json'
+import offeringsJson from './offerings.json'
 import itemsJson from './items.json'
 import killersJson from './killers.json'
 import survivorsJson from './survivors.json'
@@ -20,6 +21,17 @@ export const killerById = new Map(killers.map((k) => [k.id, k]))
  */
 export const editPerkCards = editPerksJson as (Perk & { id: string; side: PerkKind })[]
 export const editPerkById = new Map(editPerkCards.map((p) => [p.id, p]))
+
+/** The offering cards (p.19), five a side: name, flavour and rules in English and Thai, both pictures. */
+export interface Offering {
+  id: string
+  side: 'survivor' | 'killer'
+  name: string
+  flavor: { en: string; th: string }
+  text: { en: string; th: string }
+  image: { en: string; th: string }
+}
+export const offerings = offeringsJson as Offering[]
 
 export { mapById, maps } from './maps'
 

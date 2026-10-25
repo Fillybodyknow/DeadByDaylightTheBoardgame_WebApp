@@ -1,0 +1,172 @@
+[
+  {
+    "id": "cut-coin",
+    "side": "killer",
+    "name": "Cut Coin",
+    "flavor": {
+      "en": "Two halves of a thick metallic coin.",
+      "th": "เหรียญโลหะหนา ๆ ที่ถูกผ่าเป็นสองซีก"
+    },
+    "text": {
+      "en": "After setup, the Killer removes 2 face-down survival props.",
+      "th": "หลังการเซ็ตอัป, ฆาตกรนำ prop สีน้ำเงิน ที่คว่ำหน้าอยู่ 2 อันออกจากเกม"
+    },
+    "image": {
+      "en": "assets/killers/offerings-en/cut-coin.webp",
+      "th": "assets/killers/offerings-th/cut-coin.webp"
+    }
+  },
+  {
+    "id": "ebony-memento-mori",
+    "side": "killer",
+    "name": "Ebony Memento Mori",
+    "flavor": {
+      "en": "I could swear It spoke to the beast. It came to a halt, as if calmly listening to the leaves rustling, and then... grinned.",
+      "th": "ฉันสาบานได้ว่ามันพูดกับอสูรตนนั้น มันหยุดนิ่ง ราวกับกำลังฟังเสียงใบไม้ไหวอย่างสงบ แล้วก็… ยิ้ม"
+    },
+    "text": {
+      "en": "After the Killer spends 4 {BP} to take a Killer bonus turn, the Killer gains a {BP}.",
+      "th": "หลังจากฆาตกรจ่าย 4 {BP} เพื่อเล่น Killer bonus turn, ฆาตกรได้รับ 1 {BP}"
+    },
+    "image": {
+      "en": "assets/killers/offerings-en/ebony-memento-mori.webp",
+      "th": "assets/killers/offerings-th/ebony-memento-mori.webp"
+    }
+  },
+  {
+    "id": "murky-reagent",
+    "side": "killer",
+    "name": "Murky Reagent",
+    "flavor": {
+      "en": "The Mist seems to protect us from the beast, but it is a poison, a cancer, filling us with darkness and insanity. — Unknown, Notebook",
+      "th": "หมอกดูเหมือนจะปกป้องเราจากอสูร แต่มันคือยาพิษ คือมะเร็ง ที่เติมความมืดและความวิกลจริตให้เรา — ไม่ทราบชื่อ, สมุดบันทึก"
+    },
+    "text": {
+      "en": "During setup, the Survivors do not reveal props.",
+      "th": "ระหว่างการเซ็ตอัป, ผู้รอดชีวิตไม่เปิด prop"
+    },
+    "image": {
+      "en": "assets/killers/offerings-en/murky-reagent.webp",
+      "th": "assets/killers/offerings-th/murky-reagent.webp"
+    }
+  },
+  {
+    "id": "shrike-wreath",
+    "side": "killer",
+    "name": "Shrike Wreath",
+    "flavor": {
+      "en": "Crafted out of sticks, strings and bones, this wreath calls on The Entity's blessing for more blood.",
+      "th": "สานขึ้นจากกิ่งไม้ เชือก และกระดูก พวงดอกไม้นี้วิงวอนขอพรจาก The Entity เพื่อเลือดที่มากขึ้น"
+    },
+    "text": {
+      "en": "After setup, the Killer chooses 2 Survivors and places an additional sacrifice progress on their boards.",
+      "th": "หลังการเซ็ตอัป, ฆาตกรเลือกผู้รอดชีวิต 2 คน แล้ววาง sacrifice progress เพิ่มอีก 1 อันบนบอร์ดของแต่ละคน"
+    },
+    "image": {
+      "en": "assets/killers/offerings-en/shrike-wreath.webp",
+      "th": "assets/killers/offerings-th/shrike-wreath.webp"
+    }
+  },
+  {
+    "id": "torn-blueprint",
+    "side": "killer",
+    "name": "Torn Blueprint",
+    "flavor": {
+      "en": "Though brittle and torn, the design is mostly legible.",
+      "th": "แม้จะเปราะและขาดวิ่น แต่แบบแปลนส่วนใหญ่ยังอ่านออก"
+    },
+    "text": {
+      "en": "The first time a generator is revealed this game, remove it (even during setup).",
+      "th": "ครั้งแรกที่ เครื่องปั่นไฟ ถูกเปิดในเกมนี้, ให้นำมันออกจากเกม (แม้จะเป็นระหว่างการเซ็ตอัป)"
+    },
+    "image": {
+      "en": "assets/killers/offerings-en/torn-blueprint.webp",
+      "th": "assets/killers/offerings-th/torn-blueprint.webp"
+    }
+  },
+  {
+    "id": "chalk-pouch",
+    "side": "survivor",
+    "name": "Chalk Pouch",
+    "flavor": {
+      "en": "A small cotton pouch filled with white chalky powder of unknown origin. Some believe it brings good fortune.",
+      "th": "ถุงผ้าฝ้ายใบเล็กบรรจุผงชอล์กสีขาวที่ไม่รู้ที่มา บางคนเชื่อว่ามันนำโชคดี"
+    },
+    "text": {
+      "en": "When Survivors roll the dice as the Killer attempts to carry them to a hook, a '4' is treated as a great success.",
+      "th": "เมื่อผู้รอดชีวิตทอยเต๋าตอนที่ฆาตกรพยายามแบกเขาไปที่ ตะขอแขวน, หน้า '4' นับเป็น ผล สำเร็จอย่างยิ่ง"
+    },
+    "image": {
+      "en": "assets/survivors/offerings-en/chalk-pouch.webp",
+      "th": "assets/survivors/offerings-th/chalk-pouch.webp"
+    }
+  },
+  {
+    "id": "shroud-of-union",
+    "side": "survivor",
+    "name": "Shroud of Union",
+    "flavor": {
+      "en": "A knotted piece of fabric.",
+      "th": "ผ้าผืนหนึ่งที่ผูกเป็นปม"
+    },
+    "text": {
+      "en": "During setup, when determining their starting spaces, the Survivors choose one space then place all their figures in that space instead (even if that space is not a starting space).",
+      "th": "ระหว่างการเซ็ตอัป, ตอนกำหนดห้องเริ่มต้น, ผู้รอดชีวิตเลือกห้องหนึ่งห้อง แล้ววางตัวทุกตัวของพวกเขาไว้ในห้องนั้นแทน (แม้ห้องนั้นจะไม่ใช่ห้องเริ่มต้นก็ตาม)"
+    },
+    "image": {
+      "en": "assets/survivors/offerings-en/shroud-of-union.webp",
+      "th": "assets/survivors/offerings-th/shroud-of-union.webp"
+    }
+  },
+  {
+    "id": "sweet-william-sachet",
+    "side": "survivor",
+    "name": "Sweet William Sachet",
+    "flavor": {
+      "en": "A palm-sized hand-sewn sachet containing a mix of pale petals and glaucous bluish leaves. Releases a strong spicy, clove-like scent.",
+      "th": "ถุงหอมเย็บมือขนาดฝ่ามือ บรรจุกลีบดอกสีซีดผสมใบไม้สีเขียวอมฟ้า ส่งกลิ่นฉุนเผ็ดคล้ายกานพลู"
+    },
+    "text": {
+      "en": "Once per round, after a Survivor interacts with a boldness prop, they gain a {BP}. Survivors cannot use this offering again this round.",
+      "th": "รอบละครั้ง, หลังจากผู้รอดชีวิต Interact กับ prop สีแดง, เขาได้รับ 1 {BP}, ผู้รอดชีวิตใช้ offering นี้อีกไม่ได้ในรอบนี้"
+    },
+    "image": {
+      "en": "assets/survivors/offerings-en/sweet-william-sachet.webp",
+      "th": "assets/survivors/offerings-th/sweet-william-sachet.webp"
+    }
+  },
+  {
+    "id": "vigos-blueprint",
+    "side": "survivor",
+    "name": "Vigo's Blueprint",
+    "flavor": {
+      "en": "A clever design that has the letter 'V' etched on the bottom.",
+      "th": "แบบแปลนอันชาญฉลาดที่มีตัวอักษร 'V' สลักไว้ที่มุมล่าง"
+    },
+    "text": {
+      "en": "When a Survivor reveals an exit gate, they may swap it with a face-up generator without progress.",
+      "th": "เมื่อผู้รอดชีวิตเปิด ประตูทางออก, เขาอาจสลับมันกับ เครื่องปั่นไฟ ที่หงายหน้าและยังไม่มีความคืบหน้า"
+    },
+    "image": {
+      "en": "assets/survivors/offerings-en/vigos-blueprint.webp",
+      "th": "assets/survivors/offerings-th/vigos-blueprint.webp"
+    }
+  },
+  {
+    "id": "white-ward",
+    "side": "survivor",
+    "name": "White Ward",
+    "flavor": {
+      "en": "Keep me from evil, defend me, and pass away.",
+      "th": "ปกป้องฉันจากความชั่วร้าย คุ้มครองฉัน แล้วจงผ่านพ้นไป"
+    },
+    "text": {
+      "en": "When an item would be discarded, any Survivor may spend 2 {BP}. If they do, put that item on the top of the item deck.",
+      "th": "เมื่อ item จะถูกทิ้ง, ผู้รอดชีวิตคนใดก็ได้อาจจ่าย 2 {BP}, ถ้าทำเช่นนั้น, ให้วาง item นั้นไว้บนสุดของกอง item"
+    },
+    "image": {
+      "en": "assets/survivors/offerings-en/white-ward.webp",
+      "th": "assets/survivors/offerings-th/white-ward.webp"
+    }
+  }
+]

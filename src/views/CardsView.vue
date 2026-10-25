@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { editPerkCards, items, killers, survivors } from '../data'
+import { editPerkCards, items, killers, offerings, survivors } from '../data'
 import { asset, lang, tr, trName } from '../i18n'
 import BpIcon from '../components/BpIcon.vue'
 import PerkRichText from '../components/PerkRichText.vue'
 
-type Tab = 'survivor' | 'killer' | 'item' | 'perk'
-const TABS: Tab[] = ['survivor', 'killer', 'item', 'perk']
+type Tab = 'survivor' | 'killer' | 'item' | 'perk' | 'offering'
+const TABS: Tab[] = ['survivor', 'killer', 'item', 'perk', 'offering']
 const tab = ref<Tab>('survivor')
 const query = ref('')
 
@@ -39,18 +39,24 @@ const boardOf = new Map<string, string>(
 )
 const ownerOf = (name: string) => boardOf.get(name.toLowerCase()) ?? ''
 
+/** A card of the grids: a perk card, or an offering (no cost, on no board). */
+type DeckCard = (typeof editPerkCards)[number] | (typeof offerings)[number]
+/** The deck the tab shows: the perk cards, or the offerings. */
+const deck = computed<DeckCard[]>(() => (tab.value === 'offering' ? offerings : editPerkCards))
+
 const perks = computed(() => {
   const q = query.value.trim().toLowerCase()
-  return editPerkCards
+  return deck.value
     .filter((p) => side.value === 'all' || p.side === side.value)
     .filter((p) => !q || [p.name, p.text.th, p.text.en, ownerOf(p.name)].some((t) => (t ?? '').toLowerCase().includes(q)))
     .sort((a, b) => a.name.localeCompare(b.name))
 })
-const sideCount = (s: Side) => (s === 'all' ? editPerkCards.length : editPerkCards.filter((p) => p.side === s).length)
-const cardImage = (p: (typeof editPerkCards)[number]) => (lang.value === 'th' ? p.image?.th : p.image?.en) ?? p.image?.en
+const sideCount = (s: Side) => (s === 'all' ? deck.value.length : deck.value.filter((p) => p.side === s).length)
+const cardImage = (p: DeckCard) => (lang.value === 'th' ? p.image?.th : p.image?.en) ?? p.image?.en
 
 /** The card opened big in the middle of the screen. */
-const open = ref<(typeof editPerkCards)[number] | null>(null)
+const open = ref<DeckCard | null>(null)
+const costOf = (c: DeckCard) => ('cost' in c ? c.cost : null)
 const onKey = (e: KeyboardEvent) => {
   if (e.key === 'Escape') open.value = null
 }
@@ -64,26 +70,30 @@ const labels = computed(() =>
         killer: 'ฆาตกร',
         item: 'ไอเทม',
         perk: 'การ์ด Perk',
-        search: tab.value === 'perk' ? 'ค้นหา Perk / คำในการ์ด / ตัวละคร' : 'ค้นหาชื่อ / perk',
+        offering: 'Offering',
+        search: tab.value === 'perk' ? 'ค้นหา Perk / คำในการ์ด / ตัวละคร' : tab.value === 'offering' ? 'ค้นหา Offering / คำในการ์ด' : 'ค้นหาชื่อ / perk',
         all: 'ทั้งหมด',
         onBoard: 'อยู่บนกระดาน',
         noBoard: 'ไม่อยู่บนกระดานตัวละครใด — ใช้ได้จากการ์ดเท่านั้น',
         free: 'ฟรี',
         close: 'ปิด',
-        hint: 'การ์ด Perk ทั้งหมดที่ใช้ในโหมด Bloodweb และ Devout — คลิกการ์ดเพื่อดูใหญ่',
+        hint: tab.value === 'offering' ? 'การ์ด Offering ฝั่งละ 5 ใบ เลือกใช้ก่อน Setup (หน้า 19) — คลิกการ์ดเพื่อดูใหญ่' : 'การ์ด Perk ทั้งหมดที่ใช้ในโหมด Bloodweb และ Devout — คลิกการ์ดเพื่อดูใหญ่',
+        offeringRule: 'ใช้ก่อน Setup: ฝ่ายที่เสียเปรียบเลือก Offering 1–2 ใบ หรือฝ่ายละ 1 ใบ หรือสุ่มจากกอง (หน้า 19)',
       }
     : {
         survivor: 'Survivors',
         killer: 'Killers',
         item: 'Items',
         perk: 'Perk cards',
-        search: tab.value === 'perk' ? 'Search perk / card text / character' : 'Search name / perk',
+        offering: 'Offerings',
+        search: tab.value === 'perk' ? 'Search perk / card text / character' : tab.value === 'offering' ? 'Search offering / card text' : 'Search name / perk',
         all: 'All',
         onBoard: 'On the board of',
         noBoard: "On no character's board — a card only",
         free: 'Free',
         close: 'Close',
-        hint: 'Every perk card of the Bloodweb and Devout modes — click a card to see it big',
+        hint: tab.value === 'offering' ? 'Five offering cards a side, chosen before setup (p.19) — click a card to see it big' : 'Every perk card of the Bloodweb and Devout modes — click a card to see it big',
+        offeringRule: 'Used before setup: the side behind picks 1–2 offerings, or one each, or one drawn at random (p.19)',
       },
 )
 </script>
@@ -99,7 +109,7 @@ const labels = computed(() =>
   </div>
 
   <!-- the perk cards -->
-  <template v-if="tab === 'perk'">
+  <template v-if="tab === 'perk' || tab === 'offering'">
     <div class="perk-bar">
       <div class="sides">
         <button v-for="s in ['all', 'survivor', 'killer'] as Side[]" :key="s" type="button" :class="{ active: side === s }" @click="side = s">
@@ -113,7 +123,7 @@ const labels = computed(() =>
         <img :src="asset(cardImage(p))" :alt="p.name" loading="lazy" />
       </button>
     </div>
-    <p v-if="!perks.length" class="muted">{{ lang === 'th' ? 'ไม่พบการ์ด Perk' : 'No perk card found' }}</p>
+    <p v-if="!perks.length" class="muted">{{ lang === 'th' ? 'ไม่พบการ์ด' : 'No card found' }}</p>
 
     <!-- one card, big, with its text -->
     <Teleport to="body">
@@ -123,13 +133,14 @@ const labels = computed(() =>
           <div class="zoom-text">
             <p class="zoom-side" :class="open.side">{{ labels[open.side] }}</p>
             <h2>{{ trName(open.name) }}</h2>
-            <p class="zoom-cost">
-              <template v-if="open.cost">{{ open.cost }} <BpIcon /></template>
+            <p v-if="costOf(open) !== null" class="zoom-cost">
+              <template v-if="costOf(open)">{{ costOf(open) }} <BpIcon /></template>
               <template v-else>{{ labels.free }}</template>
             </p>
             <p class="zoom-rules"><PerkRichText :text="tr(open.text)" /></p>
             <p class="zoom-flavor muted">{{ tr(open.flavor) }}</p>
-            <p class="zoom-owner">{{ ownerOf(open.name) ? `${labels.onBoard} ${ownerOf(open.name)}` : labels.noBoard }}</p>
+            <p v-if="tab === 'offering'" class="zoom-owner">{{ labels.offeringRule }}</p>
+            <p v-else class="zoom-owner">{{ ownerOf(open.name) ? `${labels.onBoard} ${ownerOf(open.name)}` : labels.noBoard }}</p>
             <button type="button" @click="open = null">{{ labels.close }}</button>
           </div>
         </div>

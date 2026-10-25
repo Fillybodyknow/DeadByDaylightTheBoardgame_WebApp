@@ -98,11 +98,18 @@ function go(to: string) {
 </template>
 
 <style scoped>
+/* under the top bar, centred in the screen's height: a little wider than the page (1200 px) on big screens */
 .menu {
+  --w: min(1400px, calc(100vw - 2rem));
+  width: var(--w);
+  margin-inline: calc((100% - var(--w)) / 2);
+  min-height: calc(100dvh - 5.5rem);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 1.5rem;
-  padding: 1rem 0 2rem;
+  /* more room under it than over it: the block sits a little above the middle */
+  padding: 1rem 0 calc(1.5rem + 10vh);
 }
 .title {
   display: flex;
@@ -110,8 +117,8 @@ function go(to: string) {
   gap: 1rem;
 }
 .title img {
-  width: 64px;
-  height: 64px;
+  width: 68px;
+  height: 68px;
   filter: drop-shadow(0 0 14px rgb(255 90 30 / 0.5));
 }
 .eyebrow {
@@ -123,7 +130,7 @@ function go(to: string) {
 }
 .title h1 {
   margin: 0;
-  font-size: 2.4rem;
+  font-size: clamp(2.4rem, 2.6vw, 2.8rem);
   text-shadow: 0 2px 12px rgb(0 0 0 / 0.8);
 }
 .title h1::after {
@@ -137,14 +144,14 @@ function go(to: string) {
 }
 .modes {
   display: grid;
-  gap: 1rem;
+  gap: 1.1rem;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 .mode {
   position: relative;
   display: flex;
   align-items: flex-end;
-  min-height: 340px;
+  min-height: clamp(340px, 46vh, 500px);
   padding: 0;
   overflow: hidden;
   text-align: left;
@@ -175,15 +182,15 @@ function go(to: string) {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 1.25rem;
+  gap: 0.45rem;
+  padding: clamp(1.25rem, 1.4vw, 1.6rem);
 }
 .icon {
-  font-size: 2rem;
+  font-size: clamp(2rem, 2.2vw, 2.4rem);
 }
 .body b {
   font-family: var(--font-display);
-  font-size: 2rem;
+  font-size: clamp(2rem, 2.3vw, 2.5rem);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #f1e3c8;
@@ -191,12 +198,13 @@ function go(to: string) {
 }
 .sub {
   color: var(--blood-bright);
+  font-size: clamp(0.9rem, 0.9vw, 1rem);
   font-weight: 700;
   letter-spacing: 0.04em;
 }
 .text {
   color: #cfcac0;
-  font-size: 0.95rem;
+  font-size: clamp(0.95rem, 0.95vw, 1.05rem);
 }
 .resume {
   align-self: flex-start;
@@ -259,6 +267,11 @@ function go(to: string) {
   color: var(--muted);
 }
 @media (max-width: 560px) {
+  /* a phone scrolls the cards: no lift, no screen-high block */
+  .menu {
+    min-height: 0;
+    padding-bottom: 2rem;
+  }
   .mode {
     min-height: 220px;
   }
