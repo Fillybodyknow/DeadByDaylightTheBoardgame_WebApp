@@ -612,8 +612,9 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
   if (killerIn(st, sv.room) && st.killer.revealedCount === 0 && st.killer.planned.length && perkReady(st, s, 'power_struggle')) out.push({ k: 'powerStruggle' })
   // Diversion (Adam): send the killer in this room along any path but one with a pallet (a wall
   // he breaks on the way, as on any move of his).
+  // By the normal movement rules (the designer's ruling): not against a one-way (vault) path.
   if (killerIn(st, sv.room) && victorRoom(st) !== sv.room && perkReady(st, s, 'diversion'))
-    for (const p of touchingPaths(st, sv.room)) if (!palletOn(st, p.id)) out.push({ k: 'diversion', path: p.id })
+    for (const e of exits(st, sv.room, 'any')) if (!palletOn(st, e.path.id)) out.push({ k: 'diversion', path: e.path.id })
   return out
 }
 
@@ -4952,12 +4953,21 @@ export function wrathGain(st: GameState): number {
  * Redeemer targets: wounded survivors in a connected room, with no pallet or wall on a path
  * between. Not one wounded this round: he picks them up, and that can't be done yet (p.15).
  */
+/**
+ * The path a survivor is reeled in along by the Redeemer: from their room into the killer's, with
+ * no pallet or wall on it, and by the normal movement rules (the designer's ruling): not against a
+ * one-way (vault) path.
+ */
+function redeemerPath(st: GameState, s: number): PathDef | undefined {
+  const k = st.killer
+  return exits(st, st.survivors[s].room, 'any').find((e) => e.to === k.room && !pathState(st, e.path.id).wall && !palletOn(st, e.path.id))?.path
+}
+
 export function redeemerTargets(st: GameState): number[] {
   const k = st.killer
   return st.survivors.flatMap((sv, i) => {
     if (sv.status !== 'board' || !sv.wounded || sv.woundedThisRound || sv.room === k.room) return []
-    const clear = touchingPaths(st, k.room).some((p) => (p.a === sv.room || p.b === sv.room) && !pathState(st, p.id).wall && !palletOn(st, p.id))
-    return clear ? [i] : []
+    return redeemerPath(st, i) ? [i] : []
   })
 }
 
@@ -5290,7 +5300,7 @@ function redeemerGuess(st: GameState, s: number, guess: MoveCard) {
     return
   }
   log(st, `${sv.name} ทาย ${CARD_NAMES[guess]} — ผิด การ์ดคือ ${CARD_NAMES[card]}`, s)
-  const path = touchingPaths(st, k.room).find((p) => (p.a === sv.room || p.b === sv.room) && !pathState(st, p.id).wall && !palletOn(st, p.id))
+  const path = redeemerPath(st, s)
   const from = sv.room
   sv.room = k.room
   emit(st, { k: 'move', who: s, from, to: k.room, path: path?.id ?? '' }, s)

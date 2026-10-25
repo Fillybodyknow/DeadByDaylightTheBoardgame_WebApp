@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.11.1',
+    date: '2026-10-25',
+    items: [
+      'หันเหความสนใจ (Adam) และพระผู้ไถ่ (The Deathslinger) ใช้กฎการเดินปกติ: เดินย้อนเส้นทางสีเหลือง (Vault) ไม่ได้ ตามคำตัดสินของผู้ออกแบบ',
+    ],
+  },
+  {
     version: '1.11.0',
     date: '2026-10-25',
     items: [

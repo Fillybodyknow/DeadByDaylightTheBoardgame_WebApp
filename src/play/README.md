@@ -414,7 +414,8 @@ The Oni, The Deathslinger, Yui Kimura, Zarina Kassir:
 - "Sacrifice a Survivor" (Blood Echo, Dead Man's Switch) is hanging them on a hook (p.15).
 - Yamaoka's Wrath counts wounded survivors on the board (not in a locker) and revealed Hex
   Totems; it is only offered when it gains at least 1 ▲.
-- Redeemer: any card in hand can be discarded, Wait included. The survivor guesses among the 5
+- Redeemer: the survivor is reeled in by the normal movement rules: not against a one-way (vault)
+  path from their room to his (the designer's ruling). Any card in hand can be discarded, Wait included. The survivor guesses among the 5
   card types. A wrong guess moves them into his room and he picks them up. Like any pick-up,
   not a survivor wounded this round (p.15), so they can't be targeted. A right guess: nothing
   else happens; the card stays discarded.
@@ -457,9 +458,10 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   prop of the same colour in another room. Besides the card's exceptions, exit gates with
   progress stay put, and a prop isn't swapped with another of its own kind (nothing would change).
 - Spirit Fury: any pallet the killer breaks, also one broken with Enduring.
-- Diversion (Adam): an interaction with the killer in his room. "Any path" means any colour; a
-  wall on it the killer breaks on the way (as on any move of his), but a path with a pallet isn't
-  offered. The killer reveals a prop where he arrives, as on any move.
+- Diversion (Adam): an interaction with the killer in his room. "Any path" means any colour, but
+  by the normal movement rules: not against a one-way (vault) path (the designer's ruling, through
+  Level 99). A wall on it the killer breaks on the way (as on any move of his), but a path with a
+  pallet isn't offered. The killer reveals a prop where he arrives, as on any move.
 - Autodidact: one die of a success (not a great one already, nor a failure Iron Will counts as
   a success) becomes a great success, on any roll of a survivor in Adam's room or a connected
   one — struggling free from a carry too (one great success frees them). Not on a Phantasm roll.

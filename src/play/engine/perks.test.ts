@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { DIRECT_CARDS, crowdPledges, empIn, killerIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { DIRECT_CARDS, crowdPledges, redeemerTargets, empIn, killerIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { boards } from './boards'
 import { actorsOf, mayAct, playerOfSurvivor } from './seats'
@@ -597,6 +597,21 @@ describe('The Oni, The Deathslinger, Yui and Zarina', () => {
     return { next, killerRoom: st.killer.room }
   }
 
+  it('Redeemer keeps to the normal movement rules: not reeling a survivor in against a vault path', () => {
+    // MacMillan's p2: a vault path from Foundry Upper Floor into Mine Entrance, the only path between them
+    const target = (killer: string, survivor: string) => {
+      const st = game('deathslinger')
+      only(st)
+      killerInteracting(st)
+      st.killer.room = killer
+      st.survivors.forEach((sv) => (sv.room = 'backlot'))
+      Object.assign(st.survivors[2], { room: survivor, status: 'board', wounded: true, woundedThisRound: false })
+      return redeemerTargets(st).includes(2)
+    }
+    expect(target('mine-entrance', 'foundry-upper')).toBe(true)
+    expect(target('foundry-upper', 'mine-entrance')).toBe(false)
+  })
+
   it('Redeemer: a wrong guess reels the survivor in and he picks them up', () => {
     const { next, killerRoom } = reeled(false)
     expect(next.survivors[2].status).toBe('carried')
@@ -1159,6 +1174,24 @@ describe('Adam Francis', () => {
     expect(after.killer.room).toBe(p.a === room ? p.b : p.a)
     expect(after.killer.bp).toBe(bp + 1)
     expect(after.survivors[0].bp).toBe(6 - 2)
+  })
+
+  it('Diversion keeps to the normal movement rules: not against a one-way (vault) path', () => {
+    // MacMillan's p2 is a vault path from Foundry Upper Floor into Mine Entrance
+    const send = (room: string) => {
+      const st = adam('diversion')
+      st.killer.room = room
+      st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', planned: 'sneak', plannedRevealed: true }))
+      st.survivors[0].room = room
+      st.phase = 'survivors'
+      st.activeSurvivor = 0
+      st.canInteract = true
+      st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+      st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+      return survivorInteractions(st, 0).some((x) => x.k === 'diversion' && x.path === 'p2')
+    }
+    expect(send('foundry-upper')).toBe(true)
+    expect(send('mine-entrance')).toBe(false)
   })
 
   it('Diversion through a wall: the killer breaks it on the way', () => {
