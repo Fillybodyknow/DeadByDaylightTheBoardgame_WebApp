@@ -72,11 +72,26 @@ const code = computed(() => session.room?.code ?? '')
 
 // ---------- invite ----------
 
+/**
+ * The invite as The Entity would send it: the room, its code, then the link last (a chat app shows
+ * its preview card under the message).
+ */
+function inviteText(): string {
+  const link = `${location.origin}${location.pathname}#/online?room=${code.value}`
+  const room = data.value.name || `ห้อง ${code.value}`
+  return [
+    '🩸 The Entity เรียกหาเจ้า…',
+    `Trial “${room}” เปิดแล้ว — มาเป็นผู้รอดชีวิตที่หนีรอด หรือฆาตกรผู้ล่า ถ้าเจ้ากล้าพอ`,
+    `🔑 รหัสห้อง ${code.value}${data.value.passwordHash ? ' · มีรหัสผ่าน ถามจากหัวห้อง' : ''}`,
+    link,
+  ].join('\n')
+}
+
 /** What was copied last, said for a moment on its button. */
 const copied = ref<'' | 'link' | 'code'>('')
 async function copy(what: 'link' | 'code') {
   try {
-    await navigator.clipboard.writeText(what === 'code' ? code.value : `${location.origin}${location.pathname}#/online?room=${code.value}`)
+    await navigator.clipboard.writeText(what === 'code' ? code.value : inviteText())
     sfx.click()
     copied.value = what
     setTimeout(() => (copied.value = ''), 1500)
@@ -125,9 +140,20 @@ function saveName() {
 
 /** The lineup: the killer's slot, four survivor slots (empty ones null), and who hasn't chosen. */
 const killerMember = computed(() => memberList.value.find((m) => m.side === 'killer') ?? null)
+/** The four survivor slots: each member in the slot they took, those without one in the first free. */
 const survivorMembers = computed(() => {
   const on = memberList.value.filter((m) => m.side === 'survivor')
-  return [...on, ...Array<null>(Math.max(0, 4 - on.length)).fill(null)].slice(0, 4)
+  const slots: ((typeof on)[number] | null)[] = [null, null, null, null]
+  const rest: typeof on = []
+  for (const m of on) {
+    if (m.seat !== undefined && m.seat >= 0 && m.seat < 4 && !slots[m.seat]) slots[m.seat] = m
+    else rest.push(m)
+  }
+  for (const m of rest) {
+    const free = slots.indexOf(null)
+    if (free >= 0) slots[free] = m
+  }
+  return slots
 })
 const bench = computed(() => memberList.value.filter((m) => !m.side))
 /** Who else holds a ping colour (their name), or null when it is free or this player's own. */
@@ -137,7 +163,10 @@ const colorHolder = (color: string) => {
 }
 const readyCount = computed(() => memberList.value.filter((m) => m.ready).length)
 /** The silhouettes on the slots: the figure on the Sprint card, the skull on a card's back. */
-const artVars = { '--sprint': cssUrl('assets/movement/sprint.webp'), '--skull': cssUrl('assets/movement/back-skull.webp') }
+// each survivor seat shows one of the four movement cards (Sneak, Sprint, Crouch, Vault), the killer's the skull
+const SEAT_CARDS = ['sneak', 'sprint', 'crouch', 'vault'] as const
+const artVars = { ...Object.fromEntries(SEAT_CARDS.map((c) => [`--${c}`, cssUrl(`assets/movement/${c}.webp`)])), '--skull': cssUrl('assets/movement/back-skull.webp') }
+const seatArt = (i: number) => `var(--${SEAT_CARDS[i % SEAT_CARDS.length]})`
 
 const killerTaken = computed(() => memberList.value.some((m) => m.side === 'killer' && m.id !== session.me))
 const survivorCount = computed(() => memberList.value.filter((m) => m.side === 'survivor').length)
@@ -160,17 +189,27 @@ function kick(id: string) {
 const leavable = (id: string | undefined) => !!id && id === session.me && !me.value?.ready
 
 /** A click on a seat: an empty one takes that side, your own one leaves it. */
-function clickSeat(s: 'killer' | 'survivor', id: string | undefined) {
-  if (!id) return takeSlot(s)
+/** `slot`: which survivor slot was clicked (the one taken). */
+function clickSeat(s: 'killer' | 'survivor', id: string | undefined, slot?: number) {
+  if (!id) return takeSlot(s, slot)
   if (leavable(id) && !session.busy) side(s)
 }
 
-/** A click on an empty slot: take that side (moving over from the other one). */
-function takeSlot(s: 'killer' | 'survivor') {
-  if (session.busy || me.value?.side === s) return
+/**
+ * A click on an empty slot: take that side (moving over from the other one), in that slot; a
+ * survivor already moves to the empty survivor slot clicked.
+ */
+function takeSlot(s: 'killer' | 'survivor', slot?: number) {
+  if (session.busy) return
+  if (s === 'survivor' && me.value?.side === 'survivor') {
+    sfx.click()
+    return void setSide('survivor', slot)
+  }
+  if (me.value?.side === s) return
   if (s === 'killer' && killerTaken.value) return
   if (s === 'survivor' && survivorCount.value >= 4) return
-  side(s)
+  sfx.click()
+  void setSide(s, slot)
 }
 
 function toggleReady() {
@@ -423,11 +462,11 @@ const seatStatus = computed(() =>
             v-for="(m, i) in survivorMembers"
             :key="m?.id ?? `empty-${i}`"
             class="seat survivor"
-            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready, waiting: !m && me?.side === 'survivor', leavable: leavable(m?.id) }"
-            :style="{ '--i': i }"
-            :disabled="!m && (session.busy || me?.side === 'survivor') ? true : undefined"
+            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready, leavable: leavable(m?.id) }"
+            :style="{ '--i': i, '--art': seatArt(i) }"
+            :disabled="!m && session.busy ? true : undefined"
             :title="leavable(m?.id) ? 'คลิกเพื่อออกจากฝั่ง Survivor' : undefined"
-            @click="clickSeat('survivor', m?.id)"
+            @click="clickSeat('survivor', m?.id, i)"
           >
             <span class="art" aria-hidden="true" />
             <template v-if="m">
@@ -456,7 +495,7 @@ const seatStatus = computed(() =>
             <template v-else>
               <span class="plus" aria-hidden="true">+</span>
               <span class="seat-name">ว่าง</span>
-              <span class="seat-sub">{{ me?.side === 'survivor' ? 'รอเพื่อน' : 'คลิกเพื่อเป็น Survivor' }}</span>
+              <span class="seat-sub">{{ me?.side === 'survivor' ? 'คลิกเพื่อย้ายมาช่องนี้' : 'คลิกเพื่อเป็น Survivor' }}</span>
             </template>
             <span class="stamp">พร้อม</span>
           </component>
@@ -929,7 +968,7 @@ const seatStatus = computed(() =>
 .seat .art {
   position: absolute;
   inset: 0 0 25% 0;
-  background: var(--sprint) center 46% / 210% auto no-repeat;
+  background: var(--art) center 46% / 210% auto no-repeat;
   mix-blend-mode: screen;
   opacity: 0.85;
   filter: drop-shadow(0 0 16px rgb(var(--tone) / 0.6)) sepia(1) saturate(2.2) hue-rotate(5deg);

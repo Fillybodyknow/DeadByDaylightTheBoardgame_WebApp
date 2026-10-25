@@ -32,6 +32,11 @@ export interface Member {
   back?: boolean
   /** Their pings' colour (pingColors.ts), unique in the room; unset: the first one free. */
   color?: string
+  /**
+   * The survivor slot (0–3) they took in the lobby's row: only where they show there. Unset (a
+   * member from before, or not a survivor): the first slot free.
+   */
+  seat?: number
 }
 
 /**

@@ -419,15 +419,23 @@ export function setName(name: string) {
   return update((cur) => (cur.members[session.me] ? { ...cur, members: { ...cur.members, [session.me]: { ...cur.members[session.me], name } } } : null))
 }
 
-/** Pick a side (or none); taking a side clears "ready". The killer side holds one player. */
-export function setSide(side: Side | null) {
+/**
+ * Pick a side (or none); taking a side clears "ready". The killer side holds one player. A survivor
+ * takes the slot `seat` of the lobby's row when it is free (the first free one otherwise).
+ */
+export function setSide(side: Side | null, seat?: number) {
   return update((cur) => {
     const mine = cur.members[session.me]
     if (!mine || cur.phase !== 'lobby') return null
     const others = Object.entries(cur.members).filter(([id]) => id !== session.me)
     if (side === 'killer' && others.some(([, m]) => m.side === 'killer')) return null
     if (side === 'survivor' && others.filter(([, m]) => m.side === 'survivor').length >= MAX_SURVIVOR_PLAYERS) return null
-    return { ...cur, members: { ...cur.members, [session.me]: { ...mine, side, ready: false } } }
+    // (the database takes no undefined: a member off the survivor side has no `seat` at all)
+    const { seat: _old, ...rest } = mine
+    if (side !== 'survivor') return { ...cur, members: { ...cur.members, [session.me]: { ...rest, side, ready: false } } }
+    const taken = new Set(others.flatMap(([, m]) => (m.side === 'survivor' && m.seat !== undefined ? [m.seat] : [])))
+    const at = seat !== undefined && seat >= 0 && seat < MAX_SURVIVOR_PLAYERS && !taken.has(seat) ? seat : [0, 1, 2, 3].find((n) => !taken.has(n))
+    return { ...cur, members: { ...cur.members, [session.me]: { ...rest, side, ready: false, ...(at !== undefined ? { seat: at } : {}) } } }
   })
 }
 

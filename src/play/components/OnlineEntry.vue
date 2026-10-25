@@ -138,6 +138,8 @@ const board = computed(() =>
     .sort((a, b) => PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase] || b.updatedAt - a.updatedAt),
 )
 const PHASE_TH = { lobby: 'รอผู้เล่น', pick: 'เลือกตัวละคร', game: 'กำลังเล่น' } as const
+/** The room this device was in last, while it is still open (on the board). */
+const lastListed = computed(() => (last ? (board.value.find((r) => r.code === last) ?? null) : null))
 
 /** The table's filter and search. */
 type Filter = 'all' | 'lobby' | 'playing'
@@ -214,6 +216,17 @@ onMounted(() => {
     <!-- an error that is not about a dialog open now (no such room, a full one) -->
     <p v-if="session.error && !askFor && !creating" class="notice error">{{ session.error }}</p>
 
+    <!-- the room this device was in, still open: back in with one click -->
+    <section v-if="lastListed" class="panel rejoin">
+      <span class="rejoin-icon" aria-hidden="true">↩</span>
+      <div class="rejoin-text">
+        <small>ห้องล่าสุดของคุณยังเปิดอยู่</small>
+        <strong>{{ lastListed.name }}</strong>
+        <span class="muted">รหัส {{ lastListed.code }} · {{ PHASE_TH[lastListed.phase] }} · {{ lastListed.members }} คน</span>
+      </div>
+      <button class="primary cta" :disabled="session.busy" @click="join(lastListed.code)">กลับเข้าห้อง</button>
+    </section>
+
     <div class="hub-grid">
       <!-- the room browser -->
       <section class="panel browser">
@@ -251,14 +264,14 @@ onMounted(() => {
               v-for="(r, i) in shown"
               :key="r.code"
               class="row"
-              :class="[r.phase, { asking: askFor === r.code }]"
+              :class="[r.phase, { asking: askFor === r.code, mine: r.code === last }]"
               :style="{ '--i': i }"
               role="row"
               @dblclick="joinListed(r)"
             >
               <span class="cell room" role="cell">
                 <strong class="room-name"><span v-if="r.locked" class="lock" title="ต้องใช้รหัสผ่าน">🔒</span>{{ r.name }}</strong>
-                <small class="muted">รหัส {{ r.code }} · {{ ago(r.updatedAt) }}</small>
+                <small class="muted">รหัส {{ r.code }} · {{ ago(r.updatedAt) }}<b v-if="r.code === last" class="mine-tag"> · ห้องล่าสุดของคุณ</b></small>
               </span>
               <span class="cell host" role="cell">{{ r.host || '—' }}</span>
               <span class="cell seats" role="cell" :title="`${r.members}/${SEATS} คน`">
@@ -267,7 +280,9 @@ onMounted(() => {
               </span>
               <span class="cell" role="cell"><span class="phase" :class="r.phase">{{ PHASE_TH[r.phase] }}</span></span>
               <span class="cell go" role="cell">
-                <button :class="{ primary: r.phase === 'lobby' }" :disabled="session.busy" @click="joinListed(r)">
+                <!-- this device's last room: straight back in -->
+                <button v-if="r.code === last" class="primary" :disabled="session.busy" @click="join(r.code)">กลับเข้าห้อง</button>
+                <button v-else :class="{ primary: r.phase === 'lobby' }" :disabled="session.busy" @click="joinListed(r)">
                   {{ r.phase === 'game' ? 'เข้าไปดู' : 'เข้าร่วม' }}
                 </button>
               </span>
@@ -305,7 +320,6 @@ onMounted(() => {
             />
           </label>
           <button class="cta-2" :class="{ primary: code.length === 4 }" :disabled="session.busy || code.length !== 4" @click="join()">เข้าห้อง</button>
-          <button v-if="last" class="link" :disabled="session.busy" @click="join(last)">↩ กลับเข้าห้องล่าสุด ({{ last }})</button>
         </section>
       </div>
     </div>
@@ -554,6 +568,48 @@ onMounted(() => {
 }
 
 /* ---------- panels ---------- */
+/* back into the last room: a wide card over the browser */
+.panel.rejoin {
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+  border-color: rgb(255 213 106 / 0.6);
+  box-shadow: 0 0 24px rgb(255 213 106 / 0.12);
+}
+.rejoin-icon {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  background: rgb(255 213 106 / 0.15);
+  color: #ffd56a;
+  font-size: 1.4rem;
+}
+.rejoin-text {
+  display: grid;
+  gap: 0.1rem;
+  margin-right: auto;
+}
+.rejoin-text small {
+  color: #ffd56a;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+.rejoin-text strong {
+  font-size: 1.15rem;
+}
+.rejoin .cta {
+  width: auto;
+  padding-inline: 1.6rem;
+}
+.row.mine {
+  box-shadow: inset 3px 0 0 #ffd56a;
+}
+.mine-tag {
+  color: #ffd56a;
+  font-weight: 700;
+}
 .hub-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
