@@ -1,6 +1,6 @@
 // The full game (Online and Offline) is made for a computer or a tablet: the board, the side
-// panel and the player tiles need a big screen. Phones get a notice instead; the companion
-// still works on them.
+// panel and the player tiles need a big screen. Phones get a notice instead; the card
+// and rules pages still work on them.
 
 /** Narrower than the smallest iPad (iPad mini: 744 px) on its short side: a phone. */
 const PHONE_MAX = 700

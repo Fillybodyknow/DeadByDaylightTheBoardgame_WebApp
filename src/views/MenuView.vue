@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// The first screen: play the full game online or on one device, or use the companion with the
-// physical board game.
+// The first screen: play the full game online or on one device, or learn it in the tutorial.
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { asset } from '../i18n'
@@ -42,15 +41,6 @@ const modes = computed(() => [
     sub: 'สอนเล่นทีละบท',
     text: 'ไม่เคยเล่นมาก่อน? The Entity จะพาเล่นบนกระดานจริงทีละขั้น ทั้งฝั่งผู้รอดชีวิตและฝั่งฆาตกร',
     image: 'assets/app/background-img/background_autohaven.webp',
-    resume: '',
-  },
-  {
-    to: '/lobby',
-    icon: '📋',
-    title: 'Companion',
-    sub: 'ผู้ช่วยเล่นบอร์ดเกมจริง',
-    text: 'มีกล่องเกมอยู่แล้ว? ใช้จัดทีม สุ่มตัวละครและแผนที่ เช็กลิสต์จัดโต๊ะ และเปิดกติการะหว่างเล่น',
-    image: 'assets/app/background-img/background_lobby.webp',
     resume: '',
   },
 ])

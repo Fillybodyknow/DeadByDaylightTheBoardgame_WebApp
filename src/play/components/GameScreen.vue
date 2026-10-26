@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
+import { settings } from '../../settings'
 import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showPerk, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
@@ -21,7 +22,7 @@ import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
 import { STEP_NAME, boardActionKeys, perkPicked, perksToPick, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, cardImage, killerMini, playerOf, survivorMini } from '../labels'
-import SoundSettings from '../../components/SoundSettings.vue'
+import SettingsDialog from '../../components/SettingsDialog.vue'
 import ActionPanel from './ActionPanel.vue'
 import ActionReveal from './ActionReveal.vue'
 import FinaleReveal from './FinaleReveal.vue'
@@ -744,14 +745,16 @@ function stopTitleBlink() {
 /** `again`: a reminder, the player hasn't moved yet. */
 function notifyTurn(again = false) {
   // the skill-check warning cuts through anything; the chime after it says "you"
-  fxSound.skillWarn()
-  window.setTimeout(() => sfx.yourTurn(), 350)
-  navigator.vibrate?.(again ? [200, 100, 200, 100, 200] : [120, 80, 120])
+  if (settings.turnSound) {
+    fxSound.skillWarn()
+    window.setTimeout(() => sfx.yourTurn(), 350)
+    navigator.vibrate?.(again ? [200, 100, 200, 100, 200] : [120, 80, 120])
+  }
   if (!again) showBanner({ title: 'ถึงตาคุณแล้ว!', sub: askWhat.value, tone: 'game' })
   nudge.value = true
   if (nudgeTimer !== null) clearTimeout(nudgeTimer)
   nudgeTimer = window.setTimeout(() => (nudge.value = false), 4000)
-  if (!document.hidden) return
+  if (!document.hidden || !settings.turnNotify) return
   // in the background: blink the tab's title until the player comes back, and a system notice
   stopTitleBlink()
   let on = false
@@ -768,7 +771,7 @@ function notifyTurn(again = false) {
 const onVisible = () => !document.hidden && stopTitleBlink()
 // The browser asks for the notification permission only after a tap: ask on the first one.
 const askPermission = () => {
-  if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission()
+  if (settings.turnNotify && 'Notification' in window && Notification.permission === 'default') void Notification.requestPermission()
 }
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisible)
@@ -791,7 +794,7 @@ watch(
   [yourTurn, () => props.st],
   ([mine]) => {
     stopRemind()
-    if (mine) remindTimer = window.setInterval(() => notifyTurn(true), REMIND_MS)
+    if (mine && settings.turnRemind) remindTimer = window.setInterval(() => notifyTurn(true), REMIND_MS)
   },
   { immediate: true },
 )
@@ -1072,7 +1075,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           📍<b v-if="pingWait" class="ping-count">{{ pingWait }}</b><span v-else class="btn-text"> {{ pingArmed ? 'คลิกบนแผนที่' : 'ปิง' }}</span>
         </button>
         <button v-if="canFullscreen" :title="fullscreen ? 'ออกจากเต็มจอ' : 'เต็มจอ'" @click="toggleFullscreen">{{ fullscreen ? '🗗' : '⛶' }}</button>
-        <SoundSettings />
+        <SettingsDialog />
         <button @click="leave">ออก</button>
       </div>
       </Teleport>

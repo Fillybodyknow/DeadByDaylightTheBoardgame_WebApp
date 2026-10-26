@@ -34,7 +34,7 @@ const finished = ref(false)
 let raf = 0
 let start = 0
 let lastTile = -1
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+import { reducedMotion } from '../settings'
 
 // easeOutQuart: fast start, long slow finish
 const ease = (t: number) => 1 - Math.pow(1 - t, 4)
@@ -59,7 +59,7 @@ function land() {
 }
 
 onMounted(() => {
-  if (reduceMotion) {
+  if (reducedMotion.value) {
     offset.value = stopIndex.value * TILE.value
     land()
   } else raf = requestAnimationFrame(frame)

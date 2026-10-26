@@ -1,37 +1,14 @@
-import { reactive } from 'vue'
 import { survivorById } from './data'
 import { lang } from './i18n'
 
-// A short game-style loading screen shown when entering table setup and when the trial starts.
-// It shows a quote from a survivor in the game or a rules tip; tap to skip.
+// What the trial's loading page shows (play/components/TrialLoading.vue): a quote from a survivor
+// in the game, or a rules tip.
 
 export interface LoadingSlide {
   kind: 'quote' | 'tip'
   text: string
   by?: string
   image?: string
-}
-
-export const loading = reactive({
-  active: false,
-  title: '',
-  slide: null as LoadingSlide | null,
-})
-
-let timer: number | null = null
-
-export function showLoading(title: string, slide: LoadingSlide, ms = 2600) {
-  if (timer !== null) clearTimeout(timer)
-  loading.title = title
-  loading.slide = slide
-  loading.active = true
-  timer = window.setTimeout(hideLoading, ms)
-}
-
-export function hideLoading() {
-  if (timer !== null) clearTimeout(timer)
-  timer = null
-  loading.active = false
 }
 
 // Rules tips, all from docs/rules-th.md (rulebook page in brackets).

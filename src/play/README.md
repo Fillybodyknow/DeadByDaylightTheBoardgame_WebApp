@@ -1,13 +1,12 @@
 # ดบดล — เล่นเต็มเกม (full playable game)
 
-The full game, part of the same app as the companion (`src/`). The menu (`#/`) offers:
+The full game. The menu (`#/`) offers:
 - **Online** (`#/online`): each player on their own device, in a room shared through Firebase.
 - **Offline** (`#/play`): the whole game on one shared device (hot-seat).
-- **Companion** (`#/lobby`): the helper for the physical board game.
+- **Tutorial** (`#/tutorial`): lessons for new players.
 
-The game reuses the companion's card data (`src/data`), images (`public/assets`), theme,
-sounds, character sheet, roulette, loading screen and start-room intro. It is deployed with the
-companion to GitHub Pages.
+The game uses the app's card data (`src/data`), images (`public/assets`), theme, sounds,
+character sheet and roulette (`src/`), and is deployed to GitHub Pages.
 
 ```sh
 npm run dev      # http://localhost:5173

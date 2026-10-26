@@ -1,5 +1,6 @@
 import { reactive, ref, watch } from 'vue'
 import { asset } from './i18n'
+import { settings } from './settings'
 
 // Sound effects synthesised with the Web Audio API, so the app ships no audio files.
 // Browsers only allow audio after a user gesture; the context is created lazily on first use
@@ -24,6 +25,12 @@ watch(muted, (m) => {
   syncChase()
   syncAmbient()
 })
+
+// the chase theme switched off (or back on) in the settings: at once
+watch(
+  () => settings.chaseMusic,
+  () => syncChase(),
+)
 
 // ---------- volume: master, music (ambient + chase) and effects, each 0–1, remembered per device ----------
 
@@ -380,7 +387,7 @@ function chasePosition(): number {
 
 /** `ms`: how long the playing layer takes to reach its new volume. */
 function syncChase(ms = 500) {
-  const want = muted.value ? null : chaseWanted
+  const want = muted.value || !settings.chaseMusic ? null : chaseWanted
   const volume = CHASE_VOLUME * musicLevel()
   for (const [layer, el] of chaseEls)
     if (layer !== want && !el.paused) fadeTo(el, 0, want ? 700 : 2200, () => el.pause())

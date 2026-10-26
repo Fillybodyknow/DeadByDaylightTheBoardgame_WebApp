@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Character grid in the companion's style: tap a character to see its sheet, pick it from there,
+// Character grid: tap a character to see its sheet, pick it from there,
 // or let the roulette pick. Only characters whose perks the engine knows can be played.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import CharacterSheet from '../../components/CharacterSheet.vue'

@@ -1,4 +1,4 @@
-// How a perk's Thai text is lit, everywhere it shows: the game's panels, the companion's pages and
+// How a perk's Thai text is lit, everywhere it shows: the game's panels, the card pages and
 // the Thai perk card images (drawn from these same rules). Game terms in bold white (English names
 // in the Thai text — Interact, Skill Check, Danger Die — the Thai words for the pieces of the game,
 // numbers), props in their category's colour (as their tiles' backs), failures and wounds in red,
@@ -53,7 +53,7 @@ function kindOf(t: string): HighlightKind {
 /**
  * A perk's (or power's, or passive's) text cut into lit and plain parts: "{BP}" taken as ▲, any
  * other "{NAME}" a token (kind 'token', its NAME: tokenIcons.ts). English names in it go through
- * `rename` (their Thai names: thaiName). An English text (the companion in English) is left plain but
+ * `rename` (their Thai names: thaiName). An English text (the card pages in English) is left plain but
  * for ▲ and tokens: every word of it would be a "term".
  */
 export function highlightPerkText(text: string, rename?: (en: string) => string | undefined): { t: string; kind: HighlightKind }[] {

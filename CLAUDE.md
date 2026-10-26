@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 Working notes for this repo, for every machine and session. Details live in `README.md`
-(companion app), `src/play/README.md` (full game: scope, house rules, rulings) and
+(the app, assets, theme), `src/play/README.md` (full game: scope, house rules, rulings) and
 `docs/rules-th.md` (the Thai rulebook reference, with page numbers).
 
 ## The project
@@ -10,7 +10,7 @@ Working notes for this repo, for every machine and session. Details live in `REA
 
 - **Online** (`#/online`): the full game, each player on their own device, rooms on Firebase.
 - **Offline** (`#/play`): the full game on one shared device (hot-seat, hand-off curtains).
-- **Companion** (`#/lobby` …): a helper for the physical board game (setup, Thai card text).
+- **Tutorial** (`#/tutorial`): lessons for new players, the survivors' and the killer's.
 
 The user writes in Thai. Reply in Thai. Everything a player sees in the game is in Thai.
 
@@ -213,13 +213,13 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   `powerName` and the Guards are Thai too, and Thai UI strings name perks in Thai. The Thai card
   images (`perks-th`) had their English name painted over with the Thai one (Kanit 600, white).
 - **Perk text is lit the same everywhere** (`src/perkHighlight.ts`, shown by `src/components/PerkRichText`):
-  the game's panels, the companion and the Thai perk card images (drawn from the same rules). Terms,
+  the game's panels, the card pages and the Thai perk card images (drawn from the same rules). Terms,
   English names and numbers in bold white, props in their category's colour, failure / wounded red,
   success / healthy green, great success gold. A new place showing a perk's text uses PerkRichText.
 - Fixed overlays inside a `.card` must `<Teleport to="body">`: `.card` has `backdrop-filter`,
   which traps `position: fixed` children.
 - The full game runs on computers and tablets only. Phones get a notice (`src/play/device.ts`:
-  a screen whose short side is under 700 px). The companion still works on phones.
+  a screen whose short side is under 700 px). The card and rules pages still work on phones.
 
 ## Checking the UI in a browser
 
@@ -230,6 +230,20 @@ scripts in the scratchpad, not the repo. To set up a scene, open `#/play`, then 
 edit it, `localStorage.setItem('dbdl-play-game', JSON.stringify(st))`, and reload. Look at the
 screenshots before reporting. For online play, `?test` in the URL exposes `window.__dbdl` and the
 local backend syncs browser tabs.
+
+## Settings
+
+The ⚙ button (top bar and the game's rail) opens `src/components/SettingsDialog.vue`, a PC-game
+style window with tabs: Sound (volumes, mute, chase music), Display (animation speed, reduce motion,
+card language), Online (turn sound, background notice, 20 s reminder), Data (clear the offline
+game, reset the tutorial, reset settings). Settings live in `src/settings.ts` (`dbdl-settings`).
+
+- **Animation speed:** a JS timer of an animation is written `anim(ms)`; CSS animations and
+  transitions that end are played at the same rate by `settings.ts` (endless ones keep their pace),
+  so write CSS durations at full length. Reading time (TrialLoading's minimum), sound clips
+  (MatchBeat) and online timers are not animations: leave them unscaled.
+- **Reduce motion:** read `reducedMotion` (the device's preference or the setting), never
+  `matchMedia` directly; `html.reduce-motion` stops CSS motion page-wide (`style.css`).
 
 ## Sounds and PWA
 
@@ -250,9 +264,8 @@ local backend syncs browser tabs.
   survivor's 2400×1615 with the "ITEM CARD" label under it cropped off), the killer, a gap with
   VS in it, then the four survivors, each scaled to cover its share of the screen. The video has no sound of its own for unequip, sabotage, or
   the killer at a totem, so those borrow the nearest one (unequip is Equip reversed).
-- Volume: `volumes` in `src/sound.ts` (master, music, sfx; 0–1, remembered per device), set from
-  the sound button's panel (`src/components/SoundSettings.vue`, in the top bar and the game's
-  rail). Music (ambient and chase) scales by master × music, every effect (both `sound.ts` and
+- Volume: `volumes` in `src/sound.ts` (master, music, sfx; 0–1, remembered per device), set in
+  the settings window's Sound tab. Music (ambient and chase) scales by master × music, every effect (both `sound.ts` and
   `fx/audio.ts`) by master × sfx through a gain node.
 - Every sound file is **OGG (Vorbis)**, so loops have no gap (MP3 pads both ends). Chase music
   lives in `app/sound/theme/chase/<killer>/<theme>/layer<N>.ogg`, one 26.84 s loop per layer.

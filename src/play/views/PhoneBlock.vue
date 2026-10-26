@@ -8,10 +8,8 @@ import { RouterLink } from 'vue-router'
     <span class="icon" aria-hidden="true">💻</span>
     <h2>เล่นเต็มเกมได้บนคอมพิวเตอร์หรือ iPad เท่านั้น</h2>
     <p class="muted">กระดาน แผงตัดสินใจ และสถานะผู้เล่นต้องใช้จอใหญ่ — สมาร์ตโฟนยังไม่รองรับโหมด Online / Offline</p>
-    <p class="muted">ถ้าเล่นบอร์ดเกมจริงอยู่ ใช้ <b>Companion</b> บนมือถือได้ตามปกติ</p>
     <div class="row">
-      <RouterLink class="btn primary" to="/lobby">ไปที่ Companion</RouterLink>
-      <RouterLink class="btn" to="/">กลับเมนู</RouterLink>
+      <RouterLink class="btn primary" to="/">กลับเมนู</RouterLink>
     </div>
   </section>
 </template>

@@ -1,6 +1,6 @@
 // Sound effects for the full game. Recorded clips (public/assets/app/sound/game/) where there
-// is one, otherwise synthesised with Web Audio like the companion's src/sound.ts (whose mute
-// toggle and master / effects volume this follows). Kept here so the companion is untouched.
+// is one, otherwise synthesised with Web Audio like src/sound.ts (whose mute toggle and master /
+// effects volume this follows).
 
 import { watch } from 'vue'
 import { asset } from '../../i18n'

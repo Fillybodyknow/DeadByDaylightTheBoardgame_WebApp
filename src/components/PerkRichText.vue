@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // A perk's text with its key words lit (perkHighlight.ts): the same in the game's panels, the
-// companion's pages and on the Thai perk cards.
+// card pages and on the Thai perk cards.
 import { computed } from 'vue'
 import { thaiName } from '../data/thaiNames'
 import { asset } from '../i18n'

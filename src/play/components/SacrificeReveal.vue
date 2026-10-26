@@ -36,10 +36,11 @@ const cells = Array.from({ length: SACRIFICE_TO_WIN }, (_, i) => ({
 const shown = ref(0)
 const bump = ref(0)
 
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+import { anim, reducedMotion } from '../../settings'
 
 let timers: number[] = []
-const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms))
+// timed with the CSS fill: both run at the player's animation speed
+const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, anim(ms)))
 function clearTimers() {
   timers.forEach((t) => clearTimeout(t))
   timers = []
@@ -51,15 +52,15 @@ watch(
     clearTimers()
     const s = current.value?.sacrifice
     if (id === undefined || !s) return
-    shown.value = reduceMotion ? s.total : s.total - s.gained
+    shown.value = reducedMotion.value ? s.total : s.total - s.gained
     fxSound.perk(true)
-    if (!reduceMotion)
+    if (!reducedMotion.value)
       later(550, () => {
         shown.value = s.total
         bump.value++
       })
     // each new cell takes 350 ms to fill, one after the other
-    later(reduceMotion ? 1500 : 2400 + (s.gained - 1) * 350, next)
+    later(reducedMotion.value ? 1500 : 2400 + (s.gained - 1) * 350, next)
   },
   { immediate: true },
 )

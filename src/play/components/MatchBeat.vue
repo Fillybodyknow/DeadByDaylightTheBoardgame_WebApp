@@ -18,7 +18,7 @@ const MS = 4600
 const BPM = 96
 
 const pulse = ref<HTMLElement | null>(null)
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+import { reducedMotion } from '../../settings'
 
 let timer: number | undefined
 let beatTimers: number[] = []
@@ -27,7 +27,7 @@ let beatLoop: number | undefined
 function thump() {
   const half = (strong: boolean) => {
     fxSound.heartbeat(strong)
-    if (!reduceMotion) pulse.value?.animate([{ opacity: 0 }, { opacity: strong ? 1 : 0.6, offset: 0.2 }, { opacity: 0 }], { duration: 360, easing: 'ease-out' })
+    if (!reducedMotion.value) pulse.value?.animate([{ opacity: 0 }, { opacity: strong ? 1 : 0.6, offset: 0.2 }, { opacity: 0 }], { duration: 360, easing: 'ease-out' })
   }
   half(true)
   beatTimers.push(window.setTimeout(() => half(false), 200))

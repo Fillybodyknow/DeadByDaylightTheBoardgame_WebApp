@@ -1,11 +1,10 @@
-import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import App from './App.vue'
 import { setupInstall } from './install'
 import { router } from './router'
 import './style.css'
 
-createApp(App).use(createPinia()).use(router).mount('#app')
+createApp(App).use(router).mount('#app')
 setupInstall()
 
 // Automated multi-tab tests (`?test` in the URL) drive the full game through the same dispatch

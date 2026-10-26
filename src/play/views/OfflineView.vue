@@ -1,6 +1,5 @@
 <script setup lang="ts">
-// Offline: the full game on one device passed around the table (hot-seat). Before a game, the
-// companion's lobby flow — players and game mode, survivors pick first, then the killer, then
+// Offline: the full game on one device passed around the table (hot-seat). Before a game: players and game mode, survivors pick first, then the killer, then
 // (Bloodweb, Devout) each player's perks in turn behind a hand-off curtain, then the map.
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'

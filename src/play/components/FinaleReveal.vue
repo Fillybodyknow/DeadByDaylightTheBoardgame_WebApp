@@ -19,7 +19,7 @@ const killerWon = computed(() => current.value?.winner === 'killer')
 const pips = computed(() => Array.from({ length: SACRIFICE_TO_WIN }, (_, i) => i))
 const gateImage = PROP_IMAGE.exitGate
 
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+import { anim, reducedMotion } from '../../settings'
 
 let timer: number | undefined
 watch(
@@ -30,7 +30,7 @@ watch(
     if (id === undefined || !f) return
     if (f.winner === 'survivors') sfx.escape()
     else sfx.sacrifice()
-    timer = window.setTimeout(done, reduceMotion ? 2200 : 3600)
+    timer = window.setTimeout(done, anim(reducedMotion.value ? 2200 : 3600))
   },
   { immediate: true },
 )

@@ -36,8 +36,8 @@ const card = computed(() => {
   return { image: perkImage(c.perk!), name: p.name, label: killer.value ? 'Killer perk' : 'Survivor perk', price: p.cost ? `−${p.cost} ▲` : 'ฟรี', text: perkText(c.perk!) }
 })
 
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-const SHOW_MS = reduceMotion ? 1600 : 2100
+import { anim, reducedMotion } from '../../settings'
+const showMs = () => anim(reducedMotion.value ? 1600 : 2100)
 
 let timer: number | undefined
 watch(
@@ -47,7 +47,7 @@ watch(
     if (id === undefined) return
     if (isItem.value) fxSound.item()
     else fxSound.perk(killer.value)
-    timer = window.setTimeout(next, SHOW_MS)
+    timer = window.setTimeout(next, showMs())
   },
   { immediate: true },
 )

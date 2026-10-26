@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { RouterLink, RouterView, useRoute, useRouter, type RouteMeta } from 'vue-router'
-import LoadingVeil from './components/LoadingVeil.vue'
+import { RouterLink, RouterView, useRoute, type RouteMeta } from 'vue-router'
 import Particles from './components/Particles.vue'
-import SoundSettings from './components/SoundSettings.vue'
+import SettingsDialog from './components/SettingsDialog.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import WhatsNew from './components/WhatsNew.vue'
-import { quoteOrTip, showLoading } from './loading'
 import { asset, lang } from './i18n'
 import { game, tutorial } from './play/game'
 import { isPhone } from './play/device'
@@ -14,21 +12,10 @@ import { introStage } from './play/intro'
 import { finishedGame, session } from './play/online/session'
 import PhoneBlock from './play/views/PhoneBlock.vue'
 import { setAmbient, type AmbientTrack } from './sound'
-import { useLobbyStore } from './stores/lobby'
 import { startUpdateWatch } from './update'
 
-const lobby = useLobbyStore()
 const route = useRoute()
 startUpdateWatch()
-
-// Loading screen when entering the companion's table setup and when its trial starts: half the
-// time a quote from a survivor in this game, otherwise a rules tip. (The full game has its own:
-// play/components/TrialLoading.vue.)
-useRouter().afterEach((to, from) => {
-  const slide = () => quoteOrTip(lobby.state.survivorPicks)
-  if (to.name === 'setup' && from.name === 'lobby') showLoading('กำลังเตรียมโต๊ะ…', slide())
-  else if (to.name === 'table' && to.query.intro === '1') showLoading('กำลังเข้าสู่ Trial…', slide())
-})
 
 // The part of the app the screen belongs to; shared screens (cards, rules) keep the last one.
 type Section = NonNullable<RouteMeta['section']>
@@ -36,7 +23,7 @@ const lastSection = ref<Section>('menu')
 const section = computed<Section>(() => route.meta.section ?? lastSection.value)
 watch(section, (s) => (lastSection.value = s))
 
-const SUBTITLE: Record<Section, string> = { menu: '', companion: 'Companion', offline: 'Offline', online: 'Online', tutorial: 'Tutorial' }
+const SUBTITLE: Record<Section, string> = { menu: '', offline: 'Offline', online: 'Online', tutorial: 'Tutorial' }
 
 /** The full game (Online / Offline) is for computers and tablets; a phone gets a notice. */
 const phone = isPhone()
@@ -55,29 +42,18 @@ const inGame = computed(
 
 const links = computed(() => [
   { to: '/', label: 'เมนู', icon: '🏠' },
-  ...(section.value === 'companion'
-    ? [
-        { to: '/lobby', label: 'Lobby', icon: '🔥' },
-        ...(lobby.ready
-          ? [
-              { to: '/setup', label: 'จัดโต๊ะ', icon: '🧰' },
-              { to: '/table', label: 'ระหว่างเล่น', icon: '🎲' },
-            ]
-          : []),
-      ]
-    : section.value === 'offline'
-      ? [{ to: '/play', label: 'เล่นเครื่องเดียว', icon: '🎲' }]
-      : section.value === 'online'
-        ? [{ to: '/online', label: session.room ? `ห้อง ${session.room.code}` : 'ออนไลน์', icon: '🌐' }]
-        : []),
+  ...(section.value === 'offline'
+    ? [{ to: '/play', label: 'เล่นเครื่องเดียว', icon: '🎲' }]
+    : section.value === 'online'
+      ? [{ to: '/online', label: session.room ? `ห้อง ${session.room.code}` : 'ออนไลน์', icon: '🌐' }]
+      : []),
   { to: '/cards', label: 'การ์ด', icon: '🃏' },
   { to: '/rules', label: 'กติกา', icon: '📖' },
-  ...(section.value === 'companion' ? [{ to: '/history', label: 'ประวัติ', icon: '📜' }] : []),
 ])
 
-// Ambience: the campfire before a trial (menu, lobbies, rooms, table setup), the trial's own
-// track during play; other screens (cards, rules, history) keep whatever is already playing.
-const AMBIENT_BY_ROUTE: Record<string, AmbientTrack> = { menu: 'lobby', lobby: 'lobby', setup: 'lobby', table: 'play', offline: 'lobby', online: 'lobby' }
+// Ambience: the campfire before a trial (menu, setup, rooms), the trial's own track during play;
+// other screens (cards, rules) keep whatever is already playing.
+const AMBIENT_BY_ROUTE: Record<string, AmbientTrack> = { menu: 'lobby', offline: 'lobby', online: 'lobby' }
 watch(
   () => (inGame.value ? 'play' : AMBIENT_BY_ROUTE[String(route.name)]),
   (track) => {
@@ -86,17 +62,13 @@ watch(
   { immediate: true },
 )
 
-const PARTICLES_BY_ROUTE: Record<string, 'embers' | 'spores'> = { menu: 'embers', lobby: 'embers', setup: 'embers', table: 'spores', offline: 'embers', online: 'embers' }
+const PARTICLES_BY_ROUTE: Record<string, 'embers' | 'spores'> = { menu: 'embers', offline: 'embers', online: 'embers' }
 const particles = computed(() => (inGame.value ? 'spores' : (PARTICLES_BY_ROUTE[String(route.name)] ?? null)))
 
-// Scene behind the app: the campfire, or the map's realm once a game is set.
-const MAP_SCENES = new Set(['setup', 'table'])
-const scene = computed(() => {
-  if (inGame.value && game.value) return `assets/app/background-img/background_${game.value.board}.webp`
-  const mapId = lobby.state.mapId
-  if (mapId && MAP_SCENES.has(String(route.name))) return `assets/app/background-img/background_${mapId}.webp`
-  return 'assets/app/background-img/background_lobby.webp'
-})
+// Scene behind the app: the campfire, or the map's realm during a game.
+const scene = computed(() =>
+  inGame.value && game.value ? `assets/app/background-img/background_${game.value.board}.webp` : 'assets/app/background-img/background_lobby.webp',
+)
 </script>
 
 <template>
@@ -109,7 +81,6 @@ const scene = computed(() => {
     <Particles v-if="particles" :key="particles" :variant="particles" />
   </div>
 
-  <LoadingVeil />
   <UpdateBanner />
   <WhatsNew />
 
@@ -126,7 +97,7 @@ const scene = computed(() => {
         <span class="lbl">{{ l.label }}</span>
       </RouterLink>
     </nav>
-    <SoundSettings class="icon-btn" />
+    <SettingsDialog class="icon-btn" />
     <!-- Switches card/board text between Thai and English; the UI itself is Thai. -->
     <button class="lang" type="button" title="ภาษาข้อความการ์ด" @click="lang = lang === 'th' ? 'en' : 'th'">
       <span class="lang-label">การ์ด: </span>{{ lang === 'th' ? 'TH' : 'EN' }}

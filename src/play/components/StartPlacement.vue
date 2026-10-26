@@ -6,7 +6,6 @@
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { skillFaceImage } from '../../data'
 import { asset } from '../../i18n'
-import { loading } from '../../loading'
 import { sfx, startHeartbeat, stopHeartbeat } from '../../sound'
 import { fx } from '../fx/bus'
 
@@ -15,16 +14,15 @@ const LANDED_MS = 800
 const FRAME_MS = 85
 
 const starts = computed(() => fx.starts)
-/** Waits for the loading screen, so the heartbeat and dice don't play behind it. */
-const running = computed(() => !!fx.starts && !loading.active)
+const running = computed(() => !!fx.starts)
 const current = computed(() => (fx.starts ? fx.starts.minis[fx.starts.shown] : undefined))
 
 const shownFace = computed(() => (fx.starts ? fx.starts.face : 0))
 const landed = computed(() => !!fx.starts?.landed)
 
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+import { anim, reducedMotion } from '../../settings'
 let timers: number[] = []
-const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms))
+const later = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, anim(ms)))
 function clearTimers() {
   timers.forEach((t) => clearTimeout(t))
   timers = []
@@ -45,7 +43,7 @@ function playMini() {
     s.shown++
     later(LANDED_MS, next)
   }
-  if (reduceMotion) return land()
+  if (reducedMotion.value) return land()
   const frames = Math.floor(TUMBLE_MS / FRAME_MS)
   for (let f = 0; f < frames; f++)
     later(f * FRAME_MS, () => {

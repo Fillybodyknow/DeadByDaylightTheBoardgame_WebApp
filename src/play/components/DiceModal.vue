@@ -23,11 +23,11 @@ const current = computed(() => {
 })
 const phase = ref<'warn' | 'sweep' | 'landed'>('warn')
 
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-const WARN_MS = reduceMotion ? 0 : 350
+import { anim, reducedMotion } from '../../settings'
+const warnMs = () => (reducedMotion.value ? 0 : anim(350))
 /** Needle speed, degrees per second (a full turn in ~1.1 s, like the game). */
 const SPEED = 330
-const HOLD_MS = 1600
+const holdMs = () => anim(1600)
 
 const GOOD_DEG = 58
 const GREAT_DEG = 11
@@ -72,7 +72,8 @@ function check(verdict: SkillVerdict, greatOnly: boolean, face?: number): Check 
 
 const checks = ref<Check[]>([])
 const angle = ref<number[]>([])
-const sweepMs = computed(() => (reduceMotion ? 0 : Math.max(...checks.value.map((c) => (c.stop / SPEED) * 1000), 0)))
+// the needle's CSS transition is written at full length and played at the player's speed (settings.ts)
+const sweepMs = computed(() => (reducedMotion.value ? 0 : anim(Math.max(...checks.value.map((c) => (c.stop / SPEED) * 1000), 0))))
 
 let timers: number[] = []
 function clear() {
@@ -96,14 +97,14 @@ watch(
       window.setTimeout(() => {
         phase.value = 'sweep'
         angle.value = checks.value.map((k) => k.stop)
-      }, WARN_MS),
+      }, warnMs()),
       window.setTimeout(() => {
         phase.value = 'landed'
         if (c.tone === 'bad') fxSound.skillFail()
         else if (c.tone === 'great') fxSound.skillGreat()
         else fxSound.skillGood()
-      }, WARN_MS + sweepMs.value),
-      window.setTimeout(next, WARN_MS + sweepMs.value + HOLD_MS),
+      }, warnMs() + sweepMs.value),
+      window.setTimeout(next, warnMs() + sweepMs.value + holdMs()),
     )
   },
   { immediate: true },
@@ -167,7 +168,7 @@ const anyFail = computed(() => shownDice.value.some((d) => isFailure(d) && !d.as
               class="needle"
               :style="{
                 transform: `rotate(${angle[i]}deg)`,
-                transitionDuration: phase === 'sweep' ? `${(k.stop / SPEED) * 1000 * (reduceMotion ? 0 : 1)}ms` : '0ms',
+                transitionDuration: phase === 'sweep' ? `${(k.stop / SPEED) * 1000 * (reducedMotion ? 0 : 1)}ms` : '0ms',
               }"
             >
               <line x1="0" y1="-44" x2="0" y2="-84" />

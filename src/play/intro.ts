@@ -52,7 +52,7 @@ export function startsRolled(st: GameState): boolean {
   return st.round === 1 && !st.startPending && (st.phase === 'setup' || (st.phase === 'planning' && st.log.some((e) => /เริ่มที่/.test(e.text))))
 }
 
-/** Survivors in turn order from the first player, then the killer (as in the companion): the faces are read back from the rooms. */
+/** Survivors in turn order from the first player, then the killer: the faces are read back from the rooms. */
 export function startMinis(st: GameState): StartMini[] {
   const rooms = boards[st.board].rooms
   const faceOf = (room: string) => rooms.find((r) => r.id === room)?.startFace ?? 0

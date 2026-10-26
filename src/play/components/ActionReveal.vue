@@ -25,7 +25,7 @@ const killer = computed(() => current.value?.owner === 'killer')
 
 const LABEL = { move: 'เคลื่อนที่', action: 'แอ็กชัน', power: 'ใช้พลัง', passive: 'Passive' } as const
 
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+import { anim, reducedMotion } from '../../settings'
 
 let timer: number | undefined
 watch(
@@ -37,7 +37,7 @@ watch(
     if (a.kind === 'power') fxSound.perk(true)
     else if (a.kind === 'move') sfx.drop()
     else sfx.select()
-    timer = window.setTimeout(next, a.kind === 'move' ? 1000 : reduceMotion ? 1200 : 1400)
+    timer = window.setTimeout(next, anim(a.kind === 'move' ? 1000 : reducedMotion.value ? 1200 : 1400))
   },
   { immediate: true },
 )

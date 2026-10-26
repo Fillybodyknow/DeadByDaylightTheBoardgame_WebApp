@@ -291,7 +291,7 @@ const shaking = ref(false)
 const boardEl = ref<HTMLElement>()
 let fxId = 0
 
-const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+import { anim, reducedMotion } from '../../settings'
 
 const FX_MS: Record<FxKind, number> = { blood: 1100, spikes: 1600, burst: 1100, debris: 800, snap: 500, float: 1300, heal: 1100 }
 
@@ -299,18 +299,18 @@ function addFx(kind: FxKind, at: [number, number], extra: Partial<Fx> = {}, dela
   const show = () => {
     const fx: Fx = { id: ++fxId, kind, x: at[0], y: at[1], ...extra }
     effects.value = [...effects.value, fx]
-    window.setTimeout(() => (effects.value = effects.value.filter((f) => f.id !== fx.id)), FX_MS[kind])
+    window.setTimeout(() => (effects.value = effects.value.filter((f) => f.id !== fx.id)), anim(FX_MS[kind]))
   }
-  if (delay) window.setTimeout(show, delay)
+  if (delay) window.setTimeout(show, anim(delay))
   else show()
 }
 
 function shake() {
-  if (reduceMotion) return
+  if (reducedMotion.value) return
   shaking.value = false
   void nextTick(() => {
     shaking.value = true
-    window.setTimeout(() => (shaking.value = false), 450)
+    window.setTimeout(() => (shaking.value = false), anim(450))
   })
 }
 
@@ -347,18 +347,19 @@ watch(
     for (const ev of fresh) delay = play(ev, delay)
     // Hits, hooks and repairs need a moment to be seen before the next question pops up.
     const big = fresh.some((e) => ['wound', 'hook', 'genDone', 'gatesPowered', 'rescue', 'trapSprung', 'palletBreak', 'wallBreak'].includes(e.k))
-    holdBoard(Math.max(walking, big ? delay + 900 : 0))
+    holdBoard(Math.max(walking, big ? anim(delay + 900) : 0))
   },
 )
 
 /** Minis walk from where they were, through the middle of each path they took; returns how long it takes. */
 function walk(events: GameEvent[], from: Map<string, Rect>): number {
   let longest = 0
+  const step = anim(380) // one path's stride
   const moved = new Map<string, string[]>()
   for (const ev of events) if (ev.k === 'move') moved.set(key(ev.who), [...(moved.get(key(ev.who)) ?? []), ev.path])
   for (const [k, now] of rects.value.minis) {
     const was = from.get(k)
-    if (!was || (was.x === now.x && was.y === now.y) || reduceMotion) continue
+    if (!was || (was.x === now.x && was.y === now.y) || reducedMotion.value) continue
     const el = boardEl.value?.querySelector<HTMLElement>(`[data-mini="${k}"]`)
     if (!el) continue
     // A teleport has no path: straight there.
@@ -367,10 +368,10 @@ function walk(events: GameEvent[], from: Map<string, Rect>): number {
       return { x: cx - now.w / 2, y: cy - (now.w * board.value.aspect) / 2, w: now.w }
     })
     const frames = [was, ...via, now].map((r) => ({ left: pct(r.x), top: pct(r.y) }))
-    el.animate(frames, { duration: 380 * (frames.length - 1), easing: 'ease-in-out' })
+    el.animate(frames, { duration: step * (frames.length - 1), easing: 'ease-in-out' })
     // a footstep per path — or the vault's, or going over a pallet
-    ;(moved.get(k) ?? []).filter(Boolean).forEach((p, i) => window.setTimeout(() => pathSound(p), 380 * (i + 1)))
-    longest = Math.max(longest, 380 * (frames.length - 1))
+    ;(moved.get(k) ?? []).filter(Boolean).forEach((p, i) => window.setTimeout(() => pathSound(p), step * (i + 1)))
+    longest = Math.max(longest, step * (frames.length - 1))
   }
   return longest
 }
@@ -389,7 +390,7 @@ function play(ev: GameEvent, delay: number): number {
   switch (ev.k) {
     case 'reveal':
       flipping.value = [...flipping.value, ev.prop]
-      window.setTimeout(() => (flipping.value = flipping.value.filter((p) => p !== ev.prop)), 800)
+      window.setTimeout(() => (flipping.value = flipping.value.filter((p) => p !== ev.prop)), anim(800))
       fxSound.flip()
       if (ev.kind === 'crow') fxSound.crow()
       return delay
@@ -508,7 +509,7 @@ function play(ev: GameEvent, delay: number): number {
     case 'bp': {
       const at = whereIs(ev.who)
       if (at) addFx('float', [at[0], at[1] - 0.03], { text: `+${ev.n} ▲`, tone: ev.who === 'killer' ? 'red' : 'white' }, delay)
-      window.setTimeout(() => fxSound.bp(), delay)
+      window.setTimeout(() => fxSound.bp(), anim(delay))
       return delay + 120
     }
     case 'carryEscape': {

@@ -4,6 +4,7 @@
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { asset } from '../../i18n'
 import { fx } from '../fx/bus'
+import { anim } from '../../settings'
 import { fxSound } from '../fx/audio'
 import Mini from './Mini.vue'
 import BpText from '../../components/BpText.vue'
@@ -11,7 +12,7 @@ import BpText from '../../components/BpText.vue'
 const props = defineProps<{ paused: boolean }>()
 
 const current = computed(() => (props.paused ? null : (fx.banners[0] ?? null)))
-const SHOW_MS = 1250
+const SHOW_MS = 1250 // at the player's animation speed (anim)
 /** Older than this when its turn comes: skip it, the game has moved on. */
 const STALE_MS = 2500
 
@@ -26,7 +27,7 @@ watch(
       return
     }
     fxSound.whoosh()
-    timer = window.setTimeout(() => fx.banners.shift(), SHOW_MS)
+    timer = window.setTimeout(() => fx.banners.shift(), anim(SHOW_MS))
   },
   { immediate: true },
 )
