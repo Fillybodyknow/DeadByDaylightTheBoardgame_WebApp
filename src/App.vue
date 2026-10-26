@@ -11,7 +11,7 @@ import { asset, lang } from './i18n'
 import { game, tutorial } from './play/game'
 import { isPhone } from './play/device'
 import { introStage } from './play/intro'
-import { session } from './play/online/session'
+import { finishedGame, session } from './play/online/session'
 import PhoneBlock from './play/views/PhoneBlock.vue'
 import { setAmbient, type AmbientTrack } from './sound'
 import { useLobbyStore } from './stores/lobby'
@@ -49,7 +49,7 @@ const inGame = computed(
     // the alarm before a game plays over the page it started from, laid out as that page
     introStage.value !== 'beat' &&
     ((route.name === 'offline' && !!game.value && !session.room) ||
-      (route.name === 'online' && !!session.data?.game && !!game.value) ||
+      (route.name === 'online' && !!(session.data?.game || finishedGame.value) && !!game.value) ||
       (route.name === 'tutorial' && !!tutorial.value && !!game.value)),
 )
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
@@ -52,6 +52,35 @@ const props = defineProps<{ st: GameState }>()
 
 const view = shallowRef<GameState>(props.st)
 
+/**
+ * Sacrifice Progress rises that come with a hanging: shown once the board has played it (the
+ * survivor on the hook, its spikes and shake), not before it as the rest of the queue is. The view
+ * moves on to the new state first, so the board can play it.
+ */
+const afterBoard: [total: number, gained: number][] = []
+let afterBoardWaiting = false
+/** The game's finale, when a hanging ended it: after the board too, after any rise before it. */
+let afterBoardFinale: 'survivors' | 'killer' | null = null
+/** A rise after a hanging is waiting or showing: the side panel waits too, so the next player's question doesn't show under it. */
+const sacrificeHold = ref(false)
+const holdPanel = computed(() => sacrificeHold.value || fx.perks.some((p) => p.sacrifice))
+async function showAfterBoard() {
+  if (afterBoardWaiting) return
+  afterBoardWaiting = true
+  // the board starts its animation on the new view's next frame: let it, then wait it out
+  await nextTick()
+  await new Promise((r) => requestAnimationFrame(() => r(null)))
+  while (fx.boardBusy) await new Promise((r) => setTimeout(r, 100))
+  afterBoardWaiting = false
+  for (const [total, gained] of afterBoard.splice(0)) showSacrifice(total, gained)
+  if (afterBoardFinale) showFinale(afterBoardFinale)
+  afterBoardFinale = null
+  sacrificeHold.value = false
+}
+watch(view, () => {
+  if ((afterBoard.length || afterBoardFinale) && view.value === props.st) void showAfterBoard()
+})
+
 /** The dice of a roll that waited for a decision, already shown on screen. */
 let pendingShown: string | null = null
 
@@ -61,6 +90,9 @@ watch(
     if (!prev || st.log.length < prev.log.length) {
       // Undo: show it straight away.
       clearFx()
+      afterBoard.splice(0)
+      afterBoardFinale = null
+      sacrificeHold.value = false
       view.value = st
       return
     }
@@ -68,8 +100,11 @@ watch(
     const casts = new CastBuilder(prev, st)
     // the track as it stood before each event: only a rise is shown (Breakdown lowers it)
     let sacrificed = prev.sacrifice
+    // a survivor hung on a hook: the board shows the hanging first, the track's rise after it
+    let hung = false
     for (const [n, e] of fresh.entries()) {
       const ev = e.ev
+      if (ev?.k === 'hook') hung = true
       // a player's action (a card played, an attack, a pallet, the power): shown before the result
       const cast = casts.of(e)
       if (cast) showAction(cast)
@@ -80,10 +115,23 @@ watch(
       // The perk's card, big: the log line after "—" says what it did.
       if (ev?.k === 'sacrifice') {
         // the last one is the finale's, not a card of its own
-        if (ev.total > sacrificed && ev.total < SACRIFICE_TO_WIN) showSacrifice(ev.total, ev.total - sacrificed)
+        if (ev.total > sacrificed && ev.total < SACRIFICE_TO_WIN) {
+          // after a hanging, it waits for the board (and so does every rise after it, in order)
+          if (hung) {
+            afterBoard.push([ev.total, ev.total - sacrificed])
+            sacrificeHold.value = true
+          }
+          else showSacrifice(ev.total, ev.total - sacrificed)
+        }
         sacrificed = ev.total
       }
-      if (ev?.k === 'gameOver') showFinale(ev.winner)
+      // the hanging that fills the track: its finale waits for the board too, as the rises do
+      if (ev?.k === 'gameOver') {
+        if (hung) {
+          afterBoardFinale = ev.winner
+          sacrificeHold.value = true
+        } else showFinale(ev.winner)
+      }
       if (ev?.k === 'perk') showPerk({ perk: ev.perk, owner: ev.who, detail: e.text.split(' — ').slice(1).join(' — ') })
       // A roll already shown while it waited for a decision, and kept as it was, isn't shown twice.
       if (e.dice && ev?.k === 'roll' && JSON.stringify(e.dice) !== pendingShown)
@@ -1094,7 +1142,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <!-- while the start-room rolls play on the map, nobody is asked anything: the panel stays empty
              (else the step waiting next — a killer perk at the start of planning — showed to everyone) -->
         <ActionPanel
-          v-else-if="!over && !fx.starts"
+          v-else-if="!over && !fx.starts && !holdPanel"
           :st="view"
           :power-on="powerOn"
           :undying-on="undyingOn"
@@ -1150,9 +1198,11 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <StartPlacement />
     <PerkPrompt :st="view" :hidden="secret || !!over || !viewTurn" :on-board="onBoard" />
     <DiceModal />
-    <RoundSummary v-if="summaryRound !== null && !over && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" @close="summaryRound = null" />
+    <!-- (and not before a rise waiting for the board: the round's summary comes after its reveal) -->
+    <RoundSummary v-if="summaryRound !== null && !over && !holdPanel && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" @close="summaryRound = null" />
     <DetailModal v-if="inspecting" :st="view" :target="inspecting" @close="inspecting = null" />
-    <EndSummary v-if="over && showOver" :st="view" :winner="over" :online="!!online" @close="showOver = false" @again="playAgain" />
+    <!-- (not before the game's last beat: a finale waiting for the board holds it back too) -->
+    <EndSummary v-if="over && showOver && !holdPanel && !fx.finale" :st="view" :winner="over" :online="!!online" @close="showOver = false" @again="playAgain" />
   </div>
 </template>
 

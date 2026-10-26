@@ -28,7 +28,7 @@ export interface Member {
   side: Side | null
   ready: boolean
   joinedAt: number
-  /** The game is over and this member went back to the lobby (waiting for the others). */
+  /** Rooms from before 1.11.2: the game was over and this member waited in the lobby for the others. */
   back?: boolean
   /** Their pings' colour (pingColors.ts), unique in the room; unset: the first one free. */
   color?: string

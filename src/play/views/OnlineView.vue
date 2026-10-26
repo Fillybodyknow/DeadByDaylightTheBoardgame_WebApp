@@ -10,7 +10,7 @@ import MatchBeat from '../components/MatchBeat.vue'
 import OnlineEntry from '../components/OnlineEntry.vue'
 import OnlineRoom from '../components/OnlineRoom.vue'
 import { game } from '../game'
-import { closeOnlineGame, isHost, leaveRoom, returnToLobby, session, stillInGame } from '../online/session'
+import { finishedGame, session } from '../online/session'
 
 /**
  * Everyone is ready and the killer started: first the beat — the alarm and the heartbeat over the
@@ -43,20 +43,10 @@ watch(
        layout as if it weren't there. -->
   <div class="online-view">
     <template v-if="session.data">
-      <!-- the game is over and this player went back: wait for the others (the room resets then) -->
-      <section v-if="session.data.game && session.data.members[session.me]?.back" class="card waiting">
-        <h2>กลับ Lobby แล้ว</h2>
-        <p>รอผู้เล่นคนอื่นออกจากหน้าสรุปเกม — ห้องจะกลับไปที่ Lobby เมื่อทุกคนกดกลับ</p>
-        <p class="muted">ยังดูสรุปเกมอยู่: {{ stillInGame.map((s) => s.name).join(', ') }}</p>
-        <div class="actions">
-          <button @click="returnToLobby(false)">ดูสรุปเกมอีกครั้ง</button>
-          <button v-if="isHost" class="primary" @click="closeOnlineGame()">พาทุกคนกลับ Lobby ตอนนี้</button>
-          <button @click="leaveRoom()">ออกจากห้อง</button>
-        </div>
-      </section>
-      <TrialLoading v-else-if="session.data.game && game && intro === 'loading'" :st="game" @done="loaded" />
-      <!-- during the beat the room stays on screen, under it -->
-      <template v-else-if="session.data.game && game && intro !== 'beat'">
+      <TrialLoading v-if="session.data.game && game && intro === 'loading'" :st="game" @done="loaded" />
+      <!-- during the beat the room stays on screen, under it; a finished game's summary stays on
+           this device until its player goes back, though the room is in its lobby again -->
+      <template v-else-if="(session.data.game || finishedGame) && game && intro !== 'beat'">
         <GameScreen :st="game" />
       </template>
       <OnlineRoom v-else />
@@ -70,20 +60,5 @@ watch(
 <style scoped>
 .online-view {
   display: contents;
-}
-.waiting {
-  max-width: 560px;
-  margin: 2rem auto;
-  display: grid;
-  gap: 0.6rem;
-}
-.waiting h2,
-.waiting p {
-  margin: 0;
-}
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
 }
 </style>

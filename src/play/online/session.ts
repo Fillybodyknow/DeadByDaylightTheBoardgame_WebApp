@@ -5,13 +5,14 @@
 //           starts the game.
 //   game  — mirrored into game.ts, which every game screen already reads.
 
-import { computed, reactive, toRaw } from 'vue'
+import { computed, reactive, shallowRef, toRaw } from 'vue'
 import { killerById, survivorById } from '../../data'
 import { createGame, handLayout } from '../engine/engine'
 import { boards, macmillan } from '../engine/boards'
 import { KILLER_PLAYER } from '../engine/seats'
 import { bloodwebHands, choicesFor, loadoutProblem, packLoadout, takenBy, unpackLoadout, type LoadoutCharacter } from '../engine/loadout'
 import type { PerkId } from '../engine/perks'
+import type { GameState } from '../engine/types'
 import { game, online, receive, restoreLocal } from '../game'
 import { firebaseBackend, firebaseConfigured } from './firebase'
 import { localBackend } from './local'
@@ -201,9 +202,19 @@ function enter(room: Room) {
     if (data.host === session.me) publish(room.code, data)
     settle(room, data)
     // Mirror the room's game. A device without a seat watches (seat 0 may not act).
-    online.value = data.game ? { room, seat: mySeat.value ?? 0, latest: () => toRaw(session.data)?.game ?? null } : null
-    if (data.game) receive(data.game)
-    else if (game.value && online.value === null) restoreLocal()
+    if (data.game) {
+      summaryDone = false
+      finishedGame.value = null
+      online.value = { room, seat: mySeat.value ?? 0, latest: () => toRaw(session.data)?.game ?? null }
+      receive(data.game)
+    } else if (finishedGame.value || (online.value && game.value?.phase === 'over' && !summaryDone)) {
+      // Someone else went back and the room is in its lobby again: this device stays on the game's
+      // summary, from its own copy, until its player goes back too (returnToLobby).
+      finishedGame.value = game.value
+    } else {
+      online.value = null
+      if (game.value) restoreLocal()
+    }
   })
 }
 
@@ -809,26 +820,24 @@ export function backToLobby() {
   return update((cur) => ({ ...cur, phase: 'lobby', seats: {}, players: 0, picks: {}, locked: {}, loadouts: {}, perksDone: {}, boardSet: false, banPicks: { killer: '', survivors: '' }, bansLocked: {} }))
 }
 
-/** Seated players still on the game's summary (not back in the lobby yet). */
-export const stillInGame = computed(() => {
-  const d = session.data
-  if (!d?.game) return []
-  return Object.values(d.seats).filter((s) => !d.members[s.id]?.back)
-})
+/**
+ * A finished online game this device still shows (its summary) after the room went back to its
+ * lobby: whoever goes back first takes the room there, and everyone else stays on the summary,
+ * from their own copy, until they go back themselves. Nobody is pulled out of it, nobody waits.
+ */
+export const finishedGame = shallowRef<GameState | null>(null)
+/** This device has left the summary: the room's lobby, not its copy of the game, from now on. */
+let summaryDone = false
 
 /**
- * The game is over: this player goes back to the lobby (or, `back` false, to the summary again).
- * The room resets once every seated player has gone back; until then they wait in the lobby.
+ * The game is over: this player goes back to the lobby, now. The first one back takes the room
+ * there (the game is cleared, sides kept, everyone un-ready); the others stay on their summary.
  */
-export async function returnToLobby(back = true) {
-  await update((cur) => {
-    const mine = cur.members[session.me]
-    if (!mine || !cur.game || cur.game.phase !== 'over') return null
-    const { back: _was, ...rest } = mine
-    void _was
-    return { ...cur, members: { ...cur.members, [session.me]: back ? { ...rest, back: true } : rest } }
-  })
-  if (back && stillInGame.value.length === 0) await closeOnlineGame()
+export async function returnToLobby() {
+  summaryDone = true
+  if (session.data?.game?.phase === 'over') await closeOnlineGame()
+  finishedGame.value = null
+  restoreLocal()
 }
 
 /** Host: end the game for everyone and go back to the lobby (sides kept, everyone un-ready). */

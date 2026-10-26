@@ -694,6 +694,8 @@ function guard(e: MouseEvent) {
         @pointerleave="pressEnd"
       >
         <img :src="asset(propImage(p))" alt="" draggable="false" />
+        <!-- pointed at: a bigger copy above it, to look at (the tile itself keeps its place) -->
+        <img v-if="p.revealed" class="peek" :src="asset(propImage(p))" alt="" draggable="false" />
         <span v-if="p.revealed && (p.kind === 'generator' || p.kind === 'exitGate')" class="progress">{{ p.progress }}/3</span>
         <img v-if="entityProp === p.id" class="entity" :src="asset(components.entity.image)" alt="Entity" />
         <Mini
@@ -947,12 +949,32 @@ button.room-hit.pick:hover:not(:disabled) .pick-tag {
   border-radius: 50%;
   transition: transform 0.15s ease;
 }
-/* pointing at a revealed prop brings it up to look at (it grows from its centre, so the
-   pointer stays on it) */
+/* Pointing at a revealed prop shows a bigger copy of it just above, to look at. The tile itself
+   stays as it is: grown in place it covered the props beside it, and lifted it would leave the
+   pointer and drop back. The copy takes no pointer, so what is under it can still be pointed at. */
 .tile:not(.down):hover {
   z-index: 6;
-  transform: scale(1.6);
-  animation: none;
+}
+.peek {
+  position: absolute;
+  left: 50%;
+  bottom: 108%;
+  width: 190%;
+  height: 190%;
+  translate: -50% 0;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: 0;
+  scale: 0.6;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.85));
+  transition:
+    opacity 0.12s ease,
+    scale 0.12s ease;
+}
+.tile:not(.down):hover > .peek {
+  opacity: 1;
+  scale: 1;
 }
 button.tile {
   cursor: pointer;
@@ -1078,7 +1100,7 @@ button.tile.picked::after {
 .occupant.wounded {
   box-shadow: 0 0 0 2px rgb(0 0 0 / 0.85);
 }
-/* the tile grows on hover: the portrait rides along, so it is still readable */
+/* pointed at: the portrait shows clearly too */
 .tile:not(.down):hover .occupant {
   filter: none;
 }
@@ -1221,8 +1243,6 @@ button.tile.act {
 }
 .tile.act:hover {
   z-index: 6;
-  transform: scale(1.6);
-  animation: none;
 }
 
 /* ---------- a piece to click, or one a decision is about ----------
