@@ -7,6 +7,8 @@
 //          rooms/<code>/pings  { <client id>: { x, y, at, n } }  each member's last ping
 //          rooms/<code>/chat   { <push id>: { from, name, text, at } }  the chat, oldest first
 //          rooms/<code>/chatAt { <client id>: at }  when each member last chatted (the rules' rate limit)
+//          rooms/<code>/voice  { <client id>: { s, m } }  who is in the voice channel (voice.ts)
+//          rooms/<code>/vsig   { <client id>: { <push id>: { f, s, r, k, d } } }  voice signals to each member, read once
 //
 // A move is written to its own numbered slot, and every device replays the moves on top of the
 // checkpoint to get the same game (see transport.ts). That keeps a move at a few hundred bytes
@@ -23,11 +25,11 @@
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { get, getDatabase, limitToLast, onChildAdded, onChildChanged, onDisconnect, onValue, push, query, ref, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
+import { get, getDatabase, limitToLast, onChildAdded, onChildChanged, onDisconnect, onValue, push, query, ref, remove, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
 import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
-import type { Backend, ChatMessage, Ping, Room, RoomData, RoomListing } from './transport'
+import type { Backend, ChatMessage, Ping, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
 import { CHAT_KEEP, CHECKPOINT_EVERY, emptyRoom, moveKey, normalizeRoom } from './transport'
 
 const env = import.meta.env
@@ -356,6 +358,41 @@ class FirebaseRoom implements Room {
         seen[from] = p.n
         if (prev && prev[from] !== p.n) cb({ from, x: p.x, y: p.y })
       }
+    })
+    this.unsubs.push(off)
+    return off
+  }
+
+  // ----- voice: who is in, and the signals that connect them (the sound itself never comes here) -----
+
+  async voiceJoin(member: string, entry: VoiceEntry) {
+    // a dropped connection takes the member out, and their unread signals with them
+    await onDisconnect(this.path(`/voice/${member}`)).remove()
+    await onDisconnect(this.path(`/vsig/${member}`)).remove()
+    await set(this.path(`/voice/${member}`), entry)
+  }
+
+  async voiceLeave(member: string) {
+    await onDisconnect(this.path(`/voice/${member}`)).cancel()
+    await onDisconnect(this.path(`/vsig/${member}`)).cancel()
+    await update(this.path(), { [`voice/${member}`]: null, [`vsig/${member}`]: null })
+  }
+
+  onVoice(cb: (roster: Record<string, VoiceEntry>) => void) {
+    const off = onValue(this.path('/voice'), (snap) => cb((snap.val() as Record<string, VoiceEntry> | null) ?? {}))
+    this.unsubs.push(off)
+    return off
+  }
+
+  async voiceSignal(to: string, sig: VoiceSignal) {
+    await set(push(this.path(`/vsig/${to}`)), sig)
+  }
+
+  onVoiceSignals(member: string, cb: (sig: VoiceSignal) => void) {
+    // in push order, so an offer comes before its routes; each is taken out once read
+    const off = onChildAdded(this.path(`/vsig/${member}`), (snap) => {
+      cb(snap.val() as VoiceSignal)
+      void remove(snap.ref).catch(() => {})
     })
     this.unsubs.push(off)
     return off

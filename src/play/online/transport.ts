@@ -65,6 +65,31 @@ export interface ChatMessage {
   at: number
 }
 
+/**
+ * A member in the room's voice channel. The voice itself goes straight between the devices
+ * (WebRTC, see voice.ts): the room only says who is in and carries the messages that connect them.
+ */
+export interface VoiceEntry {
+  /** This joining's id: a new one means a new connection (they left and came back, or reloaded). */
+  s: string
+  /** Their microphone is off. */
+  m: boolean
+  /** Listening only: a spectator, who hears the players but may not talk. */
+  l?: boolean
+}
+
+/** A message connecting two devices' voice, to one member: an offer, its answer, a network route. */
+export interface VoiceSignal {
+  /** Client id of the sender. */
+  f: string
+  /** The sender's joining (VoiceEntry.s), and the one it is meant for: older ones are dropped. */
+  s: string
+  r: string
+  k: 'offer' | 'answer' | 'ice'
+  /** The description or the route, as JSON. */
+  d: string
+}
+
 /** The longest message, and how many of the latest a room shows. */
 export const CHAT_MAX = 200
 export const CHAT_KEEP = 100
@@ -170,6 +195,18 @@ export interface Room {
   chat?(m: { from: string; name: string; text: string }): Promise<void>
   /** The room's latest messages (CHAT_KEEP), oldest first: now and on every new one. Returns an unsubscribe. */
   onChat?(cb: (messages: ChatMessage[]) => void): () => void
+  /**
+   * Join the voice channel (or update this member's entry); the server takes the entry and the
+   * member's unread signals out if the connection drops.
+   */
+  voiceJoin?(member: string, entry: VoiceEntry): Promise<void>
+  voiceLeave?(member: string): Promise<void>
+  /** Who is in the voice channel: now and on every change. Returns an unsubscribe. */
+  onVoice?(cb: (roster: Record<string, VoiceEntry>) => void): () => void
+  /** Send a signal to one member. */
+  voiceSignal?(to: string, sig: VoiceSignal): Promise<void>
+  /** This member's signals as they come, each once (taken out of the room as it is read). Returns an unsubscribe. */
+  onVoiceSignals?(member: string, cb: (sig: VoiceSignal) => void): () => void
   /** Whether this device is connected to the room's server (a backend without one is always). */
   onConnection?(cb: (up: boolean) => void): () => void
   close(): void

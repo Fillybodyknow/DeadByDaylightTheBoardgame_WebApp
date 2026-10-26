@@ -44,6 +44,18 @@
             ".validate": "newData.val() == now && (!data.exists() || now - data.val() >= 1000)"
           }
         },
+        "voice": {
+          "$member": {
+            ".validate": "newData.hasChildren(['s', 'm']) && newData.child('s').isString() && newData.child('s').val().length <= 16 && newData.child('m').isBoolean() && (!newData.child('l').exists() || newData.child('l').isBoolean())"
+          }
+        },
+        "vsig": {
+          "$member": {
+            "$sig": {
+              ".validate": "newData.hasChildren(['f', 's', 'r', 'k', 'd']) && newData.child('f').isString() && newData.child('f').val().length <= 64 && newData.child('s').isString() && newData.child('s').val().length <= 16 && newData.child('r').isString() && newData.child('r').val().length <= 16 && newData.child('k').isString() && newData.child('k').val().matches(/^(offer|answer|ice)$/) && newData.child('d').isString() && newData.child('d').val().length < 20000"
+            }
+          }
+        },
         "$other": {
           ".validate": false
         }

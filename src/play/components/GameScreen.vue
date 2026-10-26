@@ -23,6 +23,7 @@ import { decisionFocus } from '../focus'
 import { STEP_NAME, boardActionKeys, perkPicked, perksToPick, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, cardImage, killerMini, playerOf, survivorMini } from '../labels'
 import SettingsDialog from '../../components/SettingsDialog.vue'
+import VoiceButton from './VoiceButton.vue'
 import ActionPanel from './ActionPanel.vue'
 import ActionReveal from './ActionReveal.vue'
 import FinaleReveal from './FinaleReveal.vue'
@@ -1075,6 +1076,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           📍<b v-if="pingWait" class="ping-count">{{ pingWait }}</b><span v-else class="btn-text"> {{ pingArmed ? 'คลิกบนแผนที่' : 'ปิง' }}</span>
         </button>
         <button v-if="canFullscreen" :title="fullscreen ? 'ออกจากเต็มจอ' : 'เต็มจอ'" @click="toggleFullscreen">{{ fullscreen ? '🗗' : '⛶' }}</button>
+        <VoiceButton v-if="online" />
         <SettingsDialog />
         <button @click="leave">ออก</button>
       </div>

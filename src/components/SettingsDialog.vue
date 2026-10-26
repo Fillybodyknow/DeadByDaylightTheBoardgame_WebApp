@@ -7,6 +7,10 @@ import { lang } from '../i18n'
 import { settings, resetSettings, type AnimSpeed } from '../settings'
 import { muted, sfx, volumes, type Volumes } from '../sound'
 import { game, online, quitGame } from '../play/game'
+import { TAKEN_KEYS, keyLabel, micList } from '../play/voice'
+
+// the window is teleported: a class given to this component goes on the ⚙ button
+defineOptions({ inheritAttrs: false })
 
 const open = ref(false)
 type Tab = 'sound' | 'display' | 'online' | 'data'
@@ -26,6 +30,7 @@ function close() {
   open.value = false
 }
 function onKey(e: KeyboardEvent) {
+  if (capturing.value) return onCapture(e)
   if (e.key === 'Escape' && open.value) {
     e.stopPropagation()
     close()
@@ -44,6 +49,40 @@ const icon = computed(() => (muted.value || volumes.master === 0 ? '🔇' : '⚙
 function setVolume(key: keyof Volumes, e: Event) {
   volumes[key] = Number((e.target as HTMLInputElement).value) / 100
 }
+// ---------- voice (online) ----------
+// The push-to-talk key: press the button, then the key wanted (Escape: as it was).
+const capturing = ref(false)
+const keyRefused = ref('')
+function onCapture(e: KeyboardEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+  if (e.code === 'Escape') {
+    capturing.value = false
+    return
+  }
+  if (TAKEN_KEYS.includes(e.code)) {
+    keyRefused.value = `${keyLabel(e.code)} ใช้ทำอย่างอื่นอยู่ เลือกปุ่มอื่น`
+    return
+  }
+  settings.pttKey = e.code
+  keyRefused.value = ''
+  capturing.value = false
+}
+watch(open, (o) => {
+  if (!o) capturing.value = false
+})
+const mics = ref<{ id: string; label: string }[]>([])
+async function loadMics() {
+  try {
+    mics.value = await micList()
+  } catch {
+    mics.value = []
+  }
+}
+watch([open, tab], ([o, t]) => {
+  if (o && t === 'sound') void loadMics()
+})
+
 /** A short tap at the new level, so the effects slider can be judged by ear. */
 function preview(key: keyof Volumes) {
   if (key !== 'music') sfx.select()
@@ -102,7 +141,7 @@ watch(tab, () => (confirming.value = null))
 </script>
 
 <template>
-  <button type="button" class="settings-btn" title="ตั้งค่า" aria-label="ตั้งค่า" :aria-expanded="open" @click="toggle">{{ icon }}</button>
+  <button v-bind="$attrs" type="button" class="settings-btn" title="ตั้งค่า" aria-label="ตั้งค่า" :aria-expanded="open" @click="toggle">{{ icon }}</button>
   <Teleport to="body">
     <div v-if="open" class="backdrop" @click.self="close">
       <section class="settings" role="dialog" aria-modal="true" aria-label="ตั้งค่า">
@@ -141,6 +180,55 @@ watch(tab, () => (confirming.value = null))
             <label class="switch">
               <input v-model="settings.chaseMusic" type="checkbox" />
               <span><b>เพลงไล่ล่า</b><small>เพลงของฆาตกรเมื่อเขาอยู่ห้องเดียวกับผู้รอดชีวิต</small></span>
+            </label>
+            <h3 class="sub">เสียงพูด (ออนไลน์)</h3>
+            <label class="slider" :class="{ off: muted }">
+              <span class="name"><span aria-hidden="true">🗣️</span> เสียงเพื่อน</span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                :value="Math.round(settings.voiceVolume * 100)"
+                :disabled="muted"
+                aria-label="เสียงเพื่อน"
+                @input="settings.voiceVolume = Number(($event.target as HTMLInputElement).value) / 100"
+              />
+              <span class="pct">{{ Math.round(settings.voiceVolume * 100) }}</span>
+            </label>
+            <label class="field">
+              <b>ไมโครโฟน</b>
+              <select v-model="settings.micId">
+                <option value="">ค่าเริ่มต้นของเครื่อง</option>
+                <option v-for="m in mics" :key="m.id" :value="m.id">{{ m.label }}</option>
+              </select>
+              <small v-if="mics.length && mics.every((m) => m.label.startsWith('ไมโครโฟน '))">ชื่อไมค์จะขึ้นหลังจากอนุญาตให้ใช้ไมค์ครั้งแรก</small>
+            </label>
+            <div class="field">
+              <b>โหมดไมค์</b>
+              <div class="choice two" role="radiogroup" aria-label="โหมดไมค์">
+                <button type="button" role="radio" :aria-checked="settings.micMode === 'open'" :class="{ on: settings.micMode === 'open' }" @click="settings.micMode = 'open'">
+                  <b>เปิดตลอด</b>
+                  <small>กด M เพื่อปิด/เปิดไมค์</small>
+                </button>
+                <button type="button" role="radio" :aria-checked="settings.micMode === 'ptt'" :class="{ on: settings.micMode === 'ptt' }" @click="settings.micMode = 'ptt'">
+                  <b>กดค้างเพื่อพูด</b>
+                  <small>พูดเฉพาะตอนกดค้าง</small>
+                </button>
+              </div>
+            </div>
+            <div v-if="settings.micMode === 'ptt'" class="field">
+              <div class="keyrow">
+                <span><b>ปุ่มกดค้างเพื่อพูด</b><small>แท็บเล็ต: กดค้างปุ่ม 🎙️ บนจอ</small></span>
+                <button type="button" class="keycap" :class="{ capturing }" @click="(capturing = !capturing), (keyRefused = '')">
+                  {{ capturing ? 'กดปุ่มที่ต้องการ… (Esc ยกเลิก)' : keyLabel(settings.pttKey) }}
+                </button>
+              </div>
+              <small v-if="keyRefused" class="refused">{{ keyRefused }}</small>
+            </div>
+            <label class="switch">
+              <input v-model="settings.voiceAuto" type="checkbox" />
+              <span><b>เข้าห้องเสียงอัตโนมัติ</b><small>เมื่อเข้าห้องออนไลน์ (ผู้เล่นพูดได้ ผู้ชมฟังอย่างเดียว)</small></span>
             </label>
           </template>
 
@@ -205,7 +293,7 @@ watch(tab, () => (confirming.value = null))
               <button type="button" :class="{ danger: confirming === 'tutorial' }" @click="wipe('tutorial')">{{ confirming === 'tutorial' ? 'ยืนยัน รีเซ็ต' : done === 'tutorial' ? '✓ รีเซ็ตแล้ว' : 'รีเซ็ต' }}</button>
             </div>
             <div class="wipe">
-              <span><b>คืนค่าการตั้งค่าทั้งหมด</b><small>เสียง การแสดงผล และการแจ้งเตือน กลับเป็นค่าเริ่มต้น</small></span>
+              <span><b>คืนค่าการตั้งค่าทั้งหมด</b><small>เสียง เสียงพูด การแสดงผล และการแจ้งเตือน กลับเป็นค่าเริ่มต้น</small></span>
               <button type="button" :class="{ danger: confirming === 'settings' }" @click="wipe('settings')">{{ confirming === 'settings' ? 'ยืนยัน คืนค่า' : done === 'settings' ? '✓ คืนค่าแล้ว' : 'คืนค่า' }}</button>
             </div>
           </template>
@@ -296,6 +384,37 @@ small {
   margin-top: 0.25rem;
   width: 1.05rem;
   height: 1.05rem;
+}
+.choice.two {
+  grid-template-columns: repeat(2, 1fr);
+}
+.keyrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+.keycap {
+  flex: none;
+  min-width: 4.5rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+.keycap.capturing {
+  border-color: var(--warn, #d9a227);
+  color: var(--warn, #d9a227);
+}
+.refused {
+  color: #ff8a80;
+}
+.sub {
+  margin: 0.4rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+select {
+  width: 100%;
 }
 .slider {
   display: grid;

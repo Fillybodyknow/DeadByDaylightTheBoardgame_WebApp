@@ -155,6 +155,11 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   otherwise. Game: a 💬 tab under the side panel's tab opens a drawer (Enter to type), an unread
   badge, and each new message as a 6 s bubble beside the sender's tile. Never saved or replayed.
   Notices in it (joined, left, kicked, lost connection, back) come from the members' changes.
+- **Voice (online):** one channel for the room, WebRTC between the devices, the room carrying only
+  who is in and the connecting signals (`voice.ts`, `VoiceButton`). Players talk, spectators only
+  listen (`mayTalk`: a seat, or in the lobby a side picked). The killer hears everyone (p.8).
+  Speaking shows as a green ring on the tile's portrait. The mic is open (M toggles it) or push
+  to talk (a key, V by default, or holding the 🎙️ button). Never saved or replayed.
 - **Presence (online):** a member whose connection drops leaves the lobby by itself (Firebase
   `onDisconnect`, `Room.presence`); in a game they keep their seat, marked `dropped`. Re-set after
   every reconnection (`settle` in `session.ts`).

@@ -122,6 +122,32 @@ and the host starts the game.
   from the moment it entered; none about itself): someone joined, left, was kicked (`kicked`),
   lost their connection or came back (`dropped`). The newest also shows beside the 💬 button
   for a few seconds while the chat is closed.
+- **Voice** (`src/play/voice.ts`, `VoiceButton.vue`): one voice channel for the room, the lobby and
+  the game. **Players talk, spectators only listen** (the user's rule): before the seats are dealt
+  a player is a member in the lineup (a side picked), after it whoever holds a seat (`mayTalk`). A
+  spectator joins without a microphone (none is asked for), and every device keeps a spectator's
+  sound muted whatever it sends. Everyone hears everyone, the killer too (p.8). The 🎙️ button
+  (the room's bar, the game's controls) opens a panel: join (🎧 to listen, for a spectator), the
+  mic on or off, who is in and speaking, each one's volume on this device, leaving. A player in the
+  channel has 🎙️ / 🔇 after their name on the tiles and a green ring on the portrait while they
+  speak (a level meter on each stream, `seatVoice`). Settings → Sound: the voices' volume, the
+  microphone, joining by itself on entering a room, and the mic's mode:
+  - **Open** (the default): the mic sends all the time; M turns it off and on.
+  - **Push to talk**: it sends only while a key is held (V by default, any key but those the
+    game or the browser uses: `TAKEN_KEYS`; picked by pressing it in the settings) or the 🎙️
+    button is held (the way on a tablet; a tap under 250 ms still opens the panel, which has a
+    hold button too). Not while typing, and letting go of the window stops it. The track is
+    switched on and off on this device only: the room isn't written on every press, so the
+    others see the mic as on and who talks by the ring.
+  The sound goes straight between the devices (WebRTC, one connection per pair; of each pair the
+  smaller client id offers). The room carries only who is in (`rooms/<code>/voice/<id>`: the
+  joining's id `s`, mic off `m`, listening only `l`) and the signals that connect them
+  (`rooms/<code>/vsig/<to>/<push id>`, each taken out once read); `onDisconnect` removes both.
+  Routes come from Google's free STUN; a device behind a strict network needs a TURN relay
+  (`VITE_TURN_URLS`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL`; none is set yet), and without
+  one shows "เชื่อมต่อไม่ได้" for that member. Local backend: a BroadcastChannel carries the same.
+  **The database rules must be updated** (`voice`, `vsig`) for voice to work on Firebase; until
+  then joining says the room can't carry voice yet.
 - **Presence** (`Room.presence`, `settle` in `session.ts`): Firebase's `onDisconnect` on the lobby
   node. In the lobby a dropped connection (a closed tab, a lost network) takes the member out and
   marks them in `dropped`, so a closed tab never keeps a place; from the picks on it only marks

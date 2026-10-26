@@ -66,6 +66,7 @@ import MapPicker from './MapPicker.vue'
 import Mini from './Mini.vue'
 import RoomSettingsCard from './RoomSettingsCard.vue'
 import SyncBadge from './SyncBadge.vue'
+import VoiceButton from './VoiceButton.vue'
 
 const data = computed(() => session.data!)
 const code = computed(() => session.room?.code ?? '')
@@ -413,6 +414,7 @@ const seatStatus = computed(() =>
       </button>
       <button type="button" class="invite" @click="copy('link')">{{ copied === 'link' ? '✓ คัดลอกลิงก์แล้ว' : '🔗 ลิงก์เชิญเพื่อน' }}</button>
       <span class="spacer" />
+      <VoiceButton />
       <SyncBadge />
       <button type="button" class="leave" @click="leaveRoom">⎋ ออกจากห้อง</button>
     </header>

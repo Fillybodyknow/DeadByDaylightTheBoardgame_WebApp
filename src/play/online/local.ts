@@ -6,7 +6,7 @@
 
 import { tryApply } from '../engine/engine'
 import type { Action, GameState } from '../engine/types'
-import type { Backend, ChatMessage, Ping, Room, RoomData, RoomListing } from './transport'
+import type { Backend, ChatMessage, Ping, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
 import { CHAT_KEEP, CHECKPOINT_EVERY, emptyRoom, normalizeRoom } from './transport'
 
 const DB = 'dbdl-rooms'
@@ -219,9 +219,91 @@ class LocalRoom implements Room {
     return () => void this.chatListeners.delete(cb)
   }
 
+  // Voice: a channel of its own carries who is in and the signals, nothing stored. A tab that
+  // starts listening asks who is there, and every tab in voice answers.
+  private voiceChannel: BroadcastChannel | null = null
+  private roster: Record<string, VoiceEntry> = {}
+  private mine: { member: string; entry: VoiceEntry } | null = null
+  private rosterListeners = new Set<(r: Record<string, VoiceEntry>) => void>()
+  private signalListeners = new Map<string, Set<(s: VoiceSignal) => void>>()
+
+  private voiceCh(): BroadcastChannel {
+    if (!this.voiceChannel) {
+      this.voiceChannel = new BroadcastChannel(`${DB}-${this.code}-voice`)
+      this.voiceChannel.onmessage = (e: MessageEvent<VoiceMsg>) => this.onVoiceMsg(e.data)
+    }
+    return this.voiceChannel
+  }
+
+  private onVoiceMsg(m: VoiceMsg) {
+    if (m.t === 'who') {
+      // a plain copy: the room sits in the reactive session, so what it holds reads back as a proxy,
+      // which a channel can't send
+      if (this.mine) this.voiceCh().postMessage({ t: 'here', id: this.mine.member, e: { ...this.mine.entry } })
+    } else if (m.t === 'here') {
+      this.setRoster({ ...this.roster, [m.id]: m.e })
+    } else if (m.t === 'gone') {
+      const next = { ...this.roster }
+      delete next[m.id]
+      this.setRoster(next)
+    } else if (m.t === 'sig') {
+      this.signalListeners.get(m.to)?.forEach((cb) => cb(m.sig))
+    }
+  }
+
+  private setRoster(r: Record<string, VoiceEntry>) {
+    this.roster = r
+    this.rosterListeners.forEach((cb) => cb({ ...r }))
+  }
+
+  private onVoiceHide = () => {
+    if (this.mine) this.voiceCh().postMessage({ t: 'gone', id: this.mine.member })
+  }
+
+  async voiceJoin(member: string, entry: VoiceEntry) {
+    this.mine = { member, entry }
+    window.addEventListener('pagehide', this.onVoiceHide)
+    this.voiceCh().postMessage({ t: 'here', id: member, e: entry })
+    this.setRoster({ ...this.roster, [member]: entry })
+  }
+
+  async voiceLeave(member: string) {
+    this.mine = null
+    window.removeEventListener('pagehide', this.onVoiceHide)
+    this.voiceCh().postMessage({ t: 'gone', id: member })
+    const next = { ...this.roster }
+    delete next[member]
+    this.setRoster(next)
+  }
+
+  onVoice(cb: (r: Record<string, VoiceEntry>) => void) {
+    this.rosterListeners.add(cb)
+    this.voiceCh().postMessage({ t: 'who' })
+    cb({ ...this.roster })
+    return () => void this.rosterListeners.delete(cb)
+  }
+
+  async voiceSignal(to: string, sig: VoiceSignal) {
+    this.voiceCh().postMessage({ t: 'sig', to, sig })
+  }
+
+  onVoiceSignals(member: string, cb: (s: VoiceSignal) => void) {
+    this.voiceCh()
+    const set = this.signalListeners.get(member) ?? new Set()
+    set.add(cb)
+    this.signalListeners.set(member, set)
+    return () => void set.delete(cb)
+  }
+
   private closed = false
 
   close() {
+    this.onVoiceHide()
+    this.mine = null
+    window.removeEventListener('pagehide', this.onVoiceHide)
+    this.rosterListeners.clear()
+    this.signalListeners.clear()
+    this.voiceChannel?.close()
     this.closed = true
     this.listeners.clear()
     this.channel.close()
@@ -232,6 +314,9 @@ class LocalRoom implements Room {
     window.removeEventListener('pagehide', this.onHide)
   }
 }
+
+/** What goes round a room's voice channel between tabs. */
+type VoiceMsg = { t: 'who' } | { t: 'here'; id: string; e: VoiceEntry } | { t: 'gone'; id: string } | { t: 'sig'; to: string; sig: VoiceSignal }
 
 // ---------- the room board: one record of listings, beside the rooms ----------
 

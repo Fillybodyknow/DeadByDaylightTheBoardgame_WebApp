@@ -8,6 +8,7 @@ import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, killerCardC
 import type { GameState, ItemUse, PathKind } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
+import { seatVoice } from '../voice'
 import type { InspectTarget } from '../inspect'
 import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini, roundEffects, perkImage } from '../labels'
 import Mini from './Mini.vue'
@@ -191,11 +192,11 @@ function onPowerSlot() {
     <div id="rail-top" class="rail-slot" />
     <div class="tiles">
     <!-- killer -->
-    <div class="tile killer" :class="{ me: mine.includes('killer') }" :data-chat-seat="KILLER_PLAYER" role="button" tabindex="0" :title="`${st.killer.name} — ดูรายละเอียดตัวละคร`" @click="emit('inspect', { k: 'killer' })" @keydown.enter="emit('inspect', { k: 'killer' })">
+    <div class="tile killer" :class="{ me: mine.includes('killer'), talking: seatVoice[KILLER_PLAYER]?.speaking }" :data-chat-seat="KILLER_PLAYER" role="button" tabindex="0" :title="`${st.killer.name} — ดูรายละเอียดตัวละคร`" @click="emit('inspect', { k: 'killer' })" @keydown.enter="emit('inspect', { k: 'killer' })">
       <div class="head">
         <Mini class="mini aura-killer" :src="asset(killerMini(st))" :alt="st.killer.name" />
         <div class="names">
-          <strong class="name" :class="{ me: mine.includes('killer') }">{{ st.killer.name }}</strong>
+          <strong class="name" :class="{ me: mine.includes('killer') }">{{ st.killer.name }}<span v-if="seatVoice[KILLER_PLAYER]" class="vc" :title="seatVoice[KILLER_PLAYER].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[KILLER_PLAYER].micOff ? '🔇' : '🎙️' }}</span></strong>
         </div>
       </div>
       <div class="line small">
@@ -244,7 +245,7 @@ function onPowerSlot() {
       :key="s"
       class="tile"
       :data-chat-seat="firstOfPlayer(s) ? playerOf(st, s) : undefined"
-      :class="{ active: st.activeSurvivor === s, hooked: st.survivors[s].status === 'hooked', wounded: st.survivors[s].wounded, me: mine.includes(s) }"
+      :class="{ talking: seatVoice[playerOf(st, s)]?.speaking, active: st.activeSurvivor === s, hooked: st.survivors[s].status === 'hooked', wounded: st.survivors[s].wounded, me: mine.includes(s) }"
       role="button"
       tabindex="0"
       :title="`${order(s)}. ${st.survivors[s].name}${st.survivors[s].wounded ? ' (บาดเจ็บ)' : ''}${STATUS_TH[st.survivors[s].status] ? ` — ${STATUS_TH[st.survivors[s].status]}` : ''} — ดูรายละเอียดตัวละคร`"
@@ -266,7 +267,7 @@ function onPowerSlot() {
           <img v-if="st.survivors[s].sacrificeToken" class="token" :src="asset(components.sacrificeProgress.image)" alt="" title="ยังมี sacrifice token บนกระดาน" />
         </div>
         <div class="names">
-          <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}</strong>
+          <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}<span v-if="seatVoice[playerOf(st, s)]" class="vc" :title="seatVoice[playerOf(st, s)].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[playerOf(st, s)].micOff ? '🔇' : '🎙️' }}</span></strong>
         </div>
       </div>
       <div class="line small">
@@ -750,6 +751,20 @@ button.slot:hover .slot-crop {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* online voice: in the channel (the mic after the name), speaking now (a green ring on the portrait) */
+.vc {
+  margin-left: 0.3rem;
+  font-size: 0.75em;
+  opacity: 0.8;
+}
+.tile.talking .vc {
+  opacity: 1;
+}
+.tile.talking :deep(.mini) {
+  box-shadow:
+    0 0 0 2px #3fae6a,
+    0 0 14px rgb(63 174 106 / 0.8);
 }
 .mini-wrap {
   position: relative;

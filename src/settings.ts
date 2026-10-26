@@ -19,9 +19,19 @@ export interface Settings {
   turnNotify: boolean
   /** Online, still your turn after 20 s: ring again. */
   turnRemind: boolean
+  /** Online voice: how loud the others are (0–1, under the master volume). */
+  voiceVolume: number
+  /** The microphone to use (a device id); empty: the system's own. */
+  micId: string
+  /** Online voice: join it on entering a room (the microphone permission given before). */
+  voiceAuto: boolean
+  /** Online voice: the mic always open (M turns it off and on), or only while a key is held. */
+  micMode: 'open' | 'ptt'
+  /** Push to talk: the key held (a KeyboardEvent.code). */
+  pttKey: string
 }
 
-const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true }
+const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV' }
 
 const KEY = 'dbdl-settings'
 
