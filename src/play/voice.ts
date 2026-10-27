@@ -41,6 +41,12 @@ export const voice = reactive({
   micOff: false,
   /** Push to talk: the key (or the 🎙️ button) is held now. */
   talking: false,
+  /** Open mic: loud enough to pass the gate (settings.voiceGate), so it sends. */
+  gateOpen: true,
+  /** This device's mic level on the settings' bar (0–1), while joined or testing the mic. */
+  level: 0,
+  /** The settings' mic test is on (the mic open without joining). */
+  testing: false,
   /** Why joining failed, in Thai. */
   error: '',
   /** Who is in the voice channel: client id → their entry. */
@@ -112,7 +118,8 @@ export const seatVoice = computed(() => {
 let mic: MediaStream | null = null
 
 async function openMic(): Promise<MediaStream> {
-  const base: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+  // echo cancellation always: without it a player on speakers sends everyone back their own voice
+  const base: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: settings.noiseFilter, autoGainControl: settings.noiseFilter }
   if (settings.micId) {
     try {
       return await navigator.mediaDevices.getUserMedia({ audio: { ...base, deviceId: { exact: settings.micId } } })
@@ -133,16 +140,73 @@ function micError(e: unknown): string {
 }
 
 /** The microphone sends now: open and not turned off, or held in push to talk. */
-export const micLive = computed(() => voice.joined && !!voice.roster[session.me] && !voice.roster[session.me].l && (settings.micMode === 'ptt' ? voice.talking : !voice.micOff))
+export const micLive = computed(
+  () => voice.joined && !!voice.roster[session.me] && !voice.roster[session.me].l && (settings.micMode === 'ptt' ? voice.talking : !voice.micOff && voice.gateOpen),
+)
 
 function setMicTracks() {
-  const on = !!mic && (settings.micMode === 'ptt' ? voice.talking : !voice.micOff)
+  const on = !!mic && (settings.micMode === 'ptt' ? voice.talking : !voice.micOff && voice.gateOpen)
   mic?.getAudioTracks().forEach((t) => (t.enabled = on))
 }
 
 function stopMic() {
   mic?.getTracks().forEach((t) => t.stop())
   mic = null
+  levelTrack?.stop()
+  levelTrack = null
+  unmeter(SELF)
+}
+
+// ---------- this device's level, and the gate ----------
+// The level is read from a copy of the mic's track that is never switched off: what is sent goes
+// silent while the gate is shut (or the mic is off), and the gate must still hear it open again.
+
+/** The meter of this device's own mic (joined, or the settings' test). */
+const SELF = '__self'
+let levelTrack: MediaStreamTrack | null = null
+let testMic: MediaStream | null = null
+/** The loudest the level bar shows (RMS); the bar and the gate share a square-root scale. */
+const LEVEL_MAX = 0.2
+/** The gate stays open this long after the last loud moment, so words aren't cut between syllables. */
+const GATE_HOLD_MS = 450
+let gateLast = 0
+
+function meterMine() {
+  levelTrack?.stop()
+  levelTrack = null
+  const t = mic?.getAudioTracks()[0]
+  if (!t) return
+  levelTrack = t.clone()
+  levelTrack.enabled = true
+  meter(SELF, new MediaStream([levelTrack]))
+}
+
+/** The gate's level as an RMS (0: no gate). Push to talk has none: the key decides. */
+function gateRms(): number {
+  return settings.micMode === 'ptt' ? 0 : settings.voiceGate ** 2 * LEVEL_MAX
+}
+
+/** The settings' mic test: the mic opened and metered without joining the channel. */
+export async function startMicTest() {
+  if (voice.joined || testMic) return
+  try {
+    testMic = await openMic()
+  } catch (e) {
+    voice.error = micError(e)
+    return
+  }
+  voice.testing = true
+  meter(SELF, testMic)
+}
+export function stopMicTest() {
+  if (!testMic) return
+  testMic.getTracks().forEach((t) => t.stop())
+  testMic = null
+  voice.testing = false
+  if (!voice.joined) {
+    unmeter(SELF)
+    voice.level = 0
+  }
 }
 
 /** The microphones of this device, for the settings (their names show once the mic was allowed). */
@@ -171,7 +235,8 @@ function meter(id: string, stream: MediaStream) {
     an.fftSize = 512
     src.connect(an)
     meters.set(id, { src, an, buf: new Uint8Array(an.fftSize), last: 0 })
-    if (!meterTimer) meterTimer = window.setInterval(measure, 120)
+    // often enough for the gate to open on a word's first syllable
+    if (!meterTimer) meterTimer = window.setInterval(measure, 50)
   } catch {
     // no level for this stream: its speaker just gets no ring
   }
@@ -193,11 +258,32 @@ function measure() {
     m.an.getByteTimeDomainData(m.buf)
     let sum = 0
     for (const v of m.buf) sum += ((v - 128) / 128) ** 2
-    const off = id === session.me ? !mic?.getAudioTracks()[0]?.enabled : !!voice.roster[id]?.m
-    if (!off && Math.sqrt(sum / m.buf.length) > LOUD) m.last = now
+    const rms = Math.sqrt(sum / m.buf.length)
+    if (id === SELF) {
+      measureSelf(rms, now, m)
+      continue
+    }
+    if (!voice.roster[id]?.m && rms > LOUD) m.last = now
     const speaking = now - m.last < HOLD_MS
     if (!!voice.speaking[id] !== speaking) voice.speaking[id] = speaking
   }
+}
+
+/** This device: the level bar, the gate, and the ring while it really sends. */
+function measureSelf(rms: number, now: number, m: { last: number }) {
+  const level = Math.round(Math.min(1, Math.sqrt(rms / LEVEL_MAX)) * 100) / 100
+  if (voice.level !== level) voice.level = level
+  if (!voice.joined) return
+  const gate = gateRms()
+  if (rms > gate) gateLast = now
+  const open = gate === 0 || now - gateLast < GATE_HOLD_MS
+  if (open !== voice.gateOpen) {
+    voice.gateOpen = open
+    setMicTracks()
+  }
+  if (mic?.getAudioTracks()[0]?.enabled && rms > LOUD) m.last = now
+  const speaking = now - m.last < HOLD_MS
+  if (!!voice.speaking[session.me] !== speaking) voice.speaking[session.me] = speaking
 }
 
 // ---------- the connections, one per other member ----------
@@ -370,6 +456,9 @@ export async function joinVoice() {
   if (!r?.voiceJoin || voice.joined || voice.busy || !canVoice.value) return
   voice.busy = true
   voice.error = ''
+  stopMicTest()
+  voice.gateOpen = true
+  gateLast = 0
   // a spectator listens only: no microphone is asked for
   if (canSpeak.value)
     try {
@@ -404,7 +493,7 @@ export async function joinVoice() {
   voice.joined = true
   voice.busy = false
   void ctx?.resume()
-  if (mic) meter(session.me, mic)
+  if (mic) meterMine()
   sync()
 }
 
@@ -414,6 +503,8 @@ function teardown() {
   for (const id of [...peers.keys()]) drop(id)
   unmeter(session.me)
   stopMic()
+  voice.level = 0
+  voice.gateOpen = true
   room = null
   mine = ''
   voice.joined = false
@@ -515,10 +606,15 @@ watch(
   },
 )
 
-// another microphone picked in the settings: swapped in on every connection, without reconnecting
+// another microphone (or the noise filter turned on or off) in the settings: swapped in on every
+// connection, without reconnecting; the mic test starts again on it
 watch(
-  () => settings.micId,
+  () => [settings.micId, settings.noiseFilter],
   async () => {
+    if (voice.testing) {
+      stopMicTest()
+      void startMicTest()
+    }
     if (!voice.joined || !mic) return
     try {
       const next = await openMic()
@@ -527,7 +623,7 @@ watch(
       stopMic()
       mic = next
       setMicTracks()
-      meter(session.me, mic)
+      meterMine()
     } catch (e) {
       voice.error = micError(e)
     }

@@ -131,8 +131,13 @@ and the host starts the game.
   mic on or off, who is in and speaking, each one's volume on this device, leaving. A player in the
   channel has 🎙️ / 🔇 after their name on the tiles and a green ring on the portrait while they
   speak (a level meter on each stream, `seatVoice`). Settings → Sound: the voices' volume, the
-  microphone, joining by itself on entering a room, and the mic's mode:
-  - **Open** (the default): the mic sends all the time; M turns it off and on.
+  microphone, the browser's noise suppression and level control (`noiseFilter`, on; echo
+  cancellation is always on), joining by itself on entering a room, and the mic's mode:
+  - **Open** (the default): the mic sends while it is louder than the gate (`voiceGate`, the
+    sensitivity: a line on a live level bar, 25 by default, 0 sends all the time); M turns it off
+    and on. The gate reads the level from a clone of the mic's track that is never switched off,
+    checks it every 50 ms, and stays open 450 ms after the last loud moment. Out of the channel the
+    settings' "ทดสอบไมค์" opens the mic to show the bar (stopped when the window closes).
   - **Push to talk**: it sends only while a key is held (V by default, any key but those the
     game or the browser uses: `TAKEN_KEYS`; picked by pressing it in the settings) or the 🎙️
     button is held (the way on a tablet; a tap under 250 ms still opens the panel, which has a

@@ -29,9 +29,16 @@ export interface Settings {
   micMode: 'open' | 'ptt'
   /** Push to talk: the key held (a KeyboardEvent.code). */
   pttKey: string
+  /**
+   * Open mic: how loud the mic must be to send (0–1 on the level bar; 0: always sends). A gate:
+   * quieter than this, a fan or a room's hum, and nothing goes.
+   */
+  voiceGate: number
+  /** The browser's noise suppression and level control on the mic (its echo cancellation stays on). */
+  noiseFilter: boolean
 }
 
-const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV' }
+const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true }
 
 const KEY = 'dbdl-settings'
 

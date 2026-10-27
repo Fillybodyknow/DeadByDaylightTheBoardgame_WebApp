@@ -7,7 +7,7 @@ import { lang } from '../i18n'
 import { settings, resetSettings, type AnimSpeed } from '../settings'
 import { muted, sfx, volumes, type Volumes } from '../sound'
 import { game, online, quitGame } from '../play/game'
-import { TAKEN_KEYS, keyLabel, micList } from '../play/voice'
+import { TAKEN_KEYS, keyLabel, micList, startMicTest, stopMicTest, voice } from '../play/voice'
 
 // the window is teleported: a class given to this component goes on the ⚙ button
 defineOptions({ inheritAttrs: false })
@@ -71,6 +71,15 @@ function onCapture(e: KeyboardEvent) {
 watch(open, (o) => {
   if (!o) capturing.value = false
 })
+
+// The mic's sensitivity: a gate on the level bar. Out of the channel the bar needs the mic test.
+watch([open, tab], ([o, t]) => {
+  if (!o || t !== 'sound') stopMicTest()
+})
+onBeforeUnmount(stopMicTest)
+const gatePct = computed(() => Math.round(settings.voiceGate * 100))
+/** The level is over the gate: this would be sent. */
+const overGate = computed(() => voice.level > settings.voiceGate)
 const mics = ref<{ id: string; label: string }[]>([])
 async function loadMics() {
   try {
@@ -204,6 +213,10 @@ watch(tab, () => (confirming.value = null))
               </select>
               <small v-if="mics.length && mics.every((m) => m.label.startsWith('ไมโครโฟน '))">ชื่อไมค์จะขึ้นหลังจากอนุญาตให้ใช้ไมค์ครั้งแรก</small>
             </label>
+            <label class="switch">
+              <input v-model="settings.noiseFilter" type="checkbox" />
+              <span><b>ลดเสียงรบกวน</b><small>ตัวกรองของเบราว์เซอร์: ตัดเสียงพัดลม แอร์ และปรับระดับเสียงพูดให้สม่ำเสมอ — ปิดได้ถ้าใช้ไมค์ดีและอยากได้เสียงธรรมชาติ (ตัดเสียงสะท้อนเปิดไว้เสมอ)</small></span>
+            </label>
             <div class="field">
               <b>โหมดไมค์</b>
               <div class="choice two" role="radiogroup" aria-label="โหมดไมค์">
@@ -214,6 +227,30 @@ watch(tab, () => (confirming.value = null))
                 <button type="button" role="radio" :aria-checked="settings.micMode === 'ptt'" :class="{ on: settings.micMode === 'ptt' }" @click="settings.micMode = 'ptt'">
                   <b>กดค้างเพื่อพูด</b>
                   <small>พูดเฉพาะตอนกดค้าง</small>
+                </button>
+              </div>
+            </div>
+            <div v-if="settings.micMode === 'open'" class="field">
+              <div class="keyrow">
+                <span><b>ความไวไมค์</b><small>เสียงที่เบากว่าเส้นจะไม่ถูกส่ง — ตั้งเส้นให้อยู่เหนือเสียงพื้นหลัง แต่ต่ำกว่าเสียงพูด</small></span>
+                <span class="pct">{{ gatePct ? gatePct : 'ปิด' }}</span>
+              </div>
+              <div class="gate" :class="{ live: voice.joined || voice.testing }">
+                <div class="gate-level" :class="{ over: overGate }" :style="{ width: `${voice.level * 100}%` }" />
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  :value="gatePct"
+                  aria-label="ความไวไมค์"
+                  @input="settings.voiceGate = Number(($event.target as HTMLInputElement).value) / 100"
+                />
+              </div>
+              <div class="keyrow">
+                <small>{{ voice.joined ? (overGate ? 'กำลังส่งเสียง' : 'เงียบ — ไม่ส่งเสียง') : voice.testing ? (overGate ? 'เสียงนี้จะถูกส่ง' : 'เสียงนี้จะไม่ถูกส่ง') : 'กดทดสอบไมค์เพื่อดูระดับเสียง' }}</small>
+                <button v-if="!voice.joined" type="button" class="test" :class="{ on: voice.testing }" @click="voice.testing ? stopMicTest() : startMicTest()">
+                  {{ voice.testing ? 'หยุดทดสอบ' : '🎙️ ทดสอบไมค์' }}
                 </button>
               </div>
             </div>
@@ -384,6 +421,65 @@ small {
   margin-top: 0.25rem;
   width: 1.05rem;
   height: 1.05rem;
+}
+/* the gate: the level bar behind the slider, green once over the line */
+.gate {
+  position: relative;
+  height: 1.6rem;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.06);
+  overflow: hidden;
+}
+.gate-level {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgb(255 255 255 / 0.22);
+  transition: width 0.05s linear;
+}
+.gate-level.over {
+  background: rgb(63 174 106 / 0.6);
+}
+/* the slider is only its line: the bar behind it is the track */
+.gate input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: ew-resize;
+}
+.gate input::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+.gate input::-moz-range-track {
+  height: 100%;
+  background: transparent;
+}
+.gate input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 4px;
+  height: 1.6rem;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.7);
+}
+.gate input::-moz-range-thumb {
+  width: 4px;
+  height: 1.6rem;
+  border: none;
+  border-radius: 2px;
+  background: #fff;
+}
+.gate input:focus-visible {
+  outline: 2px solid var(--warn, #d9a227);
+  outline-offset: 2px;
+}
+.test.on {
+  border-color: #3fae6a;
 }
 .choice.two {
   grid-template-columns: repeat(2, 1fr);
