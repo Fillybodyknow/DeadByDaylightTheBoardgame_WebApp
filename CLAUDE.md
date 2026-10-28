@@ -127,6 +127,10 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 
 ## UI rules the user asked for
 
+- **A first visit is greeted by The Entity** (`EntityWelcome`, `welcome.ts`, `dbdl-welcomed`): on the
+  menu only (not an invite link), it asks whether the player is new; a new one gets five pages of
+  the world over the realms, then picks a side and lands in its first tutorial chapter
+  (`#/tutorial?start=<id>`). "No" or skipping lets go; Settings → Data shows it again.
 - **Results never run ahead of animations.** `GameScreen` holds the view on the old state while
   dice, perk cards and board animations play. Pending rolls show their dice first.
 - **Every rise of the Sacrifice track shows** (`SacrificeReveal` (a ring of 8 cells, new ones filling gold), in the perk cards' queue, from the `sacrifice` event when the total goes up; Breakdown lowering it shows nothing). The eighth is the finale's instead. A rise that comes with a hanging waits for the board to play the hanging first (`afterBoard` in GameScreen; the view moves on, the side panel waits until the reveal is done); so does the finale of a hanging that fills the track, and the summary waits for it.
@@ -156,9 +160,9 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   badge, and each new message as a 6 s bubble beside the sender's tile. Never saved or replayed.
   Notices in it (joined, left, kicked, lost connection, back) come from the members' changes.
 - **Voice (online):** one channel for the room, WebRTC between the devices, the room carrying only
-  who is in and the connecting signals (`voice.ts`, `VoiceButton`). Players talk, spectators only
-  listen (`mayTalk`: a seat, or in the lobby a side picked). The killer hears everyone (p.8).
-  Speaking shows as a green ring on the tile's portrait. The mic is open (M toggles it) or push
+  who is in and the connecting signals (`voice.ts`, `VoiceButton`). In the lobby everyone talks;
+  from the picks on the players talk and spectators only listen (`mayTalk`). The killer hears
+  everyone (p.8). Speaking turns the tile's row (or the lobby seat) green, over a wound's red. The mic is open (M toggles it) or push
   to talk (a key, V by default, or holding the 🎙️ button). Never saved or replayed.
 - **Presence (online):** a member whose connection drops leaves the lobby by itself (Firebase
   `onDisconnect`, `Room.presence`); in a game they keep their seat, marked `dropped`. Re-set after

@@ -1,6 +1,6 @@
-// Voice chat (online): one channel for the room, the lobby and the game alike. The players talk,
-// a spectator only listens (the user's rule): before the seats are dealt a player is a member in
-// the lineup (a side picked), after it whoever holds a seat. Everyone hears everyone, the killer
+// Voice chat (online): one channel for the room, the lobby and the game alike. In the lobby (no
+// seats dealt yet) every member talks; from the picks on the players do, and a spectator only
+// listens (the user's rules). Everyone hears everyone, the killer
 // too: survivors may talk but never in secret (p.8). Like chat and pings it is not part of the
 // game: nothing of it is saved or replayed.
 //
@@ -66,12 +66,12 @@ const supported = typeof RTCPeerConnection === 'function' && !!navigator.mediaDe
 /** This device may use voice: a browser that can, in a room that carries it, as one of its members. */
 export const canVoice = computed(() => supported && !!session.room?.voiceJoin && !!session.data?.members[session.me])
 
-/** A member may talk: a player (in a seat; in the lobby, in the lineup), not a spectator. */
+/** A member may talk: anyone in the lobby (no seats dealt yet), then whoever holds a seat. */
 export function mayTalk(d: RoomData | null, id: string): boolean {
   if (!d) return false
   const seats = Object.values(d.seats ?? {})
   if (seats.length) return seats.some((s) => s.id === id)
-  return !!d.members[id]?.side
+  return !!d.members[id]
 }
 
 /** This device may talk (otherwise it joins to listen only). */

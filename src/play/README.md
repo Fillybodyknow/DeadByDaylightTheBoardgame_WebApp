@@ -123,14 +123,18 @@ and the host starts the game.
   lost their connection or came back (`dropped`). The newest also shows beside the 💬 button
   for a few seconds while the chat is closed.
 - **Voice** (`src/play/voice.ts`, `VoiceButton.vue`): one voice channel for the room, the lobby and
-  the game. **Players talk, spectators only listen** (the user's rule): before the seats are dealt
-  a player is a member in the lineup (a side picked), after it whoever holds a seat (`mayTalk`). A
+  the game. **In the lobby everyone talks; from the picks on the players talk and spectators only
+  listen** (the user's rules): a member may talk while no seats are dealt, after that whoever
+  holds a seat (`mayTalk`). A
   spectator joins without a microphone (none is asked for), and every device keeps a spectator's
   sound muted whatever it sends. Everyone hears everyone, the killer too (p.8). The 🎙️ button
   (the room's bar, the game's controls) opens a panel: join (🎧 to listen, for a spectator), the
-  mic on or off, who is in and speaking, each one's volume on this device, leaving. A player in the
-  channel has 🎙️ / 🔇 after their name on the tiles and a green ring on the portrait while they
-  speak (a level meter on each stream, `seatVoice`). Settings → Sound: the voices' volume, the
+  mic on or off, who is in and speaking, each one's volume on this device, leaving. Who speaks
+  shows (a level meter on each stream): in the lobby a 🎙️ / 🔇 after each name in the channel, a
+  green pulsing glow on the speaker's seat with "🔊 กำลังพูด" above the name (a bench chip turns
+  green); in the game the 🎙️ / 🔇 after the name on the tiles, and speaking the whole row turns
+  green over a wounded row's red, a pulsing green ring outside the portrait's wound ring, and a
+  green 🔊 pill (`seatVoice`). Settings → Sound: the voices' volume, the
   microphone, the browser's noise suppression and level control (`noiseFilter`, on; echo
   cancellation is always on), joining by itself on entering a room, and the mic's mode:
   - **Open** (the default): the mic sends while it is louder than the gate (`voiceGate`, the

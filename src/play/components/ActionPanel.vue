@@ -54,10 +54,12 @@ import {
   powerName,
   survivorInteractionLabel,
   survivorMini,
+  windowLabel,
 } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
+import MomentLine from './MomentLine.vue'
 import PerkCard from './PerkCard.vue'
 import { PERK_LEAD, pickedHint as perkPickedHint } from '../perkHints'
 import { choicePreview, decisionFocus, powerPreview, preview } from '../focus'
@@ -403,6 +405,8 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <!-- a perk's moment, the start of a turn: decided in the Perk panel (PerkPrompt) — on wide screens
          in this panel's place, on narrow ones a sheet over it — so the two never show twice -->
     <template v-else-if="step.t === 'offer' || step.t === 'turnStart'">
+      <!-- what the perk is asked about: who, doing what, to which prop -->
+      <p v-if="step.t === 'offer' && windowLabel(st, step.w)" class="moment-line"><MomentLine :st="st" :w="step.w" /></p>
       <p class="muted">⚡ ตัดสินใจเรื่อง Perk ที่แผง Perk</p>
     </template>
 

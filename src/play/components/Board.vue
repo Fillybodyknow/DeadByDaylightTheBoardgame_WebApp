@@ -287,6 +287,10 @@ interface Fx {
 
 const effects = ref<Fx[]>([])
 const flipping = ref<string[]>([])
+/** Pallets being thrown down now (their path icon's id): the token falls onto the path. */
+const dropping = ref<{ id: string; delay: number }[]>([])
+/** When a dropped pallet hits the path, into its fall (the CSS keyframe's 45% of 0.75 s). */
+const PALLET_HIT_MS = 335
 const shaking = ref(false)
 const boardEl = ref<HTMLElement>()
 let fxId = 0
@@ -346,7 +350,7 @@ watch(
     let delay = 0
     for (const ev of fresh) delay = play(ev, delay)
     // Hits, hooks and repairs need a moment to be seen before the next question pops up.
-    const big = fresh.some((e) => ['wound', 'hook', 'genDone', 'gatesPowered', 'rescue', 'trapSprung', 'palletBreak', 'wallBreak'].includes(e.k))
+    const big = fresh.some((e) => ['wound', 'hook', 'genDone', 'gatesPowered', 'rescue', 'trapSprung', 'palletBreak', 'wallBreak', 'palletDrop'].includes(e.k))
     holdBoard(Math.max(walking, big ? anim(delay + 900) : 0))
   },
 )
@@ -452,10 +456,17 @@ function play(ev: GameEvent, delay: number): number {
       fxSound.palletBreak()
       shake()
       return delay
-    case 'palletDrop':
-      addFx('debris', pathAt(ev.path), {}, delay)
-      fxSound.palletDrop()
+    case 'palletDrop': {
+      // the pallet falls onto the path: the token drops in turning, then splinters and the slam's
+      // sound on the hit (the token is hidden until its fall starts, so it never shows early)
+      const id = tokenOf(board.value, ev.path)
+      // the CSS delay at full length: the animation speed plays CSS (its delay too) at its own rate
+      dropping.value = [...dropping.value.filter((d) => d.id !== id), { id, delay }]
+      window.setTimeout(() => (dropping.value = dropping.value.filter((d) => d.id !== id)), anim(delay + 800))
+      addFx('debris', pathAt(ev.path), {}, delay + PALLET_HIT_MS)
+      window.setTimeout(() => fxSound.palletDrop(), anim(delay + PALLET_HIT_MS - 60))
       return delay
+    }
     case 'pickUp':
       fxSound.pickUp()
       return delay
@@ -797,7 +808,14 @@ function guard(e: MouseEvent) {
     <template v-for="p in paths" :key="p.id">
       <!-- where the path's icon is on the map art, for the tutorial's guide to point at -->
       <span class="path-anchor" :data-path="p.id" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" aria-hidden="true" />
-      <img v-if="p.token" class="path-token" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" :src="asset(p.token)" alt="" />
+      <img
+        v-if="p.token"
+        class="path-token"
+        :class="{ dropping: dropping.some((d) => d.id === p.id) }"
+        :style="{ left: pct(p.at[0]), top: pct(p.at[1]), '--delay': `${dropping.find((d) => d.id === p.id)?.delay ?? 0}ms` }"
+        :src="asset(p.token)"
+        alt=""
+      />
       <img v-if="p.entity" class="path-token path-entity" :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }" :src="asset(components.entity.image)" alt="Entity" title="Entity — ไม่มีใครเดินผ่านเส้นทางนี้ได้" />
       <span
         v-if="focusPaths.has(p.id) || hotPaths.has(p.id)"
@@ -1357,6 +1375,38 @@ button.tile.picked {
   translate: -50% -50%;
   pointer-events: none;
   filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.95));
+}
+/* a pallet thrown down: it falls in turning, hits the path (with the splinters), and settles */
+.path-token.dropping {
+  transform-origin: 50% 70%;
+  animation: pallet-drop 0.75s linear var(--delay, 0ms) both;
+}
+/* falling it speeds up (ease-in) to the hit at 45%, then bounces and settles (ease-out) */
+@keyframes pallet-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-260%) rotate(-95deg) scale(2.6);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
+  }
+  12% {
+    opacity: 1;
+  }
+  45% {
+    transform: translateY(0) rotate(8deg) scale(1.15);
+    animation-timing-function: ease-out;
+  }
+  60% {
+    transform: translateY(-8%) rotate(-3deg) scale(0.93);
+    animation-timing-function: ease-in-out;
+  }
+  78% {
+    transform: rotate(1deg) scale(1.03);
+    animation-timing-function: ease-out;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
 }
 /* over another token on the same path: the same size and faint, so the token under it still shows */
 .path-entity {

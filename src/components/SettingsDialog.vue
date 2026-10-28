@@ -8,6 +8,7 @@ import { settings, resetSettings, type AnimSpeed } from '../settings'
 import { muted, sfx, volumes, type Volumes } from '../sound'
 import { game, online, quitGame } from '../play/game'
 import { TAKEN_KEYS, keyLabel, micList, startMicTest, stopMicTest, voice } from '../play/voice'
+import { openWelcome } from '../welcome'
 
 // the window is teleported: a class given to this component goes on the ⚙ button
 defineOptions({ inheritAttrs: false })
@@ -99,6 +100,7 @@ function preview(key: keyof Volumes) {
 
 // ---------- display ----------
 const SPEEDS: { id: AnimSpeed; label: string; sub: string }[] = [
+  { id: 'slow', label: 'ช้า', sub: 'ยาวขึ้นครึ่งเท่า' },
   { id: 'normal', label: 'ปกติ', sub: 'แอนิเมชันเต็ม' },
   { id: 'fast', label: 'เร็ว', sub: 'เร็วขึ้นเท่าตัว' },
   { id: 'skip', label: 'ข้าม', sub: 'เห็นผลแทบทันที' },
@@ -274,7 +276,7 @@ watch(tab, () => (confirming.value = null))
             <div class="field">
               <b>ความเร็วแอนิเมชัน</b>
               <small>การ์ดแอ็กชัน ลูกเต๋า การเดินของมินิ Perk และ Sacrifice</small>
-              <div class="choice" role="radiogroup" aria-label="ความเร็วแอนิเมชัน">
+              <div class="choice four" role="radiogroup" aria-label="ความเร็วแอนิเมชัน">
                 <button
                   v-for="s in SPEEDS"
                   :key="s.id"
@@ -328,6 +330,10 @@ watch(tab, () => (confirming.value = null))
             <div class="wipe">
               <span><b>รีเซ็ตความคืบหน้า Tutorial</b><small>บทที่ผ่านแล้วกลับเป็นยังไม่ผ่าน</small></span>
               <button type="button" :class="{ danger: confirming === 'tutorial' }" @click="wipe('tutorial')">{{ confirming === 'tutorial' ? 'ยืนยัน รีเซ็ต' : done === 'tutorial' ? '✓ รีเซ็ตแล้ว' : 'รีเซ็ต' }}</button>
+            </div>
+            <div class="wipe">
+              <span><b>บทนำของ The Entity</b><small>หน้าต้อนรับผู้เล่นใหม่: เรื่องราวของโลก Dead by Daylight และเลือกฝั่งเริ่ม Tutorial</small></span>
+              <button type="button" @click="(open = false), openWelcome()">ดูอีกครั้ง</button>
             </div>
             <div class="wipe">
               <span><b>คืนค่าการตั้งค่าทั้งหมด</b><small>เสียง เสียงพูด การแสดงผล และการแจ้งเตือน กลับเป็นค่าเริ่มต้น</small></span>
@@ -481,6 +487,9 @@ small {
 .test.on {
   border-color: #3fae6a;
 }
+.choice.four {
+  grid-template-columns: repeat(4, 1fr);
+}
 .choice.two {
   grid-template-columns: repeat(2, 1fr);
 }
@@ -564,8 +573,10 @@ select {
   color: #ffb3ab;
 }
 @media (max-width: 480px) {
-  .choice {
-    grid-template-columns: 1fr;
+  .choice,
+  .choice.two,
+  .choice.four {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

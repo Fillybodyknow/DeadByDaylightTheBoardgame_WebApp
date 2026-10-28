@@ -804,7 +804,58 @@ export function windowWho(w: PerkWindow): PerkOwner | null {
   }
 }
 
-/** What an offer is about, for its heading. */
+/**
+ * What a perk's moment is done to, as a picture beside its line: the prop interacted with, or the
+ * survivor healed (a mini). Null when the moment is about nothing in particular.
+ */
+export function windowWhat(st: GameState, w: PerkWindow): { icon: string; mini?: boolean; label: string } | null {
+  const ofProp = (id: string) => {
+    const p = st.props.find((x) => x.id === id)
+    return p ? { icon: PROP_IMAGE[p.kind], label: PROP_NAMES_TH[p.kind] } : null
+  }
+  const ofSurvivor = (s: number) => ({ icon: survivorMini(st, s), mini: true, label: st.survivors[s].name })
+  switch (w.k) {
+    case 'preRoll': {
+      const c = w.ctx
+      if ('prop' in c) return ofProp(c.prop)
+      if ('target' in c && c.target !== c.s) return ofSurvivor(c.target)
+      if (c.k === 'trap') return { icon: BEAR_TRAP_IMAGE, label: 'Bear Trap' }
+      return null
+    }
+    case 'rolled':
+      return null
+    case 'genInteract':
+    case 'genProgress':
+    case 'repairFail':
+    case 'repaired':
+    case 'afterRummage':
+    case 'afterPalletLocker':
+    case 'afterReveal':
+    case 'killerRevealed':
+      return ofProp(w.prop)
+    case 'killerBreak':
+      if (w.prop) return ofProp(w.prop)
+      return w.what === 'pallet' ? { icon: PROP_IMAGE.pallet, label: 'Pallet' } : null
+    case 'palletBlock':
+      return { icon: PROP_IMAGE.pallet, label: 'Pallet' }
+    case 'preKillerInteract':
+      return ofSurvivor(w.target)
+    default:
+      return null
+  }
+}
+
+/** A roll's purpose and place, for the moment before it: "ซ่อม Generator ที่ Shack". */
+function rollWhat(st: GameState, c: RollContext): string {
+  const title = ROLL_TITLE[c.k]
+  if ('prop' in c) {
+    const p = st.props.find((x) => x.id === c.prop)
+    return p?.room ? `${title} ที่ ${roomName(st, p.room)}` : title
+  }
+  if ((c.k === 'heal' || c.k === 'botany') && c.target !== c.s) return `${title} ${st.survivors[c.target].name}`
+  return title
+}
+
 /** Skill dice faces in words: "1, กะโหลก". */
 export function diceFaces(dice: Die[]): string {
   return dice.map((d) => (d.kind === 'skill' && d.face === 0 ? 'กะโหลก' : String(d.face))).join(', ')
@@ -815,7 +866,7 @@ export function windowLabel(st: GameState, w: PerkWindow): string {
     case 'afterAttack':
       return `หลังโจมตี ${st.survivors[w.target].name}`
     case 'preRoll':
-      return `${st.survivors[w.ctx.s].name} กำลังจะทอย Skill Check`
+      return `${st.survivors[w.ctx.s].name} กำลังจะทอย: ${rollWhat(st, w.ctx)}`
     case 'planningStart':
       return 'เริ่มเฟสวางแผน'
     case 'planningEnd':

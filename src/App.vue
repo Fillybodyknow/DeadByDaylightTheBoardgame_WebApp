@@ -5,6 +5,7 @@ import Particles from './components/Particles.vue'
 import SettingsDialog from './components/SettingsDialog.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import WhatsNew from './components/WhatsNew.vue'
+import EntityWelcome from './components/EntityWelcome.vue'
 import { asset, lang } from './i18n'
 import { game, tutorial } from './play/game'
 import { isPhone } from './play/device'
@@ -13,8 +14,19 @@ import { finishedGame, session } from './play/online/session'
 import PhoneBlock from './play/views/PhoneBlock.vue'
 import { setAmbient, type AmbientTrack } from './sound'
 import { startUpdateWatch } from './update'
+import { openWelcome, welcome, welcomed } from './welcome'
 
 const route = useRoute()
+
+// A first visit to the menu: The Entity greets the new player (not on an invite link straight to
+// a room, nor anywhere else: they came for something else)
+watch(
+  () => route.name,
+  (name) => {
+    if (name === 'menu' && !welcome.open && !welcomed()) openWelcome()
+  },
+  { immediate: true },
+)
 startUpdateWatch()
 
 // The part of the app the screen belongs to; shared screens (cards, rules) keep the last one.
@@ -83,6 +95,7 @@ const scene = computed(() =>
 
   <UpdateBanner />
   <WhatsNew />
+  <EntityWelcome />
 
   <!-- in a full game, the game's own top bar (round, room, mute, leave) takes over -->
   <header v-if="!inGame" class="topbar">

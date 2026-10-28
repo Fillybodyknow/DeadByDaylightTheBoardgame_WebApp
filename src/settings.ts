@@ -4,8 +4,8 @@
 
 import { computed, reactive, ref, watch } from 'vue'
 
-/** How long the game's animations take: as made, half as long, or next to none. */
-export type AnimSpeed = 'normal' | 'fast' | 'skip'
+/** How long the game's animations take: longer, as made, half as long, or next to none. */
+export type AnimSpeed = 'slow' | 'normal' | 'fast' | 'skip'
 
 export interface Settings {
   animSpeed: AnimSpeed
@@ -79,7 +79,8 @@ if (typeof document !== 'undefined')
 // ---------- animation speed ----------
 
 /** What the animations' durations are multiplied by. */
-export const animScale = computed(() => (settings.animSpeed === 'fast' ? 0.5 : settings.animSpeed === 'skip' ? 0.05 : 1))
+const SCALE: Record<AnimSpeed, number> = { slow: 1.5, normal: 1, fast: 0.5, skip: 0.05 }
+export const animScale = computed(() => SCALE[settings.animSpeed] ?? 1)
 
 /** A duration of the game's animations (ms), at the player's speed. */
 export const anim = (ms: number) => Math.round(ms * animScale.value)

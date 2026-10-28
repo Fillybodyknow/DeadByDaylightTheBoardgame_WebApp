@@ -196,7 +196,7 @@ function onPowerSlot() {
       <div class="head">
         <Mini class="mini aura-killer" :src="asset(killerMini(st))" :alt="st.killer.name" />
         <div class="names">
-          <strong class="name" :class="{ me: mine.includes('killer') }">{{ st.killer.name }}<span v-if="seatVoice[KILLER_PLAYER]" class="vc" :title="seatVoice[KILLER_PLAYER].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[KILLER_PLAYER].micOff ? '🔇' : '🎙️' }}</span></strong>
+          <strong class="name" :class="{ me: mine.includes('killer') }">{{ st.killer.name }}<span v-if="seatVoice[KILLER_PLAYER]" class="vc" :title="seatVoice[KILLER_PLAYER].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[KILLER_PLAYER].speaking ? '🔊' : seatVoice[KILLER_PLAYER].micOff ? '🔇' : '🎙️' }}</span></strong>
         </div>
       </div>
       <div class="line small">
@@ -267,7 +267,7 @@ function onPowerSlot() {
           <img v-if="st.survivors[s].sacrificeToken" class="token" :src="asset(components.sacrificeProgress.image)" alt="" title="ยังมี sacrifice token บนกระดาน" />
         </div>
         <div class="names">
-          <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}<span v-if="seatVoice[playerOf(st, s)]" class="vc" :title="seatVoice[playerOf(st, s)].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[playerOf(st, s)].micOff ? '🔇' : '🎙️' }}</span></strong>
+          <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}<span v-if="seatVoice[playerOf(st, s)]" class="vc" :title="seatVoice[playerOf(st, s)].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[playerOf(st, s)].speaking ? '🔊' : seatVoice[playerOf(st, s)].micOff ? '🔇' : '🎙️' }}</span></strong>
         </div>
       </div>
       <div class="line small">
@@ -752,19 +752,40 @@ button.slot:hover .slot-crop {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* online voice: in the channel (the mic after the name), speaking now (a green ring on the portrait) */
+/* online voice: in the channel, a mic after the name. Speaking: the row turns green (over a
+   wounded row's red, which hid a ring on the portrait), a pulsing green ring outside the portrait's
+   wound ring, and the mic becomes a green "speaking" pill. */
 .vc {
   margin-left: 0.3rem;
   font-size: 0.75em;
   opacity: 0.8;
 }
-.tile.talking .vc {
-  opacity: 1;
+.tile.talking,
+.tile.talking.wounded,
+.tile.talking.active,
+.tile.talking.me,
+.tile.talking.killer {
+  border-left-color: #5fe08f;
+  background: linear-gradient(90deg, rgb(63 174 106 / 0.45), rgb(63 174 106 / 0.06));
 }
 .tile.talking :deep(.mini) {
-  box-shadow:
-    0 0 0 2px #3fae6a,
-    0 0 14px rgb(63 174 106 / 0.8);
+  outline: 3px solid #5fe08f;
+  outline-offset: 3px;
+  animation: tile-talk 0.9s ease-in-out infinite;
+}
+@keyframes tile-talk {
+  50% {
+    outline-color: rgb(95 224 143 / 0.35);
+    outline-offset: 5px;
+  }
+}
+.tile.talking .vc {
+  display: inline-block;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: #3fae6a;
+  opacity: 1;
+  box-shadow: 0 0 10px rgb(63 174 106 / 0.9);
 }
 .mini-wrap {
   position: relative;

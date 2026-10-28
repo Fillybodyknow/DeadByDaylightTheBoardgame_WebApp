@@ -67,6 +67,7 @@ import Mini from './Mini.vue'
 import RoomSettingsCard from './RoomSettingsCard.vue'
 import SyncBadge from './SyncBadge.vue'
 import VoiceButton from './VoiceButton.vue'
+import { voice } from '../voice'
 
 const data = computed(() => session.data!)
 const code = computed(() => session.room?.code ?? '')
@@ -188,6 +189,9 @@ function kick(id: string) {
 
 /** Your own seat, while not ready yet: a click on it leaves that side. */
 const leavable = (id: string | undefined) => !!id && id === session.me && !me.value?.ready
+/** Voice: this member is speaking now, and their mic's state in words. */
+const talking = (id: string | undefined) => !!id && !!voice.speaking[id]
+const voiceTitle = (id: string) => (voice.roster[id]?.m ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง')
 
 /** A click on a seat: an empty one takes that side, your own one leaves it. */
 /** `slot`: which survivor slot was clicked (the one taken). */
@@ -431,7 +435,7 @@ const seatStatus = computed(() =>
           <component
             :is="killerMember ? 'div' : 'button'"
             class="seat killer"
-            :class="{ empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready, leavable: leavable(killerMember?.id) }"
+            :class="{ empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready, leavable: leavable(killerMember?.id), talking: talking(killerMember?.id) }"
             :disabled="!killerMember && session.busy ? true : undefined"
             :title="leavable(killerMember?.id) ? 'คลิกเพื่อออกจากฝั่ง Killer' : undefined"
             @click="clickSeat('killer', killerMember?.id)"
@@ -444,7 +448,8 @@ const seatStatus = computed(() =>
                 <button v-else type="button" class="seat-name mine" title="เปลี่ยนชื่อ" @click.stop="startRename">{{ killerMember.name }} <i>✎</i></button>
               </template>
               <span v-else class="seat-name">{{ killerMember.name }}</span>
-              <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}</span>
+              <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}<i v-if="voice.roster[killerMember.id]" class="vc-ico" :title="voiceTitle(killerMember.id)">{{ voice.roster[killerMember.id].m ? '🔇' : '🎙️' }}</i></span>
+              <span v-if="talking(killerMember.id)" class="talk-pill">🔊 กำลังพูด</span>
               <span v-if="leavable(killerMember.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
               <button v-if="canKick(killerMember.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(killerMember.id)">✕ เตะ</button>
             </template>
@@ -464,7 +469,7 @@ const seatStatus = computed(() =>
             v-for="(m, i) in survivorMembers"
             :key="m?.id ?? `empty-${i}`"
             class="seat survivor"
-            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready, leavable: leavable(m?.id) }"
+            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready, leavable: leavable(m?.id), talking: talking(m?.id) }"
             :style="{ '--i': i, '--art': seatArt(i) }"
             :disabled="!m && session.busy ? true : undefined"
             :title="leavable(m?.id) ? 'คลิกเพื่อออกจากฝั่ง Survivor' : undefined"
@@ -478,7 +483,8 @@ const seatStatus = computed(() =>
                 <button v-else type="button" class="seat-name mine" title="เปลี่ยนชื่อ" @click.stop="startRename">{{ m.name }} <i>✎</i></button>
               </template>
               <span v-else class="seat-name">{{ m.name }}</span>
-              <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}</span>
+              <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}<i v-if="voice.roster[m.id]" class="vc-ico" :title="voiceTitle(m.id)">{{ voice.roster[m.id].m ? '🔇' : '🎙️' }}</i></span>
+              <span v-if="talking(m.id)" class="talk-pill">🔊 กำลังพูด</span>
               <!-- 3 survivor players: one of them plays two survivors -->
               <button
                 v-if="doubleId"
@@ -505,8 +511,8 @@ const seatStatus = computed(() =>
 
         <p v-if="bench.length" class="bench">
           <span class="muted">ยังไม่เลือกฝั่ง:</span>
-          <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me }">
-            <i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}
+          <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me, talking: talking(m.id) }">
+            <i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}<i v-if="voice.roster[m.id]" class="vc-ico" :title="voiceTitle(m.id)">{{ voice.roster[m.id].m ? '🔇' : '🎙️' }}</i>
             <button v-if="canKick(m.id)" type="button" class="kick small" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕</button>
           </span>
           <span v-if="!me?.side" class="bench-hint">คลิกช่องว่างด้านบนเพื่อเลือกฝั่ง</span>
@@ -1065,6 +1071,52 @@ button.seat-name.mine:hover i {
   .kick {
     opacity: 1;
   }
+}
+/* voice: a mic after the name while in the channel; speaking, the seat (or the bench chip) glows
+   green in time and says so on top */
+.vc-ico {
+  margin-left: 0.3rem;
+  font-style: normal;
+  font-size: 0.85em;
+}
+.seat.talking {
+  border-color: #3fae6a !important;
+  animation:
+    seat-in 0.5s ease-out both,
+    seat-talk 0.9s ease-in-out infinite;
+}
+@keyframes seat-talk {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px #3fae6a,
+      0 0 18px rgb(63 174 106 / 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px #5fe08f,
+      0 0 34px rgb(63 174 106 / 0.95);
+  }
+}
+/* just above the name: the seat's top corners hold the crown and the host's kick */
+.talk-pill {
+  position: absolute !important;
+  bottom: 4.1rem;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: #3fae6a;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 0 12px rgb(63 174 106 / 0.8);
+}
+.bench-chip.talking {
+  border-color: #3fae6a;
+  background: rgb(63 174 106 / 0.3);
+  box-shadow: 0 0 12px rgb(63 174 106 / 0.7);
 }
 .crown {
   position: absolute !important;

@@ -97,6 +97,17 @@ export function savedName(): string {
   }
 }
 
+/** The name typed on the online page, kept as it is typed (not only on creating or joining a room). */
+export function saveName(name: string) {
+  try {
+    const n = name.trim()
+    if (n) localStorage.setItem(NAME, n)
+    else localStorage.removeItem(NAME)
+  } catch {
+    // storage blocked: the name holds for this visit only
+  }
+}
+
 function remember(code: string | null, name?: string) {
   try {
     if (code) localStorage.setItem(LAST_ROOM, code)

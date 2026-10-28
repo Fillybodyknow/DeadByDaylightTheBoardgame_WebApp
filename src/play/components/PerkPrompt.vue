@@ -14,10 +14,11 @@ import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
-import { KILLER_CARD_BACK, VILE_PURGE_IMAGE, ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, pathLabel, perkText, playerOf, survivorMini, unknownCardNote, unknownMini, windowLabel, windowWho } from '../labels'
+import { KILLER_CARD_BACK, VILE_PURGE_IMAGE, ROLL_TITLE, orderedChoices, cardCaption, cardImage, cardLabel, killerInteractionLabel, killerMini, ownerLabel, perkChoiceLabel, perkImage, pathLabel, perkText, playerOf, survivorMini, unknownCardNote, unknownMini, windowLabel } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
 import RollDice from './RollDice.vue'
 import FaceLabel from './FaceLabel.vue'
+import MomentLine from './MomentLine.vue'
 import PerkCard from './PerkCard.vue'
 import { PERK_LEAD, pickedHint as perkPickedHint } from '../perkHints'
 import Mini from './Mini.vue'
@@ -500,7 +501,7 @@ const boardCount = computed(() => {
           <p v-if="collapsed" class="why"><BpText :text="summary" /></p>
           <!-- the moment, with the mini of whom it is about (not when that is the one deciding) -->
           <p v-else-if="step.t === 'offer' && windowLabel(st, step.w)" class="why">
-            <FaceLabel :st="st" :who="windowWho(step.w) === step.owner ? null : windowWho(step.w)" :text="windowLabel(st, step.w)" />
+            <MomentLine :st="st" :w="step.w" :deciding="step.owner" />
           </p>
         </div>
         <!-- narrow screens only: on wide ones the side panel's tab folds it, with the panel -->

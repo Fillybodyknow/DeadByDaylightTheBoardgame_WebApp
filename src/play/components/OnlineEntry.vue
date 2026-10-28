@@ -8,10 +8,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
 import ModalShell from './ModalShell.vue'
-import { BOARD_STALE_MS, backend, createRoom, joinRoom, lastRoom, randomRoomName, savedName, session, sweepRooms } from '../online/session'
+import { BOARD_STALE_MS, backend, createRoom, joinRoom, lastRoom, randomRoomName, saveName, savedName, session, sweepRooms } from '../online/session'
 import type { RoomListing } from '../online/transport'
 
 const name = ref(savedName())
+// kept as it is typed: leaving the page before a room used to lose it
+watch(name, saveName)
 const code = ref('')
 const last = lastRoom()
 

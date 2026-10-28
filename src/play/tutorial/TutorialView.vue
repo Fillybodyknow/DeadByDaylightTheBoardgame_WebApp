@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The tutorial: the chapters to choose from (PC game style cards), or the chapter in play — the
 // real game screen with The Entity's guide over it.
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import GameScreen from '../components/GameScreen.vue'
@@ -45,6 +46,18 @@ function backToList() {
 }
 
 onBeforeUnmount(exitChapter)
+
+// `?start=<chapter>` (The Entity's greeting): that chapter at once, its side's list behind it
+const route = useRoute()
+const router = useRouter()
+onMounted(() => {
+  const id = route.query.start
+  const c = typeof id === 'string' ? CHAPTERS.find((x) => x.id === id) : undefined
+  if (!c) return
+  side.value = c.side ?? 'survivor'
+  void router.replace({ query: {} })
+  startChapter(c.id)
+})
 </script>
 
 <template>
