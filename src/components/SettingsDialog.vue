@@ -9,6 +9,7 @@ import { muted, sfx, volumes, type Volumes } from '../sound'
 import { game, online, quitGame } from '../play/game'
 import { TAKEN_KEYS, keyLabel, micList, startMicTest, stopMicTest, voice } from '../play/voice'
 import { openWelcome } from '../welcome'
+import { clearHistory } from '../play/history'
 
 // the window is teleported: a class given to this component goes on the ⚙ button
 defineOptions({ inheritAttrs: false })
@@ -120,7 +121,7 @@ const PERMISSION_TH: Record<string, string> = {
 }
 
 // ---------- data: each wipe asks once, inside the window ----------
-type Wipe = 'game' | 'tutorial' | 'settings'
+type Wipe = 'game' | 'tutorial' | 'settings' | 'history'
 const confirming = ref<Wipe | null>(null)
 const done = ref<Wipe | null>(null)
 let doneTimer: number | undefined
@@ -134,6 +135,7 @@ function wipe(w: Wipe) {
   try {
     if (w === 'game') quitGame()
     if (w === 'tutorial') ['dbdl-tutorial-done', 'dbdl-tutorial-side'].forEach((k) => localStorage.removeItem(k))
+    if (w === 'history') void clearHistory().catch(() => {})
   } catch {
     // storage blocked: nothing was kept there anyway
   }
@@ -330,6 +332,10 @@ watch(tab, () => (confirming.value = null))
             <div class="wipe">
               <span><b>รีเซ็ตความคืบหน้า Tutorial</b><small>บทที่ผ่านแล้วกลับเป็นยังไม่ผ่าน</small></span>
               <button type="button" :class="{ danger: confirming === 'tutorial' }" @click="wipe('tutorial')">{{ confirming === 'tutorial' ? 'ยืนยัน รีเซ็ต' : done === 'tutorial' ? '✓ รีเซ็ตแล้ว' : 'รีเซ็ต' }}</button>
+            </div>
+            <div class="wipe">
+              <span><b>ลบประวัติเกมออนไลน์</b><small>เกมที่เล่นจบบนเครื่องนี้ (หน้า ประวัติเกม)</small></span>
+              <button type="button" :class="{ danger: confirming === 'history' }" @click="wipe('history')">{{ confirming === 'history' ? 'ยืนยัน ลบ' : done === 'history' ? '✓ ลบแล้ว' : 'ลบ' }}</button>
             </div>
             <div class="wipe">
               <span><b>บทนำของ The Entity</b><small>หน้าต้อนรับผู้เล่นใหม่: เรื่องราวของโลก Dead by Daylight และเลือกฝั่งเริ่ม Tutorial</small></span>

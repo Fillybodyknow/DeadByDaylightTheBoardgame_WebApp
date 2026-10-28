@@ -164,6 +164,12 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   from the picks on the players talk and spectators only listen (`mayTalk`). The killer hears
   everyone (p.8). Speaking turns the tile's row (or the lobby seat) green, over a wound's red. The mic is open (M toggles it) or push
   to talk (a key, V by default, or holding the 🎙️ button). Never saved or replayed.
+- **History (online):** an online game that ends is saved on each device (IndexedDB `dbdl-history`,
+  `play/history.ts`; nothing on the server, the room clears its game on going back to the lobby):
+  the players and characters, the result, the stats, the headline events and the whole log as
+  this device saw it (another survivor's item got is left out: `maskLog`). The latest 50 stay.
+  `#/history` (`HistoryView`, in the top bar) lists them and opens one round by
+  round; Settings → Data clears them.
 - **Presence (online):** a member whose connection drops leaves the lobby by itself (Firebase
   `onDisconnect`, `Room.presence`); in a game they keep their seat, marked `dropped`. Re-set after
   every reconnection (`settle` in `session.ts`).

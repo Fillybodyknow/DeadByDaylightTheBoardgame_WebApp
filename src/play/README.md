@@ -157,6 +157,13 @@ and the host starts the game.
   one shows "เชื่อมต่อไม่ได้" for that member. Local backend: a BroadcastChannel carries the same.
   **The database rules must be updated** (`voice`, `vsig`) for voice to work on Firebase; until
   then joining says the room can't carry voice yet.
+- **History** (`src/play/history.ts`, `views/HistoryView.vue`, `#/history`): the room keeps no game once it goes
+  back to its lobby (`resetGame` clears the game, moves, log and pings), so each device saves the
+  online games it saw end, in IndexedDB: a head (when, room, map, mode, rounds, winner, this
+  device's seat and side, every player's character and name), `gameStats`, `timeline` and the
+  log (`maskLog`: a line naming the item another survivor got loses the item, a house rule's
+  secret). Saved once per game, on reaching `over` (a reload on the summary saves it again under
+  the same id). The latest 50 stay; Settings → Data clears them. Offline games aren't kept.
 - **Presence** (`Room.presence`, `settle` in `session.ts`): Firebase's `onDisconnect` on the lobby
   node. In the lobby a dropped connection (a closed tab, a lost network) takes the member out and
   marks them in `dropped`, so a closed tab never keeps a place; from the picks on it only marks

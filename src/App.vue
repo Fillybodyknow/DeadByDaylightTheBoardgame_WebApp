@@ -15,6 +15,8 @@ import PhoneBlock from './play/views/PhoneBlock.vue'
 import { setAmbient, type AmbientTrack } from './sound'
 import { startUpdateWatch } from './update'
 import { openWelcome, welcome, welcomed } from './welcome'
+// online games are saved to this device's history as they end
+import './play/history'
 
 const route = useRoute()
 
@@ -61,6 +63,7 @@ const links = computed(() => [
       : []),
   { to: '/cards', label: 'การ์ด', icon: '🃏' },
   { to: '/rules', label: 'กติกา', icon: '📖' },
+  { to: '/history', label: 'ประวัติเกม', icon: '📜' },
 ])
 
 // Ambience: the campfire before a trial (menu, setup, rooms), the trial's own track during play;
@@ -252,11 +255,18 @@ const scene = computed(() =>
   font-weight: 600;
   letter-spacing: 0.1em;
 }
+/* scrolls sideways on a narrow screen, never up and down; no scrollbar of its own (its arrows
+   showed beside the settings button) */
 nav {
   display: flex;
   gap: 0.25rem;
   flex: 1;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+nav::-webkit-scrollbar {
+  display: none;
 }
 nav a {
   position: relative;
@@ -285,7 +295,7 @@ nav a.router-link-exact-active::after {
   position: absolute;
   left: 0.75rem;
   right: 0.75rem;
-  bottom: -0.1rem;
+  bottom: 0;
   height: 2px;
   background: var(--blood-bright);
   box-shadow: 0 0 8px var(--blood-bright);

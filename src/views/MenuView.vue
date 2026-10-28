@@ -74,10 +74,9 @@ function go(to: string) {
       </button>
     </div>
 
-    <nav class="refs">
-      <RouterLink to="/cards">🃏 การ์ดทั้งหมด</RouterLink>
-      <RouterLink to="/rules">📖 กติกา</RouterLink>
-      <button v-if="canInstall" type="button" class="install" @click="install">📲 ติดตั้งเป็นแอป</button>
+    <!-- the cards and the rules are in the top bar: only the install button here, when it can -->
+    <nav v-if="canInstall" class="refs">
+      <button type="button" class="install" @click="install">📲 ติดตั้งเป็นแอป</button>
     </nav>
     <p class="version" :title="`build ${APP_BUILT}`">
       {{ versionLabel() }} ·
@@ -240,9 +239,6 @@ function go(to: string) {
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
-}
-.refs a {
-  color: var(--muted);
 }
 .install {
   padding: 0.35rem 0.9rem;

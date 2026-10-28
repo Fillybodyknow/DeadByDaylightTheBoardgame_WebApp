@@ -15,6 +15,8 @@ export const router = createRouter({
     // the full game: hot-seat on one device, or online with each player on their own
     { path: '/play', name: 'offline', component: () => import('./play/views/OfflineView.vue'), meta: { section: 'offline' } },
     { path: '/online', name: 'online', component: () => import('./play/views/OnlineView.vue'), meta: { section: 'online' } },
+    // online games played to the end on this device
+    { path: '/history', name: 'history', component: () => import('./play/views/HistoryView.vue') },
     { path: '/tutorial', name: 'tutorial', component: () => import('./play/tutorial/TutorialView.vue'), meta: { section: 'tutorial' } },
     // references, shared by every mode
     { path: '/cards', name: 'cards', component: () => import('./views/CardsView.vue') },
