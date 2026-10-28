@@ -4,7 +4,7 @@ import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type Ch
 import { settings } from '../../settings'
 import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
-import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showPerk, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
+import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
 import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
@@ -20,7 +20,7 @@ import { canPing, pingArmed, pingWait } from '../pings'
 import { timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { STEP_NAME, boardActionKeys, perkPicked, perksToPick, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
+import { STEP_NAME, boardActionKeys, offerPerk, perkPicked, perksToPick, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, cardImage, killerMini, playerOf, survivorMini } from '../labels'
 import SettingsDialog from '../../components/SettingsDialog.vue'
 import VoiceButton from './VoiceButton.vue'
@@ -28,6 +28,7 @@ import ActionPanel from './ActionPanel.vue'
 import ActionReveal from './ActionReveal.vue'
 import FinaleReveal from './FinaleReveal.vue'
 import SacrificeReveal from './SacrificeReveal.vue'
+import RushReveal from './RushReveal.vue'
 import StartPlacement from './StartPlacement.vue'
 import { SEEN, firstTime, gameKey, startMinis, startsRolled } from '../intro'
 import BannerHost from './BannerHost.vue'
@@ -104,8 +105,11 @@ watch(
     let sacrificed = prev.sacrifice
     // a survivor hung on a hook: the board shows the hanging first, the track's rise after it
     let hung = false
+    // Blighted Corruption's draws: after the power's own card (the leftover one, pushed after the loop)
+    const rushes: NonNullable<Parameters<typeof showRush>[0]>[] = []
     for (const [n, e] of fresh.entries()) {
       const ev = e.ev
+      if (ev?.k === 'rushDraw') rushes.push({ card: ev.card, hand: ev.hand, ...(ev.stuck ? { stuck: true } : {}) })
       if (ev?.k === 'hook') hung = true
       // a player's action (a card played, an attack, a pallet, the power): shown before the result
       const cast = casts.of(e)
@@ -147,6 +151,7 @@ watch(
     }
     const leftover = casts.leftover()
     if (leftover) showAction(leftover)
+    for (const r of rushes) showRush(r)
     // A roll waiting on a decision (Iron Will, a key, Bond): roll it on screen first, then ask.
     const step = st.step
     if (step.t === 'roll') {
@@ -234,7 +239,7 @@ const forkMoves = shallowRef<BoardAction[] | null>(null)
 const multiPick = ref<string[]>([])
 const oppressing = computed(() => {
   const s = view.value.step
-  return s.t === 'offer' && s.perk === 'oppression' && myTurn.value
+  return s.t === 'offer' && offerPerk(view.value) === 'oppression' && myTurn.value
 })
 /** The generators picked, in the engine's own order, as the choice to send. */
 const oppressionChoice = computed(() => {
@@ -1199,6 +1204,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <PerkReveal :st="view" />
     <ActionReveal :st="view" />
     <SacrificeReveal :st="view" />
+    <RushReveal :st="view" />
     <FinaleReveal :st="props.st" />
     <StartPlacement />
     <PerkPrompt :st="view" :hidden="secret || !!over || !viewTurn" :on-board="onBoard" />

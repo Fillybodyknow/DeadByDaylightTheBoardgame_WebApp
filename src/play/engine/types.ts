@@ -723,6 +723,8 @@ export type GameEvent =
   /** `path` is empty for a teleport (Wailing Bell, a Phantasm Trap). `victor`: The Twins' Victor. */
   | { k: 'move'; who: number | 'killer' | 'victor'; from: string; to: string; path: string }
   | { k: 'phantasmSet'; room: string }
+  /** Blighted Corruption: `card` drawn at random from `hand` (his hand before it); `stuck`: it goes nowhere. */
+  | { k: 'rushDraw'; card: MoveCard; hand: MoveCard[]; stuck?: boolean }
   | { k: 'madness'; s: number; on: boolean }
   | { k: 'reveal'; prop: string; kind: PropKind; room: string }
   /** `prop` / `target`: the generator, gate, totem or locker, or the survivor healed (for the screen). */

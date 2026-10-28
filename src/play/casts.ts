@@ -11,7 +11,7 @@ import { itemHidden } from './game'
 import { BEAR_TRAP_IMAGE, KNIFE_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, powerName } from './labels'
 
 /** Events that already have a reveal of their own, or are the game's bookkeeping. */
-const SKIP = new Set(['perk', 'item', 'roll', 'reveal', 'repair', 'genDone', 'gatesPowered', 'gate', 'sacrifice', 'round', 'heal', 'cleanse', 'carryEscape', 'gameOver', 'bp', 'phantasmSet'])
+const SKIP = new Set(['rushDraw', 'perk', 'item', 'roll', 'reveal', 'repair', 'genDone', 'gatesPowered', 'gate', 'sacrifice', 'round', 'heal', 'cleanse', 'carryEscape', 'gameOver', 'bp', 'phantasmSet'])
 
 /** Log lines that aren't a player's action: setup rolls, Stridor's note, the result of a roll. */
 const SKIP_TEXT = [/ทอยได้ \d+ เริ่มที่/, /^เสียงแหบดัง:/, /ดิ้นหลุด!/, /เลือกทอย \d+ ลูก/, /หาย บ้าคลั่ง/, /^วางแผน/, /^—/]

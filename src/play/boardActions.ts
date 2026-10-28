@@ -382,10 +382,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
 
     case 'offer': {
       const name = PERKS[s.perk].name
-      // Oppression: click one or two generators, then confirm (GameScreen's bar)
-      if (s.perk === 'oppression') {
+      // Oppression: click one or two generators, then confirm (GameScreen's bar) — when it is the
+      // perk picked (Dragon's Grip may be offered with it)
+      if (offerPerk(st) === 'oppression') {
         const picked = modes.multiPick
-        for (const c of perkChoices(st, s.perk, s.owner, s.w)) {
+        for (const c of perkChoices(st, 'oppression', s.owner, s.w)) {
           if (c.prop2) continue
           const id = c.prop!
           const on = picked.value.includes(id)
@@ -629,6 +630,15 @@ const onMap = (c: PerkChoice) => !c.card && (!!c.path || !!c.prop || c.target !=
  * interact step, or offered at its moment. Its paths and generators look just like an ordinary
  * move or repair, so a player clicking one by habit set off Sprint Burst or For the People.
  */
+/**
+ * The perk an offer is about right now: the one picked in the panel when several are offered at
+ * once (or one must be armed first), else the offer's own; null while none is picked.
+ */
+export function offerPerk(st: GameState): PerkId | null {
+  if (st.step.t !== 'offer') return null
+  return perksToPick(st) ? perkPicked.value : st.step.perk
+}
+
 export function perksToPick(st: GameState): boolean {
   const s = st.step
   if (s.t === 'offer') {

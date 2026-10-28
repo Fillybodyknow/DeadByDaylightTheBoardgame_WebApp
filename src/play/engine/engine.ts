@@ -5093,13 +5093,14 @@ export function powerOptions(st: GameState): KillerInteraction[] {
  */
 function blightRush(st: GameState) {
   const k = st.killer
+  const hand = [...k.hand]
   const card = k.hand.splice(Math.floor(random(st) * k.hand.length), 1)[0] as PathKind
   const moves = killerMoves(st, card)
   if (!moves.length) {
-    log(st, `${k.name} ใช้ ความเสื่อมทรามที่พังทลาย สุ่มได้ ${CARD_NAMES[card]} — ไม่มีเส้นทาง จบพลัง`, 'killer')
+    log(st, `${k.name} ใช้ ความเสื่อมทรามที่พังทลาย สุ่มได้ ${CARD_NAMES[card]} — ไม่มีเส้นทาง จบพลัง`, 'killer', { ev: { k: 'rushDraw', card, hand, stuck: true } })
     return
   }
-  log(st, `${k.name} ใช้ ความเสื่อมทรามที่พังทลาย สุ่มได้ ${CARD_NAMES[card]}`, 'killer')
+  log(st, `${k.name} ใช้ ความเสื่อมทรามที่พังทลาย สุ่มได้ ${CARD_NAMES[card]}`, 'killer', { ev: { k: 'rushDraw', card, hand } })
   st.rushCard = card
   st.queue.unshift({ k: 'rushArrive', turn: k.revealedCount - 1, from: k.room })
   wait(st, { t: 'killerMove', turn: k.revealedCount - 1, card, rush: true })

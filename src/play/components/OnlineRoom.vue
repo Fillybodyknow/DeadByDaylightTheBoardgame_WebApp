@@ -163,7 +163,9 @@ const colorHolder = (color: string) => {
   const id = Object.keys(pingColors.value).find((k) => pingColors.value[k] === color)
   return id && id !== session.me ? (session.data?.members[id]?.name ?? '?') : null
 }
-const readyCount = computed(() => memberList.value.filter((m) => m.ready).length)
+/** The seated players (a side taken): only they say ready; the others watch the game. */
+const seated = computed(() => memberList.value.filter((m) => m.side))
+const readyCount = computed(() => seated.value.filter((m) => m.ready).length)
 /** The silhouettes on the slots: the figure on the Sprint card, the skull on a card's back. */
 // each survivor seat shows one of the four movement cards (Sneak, Sprint, Crouch, Vault), the killer's the skull
 const SEAT_CARDS = ['sneak', 'sprint', 'crouch', 'vault'] as const
@@ -548,13 +550,13 @@ const seatStatus = computed(() =>
       <footer class="ready-bar">
         <div class="rb-status">
           <span class="ready-line">
-            <span class="ready-pips" aria-hidden="true"><i v-for="m in memberList" :key="m.id" :class="{ on: m.ready }" /></span>
-            พร้อม {{ readyCount }}/{{ memberList.length }}
+            <span class="ready-pips" aria-hidden="true"><i v-for="m in seated" :key="m.id" :class="{ on: m.ready }" /></span>
+            พร้อม {{ readyCount }}/{{ seated.length }}
           </span>
-          <small class="muted">{{ lobbyBlocker || (isHost ? 'ทุกคนพร้อมแล้ว — ดำเนินเกมได้เลย' : 'ทุกคนพร้อมแล้ว — รอหัวห้องดำเนินเกม') }}</small>
+          <small class="muted">{{ lobbyBlocker || (isHost ? 'ผู้เล่นพร้อมแล้ว — ดำเนินเกมได้เลย' : 'ผู้เล่นพร้อมแล้ว — รอหัวห้องดำเนินเกม') }}{{ seated.length < memberList.length ? ` · คนที่ยังไม่เลือกฝั่ง ${memberList.length - seated.length} คนจะเป็นผู้ชม` : '' }}</small>
         </div>
         <button class="ready-btn" :class="{ primary: !me?.ready, done: me?.ready }" :disabled="session.busy || !me?.side" @click="toggleReady">
-          <span>{{ me?.ready ? '✓ พร้อมแล้ว' : me?.side ? 'พร้อม' : 'เลือกฝั่งก่อน' }}</span>
+          <span>{{ me?.ready ? '✓ พร้อมแล้ว' : me?.side ? 'พร้อม' : 'เป็นผู้ชม' }}</span>
           <small v-if="me?.ready">กดเพื่อยกเลิก</small>
         </button>
         <button v-if="isHost" class="go-btn primary" :disabled="!!lobbyBlocker || session.busy" @click="proceed">ดำเนินเกม ➜</button>

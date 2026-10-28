@@ -247,7 +247,8 @@ const handCards = computed(() => {
 
 const killerSide = computed(() => decider.value === 'killer')
 /** Dragon's Grip discards one or two cards: its choices are buttons, not the hand. */
-const isGrip = computed(() => step.value.t === 'offer' && step.value.perk === 'dragons_grip')
+// (the perk picked: it may be offered with Oppression, which asks at the same moment)
+const isGrip = computed(() => activePerk.value === 'dragons_grip')
 // ---------- Dragon's Grip: one or two cards picked from the hand, then confirmed ----------
 
 const gripPick = ref<MoveCard[]>([])
@@ -299,11 +300,11 @@ watch(gripHits, (hits) => {
 
 function confirmGrip() {
   const s = step.value
-  if (s.t === 'offer' && gripChoice.value) act({ t: 'perk', perk: s.perk, use: true, choice: gripChoice.value })
+  if (s.t === 'offer' && gripChoice.value) act({ t: 'perk', perk: 'dragons_grip', use: true, choice: gripChoice.value })
 }
 
 /** Oppression: its generators are picked on the board (GameScreen confirms), not from a list. */
-const isOppression = computed(() => step.value.t === 'offer' && step.value.perk === 'oppression')
+const isOppression = computed(() => activePerk.value === 'oppression')
 
 // ---------- movement cards: picked from the hand along the bottom, then confirmed ----------
 
@@ -534,7 +535,7 @@ const boardCount = computed(() => {
         >
           <template v-if="perkPicked === o.perk">
               <button
-                v-for="(c, i) in o.choices.filter((c) => !c.card && here(perkAct(o.perk, c)))"
+                v-for="(c, i) in o.choices.filter((c) => !c.card && o.perk !== 'oppression' && here(perkAct(o.perk, c)))"
                 :key="i"
                 class="primary"
                 @mouseenter="hover(step.owner, c, o.perk)"
@@ -547,7 +548,15 @@ const boardCount = computed(() => {
               </button>
           </template>
         </PerkCard>
+        <template v-if="isGrip">
+          <p class="hand-hint">👇 เลือกการ์ด 1–2 ใบจากไพ่บนมือด้านล่าง — แผนที่จะไฮไลต์ผู้รอดชีวิตที่โดน</p>
+          <p v-if="gripPick.length" class="small">โดน: {{ gripHits.length ? gripHits.map((s) => st.survivors[s].name).join(', ') : 'ไม่มีใคร — เลือกการ์ดสีอื่น' }}</p>
+        </template>
+        <p v-if="isOppression" class="hand-hint">🎯 คลิก Generator 1–2 เครื่องบนแผนที่ แล้วกดยืนยันที่แถบด้านล่าง</p>
         <div class="choices">
+          <button v-if="isGrip" class="primary" :disabled="!gripChoice" @click="confirmGrip">
+            <BpText :text="gripChoice ? `ยืนยัน: ${PERKS.dragons_grip.name} — ${perkChoiceLabel(st, 'dragons_grip', step.owner, step.w, gripChoice)}` : 'เลือกการ์ดจากมือก่อน'" />
+          </button>
           <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
             <BpText :text="cardPick && activePerk ? `ยืนยัน: ${PERKS[activePerk].name} — ${perkChoiceLabel(st, activePerk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน'" />
           </button>
@@ -634,7 +643,7 @@ const boardCount = computed(() => {
         </template>
         <div class="choices">
           <button v-if="isGrip" class="primary" :disabled="!gripChoice" @click="confirmGrip">
-            <BpText :text="gripChoice ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, gripChoice)}` : 'เลือกการ์ดจากมือก่อน'" />
+            <BpText :text="gripChoice ? `ยืนยัน: ${perkChoiceLabel(st, 'dragons_grip', step.owner, step.w, gripChoice)}` : 'เลือกการ์ดจากมือก่อน'" />
           </button>
           <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
             <BpText :text="cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน'" />

@@ -71,8 +71,8 @@ export const lobbyBlocker = computed(() => {
   const survivors = ms.filter((m) => m.side === 'survivor').length
   if (killers !== 1) return 'ต้องมี Killer 1 คน'
   if (survivors < MIN_SURVIVOR_PLAYERS) return `ต้องมีผู้เล่นฝั่ง Survivor อย่างน้อย ${MIN_SURVIVOR_PLAYERS} คน`
-  if (ms.some((m) => !m.side)) return 'ทุกคนต้องเลือกฝั่ง'
-  if (ms.some((m) => !m.ready)) return 'รอทุกคนกดพร้อม'
+  // members without a side don't hold the game up: they watch it
+  if (ms.some((m) => m.side && !m.ready)) return 'รอผู้เล่นที่นั่งแล้วกดพร้อม'
   return ''
 })
 
@@ -548,7 +548,7 @@ export function proceedToPick() {
     // player 2 plays the first hand, which holds two survivors when there are 3 survivor players
     const double = survivors.length === 3 ? survivors.findIndex(([id]) => id === cur.double) : -1
     if (double > 0) survivors.unshift(...survivors.splice(double, 1))
-    if (!killer || survivors.length < MIN_SURVIVOR_PLAYERS || ms.some(([, m]) => !m.side || !m.ready)) return null
+    if (!killer || survivors.length < MIN_SURVIVOR_PLAYERS || ms.some(([, m]) => m.side && !m.ready)) return null
     const seats: RoomData['seats'] = { [KILLER_PLAYER]: { id: killer[0], name: killer[1].name } }
     survivors.forEach(([id, m], i) => (seats[String(i + 2)] = { id, name: m.name }))
     const s = settingsOf(cur.settings)

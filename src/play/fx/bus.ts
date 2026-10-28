@@ -2,7 +2,7 @@
 
 import { reactive } from 'vue'
 import type { PerkId } from '../engine/perks'
-import type { Die, PerkOwner } from '../engine/types'
+import type { Die, MoveCard, PerkOwner } from '../engine/types'
 
 export interface DiceShow {
   id: number
@@ -62,6 +62,8 @@ export interface PerkShow {
   action?: ActionShow
   /** Not a card at all: the killer's Sacrifice Progress going up (SacrificeReveal shows these). */
   sacrifice?: { total: number; gained: number }
+  /** Not a card at all: Blighted Corruption's random draw from his hand (RushReveal shows these). */
+  rush?: { card: MoveCard; hand: MoveCard[]; stuck?: boolean }
 }
 
 /** A player's action, shown briefly before the board plays it out (built in casts.ts). */
@@ -128,6 +130,10 @@ export function showAction(a: Omit<ActionShow, 'id'>) {
 
 export function showSacrifice(total: number, gained: number) {
   fx.perks.push({ id: ++id, owner: 'killer', detail: '', sacrifice: { total, gained } })
+}
+
+export function showRush(rush: NonNullable<PerkShow['rush']>) {
+  fx.perks.push({ id: ++id, owner: 'killer', detail: '', rush })
 }
 
 export function showPerk(p: Omit<PerkShow, 'id'>) {
