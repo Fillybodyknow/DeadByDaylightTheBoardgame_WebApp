@@ -1,5 +1,5 @@
 // The online room this device is in, and its flow:
-//   lobby — everyone picks a side (1 killer, 2–4 survivor players) and says ready; the host goes on.
+//   lobby — everyone picks a side (1 killer, 1–4 survivor players) and says ready; the host goes on.
 //   pick  — survivors pick their survivors (seeing each other's, no duplicates, the killer's
 //           choice never shown), the killer picks; when every player has locked in, the killer
 //           starts the game.
@@ -26,7 +26,8 @@ export const backend: Backend = firebaseConfigured ? firebaseBackend : localBack
 const LAST_ROOM = 'dbdl-last-room'
 const NAME = 'dbdl-player-name'
 export const MAX_SURVIVOR_PLAYERS = 4
-export const MIN_SURVIVOR_PLAYERS = 2
+/** One survivor player is a game of two: they play all four survivors (p.6). */
+export const MIN_SURVIVOR_PLAYERS = 1
 
 export const session = reactive({
   me: clientId(backend.name === 'local'),
@@ -78,8 +79,8 @@ export const lobbyBlocker = computed(() => {
 
 /** Survivor slots (0–3) played by each player, for the seated player count (p.19). */
 export function slotsOf(player: number, players = session.data?.players ?? 0): number[] {
-  if (player === KILLER_PLAYER || players < 3) return []
-  return handLayout(players as 3 | 4 | 5).flatMap((hand, slot) => (hand === player - 2 ? [slot] : []))
+  if (player === KILLER_PLAYER || players < 2) return []
+  return handLayout(players as 2 | 3 | 4 | 5).flatMap((hand, slot) => (hand === player - 2 ? [slot] : []))
 }
 
 /** Players still to lock in their characters. */
@@ -817,7 +818,7 @@ export function startOnlineGame() {
           return { id, name: n ? `${name} ${n + 1}` : name, perks: perks[String(i)] }
         }),
         killer: { id: killer, name: killerById.get(killer)!.name, perks: perks.killer },
-        players: d.players as 3 | 4 | 5,
+        players: d.players as 2 | 3 | 4 | 5,
         startBp: { survivor: roomSettings.value.survivorBp, killer: roomSettings.value.killerBp },
         seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
       }),

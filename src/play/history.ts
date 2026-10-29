@@ -48,6 +48,13 @@ export interface HistoryGame {
   stats: ReturnType<typeof gameStats>
   timeline: TimelineItem[]
   log: LogEntry[]
+  /**
+   * The game's last state, whole (its log unmasked), as JSON: only for a problem report to the
+   * developer (report.ts), never shown. Games saved before 1.17.0 have none.
+   */
+  state?: string
+  /** The id of the report sent about this game, if one was. */
+  reported?: string
 }
 
 // ---------- the log as this device may see it ----------
@@ -130,11 +137,24 @@ export async function clearHistory() {
   await done(tx)
 }
 
+/** Mark a game as reported (its report's id). */
+export async function markReported(id: string, report: string) {
+  const g = await getHistory(id)
+  if (!g) return
+  g.reported = report
+  const db = await open()
+  const tx = db.transaction('games', 'readwrite')
+  tx.objectStore('games').put(g)
+  await done(tx)
+}
+
 /** Save a game (again: the same id replaces it), then drop the oldest past KEEP. */
 export async function saveHistory(g: HistoryGame) {
   const db = await open()
   // a plain copy: the state's arrays may be Vue proxies, which IndexedDB can't store
   const copy = JSON.parse(JSON.stringify(g)) as HistoryGame
+  // saved again (a reload on the summary): a report already sent about it stays marked
+  copy.reported ??= (await getHistory(copy.head.id).catch(() => null))?.reported
   const tx = db.transaction(['heads', 'games'], 'readwrite')
   tx.objectStore('heads').put(copy.head)
   tx.objectStore('games').put(copy)
@@ -168,7 +188,7 @@ function record(st: GameState, seat: number): HistoryGame {
       return { id: sv.characterId, name: sv.name, player: playerName(n), seat: n }
     }),
   }
-  return { head, stats: gameStats(st), timeline: timeline(st), log: maskLog(st, seat) }
+  return { head, stats: gameStats(st), timeline: timeline(st), log: maskLog(st, seat), state: JSON.stringify(st) }
 }
 
 /** Ids saved this visit: a game is saved once, when it ends. */

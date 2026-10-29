@@ -9,6 +9,7 @@ Working notes for this repo, for every machine and session. Details live in `REA
 **ดบดล** is a web app for *Dead by Daylight: The Board Game*, with three modes:
 
 - **Online** (`#/online`): the full game, each player on their own device, rooms on Firebase.
+  2–5 players; with 2, one player holds all four survivors (the two-player deck, p.6).
 - **Offline** (`#/play`): the full game on one shared device (hot-seat, hand-off curtains).
 - **Tutorial** (`#/tutorial`): lessons for new players, the survivors' and the killer's.
 
@@ -170,6 +171,12 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   this device saw it (another survivor's item got is left out: `maskLog`). The latest 50 stay.
   `#/history` (`HistoryView`, in the top bar) lists them and opens one round by
   round; Settings → Data clears them.
+- **Problem reports:** a game in the history can be reported to the developer (🐞, `play/report.ts`):
+  the player's note, the round, the app version and the game (its whole last state too, unmasked)
+  go to `reports/RP-XXXX-XXXX-XXXX` on Firebase, one a minute per device, readable only by that id
+  (the list isn't). The player gets the id; open it with `#/history?report=<id>` (a "full log"
+  switch unmasks it), or read it with
+  `curl "$VITE_FIREBASE_DATABASE_URL/reports/<id>.json"` to look into a bug.
 - **Presence (online):** a member whose connection drops leaves the lobby by itself (Firebase
   `onDisconnect`, `Room.presence`); in a game they keep their seat, marked `dropped`. Re-set after
   every reconnection (`settle` in `session.ts`).

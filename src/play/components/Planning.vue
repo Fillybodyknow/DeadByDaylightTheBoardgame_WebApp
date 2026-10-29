@@ -3,11 +3,12 @@
 // (CardHand): point at one to draw it up and see where it goes on the map, click to pick it —
 // it stays drawn up until the choice is confirmed here. A player with several survivors
 // switches between them with the tabs. On one shared device the survivors pick together, then
-// the device goes to the killer behind a hand-off curtain.
+// the device goes to the killer behind a hand-off curtain. Two players (p.6): the drawn cards are
+// set one at a time, to each survivor in turn order, one more drawn after each.
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
-import { CARD_NAMES, directRoom, isDirect, isPathCard, killerCardCount, killerMoves, roomName, turnOrder, unknownRooms } from '../engine/engine'
+import { CARD_NAMES, directRoom, isDirect, isPathCard, killerCardCount, killerMoves, nextToPlan, roomName, turnOrder, twoPlayer, unknownRooms } from '../engine/engine'
 import { KILLER_PLAYER, handsToPlan } from '../engine/seats'
 import type { GameState, MoveCard } from '../engine/types'
 import { choicePreview, preview } from '../focus'
@@ -150,6 +151,45 @@ function confirmSurvivors() {
   }
 }
 
+// ---------- two players: one card at a time, in turn order (p.6) ----------
+
+const two = computed(() => twoPlayer(props.st))
+/** The survivor whose card is set next. */
+const nextUp = computed(() => (two.value ? nextToPlan(props.st) : null))
+const twoPick = ref<MoveCard | null>(null)
+watch(
+  () => [props.st.round, props.st.survivorHands[0]?.join()],
+  () => (twoPick.value = null),
+)
+/** The drawn cards, a kind once with how many there are (two sets: a kind may be drawn twice). */
+const twoHand = computed<HandCard[]>(() => {
+  const hand = props.st.survivorHands[0] ?? []
+  return [...new Set(hand)].map((card) => {
+    const n = hand.filter((c) => c === card).length
+    return { card, picked: twoPick.value === card, ...(n > 1 ? { count: n } : {}) }
+  })
+})
+/** The survivors in turn order, with what each has: set, next, waiting, on a hook, face up first. */
+const twoOrder = computed(() =>
+  turnOrder(props.st).map((s) => {
+    const sv = props.st.survivors[s]
+    const card = sv.planned ?? props.st.planDraft?.[s] ?? null
+    return { s, card, hooked: sv.status === 'hooked', faceUp: sv.plannedRevealed && !!sv.planned, next: nextUp.value === s }
+  }),
+)
+function pickTwo(card: MoveCard) {
+  sfx.click()
+  twoPick.value = twoPick.value === card ? null : card
+}
+function confirmTwo() {
+  if (!twoPick.value) return
+  if (dispatch({ t: 'planNext', card: twoPick.value })) {
+    sfx.select()
+    twoPick.value = null
+    preview.value = null
+  }
+}
+
 // ---------- killer ----------
 
 /**
@@ -235,6 +275,8 @@ watchEffect(() => {
   if (!curtainOpen.value) pathPick.value = null
   else if (stridorStep.value !== null)
     pathPick.value = pathPickFor(st, st.survivors[stridorStep.value].room, stridorHand.value.map((c) => c.card), pickStridor)
+  else if (!planningKiller.value && two.value)
+    pathPick.value = nextUp.value === null ? null : pathPickFor(st, st.survivors[nextUp.value].room, twoHand.value.map((c) => c.card), pickTwo)
   else if (!planningKiller.value)
     pathPick.value = current.value === null ? null : pathPickFor(st, st.survivors[current.value].room, survivorHand.value.map((c) => c.card), pickSurvivorCard)
   else pathPick.value = pathPickFor(st, killerFrom.value, killerHand.value.map((c) => c.card), pickKiller)
@@ -292,6 +334,39 @@ function confirmKiller() {
       :prompt="`${firstWhy} — เปิดการ์ดหงายก่อนใคร`"
       @pick="pickStridor"
       @hover="hover($event, stridorStep)"
+    />
+  </section>
+
+  <!-- two players: the drawn cards, one to each survivor in turn order (p.6) -->
+  <section v-else-if="!planningKiller && two" class="card panel">
+    <h2>วางแผน: วางการ์ดให้ทีละตัวตามลำดับเทิร์น</h2>
+    <p class="muted">โหมด 2 คน — การ์ด 2 ชุดสับรวมกัน จั่วไว้ 3 ใบ วางให้ตัวที่ถึงคิว 1 ใบ แล้วจั่วเพิ่ม 1 ใบ · วางแล้วเปลี่ยนไม่ได้ (หน้า 6)</p>
+    <p v-for="c in faceUpFirst" :key="c.name" class="stridor-note">👁 {{ c.name }} เปิดไว้แล้ว — <b>{{ CARD_NAMES[c.card] }}</b></p>
+    <p v-if="tonicNames.length" class="stridor-note">🧪 ยาบำรุงส่งท้าย: {{ tonicNames.join(', ') }} อยู่ห้องเดียวกับ Tonic — การ์ดจะวาง<b>หงาย</b></p>
+
+    <ol class="two-order">
+      <li v-for="o in twoOrder" :key="o.s" :class="{ next: o.next, done: !!o.card, hooked: o.hooked }">
+        <Mini class="mini" :src="asset(survivorMini(st, o.s))" alt="" />
+        <span class="tab-text">
+          <strong>{{ st.survivors[o.s].name }}</strong>
+          <small class="muted">{{ o.hooked ? 'อยู่บน Hook — ไม่วางการ์ด' : o.faceUp ? 'เปิดหงายไว้แล้ว' : o.card ? 'วางแล้ว' : o.next ? 'ถึงคิว — เลือกการ์ด' : 'รอคิว' }} · {{ roomName(st, st.survivors[o.s].room) }}</small>
+        </span>
+        <img class="tab-card" :class="{ empty: !o.card }" :src="asset(o.card ? cardImage(o.card) : SURVIVOR_CARD_BACK)" :alt="o.card ? cardLabel(o.card) : 'ยังไม่วาง'" />
+      </li>
+    </ol>
+
+    <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทางของ {{ nextUp !== null ? st.survivors[nextUp].name : '' }} บนแผนที่ · คลิกเพื่อเลือก</p>
+    <p class="muted small">เหลือในกอง {{ st.survivorDeck?.length ?? 0 }} ใบ</p>
+    <button class="primary" :disabled="!twoPick || nextUp === null" @click="confirmTwo">
+      {{ twoPick && nextUp !== null ? `วาง ${CARD_NAMES[twoPick]} ให้ ${st.survivors[nextUp].name} แล้วจั่วใบใหม่` : 'เลือกการ์ดก่อน' }}
+    </button>
+
+    <CardHand
+      v-if="nextUp !== null"
+      :cards="twoHand"
+      :label="`การ์ดที่จั่วไว้ — วางให้ ${st.survivors[nextUp].name}`"
+      @pick="pickTwo"
+      @hover="hover($event, nextUp)"
     />
   </section>
 
@@ -374,6 +449,35 @@ function confirmKiller() {
 </template>
 
 <style scoped>
+/* two players: the survivors in turn order, the next one lit */
+.two-order {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.4rem 0;
+  padding: 0;
+  list-style: none;
+}
+.two-order li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  opacity: 0.75;
+}
+.two-order li.next {
+  opacity: 1;
+  border-color: #ffd56a;
+  box-shadow: 0 0 12px rgb(255 213 106 / 0.35);
+}
+.two-order li.done {
+  opacity: 1;
+}
+.two-order li.hooked {
+  opacity: 0.45;
+}
 .overlay {
   position: fixed;
   inset: 0;

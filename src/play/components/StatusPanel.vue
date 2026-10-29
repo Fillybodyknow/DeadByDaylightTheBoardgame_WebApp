@@ -4,8 +4,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components, items, killerById } from '../../data'
 import { asset } from '../../i18n'
-import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, killerCardCount, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, victorRoom } from '../engine/engine'
-import type { GameState, ItemUse, PathKind } from '../engine/types'
+import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, killerCardCount, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, twoPlayer, victorRoom } from '../engine/engine'
+import type { GameState, ItemUse, MoveCard, PathKind } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
 import { KILLER_PLAYER } from '../engine/seats'
 import { seatVoice } from '../voice'
@@ -51,8 +51,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
  * still face down in planning is no one else's business: it counts as not used. Players sharing a
  * hand (p.19) show the same one. Everything comes back at Cleanup (p.11).
  */
-function handCards(s: number): { card: PathKind; used: boolean }[] {
+function handCards(s: number): { card: PathKind; used: boolean; left?: number }[] {
   const st = props.st
+  // Two players (p.6): two sets for the four, drawn from a deck — a kind shows how many of its two
+  // are not face up yet (in hand, in the deck, or set face down), as the killer can count them.
+  if (twoPlayer(st)) {
+    // the cards set so far this planning are still face down (in the draft until the last one)
+    const drafted = (st.planDraft ?? []).filter((c): c is MoveCard => !!c)
+    const unseen = [...(st.survivorHands[0] ?? []), ...(st.survivorDeck ?? []), ...drafted, ...st.survivors.flatMap((sv) => (sv.planned && !sv.plannedRevealed ? [sv.planned] : []))]
+    return SURVIVOR_CARDS.map((card) => {
+      const left = unseen.filter((c) => c === card).length
+      return { card, used: left === 0, left }
+    })
+  }
   const hand = st.survivors[s].hand
   const missing = [...SURVIVOR_CARDS] as PathKind[]
   for (const c of st.survivorHands[hand] ?? []) {
@@ -71,6 +82,7 @@ function handCards(s: number): { card: PathKind; used: boolean }[] {
   })
 }
 const handTitle = (s: number) => {
+  if (twoPlayer(props.st)) return `การ์ด 2 ชุดของผู้รอดชีวิตทั้ง 4 ตัว ที่ยังไม่ถูกเปิดรอบนี้: ${handCards(s).map((c) => `${CARD_NAMES[c.card]} ${c.left}`).join(', ')}`
   const used = handCards(s).filter((c) => c.used)
   const mates = props.st.survivors.filter((sv, i) => i !== s && sv.hand === props.st.survivors[s].hand).map((sv) => sv.name)
   return `การ์ดที่ใช้ไปแล้วรอบนี้: ${used.length ? used.map((c) => CARD_NAMES[c.card]).join(', ') : 'ยังไม่มี'}${mates.length ? ` (มือร่วมกับ ${mates.join(', ')})` : ''}`
@@ -281,6 +293,7 @@ function onPowerSlot() {
         <span class="hand-strip" :title="handTitle(s)" :aria-label="handTitle(s)">
           <span v-for="c in handCards(s)" :key="c.card" class="hcard" :class="{ used: c.used }">
             <img :src="asset(cardImage(c.card))" alt="" />
+            <b v-if="c.left !== undefined && c.left > 0" class="hleft">{{ c.left }}</b>
           </span>
         </span>
       </div>
@@ -879,6 +892,20 @@ button.slot:hover .slot-crop {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+/* two players: how many of a kind are not face up yet (of two) */
+.hleft {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  min-width: 9px;
+  padding: 0 1px;
+  border-radius: 2px 0 0 0;
+  background: rgb(0 0 0 / 0.8);
+  color: #fff;
+  font-size: 9px;
+  line-height: 11px;
+  text-align: center;
 }
 .hcard.used img {
   opacity: 0.28;

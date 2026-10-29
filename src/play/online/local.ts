@@ -6,7 +6,7 @@
 
 import { tryApply } from '../engine/engine'
 import type { Action, GameState } from '../engine/types'
-import type { Backend, ChatMessage, Ping, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
+import type { Backend, ChatMessage, Ping, Report, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
 import { CHAT_KEEP, CHECKPOINT_EVERY, emptyRoom, normalizeRoom } from './transport'
 
 const DB = 'dbdl-rooms'
@@ -365,6 +365,18 @@ async function destroy(code: string) {
 
 export const localBackend: Backend = {
   name: 'local',
+  // Reports stay in this browser (a record beside the rooms), for trying the report out.
+  async sendReport(id, r) {
+    await modify(`#report:${id}`, () => ({ ...r, at: Date.now() }) as unknown as StoredRoom)
+  },
+  async fetchReport(id) {
+    const db = await open()
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE).objectStore(STORE).get(`#report:${id}`)
+      req.onsuccess = () => resolve((req.result as Report | undefined) ?? null)
+      req.onerror = () => reject(req.error)
+    })
+  },
   listRooms(cb) {
     const ch = indexChannel()
     const send = () => void readBoard().then(cb)

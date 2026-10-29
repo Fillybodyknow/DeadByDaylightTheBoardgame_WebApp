@@ -650,6 +650,11 @@ export type Action =
    * survivor, by index; only that hand's entries are read). Planning ends once every hand is in.
    */
   | { t: 'planHand'; hand: number; cards: (MoveCard | null)[] }
+  /**
+   * Two players (p.6): one card from the drawn ones to the next survivor in turn order, then one
+   * more is drawn. Set for good: the earlier ones can't change.
+   */
+  | { t: 'planNext'; card: MoveCard }
   | { t: 'planKiller'; cards: MoveCard[] }
   /** Online planning: take a hand's (or the killer's) confirmed cards back, while others still plan. */
   | { t: 'unplanHand'; hand: number }
@@ -771,6 +776,11 @@ export interface GameState {
   survivors: SurvivorState[]
   /** Movement cards still in each survivor hand this round. */
   survivorHands: MoveCard[][]
+  /**
+   * Two players (p.6): the one hand is drawn from two sets of survivor cards shuffled together;
+   * these are the ones not drawn yet this round. Unset in a game of 3–5 players.
+   */
+  survivorDeck?: MoveCard[]
   /** Player number (1-based, killer = 1) controlling each hand. */
   handPlayers: number[]
   killer: KillerState

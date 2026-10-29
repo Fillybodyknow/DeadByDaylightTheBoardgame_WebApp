@@ -450,8 +450,8 @@ describe('perks', () => {
      * One random game, its rules checked as it goes; the perks it used go into `used`. `only`: its
      * character plays with that one perk (the others spend the ▲ it needs before its moment comes).
      */
-    function play(seed: number, killer: string, crew: string[], only?: PerkId) {
-      let st = createGame({ board: 'macmillan', survivors: crew.map((id) => ({ id, name: id })), killer: { id: killer, name: killer }, players: 5, seed })
+    function play(seed: number, killer: string, crew: string[], only?: PerkId, players: 2 | 5 = 5) {
+      let st = createGame({ board: 'macmillan', survivors: crew.map((id) => ({ id, name: id })), killer: { id: killer, name: killer }, players, seed })
       if (only) {
         // a card-only perk (the edit-perks mode) is on no board: deal it to the right side
         if (PERKS[only].card) {
@@ -489,12 +489,17 @@ describe('perks', () => {
         expect(new Set(st.phantasm).size).toBe(st.phantasm.length)
         // The Redeemer card is only held while its guess is pending.
         expect(!!st.redeemer).toBe(st.step.t === 'redeemerGuess')
+        // two players: the hand and the deck never hold more than the two sets (p.6)
+        if (players === 2) expect(st.survivorHands[0].length + (st.survivorDeck?.length ?? 0)).toBeLessThanOrEqual(8)
       }
       for (const e of st.log) if (e.ev?.k === 'perk') used.add(e.ev.perk)
     }
     for (let seed = 1; seed <= 240; seed++)
       // every killer in turn, and 4 of the survivors, rotating so everyone plays
       play(seed, ALL_KILLERS[seed % ALL_KILLERS.length], [0, 1, 2, 3].map((i) => ALL_SURVIVORS[(seed + i * 2) % ALL_SURVIVORS.length]))
+    // two players (p.6): one hand drawn from a deck of two sets, with every perk that handles cards
+    for (let seed = 1001; seed <= 1080; seed++)
+      play(seed, ALL_KILLERS[seed % ALL_KILLERS.length], [0, 1, 2, 3].map((i) => ALL_SURVIVORS[(seed + i * 3) % ALL_SURVIVORS.length]), undefined, 2)
     // A perk whose moment didn't come: more games with its character, until it does (or 120 more:
     // Game Afoot's moment, an attack in the killer's bonus turn, can take that long).
     for (const p of Object.keys(PERKS) as PerkId[]) {

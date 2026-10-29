@@ -164,6 +164,14 @@ and the host starts the game.
   log (`maskLog`: a line naming the item another survivor got loses the item, a house rule's
   secret). Saved once per game, on reaching `over` (a reload on the summary saves it again under
   the same id). The latest 50 stay; Settings → Data clears them. Offline games aren't kept.
+  Each game also keeps its last state whole (`state`, its log unmasked), never shown: it goes
+  with a **problem report** (`src/play/report.ts`). In a game's page, 🐞 opens a form (what
+  happened, which round); it sends the note, the app version, the browser and the game to
+  `reports/<id>` (the id is random, `RP-XXXX-XXXX-XXXX`, shown to the sender to pass on). The rules
+  let a report be written once and read only by its id, and a device send one a minute
+  (`reportAt/<client id>`, written with it). `#/history?report=<id>` (or the box under the list)
+  shows a report's game, with a "full log" switch for the unmasked log. "ดาวน์โหลดไฟล์แทน" saves
+  the same as a JSON file. **The database rules must be updated** (`reports`, `reportAt`).
 - **Presence** (`Room.presence`, `settle` in `session.ts`): Firebase's `onDisconnect` on the lobby
   node. In the lobby a dropped connection (a closed tab, a lost network) takes the member out and
   marks them in `dropped`, so a closed tab never keeps a place; from the picks on it only marks
@@ -290,8 +298,16 @@ Entity speaking (`src/play/tutorial/`). The list has a tab per side (remembered 
   step): once every character is picked, each player sets their 3 perks on a loadout screen in the
   PC game's style (`PerkLoadout.vue`; offline one player at a time behind a hand-off card). The
   rules live in `engine/loadout.ts`; `createGame` takes each character's `perks`.
-- 3–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
-  The 2-player deck rule is not in yet.
+- 2–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
+  **Two players** (p.6): one player controls all four survivors (`handLayout(2)`: one hand).
+  Each planning, two sets of survivor cards are shuffled into a deck (`survivorDeck`) and three
+  drawn (`survivorHands[0]`); `planNext` sets one of them for the next survivor in turn order
+  (`nextToPlan`; a hooked one is skipped) and draws one more. A set card can't change, so there is
+  no whole plan and no taking back. With all four set the killer plans (`planKiller`), or the
+  round starts if he planned already (online, at the same time). The three cards left stay in hand
+  as usual: bonus turns and perks use them. Stridor's / a Dire Crow's face-up card draws one more
+  too. The tiles show, for each kind, how many of its two aren't face up yet. Offline the players
+  step offers 2; online one survivor player is enough (`MIN_SURVIVOR_PLAYERS`).
 - Full round structure: planning with hand-off screens, survivor turns, killer turns and the
   4 ▲ bonus turn, crow bonus turns, cleanup.
 - Every survivor and killer interaction, carrying to a hook (1–4 dice), rescues, lockers,
@@ -323,7 +339,7 @@ players clicking them by habit used the perk by mistake. Usable perks glow and p
 armed. The killer's offers still put their targets on the map at once.
 
 Next: the other killers and survivors, Devout / Bloodweb perk choice, the other boards (each
-needs its graph in `boards.ts`), the 2-player rule, then bots from the automated rules.
+needs its graph in `boards.ts`), then bots from the automated rules.
 
 ## House rules
 

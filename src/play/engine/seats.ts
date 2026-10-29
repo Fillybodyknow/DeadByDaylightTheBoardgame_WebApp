@@ -110,6 +110,8 @@ export function mayAct(st: GameState, player: number, action: Action): boolean {
   if (action.t === 'acceptRoll') return st.step.t === 'roll' && playerOfSurvivor(st, st.step.ctx.s) === player
   if (action.t === 'react') return st.step.t === 'reaction' && actorsOf(st).includes(player) && (action.s === null || playerOfSurvivor(st, action.s) === player)
   if (action.t === 'planHand') return st.step.t === 'planSurvivors' && st.handPlayers[action.hand] === player
+  // two players: the one survivor player sets the cards
+  if (action.t === 'planNext') return st.step.t === 'planSurvivors' && st.handPlayers[0] === player
   // planning runs for everyone at once, so both actions are legal in the same step: each belongs
   // to its own side
   if (action.t === 'planKiller') return player === KILLER_PLAYER && actorsOf(st).includes(player)

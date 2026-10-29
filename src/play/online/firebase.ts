@@ -29,7 +29,7 @@ import { get, getDatabase, limitToLast, onChildAdded, onChildChanged, onDisconne
 import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
-import type { Backend, ChatMessage, Ping, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
+import type { Backend, ChatMessage, Ping, Report, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
 import { CHAT_KEEP, CHECKPOINT_EVERY, emptyRoom, moveKey, normalizeRoom } from './transport'
 
 const env = import.meta.env
@@ -433,6 +433,15 @@ class FirebaseRoom implements Room {
 
 export const firebaseBackend: Backend = {
   name: 'firebase',
+  // Reports: reports/<id>, written once and read only by id (the list isn't readable); the
+  // sender's reportAt goes in the same write, for the rules' one-a-minute limit.
+  async sendReport(id, r) {
+    await update(ref(database()), { [`reports/${id}`]: { ...r, at: serverTimestamp() }, [`reportAt/${r.from}`]: serverTimestamp() })
+  },
+  async fetchReport(id) {
+    const snap = await get(ref(database(), `reports/${id}`))
+    return (snap.val() as Report | null) ?? null
+  },
   // The board lives apart from the rooms (roomIndex/<code>), readable by anyone: the rooms
   // themselves are only read with their code.
   listRooms(cb) {

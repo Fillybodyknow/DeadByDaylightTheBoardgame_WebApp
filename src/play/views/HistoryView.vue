@@ -12,6 +12,9 @@ import { boards } from '../engine/boards'
 import { deleteHistory, getHistory, KEEP, listHistory, type HistoryGame, type HistoryHead } from '../history'
 import { diceFaces } from '../labels'
 import Mini from '../components/Mini.vue'
+import ModalShell from '../components/ModalShell.vue'
+import { downloadReport, fetchReport, parseReportId, reportError, sendReport } from '../report'
+import type { Report } from '../online/transport'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,13 +34,39 @@ async function loadList() {
 void loadList()
 
 const openId = computed(() => (typeof route.query.id === 'string' ? route.query.id : null))
+/** A report opened by its id (#/history?report=RP-…): the game it carries, read-only. */
+const reportId = computed(() => (typeof route.query.report === 'string' ? parseReportId(route.query.report) : null))
+const report = ref<Report | null>(null)
+const loading = ref(false)
+/** A report's game: its whole log from the state (nothing masked), for finding the bug. */
+const fullLog = ref(false)
 watch(
-  openId,
-  async (id) => {
+  [openId, reportId],
+  async ([id, rid]) => {
+    report.value = null
+    fullLog.value = false
+    if (rid) {
+      loading.value = true
+      const r = await fetchReport(rid).catch(() => null)
+      loading.value = false
+      report.value = r?.report ?? null
+      opened.value = r?.game ?? null
+      return
+    }
     opened.value = id ? await getHistory(id).catch(() => null) : null
   },
   { immediate: true },
 )
+const showing = computed(() => !!openId.value || !!reportId.value)
+
+/** The list's box: open a report by its id. */
+const typedId = ref('')
+const typedOk = computed(() => parseReportId(typedId.value))
+function openReport() {
+  if (!typedOk.value) return
+  sfx.click()
+  void router.push({ path: '/history', query: { report: typedOk.value } })
+}
 
 function openGame(id: string) {
   sfx.click()
@@ -76,12 +105,22 @@ function result(h: HistoryHead): 'win' | 'loss' | 'watch' {
 const RESULT_TH = { win: 'ชนะ', loss: 'แพ้', watch: 'ดู' } as const
 const winnerLine = (h: HistoryHead) => (h.winner === 'survivors' ? 'ผู้รอดชีวิตหนีรอด' : `${h.killer.name} สังเวยครบ 8`)
 
+const stateLog = computed<HistoryGame['log'] | null>(() => {
+  const s = opened.value?.state
+  if (!s) return null
+  try {
+    return (JSON.parse(s) as { log: HistoryGame['log'] }).log.filter((e) => e.text)
+  } catch {
+    return null
+  }
+})
+
 // the opened game: its log by round
 const rounds = computed(() => {
   const g = opened.value
   if (!g) return []
   const out: { round: number; lines: HistoryGame['log'] }[] = []
-  for (const e of g.log) {
+  for (const e of fullLog.value && stateLog.value ? stateLog.value : g.log) {
     // the "— round N —" line: the round's own heading says it
     if (e.ev?.k === 'round') continue
     const last = out[out.length - 1]
@@ -110,6 +149,51 @@ function lineFace(g: HistoryGame, who: number | 'killer' | 'game'): string {
   return survivorMini(g.head.survivors[who]?.id ?? '')
 }
 
+// ---------- a problem report to the developer ----------
+const reporting = ref(false)
+const note = ref('')
+const noteRound = ref(0)
+const sending = ref(false)
+const sentId = ref('')
+const sendError = ref('')
+const copied = ref(false)
+function openReporting() {
+  sfx.click()
+  note.value = ''
+  noteRound.value = 0
+  sentId.value = ''
+  sendError.value = ''
+  reporting.value = true
+}
+async function send() {
+  const g = opened.value
+  if (!g || note.value.trim().length < 5 || sending.value) return
+  sending.value = true
+  sendError.value = ''
+  try {
+    sentId.value = await sendReport(g, note.value, noteRound.value)
+    g.reported = sentId.value
+    sfx.select()
+  } catch (e) {
+    console.warn('report: not sent (database.rules.json needs "reports")', e)
+    sendError.value = reportError(e)
+  } finally {
+    sending.value = false
+  }
+}
+function download() {
+  if (opened.value) downloadReport(opened.value, note.value || '(ไม่ได้เขียน)', noteRound.value)
+}
+async function copyId(id: string) {
+  try {
+    await navigator.clipboard.writeText(id)
+    copied.value = true
+    setTimeout(() => (copied.value = false), 2000)
+  } catch {
+    // no clipboard: the id is on screen to copy by hand
+  }
+}
+
 const SURVIVOR_COLS = [
   { key: 'repair', label: 'ซ่อม' },
   { key: 'gensDone', label: 'Gen เสร็จ' },
@@ -131,11 +215,24 @@ const KILLER_COLS = [
 
 <template>
   <div class="history">
-    <!-- ================= a game ================= -->
-    <template v-if="openId">
+    <!-- ================= a game (or a report's) ================= -->
+    <template v-if="showing">
       <button type="button" class="back" @click="backToList">◂ ประวัติทั้งหมด</button>
-      <p v-if="!opened" class="muted">ไม่พบเกมนี้ในเครื่อง</p>
+      <p v-if="loading" class="muted">กำลังโหลดรายงาน…</p>
+      <p v-else-if="!opened" class="muted">{{ reportId ? 'ไม่พบรายงาน ' + reportId : 'ไม่พบเกมนี้ในเครื่อง' }}</p>
       <template v-else>
+        <!-- a report: what its sender said -->
+        <section v-if="report" class="report-box">
+          <p class="eyebrow">รายงานปัญหา · {{ reportId }}</p>
+          <p class="report-note">{{ report.note }}</p>
+          <small>{{ report.round ? 'รอบ ' + report.round + ' · ' : '' }}ส่งเมื่อ {{ report.at ? when(report.at) : '-' }} · แอป {{ report.app }}</small>
+          <small class="ua">{{ report.ua }}</small>
+        </section>
+        <!-- this device's game: report a problem in it -->
+        <div v-else class="report-bar">
+          <span v-if="opened.reported" class="reported">✓ ส่งรายงานแล้ว: <b>{{ opened.reported }}</b> <button type="button" class="small" @click="copyId(opened.reported)">{{ copied ? '✓ คัดลอกแล้ว' : 'คัดลอก' }}</button></span>
+          <button type="button" class="report-btn" @click="openReporting">🐞 รายงานปัญหาในเกมนี้</button>
+        </div>
         <header class="hero" :class="[opened.head.winner, result(opened.head)]" :style="{ backgroundImage: `url(${asset(scene(opened.head.board))})` }">
           <div class="hero-text">
             <p class="eyebrow">{{ when(opened.head.at) }} · {{ boardName(opened.head.board) }} · {{ MODES[opened.head.mode] ?? opened.head.mode }} · {{ opened.head.rounds }} รอบ</p>
@@ -205,7 +302,10 @@ const KILLER_COLS = [
         <section class="panel">
           <div class="log-head">
             <h2>บันทึกทั้งเกม</h2>
-            <button type="button" class="small" @click="toggleAll">{{ allOpen ? 'ย่อทุกรอบ' : 'เปิดทุกรอบ' }}</button>
+            <span class="log-tools">
+              <label v-if="report && stateLog" class="full"><input v-model="fullLog" type="checkbox" /> log เต็ม (ไม่ปิด item)</label>
+              <button type="button" class="small" @click="toggleAll">{{ allOpen ? 'ย่อทุกรอบ' : 'เปิดทุกรอบ' }}</button>
+            </span>
           </div>
           <div v-for="r in rounds" :key="r.round" class="round">
             <button type="button" class="round-head" :aria-expanded="openRounds.has(r.round)" @click="toggleRound(r.round)">
@@ -223,10 +323,40 @@ const KILLER_COLS = [
           </div>
         </section>
 
-        <p class="foot">
+        <p v-if="!report" class="foot">
           <button type="button" :class="{ danger: confirmDelete }" @click="remove(opened.head.id)">{{ confirmDelete ? 'ยืนยัน ลบเกมนี้' : 'ลบเกมนี้จากประวัติ' }}</button>
         </p>
       </template>
+
+      <ModalShell :open="reporting" title="🐞 รายงานปัญหาถึงผู้พัฒนา" width="560px" @close="reporting = false">
+        <template v-if="!sentId">
+          <p class="lead">เล่าว่าเกิดอะไรขึ้น ผิดจากที่ควรเป็นยังไง — ผู้พัฒนาจะดูประกอบกับบันทึกของเกมนี้</p>
+          <textarea v-model="note" rows="5" maxlength="2000" placeholder="เช่น Meg มี Vile Purge 2 อัน เข้า Locker แล้วหายหมดทั้ง 2 อัน ทั้งที่ควรหายแค่ 1 อัน" />
+          <label class="round-pick">
+            เกิดในรอบที่
+            <select v-model.number="noteRound">
+              <option :value="0">ไม่แน่ใจ</option>
+              <option v-for="r in opened?.head.rounds ?? 0" :key="r" :value="r">{{ r }}</option>
+            </select>
+          </label>
+          <p class="small muted">ที่ส่งไป: บันทึกและสถานะของเกมนี้ทั้งหมด ชื่อผู้เล่นในเกม เวอร์ชันแอป และชนิดเบราว์เซอร์ — ไม่มีข้อมูลอื่นของเครื่องคุณ</p>
+          <p v-if="opened && !opened.state" class="small warn">เกมนี้บันทึกก่อนเวอร์ชัน 1.17.0: มีแค่บันทึกการกระทำ ไม่มีสถานะเกมเต็ม</p>
+          <p v-if="sendError" class="error">{{ sendError }}</p>
+        </template>
+        <template v-else>
+          <p class="lead">ส่งแล้ว ขอบคุณที่ช่วยรายงาน — บอกรหัสนี้กับผู้พัฒนา:</p>
+          <p class="sent-id">{{ sentId }}</p>
+          <button type="button" class="primary" @click="copyId(sentId)">{{ copied ? '✓ คัดลอกแล้ว' : '📋 คัดลอกรหัส' }}</button>
+        </template>
+        <template #footer>
+          <template v-if="!sentId">
+            <button type="button" class="quiet" @click="download">ดาวน์โหลดไฟล์แทน</button>
+            <button type="button" @click="reporting = false">ยกเลิก</button>
+            <button type="button" class="primary" :disabled="note.trim().length < 5 || sending" @click="send">{{ sending ? 'กำลังส่ง…' : 'ส่งรายงาน' }}</button>
+          </template>
+          <button v-else type="button" @click="reporting = false">ปิด</button>
+        </template>
+      </ModalShell>
     </template>
 
     <!-- ================= the list ================= -->
@@ -259,6 +389,12 @@ const KILLER_COLS = [
           </button>
         </li>
       </ul>
+      <!-- a report sent from another device, by its id -->
+      <form class="open-report" @submit.prevent="openReport">
+        <small>มีรหัสรายงาน?</small>
+        <input v-model="typedId" placeholder="RP-XXXX-XXXX-XXXX" maxlength="20" aria-label="รหัสรายงาน" />
+        <button type="submit" :disabled="!typedOk">เปิดดู</button>
+      </form>
     </template>
   </div>
 </template>
@@ -550,6 +686,88 @@ tr.me td {
 }
 .foot {
   text-align: right;
+}
+.report-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+.report-btn {
+  border-color: #d9a227;
+}
+.reported {
+  color: #8fd19e;
+  font-size: 0.9rem;
+}
+.report-box {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid #d9a227;
+  border-radius: 10px;
+  background: rgb(217 162 39 / 0.08);
+}
+.report-note {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 1.05rem;
+}
+.ua {
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
+}
+.log-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.full {
+  font-size: 0.85rem;
+  color: #ffd56a;
+}
+.lead {
+  margin: 0 0 0.6rem;
+}
+textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+}
+.round-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.6rem 0;
+}
+.warn {
+  color: #ffd56a;
+}
+.error {
+  color: #ff8a80;
+}
+.sent-id {
+  margin: 0.4rem 0 0.8rem;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  letter-spacing: 0.08em;
+  color: #ffd56a;
+}
+.quiet {
+  margin-right: auto;
+  background: transparent;
+}
+.open-report {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  opacity: 0.8;
+}
+.open-report input {
+  width: 13rem;
 }
 .danger {
   border-color: #e04a3f;

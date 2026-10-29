@@ -64,7 +64,7 @@ const MODES: { id: GameMode; label: string; note: string }[] = [
 ]
 const mode = ref<GameMode>('adept')
 
-const players = ref<3 | 4 | 5>(5)
+const players = ref<2 | 3 | 4 | 5>(5)
 const confirmed = ref(false)
 const picks = ref<(string | null)[]>([null, null, null, null])
 const killer = ref<string | null>(null)
@@ -88,6 +88,7 @@ const seatPlayer = computed(() => handLayout(players.value).map((hand) => hand +
 const seatingNote = computed(() => {
   if (players.value === 5) return 'ผู้รอดชีวิตคนละ 1 ตัว'
   if (players.value === 4) return 'ผู้เล่น 2 คุม Survivor 2 ตัว ใช้การ์ดเคลื่อนที่ชุดเดียวร่วมกัน (หน้า 19)'
+  if (players.value === 2) return 'ผู้เล่น 2 คุม Survivor ทั้ง 4 ตัว — การ์ดเคลื่อนที่ 2 ชุดสับรวมกัน จั่ว 3 ใบ แล้ววางให้ทีละตัวตามลำดับ (หน้า 6)'
   return 'ผู้เล่นฝั่ง Survivor คุมคนละ 2 ตัว ใช้การ์ดเคลื่อนที่ชุดเดียวต่อคน (หน้า 19)'
 })
 
@@ -103,7 +104,7 @@ function setMode(m: GameMode) {
   mode.value = m
 }
 
-function setPlayers(n: 3 | 4 | 5) {
+function setPlayers(n: 2 | 3 | 4 | 5) {
   sfx.click()
   players.value = n
 }
@@ -270,7 +271,7 @@ function start() {
         <section class="card">
           <h2>ผู้เล่นกี่คน?</h2>
           <div class="counts">
-            <button v-for="n in [3, 4, 5] as const" :key="n" type="button" :class="{ active: players === n }" @click="setPlayers(n)">{{ n }} คน</button>
+            <button v-for="n in [2, 3, 4, 5] as const" :key="n" type="button" :class="{ active: players === n }" @click="setPlayers(n)">{{ n }} คน</button>
           </div>
           <p class="muted">ผู้เล่น 1 = Killer · {{ seatingNote }}</p>
           <h2>โหมดเกม</h2>

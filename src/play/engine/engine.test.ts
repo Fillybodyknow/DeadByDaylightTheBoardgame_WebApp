@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { macmillan } from './boards'
-import { apply, createGame, isFailure, killerInteractions, propsIn, survivorMoves, tryApply, type GameConfig } from './engine'
+import { apply, createGame, isFailure, killerInteractions, nextToPlan, propsIn, survivorMoves, turnOrder, tryApply, type GameConfig } from './engine'
 import { legalActions } from './legal'
+import { mayAct } from './seats'
 import type { GameState, Prop, PropKind } from './types'
 
 const config = (seed = 1, players: GameConfig['players'] = 5, killer = 'trapper'): GameConfig => ({
@@ -124,6 +125,106 @@ describe('setup', () => {
     while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
     expect(() => apply(st, { t: 'planSurvivors', cards: ['sneak', 'sneak', 'crouch', 'vault'] })).toThrow()
     expect(apply(st, { t: 'planSurvivors', cards: ['sneak', 'sprint', 'sneak', 'vault'] }).step.t).toBe('planKiller')
+  })
+})
+
+describe('two players (p.6)', () => {
+  /** A two-player game past the setup reveals, at its first planning. */
+  function two(seed = 1): GameState {
+    let st = createGame(config(seed, 2))
+    st.survivors.forEach((sv) => (sv.perks = []))
+    st.killer.perks = []
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    return st
+  }
+  /** Every survivor card of the round, wherever it is: two sets. */
+  const cardsOf = (st: GameState) => [...st.survivorHands[0], ...(st.survivorDeck ?? []), ...st.survivors.flatMap((sv) => (sv.planned ? [sv.planned] : [])), ...((st.planDraft ?? []).filter(Boolean) as string[])]
+
+  it('one player holds the four survivors: three cards drawn from two sets', () => {
+    const st = two()
+    expect(st.handPlayers).toEqual([2])
+    expect(st.survivors.map((sv) => sv.hand)).toEqual([0, 0, 0, 0])
+    expect(st.step.t).toBe('planSurvivors')
+    expect(st.survivorHands[0]).toHaveLength(3)
+    expect(st.survivorDeck).toHaveLength(5)
+    expect(cardsOf(st).sort()).toEqual(['crouch', 'crouch', 'sneak', 'sneak', 'sprint', 'sprint', 'vault', 'vault'])
+  })
+
+  it('a card to each survivor in turn order, one more drawn after each, and set for good', () => {
+    let st = two(2)
+    const order = turnOrder(st)
+    expect(() => apply(st, { t: 'planSurvivors', cards: ['sneak', 'sneak', 'sneak', 'sneak'] })).toThrow()
+    const chosen: string[] = []
+    for (let n = 0; n < 4; n++) {
+      expect(nextToPlan(st)).toBe(order[n])
+      const card = st.survivorHands[0][0]
+      const deckBefore = st.survivorDeck!.length
+      st = apply(st, { t: 'planNext', card })
+      chosen.push(card)
+      if (n < 3) {
+        // drawn again: three in hand, one fewer in the deck; the one set can't be taken back
+        expect(st.survivorHands[0]).toHaveLength(3)
+        expect(st.survivorDeck).toHaveLength(deckBefore - 1)
+        expect(() => apply(st, { t: 'unplanHand', hand: 0 })).toThrow()
+        expect(cardsOf(st)).toHaveLength(8)
+      }
+    }
+    // all four set: the killer plans; the three left stay in hand, one card in the deck
+    expect(st.step.t).toBe('planKiller')
+    expect(order.map((i) => st.survivors[i].planned)).toEqual(chosen)
+    expect(st.survivorHands[0]).toHaveLength(3)
+    expect(st.survivorDeck).toHaveLength(1)
+    expect(cardsOf(st)).toHaveLength(8)
+  })
+
+  it('a card not in the drawn ones is refused', () => {
+    const st = two(3)
+    const missing = (['sneak', 'sprint', 'crouch', 'vault'] as const).find((c) => !st.survivorHands[0].includes(c))
+    if (missing) expect(() => apply(st, { t: 'planNext', card: missing })).toThrow()
+    expect(() => apply(st, { t: 'planNext', card: 'wait' })).toThrow()
+  })
+
+  it('a survivor on a hook is skipped', () => {
+    let st = two(4)
+    const order = turnOrder(st)
+    st.survivors[order[1]].status = 'hooked'
+    st = apply(st, { t: 'planNext', card: st.survivorHands[0][0] })
+    expect(nextToPlan(st)).toBe(order[2])
+    st = apply(st, { t: 'planNext', card: st.survivorHands[0][0] })
+    st = apply(st, { t: 'planNext', card: st.survivorHands[0][0] })
+    expect(st.step.t).toBe('planKiller')
+    expect(st.survivors[order[1]].planned).toBe(null)
+  })
+
+  it('online: only the survivor player sets cards; the killer planning first starts the round with the last card', () => {
+    let st = two(5)
+    const card = st.survivorHands[0][0]
+    expect(mayAct(st, 2, { t: 'planNext', card })).toBe(true)
+    expect(mayAct(st, 1, { t: 'planNext', card })).toBe(false)
+    const killerCards = legalActions({ ...st, step: { t: 'planKiller' } }).find((a) => a.t === 'planKiller')!
+    st = apply(st, killerCards)
+    expect(st.step.t).toBe('planSurvivors')
+    for (let n = 0; n < 4; n++) st = apply(st, { t: 'planNext', card: st.survivorHands[0][0] })
+    expect(st.phase).not.toBe('planning')
+  })
+
+  it('every planning shuffles the eight again and draws three', () => {
+    let st = two(6)
+    let r = 99
+    for (let n = 0; n < 3000 && st.round < 2; n++) {
+      const options = legalActions(st)
+      r = (r * 1103515245 + 12345) >>> 0
+      st = apply(st, options[r % options.length])
+    }
+    expect(st.round).toBe(2)
+    while (st.step.t !== 'planSurvivors' && st.phase !== 'over') {
+      const options = legalActions(st)
+      r = (r * 1103515245 + 12345) >>> 0
+      st = apply(st, options[r % options.length])
+    }
+    if (st.phase === 'over') return
+    expect(st.survivorHands[0]).toHaveLength(3)
+    expect(st.survivorDeck).toHaveLength(5)
   })
 })
 
@@ -343,7 +444,7 @@ describe('random playthroughs', () => {
   it('only ever offers legal actions and keeps the invariants', () => {
     let finished = 0
     for (let seed = 1; seed <= 40; seed++) {
-      let st = createGame(config(seed, ([3, 4, 5] as const)[seed % 3], ['trapper', 'nurse', 'huntress', 'hillbilly'][seed % 4]))
+      let st = createGame(config(seed, ([2, 3, 4, 5] as const)[seed % 4], ['trapper', 'nurse', 'huntress', 'hillbilly'][Math.floor(seed / 4) % 4]))
       let rng = seed * 7919
       for (let n = 0; n < 4000 && st.phase !== 'over'; n++) {
         const options = legalActions(st)
@@ -358,6 +459,8 @@ describe('random playthroughs', () => {
         expect(st.killer.bp).toBeLessThanOrEqual(12)
         expect(st.sacrifice).toBeLessThanOrEqual(8)
         for (const sv of st.survivors) expect(sv.bp).toBeLessThanOrEqual(6)
+        // two players: never more than the two sets in the hand and the deck
+        if (st.handPlayers.length === 1) expect(st.survivorHands[0].length + (st.survivorDeck?.length ?? 0)).toBeLessThanOrEqual(8)
         for (const r of macmillan.rooms) expect(propsIn(st, r.id).filter((p) => p.occupant !== null).length).toBeLessThanOrEqual(4)
       }
       if (st.phase === 'over') finished++

@@ -9,6 +9,19 @@
         ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 60 && newData.child('updatedAt').isNumber())"
       }
     },
+    "reports": {
+      "$id": {
+        ".read": "$id.matches(/^RP-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/)",
+        ".write": "!data.exists() && $id.matches(/^RP-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/)",
+        ".validate": "newData.hasChildren(['from', 'app', 'note', 'round', 'ua', 'game', 'at']) && newData.child('from').isString() && newData.child('from').val().length <= 64 && newData.child('app').isString() && newData.child('app').val().length <= 80 && newData.child('note').isString() && newData.child('note').val().length > 0 && newData.child('note').val().length <= 2000 && newData.child('round').isNumber() && newData.child('ua').isString() && newData.child('ua').val().length <= 400 && newData.child('game').isString() && newData.child('game').val().length < 5000000 && newData.child('at').val() == now && newData.parent().parent().child('reportAt').child(newData.child('from').val()).val() == now"
+      }
+    },
+    "reportAt": {
+      "$member": {
+        ".write": "$member.matches(/^[A-Za-z0-9-]{1,64}$/)",
+        ".validate": "newData.val() == now && (!data.exists() || now - data.val() >= 60000)"
+      }
+    },
     "rooms": {
       "$code": {
         ".read": "$code.matches(/^[A-Z2-9]{4}$/)",

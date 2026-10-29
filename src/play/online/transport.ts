@@ -226,8 +226,33 @@ export interface RoomListing {
   updatedAt: number
 }
 
+/**
+ * A problem report sent to the developer from the game history (report.ts): what the player says
+ * happened, and the game as this device kept it (a HistoryGame, as JSON). Read back only by its id.
+ */
+export interface Report {
+  /** Client id of the sender (the rules' rate limit). */
+  from: string
+  /** The app's version and build. */
+  app: string
+  /** What the player says happened. */
+  note: string
+  /** The round it happened in (0: not said). */
+  round: number
+  /** The browser, for problems of one device. */
+  ua: string
+  /** The game: a HistoryGame as JSON. */
+  game: string
+  /** The server's time (set on sending). */
+  at?: number
+}
+
 export interface Backend {
   readonly name: 'firebase' | 'local'
+  /** Send a problem report under `id` (the database refuses more than one a minute per device). */
+  sendReport?(id: string, r: Report): Promise<void>
+  /** A report, by its id (null: none). */
+  fetchReport?(id: string): Promise<Report | null>
   create(code: string, host: string): Promise<Room>
   /** null when there is no room with this code. */
   join(code: string): Promise<Room | null>

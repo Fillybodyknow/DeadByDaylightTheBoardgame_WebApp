@@ -170,18 +170,55 @@ export interface GameConfig {
   /** `perks`: the 3 perks played (Bloodweb, Devout, p.19); missing: the printed ones (Adept). */
   survivors: { id: string; name: string; perks?: PerkId[] }[]
   killer: { id: string; name: string; perks?: PerkId[] }
-  /** 3–5 players: with fewer than 5, one player controls two survivors sharing a hand (p.19). */
-  players: 3 | 4 | 5
+  /**
+   * 2–5 players: with 3–4, one player controls two survivors sharing a hand (p.19); with 2, one
+   * player controls all four, drawing from two sets of cards (p.6).
+   */
+  players: 2 | 3 | 4 | 5
   seed: number
   /** Starting ▲ when the table changes them (online room settings); else the rulebook's (p.6). */
   startBp?: { survivor: number; killer: number }
 }
 
 /** Survivor hand index for each of the 4 survivors, by player count (p.6, p.19). */
-export function handLayout(players: 3 | 4 | 5): number[] {
+export function handLayout(players: 2 | 3 | 4 | 5): number[] {
   if (players === 5) return [0, 1, 2, 3]
   if (players === 4) return [0, 0, 1, 2]
-  return [0, 0, 1, 1]
+  if (players === 3) return [0, 0, 1, 1]
+  return [0, 0, 0, 0]
+}
+
+// ---------- two players (p.6) ----------
+// One player controls all four survivors. Their cards: two sets shuffled into a deck, three drawn;
+// one goes to the first survivor in turn order, then one more is drawn, and so on — a card set
+// can't be changed. The cards left stay in hand as usual (bonus turns, perks); each planning the
+// eight are shuffled again.
+
+/** A game of two players: one hand for the four survivors, drawn from a deck. */
+export function twoPlayer(st: GameState): boolean {
+  return st.handPlayers.length === 1
+}
+
+/** How many cards are drawn at the start of a two-player planning. */
+export const TWO_PLAYER_DRAW = 3
+
+/** Shuffle the two sets and draw the first three: the start of a two-player planning. */
+function dealTwoPlayer(st: GameState) {
+  const deck = shuffle(st, [...SURVIVOR_CARDS, ...SURVIVOR_CARDS])
+  st.survivorHands = [deck.splice(0, TWO_PLAYER_DRAW)]
+  st.survivorDeck = deck
+}
+
+/** One more card from the two-player deck into the hand (none left: nothing). */
+function drawTwoPlayer(st: GameState) {
+  const c = st.survivorDeck?.shift()
+  if (c) st.survivorHands = [[...st.survivorHands[0], c]]
+}
+
+/** Two players: the survivor whose card is set next (in turn order), or null when all are set. */
+export function nextToPlan(st: GameState): number | null {
+  const draft = st.planDraft ?? []
+  return turnOrder(st).find((i) => st.survivors[i].status !== 'hooked' && st.survivors[i].planned === null && !draft[i]) ?? null
 }
 
 export function createGame(config: GameConfig): GameState {
@@ -825,6 +862,8 @@ function handle(st: GameState, a: Action) {
       const pool = st.survivorHands[sv.hand]
       if (a.card === 'wait' || !pool.includes(a.card)) fail('card not in hand')
       st.survivorHands = st.survivorHands.map((h, i) => (i === sv.hand ? h.filter((_, j) => j !== h.indexOf(a.card)) : h))
+      // two players: a card set, one more drawn, as for every survivor's (p.6)
+      if (twoPlayer(st)) drawTwoPlayer(st)
       sv.planned = a.card
       sv.plannedRevealed = true
       sv.acted = false
@@ -855,6 +894,27 @@ function handle(st: GameState, a: Action) {
         delete st.killerDraft
         return wait(st, { t: 'planSurvivors' })
       }
+      if (a.t === 'planNext') {
+        if (!twoPlayer(st)) fail('one card at a time is the two-player planning')
+        const s = nextToPlan(st) ?? fail('every survivor has a card')
+        const hand = st.survivorHands[0]
+        if (a.card === 'wait' || !hand.includes(a.card)) fail('card not in hand')
+        st.survivorHands = [hand.filter((_, j) => j !== hand.indexOf(a.card))]
+        drawTwoPlayer(st)
+        const draft = st.planDraft ?? [null, null, null, null]
+        draft[s] = a.card
+        st.planDraft = draft
+        if (!survivorsPlanned(st, draft)) return wait(st, { t: 'planSurvivors' })
+        delete st.planDraft
+        planSurvivors(st, draft, true)
+        // the killer planned already (online, at the same time): the round starts; else it's his turn
+        const killerCards = st.killerDraft
+        delete st.killerDraft
+        if (killerCards && takeCards(st.killer.hand, killerCards)) return finishKillerPlan(st, killerCards)
+        return wait(st, { t: 'planKiller' })
+      }
+      // two players set their cards one by one, for good: no whole plan, nothing taken back
+      if (twoPlayer(st) && (a.t === 'unplanHand' || a.t === 'planHand' || a.t === 'planSurvivors')) fail('two players set one card at a time')
       if (a.t === 'unplanHand') {
         const draft = st.planDraft ?? []
         const mine = st.survivors.flatMap((sv, i) => (sv.hand === a.hand && draft[i] ? [i] : []))
@@ -1705,6 +1765,7 @@ function runTask(st: GameState, task: Task) {
 function startPlanning(st: GameState) {
   st.phase = 'planning'
   st.activeSurvivor = null
+  if (twoPlayer(st)) dealTwoPlayer(st)
   // Stridor, Beast of Prey come before the cards are chosen.
   st.queue.unshift({ k: 'trigger', w: { k: 'planningStart' }, done: [] }, { k: 'plan' })
 }
@@ -1719,7 +1780,8 @@ function survivorsPlanned(st: GameState, draft: (MoveCard | null)[]): boolean {
   return st.survivors.every((sv, i) => sv.status === 'hooked' || sv.planned !== null || !!draft[i])
 }
 
-function planSurvivors(st: GameState, cards: (MoveCard | null)[]) {
+/** `taken`: the cards are out of the hands already (two players take each one as it is set). */
+function planSurvivors(st: GameState, cards: (MoveCard | null)[], taken = false) {
   if (cards.length !== 4) fail('one card per survivor')
   const hands = st.survivorHands.map((h) => [...h])
   st.survivors.forEach((sv, i) => {
@@ -1730,6 +1792,7 @@ function planSurvivors(st: GameState, cards: (MoveCard | null)[]) {
       return
     }
     if (!c || c === 'wait') fail(`${sv.name} needs a card`)
+    if (taken) return
     const h = hands[sv.hand]
     if (!h.includes(c)) fail(`${CARD_NAMES[c]} is not in ${sv.name}'s hand`)
     h.splice(h.indexOf(c), 1)

@@ -31,6 +31,7 @@ import {
   rollHelpers,
   survivorInteractions,
   survivorMoves,
+  twoPlayer,
 } from './engine'
 import { boards } from './boards'
 import type { Action, GameState, MoveCard } from './types'
@@ -51,7 +52,9 @@ export function legalActions(st: GameState): Action[] {
     case 'planSurvivors':
       // The online-only actions of this step are left out, as `planHand` is: the killer may also
       // send `planKiller` here (he plans at the same time), and each player sends their own hand.
-      for (const cards of survivorPlans(st)) out.push({ t: 'planSurvivors', cards })
+      // two players: one card at a time, to the next survivor in turn order (p.6)
+      if (twoPlayer(st)) for (const card of new Set(st.survivorHands[0])) out.push({ t: 'planNext', card })
+      else for (const cards of survivorPlans(st)) out.push({ t: 'planSurvivors', cards })
       break
     case 'planKiller':
       out.push(...killerPlans(st))
