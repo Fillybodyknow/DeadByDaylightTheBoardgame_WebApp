@@ -171,6 +171,19 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   this device saw it (another survivor's item got is left out: `maskLog`). The latest 50 stay.
   `#/history` (`HistoryView`, in the top bar) lists them and opens one round by
   round; Settings → Data clears them.
+- **The player's name is set in one place: the top bar's profile** (`ProfileButton`, `src/profile.ts`,
+  `dbdl-player-name`), as a PC game's: their initial in a ring and the name; a click opens the
+  profile window. No page has a name field of its own. Whatever needs a name (making or joining a
+  room, an invite link, writing in the public chat) calls `withName`, which opens the profile
+  first when there is none (a dialog over any other, `ModalShell`'s `over`). In a lobby your own
+  name on your seat opens it too, and a rename reaches the room (`session.ts`).
+- **Looking for players (online):** a public chat for everyone (`#/lfg`, หาผู้เล่น in the top bar,
+  `LfgView`, `online/lfg.ts`). A message may carry a room (🏠 in the chat, or a lobby's
+  📢 ประกาศหาคน), shown as a card that joins it while it gathers; beside it, who is there and the
+  rooms waiting. One message every 3 s, the latest 100, a day's life; "ซ่อน" hides a sender on
+  the device (no accounts, no bans). A room announced there is told on every page (`lfgNotify.ts`,
+  `LfgToasts`: a corner card, a count on the top bar, a system notice in the background), not to
+  a player in a room or a game; Settings → Online turns it off. Details in `src/play/README.md`.
 - **Problem reports:** a game in the history can be reported to the developer (🐞, `play/report.ts`):
   the player's note, the round, the app version and the game (its whole last state too, unmasked)
   go to `reports/RP-XXXX-XXXX-XXXX` on Firebase, one a minute per device, readable only by that id

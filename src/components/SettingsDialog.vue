@@ -321,6 +321,10 @@ watch(tab, () => (confirming.value = null))
               <small>สิทธิ์แจ้งเตือนของเบราว์เซอร์: <b>{{ PERMISSION_TH[permission] }}</b></small>
               <button v-if="permission === 'default'" type="button" :disabled="!settings.turnNotify" @click="askPermission">ขอสิทธิ์แจ้งเตือน</button>
             </div>
+            <label class="switch">
+              <input v-model="settings.lfgNotify" type="checkbox" />
+              <span><b>แจ้งเตือนประกาศหาผู้เล่น</b><small>มีคนประกาศห้องในห้องหาผู้เล่น: การ์ดมุมจอและเสียง ทุกหน้าในแอป (ไม่แจ้งระหว่างอยู่ในห้องหรือในเกม)</small></span>
+            </label>
           </template>
 
           <!-- data -->

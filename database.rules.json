@@ -9,6 +9,36 @@
         ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 60 && newData.child('updatedAt').isNumber())"
       }
     },
+    "lfgChat": {
+      ".read": true,
+      "$msg": {
+        ".write": "(!data.exists() && newData.exists()) || (data.exists() && !newData.exists() && data.child('at').val() < now - 86400000)",
+        ".validate": "newData.hasChildren(['from', 'name', 'at']) && newData.child('from').isString() && newData.child('from').val().matches(/^[a-f0-9]{20}$/) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 16 && (newData.child('text').exists() || newData.child('room').exists()) && newData.child('at').val() == now && newData.parent().parent().child('lfgChatAt').child(newData.child('from').val()).val() == now",
+        "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200" },
+        "room": { ".validate": "newData.isString() && newData.val().matches(/^[A-Z2-9]{4}$/)" },
+        "need": { ".validate": "newData.isString() && newData.val().matches(/^(killer|survivor|any)$/)" },
+        "from": { ".validate": true },
+        "name": { ".validate": true },
+        "at": { ".validate": true },
+        "$other": { ".validate": false }
+      }
+    },
+    "lfgChatAt": {
+      "$id": {
+        ".write": "$id.matches(/^[a-f0-9]{20}$/)",
+        ".validate": "newData.val() == now && (!data.exists() || now - data.val() >= 3000)"
+      }
+    },
+    "lfgHere": {
+      ".read": true,
+      "$id": {
+        ".write": "$id.matches(/^[a-f0-9]{20}$/)",
+        ".validate": "newData.hasChildren(['name', 'at']) && newData.child('name').isString() && newData.child('name').val().length <= 16 && newData.child('at').val() == now",
+        "name": { ".validate": true },
+        "at": { ".validate": true },
+        "$other": { ".validate": false }
+      }
+    },
     "reports": {
       "$id": {
         ".read": "$id.matches(/^RP-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/)",

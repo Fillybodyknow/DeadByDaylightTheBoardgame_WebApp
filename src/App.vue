@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, type RouteMeta } from 'vue-router'
 import Particles from './components/Particles.vue'
+import ProfileButton from './components/ProfileButton.vue'
 import SettingsDialog from './components/SettingsDialog.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import WhatsNew from './components/WhatsNew.vue'
@@ -17,6 +18,9 @@ import { startUpdateWatch } from './update'
 import { openWelcome, welcome, welcomed } from './welcome'
 // online games are saved to this device's history as they end
 import './play/history'
+// rooms announced in the looking-for-players chat are told on every page
+import { lfgUnread } from './play/lfgNotify'
+import LfgToasts from './play/components/LfgToasts.vue'
 
 const route = useRoute()
 
@@ -61,6 +65,7 @@ const links = computed(() => [
     : section.value === 'online'
       ? [{ to: '/online', label: session.room ? `ห้อง ${session.room.code}` : 'ออนไลน์', icon: '🌐' }]
       : []),
+  { to: '/lfg', label: 'หาผู้เล่น', icon: '💬' },
   { to: '/cards', label: 'การ์ด', icon: '🃏' },
   { to: '/rules', label: 'กติกา', icon: '📖' },
   { to: '/history', label: 'ประวัติเกม', icon: '📜' },
@@ -99,6 +104,7 @@ const scene = computed(() =>
   <UpdateBanner />
   <WhatsNew />
   <EntityWelcome />
+  <LfgToasts v-if="!inGame" />
 
   <!-- in a full game, the game's own top bar (round, room, mute, leave) takes over -->
   <header v-if="!inGame" class="topbar">
@@ -111,8 +117,11 @@ const scene = computed(() =>
       <RouterLink v-for="l in links" :key="l.to" :to="l.to" :aria-label="l.label">
         <span class="ico" aria-hidden="true">{{ l.icon }}</span>
         <span class="lbl">{{ l.label }}</span>
+        <b v-if="l.to === '/lfg' && lfgUnread" class="badge" :title="`ประกาศห้องใหม่ ${lfgUnread} รายการ`">{{ lfgUnread > 9 ? '9+' : lfgUnread }}</b>
       </RouterLink>
     </nav>
+    <!-- the player's name, set here only, as a PC game's profile -->
+    <ProfileButton />
     <SettingsDialog class="icon-btn" />
     <!-- Switches card/board text between Thai and English; the UI itself is Thai. -->
     <button class="lang" type="button" title="ภาษาข้อความการ์ด" @click="lang = lang === 'th' ? 'en' : 'th'">
@@ -280,6 +289,21 @@ nav a {
   white-space: nowrap;
   transition: color 0.15s;
 }
+/* rooms announced in the looking-for-players chat since it was last open */
+nav a .badge {
+  display: inline-block;
+  min-width: 1.15rem;
+  margin-left: 0.3rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--ok);
+  color: #04130a;
+  font-size: 0.72rem;
+  line-height: 1.15rem;
+  text-align: center;
+  letter-spacing: 0;
+  box-shadow: 0 0 8px rgb(79 179 106 / 0.6);
+}
 nav a .ico {
   display: none;
 }
@@ -357,6 +381,13 @@ nav a.router-link-exact-active::after {
   nav a.router-link-exact-active::after {
     left: 20%;
     right: 20%;
+  }
+  /* icons over labels: the count on the icon's corner */
+  nav a .badge {
+    position: absolute;
+    top: -0.2rem;
+    right: 0;
+    margin: 0;
   }
   .lang {
     padding: 0.35rem 0.5rem;

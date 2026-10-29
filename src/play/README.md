@@ -90,6 +90,31 @@ and the host starts the game.
   the room comes back without it. Friends, not strangers: the check is on the joining device.
   **The database rules must be updated** (`roomIndex`) for the board to show rooms; without
   them rooms still work by code.
+- **Looking for players** (`#/lfg`, `views/LfgView.vue`, `online/lfg.ts`; หาผู้เล่น in the top
+  bar): the app's one public chat, for finding people to play with. Messages under
+  `lfgChat/<push id>` (from, name, text, room, need, at). Senders go by a chat id of their own
+  (`dbdl-lfg-id`, 20 hex digits): never the client id, which is a seat's key in a room.
+  - A message may carry a room: 🏠 in the chat attaches the room this device is in, or its last
+    one, while it gathers, with the side it lacks (`need`, from `lobbyLacks` in the room); a
+    lobby's 📢 ประกาศหาคน (`LfgPostDialog`) sends one too. It shows as a card that joins the room
+    (through `#/online?room=`, which asks a password if there is one) while the room is on the room
+    board in its lobby.
+  - Beside the chat: who is on the page (`lfgHere/<chat id>`, refreshed every 3 minutes, taken
+    out by the server when the connection drops) and the rooms waiting for players.
+  - Spam: one message every 3 s (`lfgChatAt`, in the rules too), 200 characters, the latest 100
+    loaded (`LFG_KEEP`). Nobody can change a message, and it can be deleted only once it is a day
+    old: whoever opens the chat deletes the oldest (`sweepLfg`). There are no accounts, so nobody can
+    be banned: "ซ่อน" hides a sender's messages on that device (`dbdl-lfg-muted`).
+  - A room announced is told on every page (`play/lfgNotify.ts`, `LfgToasts`): a card in the top
+    right (who, what the room lacks, their words, เข้าห้อง / ดูแชต) for 15 s with a chime, a count on
+    the top bar's หาผู้เล่น until the chat is opened, and with the tab in the background a system
+    notice. Not for talk alone, the sender's own, a hidden sender's, a player in a room or a game
+    (offline, the tutorial), on the chat's page, or with the setting off (Settings → Online). It
+    listens to new messages only (`onLfgNew`: a window of the last one), and only on a device
+    that plays online (a name in its profile, or an online page opened this visit), so someone
+    only reading the cards never connects to the database.
+  - A message is a few hundred bytes; opening the chat loads about 25 KB. **The database rules
+    must be updated** (`lfgChat`, `lfgChatAt`, `lfgHere`).
 - **Pings** (`src/play/pings.ts`, `PingLayer.vue`): in the game a player marks a spot on the map for
   everyone, straight away: a right-click on the map (a prop or a mini keeps its right-click, its
   details), the middle button, Q while pointing, or on a tablet a finger held still on the map

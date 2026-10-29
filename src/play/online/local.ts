@@ -6,8 +6,8 @@
 
 import { tryApply } from '../engine/engine'
 import type { Action, GameState } from '../engine/types'
-import type { Backend, ChatMessage, Ping, Report, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
-import { CHAT_KEEP, CHECKPOINT_EVERY, emptyRoom, normalizeRoom } from './transport'
+import type { Backend, ChatMessage, LfgHere, LfgMessage, Ping, Report, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
+import { CHAT_KEEP, CHECKPOINT_EVERY, LFG_KEEP, emptyRoom, normalizeRoom } from './transport'
 
 const DB = 'dbdl-rooms'
 const STORE = 'rooms'
@@ -339,6 +339,37 @@ async function writeBoard(fn: (cur: Record<string, RoomListing>) => Record<strin
   ch.close()
 }
 
+// ---------- the looking-for-players chat: one record of its messages and who is there ----------
+
+const LFG = '__lfg-chat__'
+type LfgStore = { msgs: LfgMessage[]; here: Record<string, LfgHere> }
+const lfgChannel = () => new BroadcastChannel(`${DB}-lfg`)
+
+async function readLfg(): Promise<LfgStore> {
+  const db = await open()
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(STORE).objectStore(STORE).get(LFG)
+    req.onsuccess = () => resolve((req.result as LfgStore | undefined) ?? { msgs: [], here: {} })
+    req.onerror = () => reject(req.error)
+  })
+}
+
+async function writeLfg(fn: (cur: LfgStore) => LfgStore) {
+  await modify(LFG, (cur) => fn((cur as unknown as LfgStore) ?? { msgs: [], here: {} }) as unknown as StoredRoom)
+  const ch = lfgChannel()
+  ch.postMessage('changed')
+  ch.close()
+}
+
+/** Call `cb` with `pick` of the chat's record now and on every change. */
+function watchLfg<T>(pick: (s: LfgStore) => T, cb: (v: T) => void): () => void {
+  const ch = lfgChannel()
+  const send = () => void readLfg().then((s) => cb(pick(s)))
+  ch.onmessage = send
+  send()
+  return () => ch.close()
+}
+
 /** A room's chat record. */
 const chatKey = (code: string) => `${code}#chat`
 
@@ -376,6 +407,36 @@ export const localBackend: Backend = {
       req.onsuccess = () => resolve((req.result as Report | undefined) ?? null)
       req.onerror = () => reject(req.error)
     })
+  },
+  onLfgChat(cb) {
+    return watchLfg((s) => s.msgs.slice(-LFG_KEEP), cb)
+  },
+  onLfgNew(cb) {
+    let known: Set<string> | null = null
+    return watchLfg(
+      (s) => s.msgs,
+      (msgs) => {
+        if (known) for (const m of msgs) if (!known.has(m.id)) cb(m)
+        known = new Set(msgs.map((m) => m.id))
+      },
+    )
+  },
+  async sendLfg(m) {
+    await writeLfg((s) => ({ ...s, msgs: [...s.msgs, { ...m, id: crypto.randomUUID(), at: Date.now() }] }))
+  },
+  async sweepLfg(before) {
+    await writeLfg((s) => ({ ...s, msgs: s.msgs.filter((m) => m.at >= before) }))
+  },
+  async lfgHere(id, name) {
+    await writeLfg((s) => {
+      const here = { ...s.here }
+      if (name === null) delete here[id]
+      else here[id] = { name, at: Date.now() }
+      return { ...s, here }
+    })
+  },
+  onLfgHere(cb) {
+    return watchLfg((s) => s.here, cb)
   },
   listRooms(cb) {
     const ch = indexChannel()

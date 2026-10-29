@@ -1,24 +1,20 @@
 <script setup lang="ts">
-// Online play, laid out as a PC game's server browser: the player's card on top, the open rooms
+// Online play, laid out as a PC game's server browser: a title strip on top, the open rooms
 // as a table on the left (filter, search, a dot per player), and on the right creating a room (a
 // name, a random one on offer, and an optional password, in a dialog of its own) or joining one
-// with its 4-letter code. A room with a password asks for it in a dialog too.
+// with its 4-letter code. A room with a password asks for it in a dialog too. Under those, the
+// way to the looking-for-players chat (#/lfg).
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
 import ModalShell from './ModalShell.vue'
-import { BOARD_STALE_MS, backend, createRoom, joinRoom, lastRoom, randomRoomName, saveName, savedName, session, sweepRooms } from '../online/session'
+import { BOARD_STALE_MS, backend, createRoom, joinRoom, lastRoom, randomRoomName, session, sweepRooms } from '../online/session'
+import { playerName, withName } from '../../profile'
 import type { RoomListing } from '../online/transport'
 
-const name = ref(savedName())
-// kept as it is typed: leaving the page before a room used to lose it
-watch(name, saveName)
 const code = ref('')
 const last = lastRoom()
-
-/** The player's initial, on their card. */
-const initial = computed(() => name.value.trim().charAt(0).toUpperCase() || '?')
 
 // ---------- creating a room ----------
 
@@ -41,12 +37,15 @@ function reroll() {
   requestAnimationFrame(() => (rolling.value = true))
 }
 
-async function create() {
-  sfx.select()
-  await createRoom(name.value.trim(), roomName.value, password.value)
-  // in the room the page is replaced; if it failed the dialog stays, with the error
-  if (!session.room) return
-  creating.value = false
+function create() {
+  // a room shows its members by name: the profile asks for one first
+  withName(async () => {
+    sfx.select()
+    await createRoom(playerName.value, roomName.value, password.value)
+    // in the room the page is replaced; if it failed the dialog stays, with the error
+    if (!session.room) return
+    creating.value = false
+  })
 }
 
 // ---------- joining ----------
@@ -61,11 +60,13 @@ watch(
   },
 )
 
-async function join(c = code.value, pw = '') {
+function join(c = code.value, pw = '') {
   if (!c.trim()) return
-  sfx.select()
-  await joinRoom(c, name.value.trim(), pw)
-  if (session.room) askFor.value = null
+  withName(async () => {
+    sfx.select()
+    await joinRoom(c, playerName.value, pw)
+    if (session.room) askFor.value = null
+  })
 }
 
 function joinListed(r: RoomListing) {
@@ -172,20 +173,24 @@ function ago(t: number): string {
   return m < 1 ? 'เมื่อกี้' : m < 60 ? `${m} นาทีก่อน` : `${Math.round(m / 60)} ชม.ก่อน`
 }
 
-// #/online?room=ABCD in an invite link joins straight away
+// #/online?room=ABCD in an invite link joins straight away (also while the page is open: an
+// announced room's card, lfgNotify, links here)
 const route = useRoute()
 const router = useRouter()
-onMounted(() => {
-  const fromLink = route.query.room
-  if (typeof fromLink !== 'string' || !fromLink) return
-  void router.replace({ query: {} })
-  void join(fromLink)
-})
+watch(
+  () => route.query.room,
+  (fromLink) => {
+    if (typeof fromLink !== 'string' || !fromLink) return
+    void router.replace({ query: {} })
+    void join(fromLink)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="hub">
-    <!-- the title strip, and the player's own card -->
+    <!-- the title strip (the player's name is the top bar's profile) -->
     <header class="hub-head" :style="{ '--art': cssUrl('assets/app/background-img/background_dbd.webp') }">
       <div class="title">
         <p class="eyebrow">Online · Trials</p>
@@ -197,14 +202,6 @@ onMounted(() => {
         <span class="stat"><b>{{ playersOnline }}</b> ผู้เล่นในห้อง</span>
         <span class="net" :class="backend.name"><i />{{ backend.name === 'local' ? 'โหมดทดสอบ' : 'ออนไลน์' }}</span>
       </div>
-      <label class="player">
-        <span class="avatar" aria-hidden="true">{{ initial }}</span>
-        <span class="player-text">
-          <small>ชื่อของคุณ</small>
-          <input v-model="name" maxlength="16" placeholder="เช่น บิว" />
-        </span>
-        <span class="pen" aria-hidden="true">✎</span>
-      </label>
     </header>
 
     <p v-if="backend.name === 'local'" class="notice warn">
@@ -323,6 +320,13 @@ onMounted(() => {
           </label>
           <button class="cta-2" :class="{ primary: code.length === 4 }" :disabled="session.busy || code.length !== 4" @click="join()">เข้าห้อง</button>
         </section>
+
+        <!-- nobody to play with: the public chat -->
+        <section class="panel lfg">
+          <header class="panel-head"><h2>หาเพื่อนเล่น</h2></header>
+          <p class="muted small">ยังไม่มีเพื่อนเล่น? คุยในห้องแชตสาธารณะ แล้วแนบห้องให้คนกดเข้าได้ทันที</p>
+          <RouterLink to="/lfg" class="cta-2 lfg-link" @click="sfx.click()">💬 ไปห้องหาผู้เล่น</RouterLink>
+        </section>
       </div>
     </div>
 
@@ -382,10 +386,10 @@ onMounted(() => {
 .hub-head {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr;
   grid-template-areas:
-    'title player'
-    'stats player';
+    'title'
+    'stats';
   align-items: end;
   gap: 0.6rem 1.5rem;
   padding: 1.4rem 1.6rem;
@@ -476,61 +480,6 @@ onMounted(() => {
   50% {
     opacity: 0.35;
   }
-}
-
-/* the player's card: their initial in a ring, the name editable in place */
-.player {
-  grid-area: player;
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-width: 270px;
-  padding: 0.7rem 0.9rem;
-  background: rgb(8 9 12 / 0.85);
-  border: 1px solid var(--line-strong);
-  cursor: text;
-  transition: border-color 0.15s;
-}
-.player:hover,
-.player:focus-within {
-  border-color: var(--blood);
-}
-.avatar {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  color: #fff;
-  background: radial-gradient(circle at 35% 30%, #4a0d10, #12080a);
-  box-shadow:
-    0 0 0 2px var(--blood),
-    0 0 16px rgb(255 30 30 / 0.45);
-}
-.player-text {
-  display: grid;
-  min-width: 0;
-}
-.player-text small {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-.player-text input {
-  width: 100%;
-  padding: 0;
-  border: none;
-  background: none;
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  color: var(--text);
-  outline: none;
-}
-.pen {
-  color: var(--muted);
 }
 
 /* ---------- notices ---------- */
@@ -1002,6 +951,20 @@ input:focus {
   padding: 0.65rem;
   font-size: 1.05rem;
 }
+/* a link dressed as the panels' buttons */
+.lfg-link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: rgb(255 255 255 / 0.04);
+  transition: border-color 0.15s;
+}
+.lfg-link:hover {
+  border-color: var(--blood);
+}
 .link {
   align-self: flex-start;
   background: none;
@@ -1021,12 +984,11 @@ input:focus {
   .side-col {
     grid-template-columns: 1fr 1fr;
   }
+  .lfg {
+    grid-column: 1 / -1;
+  }
 }
 @media (max-width: 760px) {
-  .hub-head {
-    grid-template-columns: 1fr;
-    grid-template-areas: 'title' 'stats' 'player';
-  }
   .side-col {
     grid-template-columns: 1fr;
   }

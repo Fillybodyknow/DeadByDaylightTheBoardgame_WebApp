@@ -9,6 +9,9 @@
 //          rooms/<code>/chatAt { <client id>: at }  when each member last chatted (the rules' rate limit)
 //          rooms/<code>/voice  { <client id>: { s, m } }  who is in the voice channel (voice.ts)
 //          rooms/<code>/vsig   { <client id>: { <push id>: { f, s, r, k, d } } }  voice signals to each member, read once
+//          lfgChat    { <push id>: { from, name, text?, room?, need?, at } }  the looking-for-players chat (lfg.ts)
+//          lfgChatAt  { <chat id>: at }  when each sender last wrote there (the rules' rate limit)
+//          lfgHere    { <chat id>: { name, at } }  who is on the chat's page
 //
 // A move is written to its own numbered slot, and every device replays the moves on top of the
 // checkpoint to get the same game (see transport.ts). That keeps a move at a few hundred bytes
@@ -25,12 +28,12 @@
 //   VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID
 
 import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { get, getDatabase, limitToLast, onChildAdded, onChildChanged, onDisconnect, onValue, push, query, ref, remove, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
+import { get, getDatabase, limitToFirst, limitToLast, onChildAdded, onChildChanged, onDisconnect, onValue, push, query, ref, remove, runTransaction, serverTimestamp, set, update, type Database } from 'firebase/database'
 import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
-import type { Backend, ChatMessage, Ping, Report, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
-import { CHAT_KEEP, CHECKPOINT_EVERY, emptyRoom, moveKey, normalizeRoom } from './transport'
+import type { Backend, ChatMessage, LfgHere, LfgMessage, Ping, Report, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
+import { CHAT_KEEP, CHECKPOINT_EVERY, LFG_KEEP, emptyRoom, moveKey, normalizeRoom } from './transport'
 
 const env = import.meta.env
 
@@ -441,6 +444,48 @@ export const firebaseBackend: Backend = {
   async fetchReport(id) {
     const snap = await get(ref(database(), `reports/${id}`))
     return (snap.val() as Report | null) ?? null
+  },
+  // The looking-for-players chat: lfgChat/<push id>, readable by anyone, the latest LFG_KEEP
+  // loaded. The sender's lfgChatAt goes in the same write (the rules' one every 3 s). The rules
+  // let nobody change a message, and delete one only once it is a day old.
+  onLfgChat(cb) {
+    return onValue(query(ref(database(), 'lfgChat'), limitToLast(LFG_KEEP)), (snap) => {
+      const out: LfgMessage[] = []
+      snap.forEach((c) => void out.push({ ...(c.val() as Omit<LfgMessage, 'id'>), id: c.key! }))
+      cb(out)
+    })
+  },
+  onLfgNew(cb) {
+    // a window of the last one: each new message slides in as a child added
+    return onChildAdded(query(ref(database(), 'lfgChat'), limitToLast(1)), (snap) => cb({ ...(snap.val() as Omit<LfgMessage, 'id'>), id: snap.key! }))
+  },
+  async sendLfg(m) {
+    const key = push(ref(database(), 'lfgChat')).key!
+    await update(ref(database()), { [`lfgChat/${key}`]: { ...m, at: serverTimestamp() }, [`lfgChatAt/${m.from}`]: serverTimestamp() })
+  },
+  async sweepLfg(before) {
+    // push ids sort by time: the first ones are the oldest
+    const snap = await get(query(ref(database(), 'lfgChat'), limitToFirst(20)))
+    const gone: Record<string, null> = {}
+    snap.forEach((c) => {
+      if ((c.val() as LfgMessage).at < before) gone[`lfgChat/${c.key}`] = null
+    })
+    if (Object.keys(gone).length) await update(ref(database()), gone)
+  },
+  // lfgHere/<chat id>: who is on the chat's page, taken out by the server if the connection drops
+  // (set again with every refresh, so a reconnection gets it back).
+  async lfgHere(id, name) {
+    const at = ref(database(), `lfgHere/${id}`)
+    if (name === null) {
+      await onDisconnect(at).cancel()
+      await remove(at)
+      return
+    }
+    await onDisconnect(at).remove()
+    await set(at, { name, at: serverTimestamp() })
+  },
+  onLfgHere(cb) {
+    return onValue(ref(database(), 'lfgHere'), (snap) => cb((snap.val() as Record<string, LfgHere> | null) ?? {}))
   },
   // The board lives apart from the rooms (roomIndex/<code>), readable by anyone: the rooms
   // themselves are only read with their code.

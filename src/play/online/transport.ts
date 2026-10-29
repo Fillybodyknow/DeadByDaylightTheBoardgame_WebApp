@@ -247,8 +247,54 @@ export interface Report {
   at?: number
 }
 
+/**
+ * A message in the looking-for-players chat (lfg.ts), the one public channel of the app: anyone
+ * on its page reads and writes it. `from` is the sender's chat id, a random id of its own (not the
+ * client id: the chat is public, and a client id is a seat's key in a room).
+ */
+export interface LfgMessage {
+  id: string
+  from: string
+  /** The sender's name when they sent it. */
+  name: string
+  /** What they say; a message with a room may have none. */
+  text?: string
+  /** A room going with the message, joined straight from the chat. */
+  room?: string
+  /** With a room: the side it lacks. */
+  need?: 'killer' | 'survivor' | 'any'
+  /** The server's time. */
+  at: number
+}
+
+/** Someone on the chat's page now (their entry refreshed every few minutes while they are). */
+export interface LfgHere {
+  name: string
+  at: number
+}
+
+/** How many of the latest messages the chat loads: spam can't make it heavy. */
+export const LFG_KEEP = 100
+/** Messages older than this go: whoever opens the chat deletes a few of the oldest. */
+export const LFG_TTL_MS = 24 * 3600_000
+
 export interface Backend {
   readonly name: 'firebase' | 'local'
+  /** The looking-for-players chat's latest LFG_KEEP messages, oldest first: now and on every new one. Returns an unsubscribe. */
+  onLfgChat?(cb: (messages: LfgMessage[]) => void): () => void
+  /**
+   * The chat's messages as they come, loading none of the old ones (for the notices on every page,
+   * lfgNotify.ts). The newest one there already may come first: the caller drops what is old.
+   */
+  onLfgNew?(cb: (m: LfgMessage) => void): () => void
+  /** Send a message (the database refuses more than one every 3 s per sender). */
+  sendLfg?(m: Omit<LfgMessage, 'id' | 'at'>): Promise<void>
+  /** Delete the oldest messages sent before `before` (a few at a time). */
+  sweepLfg?(before: number): Promise<void>
+  /** Be on the chat's page under this chat id (or refresh it), or leave it (null); the server drops it if the connection does. */
+  lfgHere?(id: string, name: string | null): Promise<void>
+  /** Who is on the chat's page: now and on every change. Returns an unsubscribe. */
+  onLfgHere?(cb: (here: Record<string, LfgHere>) => void): () => void
   /** Send a problem report under `id` (the database refuses more than one a minute per device). */
   sendReport?(id: string, r: Report): Promise<void>
   /** A report, by its id (null: none). */

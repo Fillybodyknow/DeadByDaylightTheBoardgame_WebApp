@@ -45,7 +45,6 @@ import {
   session,
   setBoard,
   setDouble,
-  setName,
   setPingColor,
   pingColors,
   setReady,
@@ -67,6 +66,9 @@ import Mini from './Mini.vue'
 import RoomSettingsCard from './RoomSettingsCard.vue'
 import SyncBadge from './SyncBadge.vue'
 import VoiceButton from './VoiceButton.vue'
+import LfgPostDialog from './LfgPostDialog.vue'
+import { lobbyLacks } from '../online/lfg'
+import { openProfile } from '../../profile'
 import { voice } from '../voice'
 
 const data = computed(() => session.data!)
@@ -102,6 +104,19 @@ async function copy(what: 'link' | 'code') {
   }
 }
 
+// ---------- looking for players: a message with this room in the public chat (#/lfg) ----------
+
+const lfgOpen = ref(false)
+const lfgPosted = ref(false)
+function openLfg() {
+  sfx.click()
+  lfgOpen.value = true
+}
+function onLfgPosted() {
+  lfgPosted.value = true
+  setTimeout(() => (lfgPosted.value = false), 2500)
+}
+
 // ---------- lobby ----------
 
 // someone joins or leaves the lobby: a sound (not for the room as you open it)
@@ -114,30 +129,13 @@ watch(
   },
 )
 
-const name = ref(me.value?.name ?? '')
-watch(
-  () => me.value?.name,
-  (n) => {
-    if (n && !nameFocused.value) name.value = n
-  },
-)
-const nameFocused = ref(false)
-/** Puts the cursor in the rename field as it appears. */
-const vFocus = { mounted: (el: HTMLInputElement) => (el.focus(), el.select()) }
-
-/** Renaming on your own seat (the name is set on the Online page; this is only to change it). */
-const renaming = ref(false)
-function startRename() {
+/**
+ * Your own name on your seat opens the profile (the top bar's): the name is set there only, and
+ * the room follows it (session.ts).
+ */
+function rename() {
   sfx.click()
-  name.value = me.value?.name ?? ''
-  renaming.value = true
-  nameFocused.value = true
-}
-function saveName() {
-  renaming.value = false
-  nameFocused.value = false
-  const n = name.value.trim()
-  if (n && n !== me.value?.name) void setName(n)
+  openProfile()
 }
 
 /** The lineup: the killer's slot, four survivor slots (empty ones null), and who hasn't chosen. */
@@ -420,6 +418,9 @@ const seatStatus = computed(() =>
         <span class="copied" :class="{ on: copied === 'code' }">{{ copied === 'code' ? '✓ คัดลอกแล้ว' : '📋' }}</span>
       </button>
       <button type="button" class="invite" @click="copy('link')">{{ copied === 'link' ? '✓ คัดลอกลิงก์แล้ว' : '🔗 ลิงก์เชิญเพื่อน' }}</button>
+      <button v-if="data.phase === 'lobby'" type="button" class="invite" title="ส่งประกาศไปที่ห้องแชตหาผู้เล่น พร้อมห้องนี้" @click="openLfg">
+        {{ lfgPosted ? '✓ ลงประกาศแล้ว' : '📢 ประกาศหาคน' }}
+      </button>
       <span class="spacer" />
       <VoiceButton />
       <SyncBadge />
@@ -446,10 +447,7 @@ const seatStatus = computed(() =>
             <span class="art" aria-hidden="true" />
             <template v-if="killerMember">
               <span v-if="killerMember.id === data.host" class="crown" title="หัวห้อง">👑</span>
-              <template v-if="killerMember.id === session.me">
-                <input v-if="renaming" v-model="name" v-focus class="seat-rename" maxlength="16" aria-label="ชื่อของคุณ" @blur="saveName" @keyup.enter="saveName" @keyup.esc="renaming = false" @click.stop />
-                <button v-else type="button" class="seat-name mine" title="เปลี่ยนชื่อ" @click.stop="startRename">{{ killerMember.name }} <i>✎</i></button>
-              </template>
+              <button v-if="killerMember.id === session.me" type="button" class="seat-name mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ killerMember.name }} <i>✎</i></button>
               <span v-else class="seat-name">{{ killerMember.name }}</span>
               <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}<i v-if="voice.roster[killerMember.id]" class="vc-ico" :title="voiceTitle(killerMember.id)">{{ voice.roster[killerMember.id].m ? '🔇' : '🎙️' }}</i></span>
               <span v-if="talking(killerMember.id)" class="talk-pill">🔊 กำลังพูด</span>
@@ -481,10 +479,7 @@ const seatStatus = computed(() =>
             <span class="art" aria-hidden="true" />
             <template v-if="m">
               <span v-if="m.id === data.host" class="crown" title="หัวห้อง">👑</span>
-              <template v-if="m.id === session.me">
-                <input v-if="renaming" v-model="name" v-focus class="seat-rename" maxlength="16" aria-label="ชื่อของคุณ" @blur="saveName" @keyup.enter="saveName" @keyup.esc="renaming = false" @click.stop />
-                <button v-else type="button" class="seat-name mine" title="เปลี่ยนชื่อ" @click.stop="startRename">{{ m.name }} <i>✎</i></button>
-              </template>
+              <button v-if="m.id === session.me" type="button" class="seat-name mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ m.name }} <i>✎</i></button>
               <span v-else class="seat-name">{{ m.name }}</span>
               <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}<i v-if="voice.roster[m.id]" class="vc-ico" :title="voiceTitle(m.id)">{{ voice.roster[m.id].m ? '🔇' : '🎙️' }}</i></span>
               <span v-if="talking(m.id)" class="talk-pill">🔊 กำลังพูด</span>
@@ -790,6 +785,16 @@ const seatStatus = computed(() =>
 
     <!-- the room's chat: beside the column on a wide screen, a 💬 button otherwise -->
     <ChatDock mode="room" />
+
+    <LfgPostDialog
+      :open="lfgOpen"
+      :name="data.members[session.me]?.name ?? ''"
+      :room="code"
+      :room-name="data.name"
+      :need="lobbyLacks(data.members)"
+      @close="lfgOpen = false"
+      @posted="onLfgPosted"
+    />
   </div>
 </template>
 
@@ -1030,14 +1035,6 @@ button.seat-name.mine i {
 }
 button.seat-name.mine:hover i {
   opacity: 1;
-}
-.seat-rename {
-  width: 100%;
-  padding: 0.2rem 0.4rem;
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  text-align: center;
-  border-color: rgb(var(--tone));
 }
 .seat-sub {
   font-size: 0.85rem;

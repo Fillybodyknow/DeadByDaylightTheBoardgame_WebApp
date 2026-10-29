@@ -36,9 +36,11 @@ export interface Settings {
   voiceGate: number
   /** The browser's noise suppression and level control on the mic (its echo cancellation stays on). */
   noiseFilter: boolean
+  /** A room announced in the looking-for-players chat: a card on any page, a chime (lfgNotify.ts). */
+  lfgNotify: boolean
 }
 
-const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true }
+const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true, lfgNotify: true }
 
 const KEY = 'dbdl-settings'
 

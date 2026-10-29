@@ -4,13 +4,15 @@
 // panels' backdrop-filter would trap a fixed box inside them.
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
-const props = defineProps<{ open: boolean; title: string; width?: string }>()
+/** `over`: above any other dialog (one opened from another, like the profile asking for a name). */
+const props = defineProps<{ open: boolean; title: string; width?: string; over?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const box = ref<HTMLElement | null>(null)
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape') emit('close')
+  // a dialog open over this one takes the Esc
+  if (e.key === 'Escape' && (props.over || !document.querySelector('.modal-back.over'))) emit('close')
 }
 
 watch(
@@ -30,7 +32,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="open" class="modal-back" @mousedown.self="emit('close')">
+      <div v-if="open" class="modal-back" :class="{ over }" @mousedown.self="emit('close')">
         <div ref="box" class="modal-box" role="dialog" aria-modal="true" :aria-label="title" :style="{ width: width ?? '440px' }">
           <header class="modal-head">
             <h2>{{ title }}</h2>
@@ -54,6 +56,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   padding: 1rem;
   background: rgb(0 0 0 / 0.72);
   backdrop-filter: blur(3px);
+}
+.modal-back.over {
+  z-index: 80;
 }
 .modal-box {
   position: relative;

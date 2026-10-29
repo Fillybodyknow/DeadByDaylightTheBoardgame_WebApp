@@ -5,8 +5,9 @@
 //           starts the game.
 //   game  — mirrored into game.ts, which every game screen already reads.
 
-import { computed, reactive, shallowRef, toRaw } from 'vue'
+import { computed, reactive, shallowRef, toRaw, watch } from 'vue'
 import { killerById, survivorById } from '../../data'
+import { playerName } from '../../profile'
 import { createGame, handLayout } from '../engine/engine'
 import { boards, macmillan } from '../engine/boards'
 import { KILLER_PLAYER } from '../engine/seats'
@@ -24,7 +25,6 @@ import { clientId, newRoomCode, type Backend, type Room, type RoomData, type Roo
 export const backend: Backend = firebaseConfigured ? firebaseBackend : localBackend
 
 const LAST_ROOM = 'dbdl-last-room'
-const NAME = 'dbdl-player-name'
 export const MAX_SURVIVOR_PLAYERS = 4
 /** One survivor player is a game of two: they play all four survivors (p.6). */
 export const MIN_SURVIVOR_PLAYERS = 1
@@ -90,30 +90,19 @@ export const pickWaiting = computed(() => {
   return Array.from({ length: d.players }, (_, i) => i + 1).filter((p) => !d.locked[String(p)])
 })
 
-export function savedName(): string {
-  try {
-    return localStorage.getItem(NAME) ?? ''
-  } catch {
-    return ''
-  }
-}
+/** The player's name, from their profile (the top bar's profile button, src/profile.ts). */
+export const savedName = () => playerName.value
 
-/** The name typed on the online page, kept as it is typed (not only on creating or joining a room). */
-export function saveName(name: string) {
-  try {
-    const n = name.trim()
-    if (n) localStorage.setItem(NAME, n)
-    else localStorage.removeItem(NAME)
-  } catch {
-    // storage blocked: the name holds for this visit only
-  }
-}
+// Renamed in the profile while in a room: the room shows the new name too.
+watch(playerName, (n) => {
+  const mine = session.data?.members[session.me]
+  if (session.room && mine && n && n !== mine.name) void setName(n)
+})
 
-function remember(code: string | null, name?: string) {
+function remember(code: string | null) {
   try {
     if (code) localStorage.setItem(LAST_ROOM, code)
     else localStorage.removeItem(LAST_ROOM)
-    if (name) localStorage.setItem(NAME, name)
   } catch {
     // storage blocked: the player just retypes the code
   }
@@ -299,7 +288,7 @@ export function createRoom(name: string, roomName = '', password = '') {
     const room = await backend.create(code, session.me)
     const pw = password.trim()
     const hash = pw ? await hashPassword(code, pw) : ''
-    remember(code, name)
+    remember(code)
     // in the room first: Firebase holds lobby writes until the room is being listened to
     enter(room)
     await room.updateRoom((cur) => ({ ...cur, name: roomName.trim() || randomRoomName(), ...(hash ? { passwordHash: hash } : {}) }))
@@ -329,7 +318,7 @@ export function joinRoom(code: string, name: string, password = '') {
       }
     }
     session.needPassword = null
-    remember(room.code, name)
+    remember(room.code)
     enter(room)
     await join(name)
     joined = true
@@ -438,7 +427,6 @@ export function randomRoomName(): string {
 // ---------- lobby ----------
 
 export function setName(name: string) {
-  remember(session.room?.code ?? null, name)
   return update((cur) => (cur.members[session.me] ? { ...cur, members: { ...cur.members, [session.me]: { ...cur.members[session.me], name } } } : null))
 }
 
