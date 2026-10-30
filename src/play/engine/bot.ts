@@ -303,13 +303,24 @@ const knownProps = (st: GameState) => new Set(st.props.filter((p) => p.revealed)
 // ---------- trying a choice ----------
 
 /** The steps a tried choice is played on through by itself; the rest are someone's real decision. */
-const FORCED = new Set(['roll', 'revealProp', 'setupReveal', 'offer', 'turnStart', 'reaction', 'keepItem', 'pickItem', 'carryDice', 'carryMove', 'sparkChoice'])
+const FORCED = new Set(['roll', 'revealProp', 'setupReveal', 'offer', 'turnStart', 'reaction', 'keepItem', 'pickItem', 'carryDice', 'carryMove', 'sparkChoice', 'redeemerGuess'])
+
+/**
+ * A guess at the card behind the Redeemer, blind: one of the five, by a draw of the bot's own (the
+ * copy's dice while trying, so the tries average to 1 right in 5). Never the card itself: trying
+ * each guess on the real game read it, and the bots guessed right every time.
+ */
+function blindGuess(st: GameState, acts: Action[]): Action | null {
+  return acts.length ? acts[(Math.imul(st.rng ^ 0x2545f491, 0x9e3779b1) >>> 0) % acts.length] : null
+}
 
 /** The plain answer to a forced step, while trying a choice (no thinking ahead of its own). */
 function forced(st: GameState): Action | null {
   const acts = legalActions(st)
   const s = st.step
   switch (s.t) {
+    case 'redeemerGuess':
+      return blindGuess(st, acts)
     // Carter's Spark (and Dragon's Grip, Whispers): a survivor with ▲ pays it off, as they mostly do
     case 'sparkChoice':
       return acts.find((a) => a.t === 'spark' && a.pay) ?? acts[0] ?? null
@@ -738,6 +749,8 @@ export function botMove(st: GameState, player: number): Action | null {
   )
   if (!acts.length) return legalActions(st).find((a) => mayAct(st, player, a)) ?? null
   if (step.t === 'offer') return acts.find((a) => a.t === 'perk' && a.quiet) ?? acts[0]
+  // the Redeemer's card is face down: a blind guess
+  if (step.t === 'redeemerGuess') return blindGuess(st, acts) ?? acts[0]
   // a roll another survivor could change: this one lets it be
   const pass = acts.find((a) => a.t === 'passRoll')
   if (pass && !acts.some((a) => a.t === 'acceptRoll')) return pass

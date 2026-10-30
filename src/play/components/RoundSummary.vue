@@ -1,13 +1,27 @@
 <script setup lang="ts">
-// End-of-round summary, shown after cleanup and before the next round's planning.
-import { computed } from 'vue'
+// End-of-round summary, shown after cleanup and before the next round's planning. For someone only
+// watching (`auto`, ms) it closes by itself, a bar under the button showing the time left.
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { GENERATORS_TO_POWER, SACRIFICE_TO_WIN, generatorsDone } from '../engine/engine'
 import type { GameState } from '../engine/types'
 import { roundSummary } from '../stats'
 import BpText from '../../components/BpText.vue'
 
-const props = defineProps<{ st: GameState; round: number }>()
+const props = defineProps<{ st: GameState; round: number; auto?: number }>()
 const emit = defineEmits<{ close: [] }>()
+
+/** What is left of the time to read it (1 → 0), while closing by itself. */
+const left = ref(1)
+let timer: number | null = null
+if (props.auto) {
+  const start = Date.now()
+  // a timer, not a CSS animation: reading time isn't scaled with the animation speed setting
+  timer = window.setInterval(() => {
+    left.value = Math.max(0, 1 - (Date.now() - start) / props.auto!)
+    if (left.value === 0) emit('close')
+  }, 100)
+}
+onBeforeUnmount(() => timer !== null && clearInterval(timer))
 
 const sum = computed(() => roundSummary(props.st, props.round))
 const gained = computed(() => sum.value.sacrificeAfter - sum.value.sacrificeBefore)
@@ -42,6 +56,7 @@ const gained = computed(() => sum.value.sacrificeAfter - sum.value.sacrificeBefo
       <p v-else class="muted">รอบนี้เงียบ… ไม่มีใครบาดเจ็บหรือถูกแขวน</p>
 
       <button class="primary" @click="emit('close')">ไปรอบ {{ round + 1 }}</button>
+      <div v-if="auto" class="autoclose" aria-hidden="true"><i :style="{ transform: `scaleX(${left})` }" /></div>
     </div>
   </div>
 </template>
@@ -79,6 +94,21 @@ h2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.6rem;
+}
+/* watching: the time left before it closes by itself */
+.autoclose {
+  height: 3px;
+  margin-top: -0.5rem;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 0.08);
+  overflow: hidden;
+}
+.autoclose i {
+  display: block;
+  height: 100%;
+  background: var(--blood-bright);
+  transform-origin: left;
+  transition: transform 0.1s linear;
 }
 .tile {
   display: grid;

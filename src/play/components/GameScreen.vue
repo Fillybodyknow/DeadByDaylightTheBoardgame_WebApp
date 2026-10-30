@@ -623,6 +623,17 @@ function diceResult(ctx: RollContext['k'], dice: Die[]): Pick<DiceShow, 'outcome
 
 /** The round whose summary is open (shown after cleanup). */
 const summaryRound = ref<number | null>(null)
+/**
+ * Nobody here plays (a spectator online, or every seat a bot on one device): the summary closes by
+ * itself after a moment to read it, instead of waiting for a click every round.
+ */
+const onlyWatching = computed(() => {
+  const st = props.st
+  if (online.value) return !online.value.seat
+  return !tutorial.value && [KILLER_PLAYER, ...new Set(st.handPlayers)].every((p) => st.bots?.includes(p))
+})
+/** How long a watcher has to read the summary (reading time: not scaled with the animations). */
+const SUMMARY_READ_MS = 5000
 
 watch(
   () => view.value.log.length,
@@ -843,7 +854,7 @@ onBeforeUnmount(() => clockTimer !== null && clearInterval(clockTimer))
 const BOT_PAUSE_MS = 700
 let botTimer: number | null = null
 watch(
-  [() => props.st, view, fxBusy, () => fx.starts, botDriver, standIns],
+  [() => props.st, view, fxBusy, () => fx.starts, botDriver, standIns, summaryRound],
   () => {
     if (botTimer !== null) clearTimeout(botTimer)
     botTimer = null
@@ -853,6 +864,8 @@ watch(
     const o = online.value
     if (tutorial.value || st.phase === 'over' || (!o && !st.bots?.length)) return
     if (o && session.me !== botDriver.value) return
+    // on one device the round's summary is read first (it closes by itself when only bots play)
+    if (!o && summaryRound.value !== null) return
     if (view.value !== st || fxBusy.value || fx.starts) return
     if (o ? !onlineBotMove(st, standIns.value) : !botTurn(st)) return
     botTimer = window.setTimeout(() => {
@@ -1301,7 +1314,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <PerkPrompt :st="view" :hidden="secret || !!over || !viewTurn" :on-board="onBoard" />
     <DiceModal />
     <!-- (and not before a rise waiting for the board: the round's summary comes after its reveal) -->
-    <RoundSummary v-if="summaryRound !== null && !over && !holdPanel && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" @close="summaryRound = null" />
+    <RoundSummary v-if="summaryRound !== null && !over && !holdPanel && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" :auto="onlyWatching ? SUMMARY_READ_MS : 0" @close="summaryRound = null" />
     <DetailModal v-if="inspecting" :st="view" :target="inspecting" @close="inspecting = null" />
     <!-- (not before the game's last beat: a finale waiting for the board holds it back too) -->
     <EndSummary v-if="over && showOver && !holdPanel && !fx.finale" :st="view" :winner="over" :online="!!online" @close="showOver = false" @again="playAgain" />
