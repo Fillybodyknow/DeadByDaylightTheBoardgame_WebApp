@@ -23,7 +23,7 @@ npm run build    # type-check + build into dist/
 | `src/play/engine/engine.ts` | The rules: `createGame`, `apply(state, action)`, legal-option queries |
 | `src/play/engine/legal.ts` | Every legal action in a state (tests, bots) |
 | `src/play/engine/bot.ts` | The bot: a move for one player (`botMove`), from what that player can see |
-| `src/play/bots.ts` | Bots on one device (offline): who they are, when they move, what the people may do |
+| `src/play/bots.ts` | Bots in a game: who they are, when they move, what the people may do (offline); their moves online (`onlineBotMove`) |
 | `src/play/engine/engine.test.ts` | Rule tests plus random full playthroughs |
 | `src/play/game.ts` | Current game, undo history, save to localStorage |
 | `src/play/components/` | Setup screen, board (with its animations), action panel, planning, status, log, and the modals: dice, banners, details, round summary, end summary |
@@ -205,7 +205,10 @@ and the host starts the game.
   them (their seat waits for them). The server forgets it once it has run: the device sets it
   again after every reconnection, clears its own `dropped` mark, and if it was taken out of the
   lobby, goes straight back in (only a member in `kicked` is sent to the entry page). Leaving
-  with the button cancels it. The local backend stands in with `pagehide` (best effort).
+  with the button cancels it; from the picks on, leaving with the button marks the member
+  `dropped` itself (`leaveRoom`), as a lost connection would, and a host who leaves hands the role
+  on at once, so the game's end and the bots (`botDriver`) don't wait on someone gone. The local
+  backend stands in with `pagehide` (best effort).
   Back in the lobby after a game, members still marked `dropped` are let go (by any device there),
   are never handed the host role, and don't keep the room alive: the last member left who is
   connected leaving deletes it.
@@ -368,8 +371,8 @@ armed. The killer's offers still put their targets on the map at once.
 ### Bots
 
 A seat can be played by the computer (`engine/bot.ts`). Offline, the players step marks which
-players are bots (`GameState.bots`, saved with the game; the engine never reads it). Online is not
-in yet: the host's device will play the bots' seats.
+players are bots (`GameState.bots`, saved with the game; the engine never reads it). Online, the
+host seats them in the lobby, and the host's device plays them.
 
 - **What a bot knows:** what its player would at the table. Positions, the props face up, the
   tracks, the cards left in each hand. Never the face-down cards, the props still hidden or the
@@ -410,6 +413,16 @@ in yet: the host's device will play the bots' seats.
   - The people may only make their own moves (`peopleMay` in `dispatch`).
   - The hand-off curtains are only for people of both sides.
   - Undo goes back to the people's last move.
+- **Online** (rooms): in the lobby the host seats a bot on the killer's side or a survivor slot
+  (`addBot`, `removeBot` in `online/session.ts`). A bot is a member with `bot: true`: always ready,
+  never the host, no ping colour, no chat notice, not counted in the room's listing, and its seat
+  carries `bot` too. Its character is drawn as the characters stage opens (after the bans, if any),
+  before anyone picks, so it never takes a person's; it bans nothing, locks at once and keeps its
+  printed perks. A bot killer picks no map (it is drawn, unless the host picks it), and the host
+  starts the game. In the game one device plays every bot (`botDriver`: the host, or while the
+  host's connection is gone the person in the room longest): `onlineBotMove` (`play/bots.ts`) gives
+  a bot's move as that player would send it (a hand's plan at a time), sent by `dispatchBot`
+  (`play/game.ts`) after the host's screen has caught up, like a person's move.
 - **Balance** (bots against bots, MacMillan, 5 players). The survivors planning as a team, 44 games
   (every killer twice): the killer won 11, the survivors 33, in 12 rounds on average. Two wounded
   survivors in three are healed.

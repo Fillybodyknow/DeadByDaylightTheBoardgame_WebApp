@@ -14,9 +14,11 @@ import type { Action, GameState } from '../engine/types'
 import type { RoomSettings } from './settings'
 
 export interface SeatInfo {
-  /** Client id of the device sitting here. */
+  /** Client id of the device sitting here (a bot's own id: no device). */
   id: string
   name: string
+  /** The computer plays this seat: a bot the host seated in the lobby. */
+  bot?: boolean
 }
 
 export type Side = 'killer' | 'survivor'
@@ -37,6 +39,11 @@ export interface Member {
    * member from before, or not a survivor): the first slot free.
    */
   seat?: number
+  /**
+   * A bot the host seated (not a person): always ready, never the host, no ping colour or voice.
+   * In the game the host's device plays it (`botDriver` in session.ts).
+   */
+  bot?: boolean
 }
 
 /**

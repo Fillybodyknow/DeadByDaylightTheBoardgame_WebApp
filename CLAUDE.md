@@ -90,7 +90,9 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 - **Bots** (`bot.ts`, `botMove(st, player)`): a seat the computer plays. It sees only what its
   player would: never face-down cards, hidden props or the dice to come (a choice is tried on a
   copy with a fresh dice seed). No perks yet. Offline the players step marks bots
-  (`GameState.bots`) and `play/bots.ts` drives them from `GameScreen`. Details and balance in
+  (`GameState.bots`) and `play/bots.ts` drives them from `GameScreen`. Online the host seats them
+  in the lobby (members with `bot: true`; places that mean people skip them) and the host's device
+  plays them (`botDriver`, `onlineBotMove`, `dispatchBot`). Details and balance in
   `src/play/README.md` → Bots.
 
 ### Perks on boards, perk cards, and the game modes
@@ -197,7 +199,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   `curl "$VITE_FIREBASE_DATABASE_URL/reports/<id>.json"` to look into a bug.
 - **Presence (online):** a member whose connection drops leaves the lobby by itself (Firebase
   `onDisconnect`, `Room.presence`); in a game they keep their seat, marked `dropped`. Re-set after
-  every reconnection (`settle` in `session.ts`).
+  every reconnection (`settle` in `session.ts`). Leaving with the button from the picks on marks
+  them `dropped` too, and a host who leaves hands the role on (`leaveRoom`).
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
   already offers and show "เลือกบนแผนที่" instead. The exception is a survivor's perk aimed on the

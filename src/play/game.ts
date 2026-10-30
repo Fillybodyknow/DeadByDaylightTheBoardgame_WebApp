@@ -76,6 +76,34 @@ function save() {
   }
 }
 
+type Online = NonNullable<typeof online.value>
+
+/** Online: make `seat`'s move here at once, then send it to the room. */
+function send(o: Online, seat: number, action: Action): boolean {
+  const cur = game.value
+  if (!cur || !mayAct(cur, seat, action)) return false
+  const next = tryApply(cur, action)
+  if (!next) return false
+  // Show it at once, then send the move. If someone else moved first, it is checked again
+  // against their state; every device replays the same moves, so all of them agree.
+  game.value = next
+  pendingWrites.value++
+  void o.room
+    .sendMove((latest) => (latest && mayAct(latest, seat, action) && tryApply(latest, action) ? action : null))
+    .then(
+      (ok) => !ok && resync(o),
+      () => resync(o),
+    )
+    .finally(() => pendingWrites.value--)
+  return true
+}
+
+/** Online: a bot's move, sent by the device that plays the bots (session.ts `botDriver`). */
+export function dispatchBot(player: number, action: Action): boolean {
+  const o = online.value
+  return !!o && !!game.value?.bots?.includes(player) && send(o, player, action)
+}
+
 /**
  * Apply an action; false when it is not legal right now (or, online, not this player's; on one
  * device with bots, a bot's — unless `byBot`, the bot driver's own).
@@ -84,23 +112,7 @@ export function dispatch(action: Action, byBot = false): boolean {
   const cur = game.value
   if (!cur) return false
   const o = online.value
-  if (o) {
-    if (!mayAct(cur, o.seat, action)) return false
-    const next = tryApply(cur, action)
-    if (!next) return false
-    // Show it at once, then send the move. If someone else moved first, it is checked again
-    // against their state; every device replays the same moves, so all of them agree.
-    game.value = next
-    pendingWrites.value++
-    void o.room
-      .sendMove((latest) => (latest && mayAct(latest, o.seat, action) && tryApply(latest, action) ? action : null))
-      .then(
-        (ok) => !ok && resync(o),
-        () => resync(o),
-      )
-      .finally(() => pendingWrites.value--)
-    return true
-  }
+  if (o) return send(o, o.seat, action)
   if (tutorial.value && !tutorial.value.allow(cur, action)) return false
   if (!byBot && !peopleMay(cur, action)) return false
   const next = tryApply(cur, action)

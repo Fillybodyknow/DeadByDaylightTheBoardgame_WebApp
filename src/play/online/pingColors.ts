@@ -30,7 +30,10 @@ export const pingHex = (id: string | undefined) => PING_COLORS.find((c) => c.id 
 export function memberColors(members: Record<string, Member>): Record<string, string> {
   const out: Record<string, string> = {}
   const taken = new Set<string>()
-  const order = Object.entries(members).sort(([, a], [, b]) => a.joinedAt - b.joinedAt)
+  // bots never ping
+  const order = Object.entries(members)
+    .filter(([, m]) => !m.bot)
+    .sort(([, a], [, b]) => a.joinedAt - b.joinedAt)
   for (const [id, m] of order)
     if (m.color && !taken.has(m.color)) {
       out[id] = m.color

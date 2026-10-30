@@ -206,7 +206,8 @@ watch(
   (d) => {
     if (!d) return void (before = null)
     const now: Seen = {
-      names: Object.fromEntries(Object.entries(d.members).map(([id, m]) => [id, m.name])),
+      // a bot seated or taken out is the host's doing, not someone joining or leaving
+      names: Object.fromEntries(Object.entries(d.members).flatMap(([id, m]) => (m.bot ? [] : [[id, m.name]]))),
       kicked: new Set(Object.keys(d.kicked ?? {})),
       dropped: new Set(Object.keys(d.dropped ?? {})),
     }

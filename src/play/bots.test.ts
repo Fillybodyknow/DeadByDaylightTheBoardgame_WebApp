@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { botAction, botPlanCards, botTurn, botsOnly, peopleMay, peopleOnBothSides } from './bots'
+import { botAction, botPlanCards, botTurn, botsOnly, onlineBotMove, peopleMay, peopleOnBothSides } from './bots'
 import { botMove } from './engine/bot'
 import { apply, createGame } from './engine/engine'
 import { legalActions } from './engine/legal'
+import { actorsOf, mayAct } from './engine/seats'
 import type { Action, GameState } from './engine/types'
 
 function game(bots: number[], players: 2 | 3 | 4 | 5 = 5, seed = 11): GameState {
@@ -67,5 +68,30 @@ describe('bots on one device', () => {
     const st = game([2], 2)
     expect(botsOnly(st)).toBe(true)
     expect(botAction(st)).toMatchObject({ t: 'planNext' })
+  })
+})
+
+describe('bots online', () => {
+  // each player sends their own moves, a bot's from the host's device: a hand's plan at a time
+  it('plays its own seats only, a move at a time, through a game with a person in it', () => {
+    let st = game([1, 3, 4, 5])
+    for (let n = 0; n < 6000 && st.phase !== 'over' && st.round <= 4; n++) {
+      const m = onlineBotMove(st)
+      if (m) {
+        expect(st.bots).toContain(m.player)
+        expect(mayAct(st, m.player, m.action), `${m.action.t} at ${st.step.t}`).toBe(true)
+        st = apply(st, m.action)
+        continue
+      }
+      // nothing for the bots: the person (player 2, a stand-in playing as a bot would) is waited on
+      expect(actorsOf(st)).toContain(2)
+      st = apply(st, botMove(st, 2) ?? legalActions(st).find((a) => mayAct(st, 2, a))!)
+    }
+    expect(st.round > 4 || st.phase === 'over').toBe(true)
+  }, 120_000)
+
+  it('plans a hand at a time, not the whole table at once', () => {
+    const m = onlineBotMove(game([2, 3, 4, 5]))
+    expect(m).toMatchObject({ player: 2, action: { t: 'planHand' } })
   })
 })

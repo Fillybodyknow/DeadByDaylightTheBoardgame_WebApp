@@ -5,7 +5,8 @@
 //   goes on when everyone is.
 //   Picks: survivor players pick their survivors (they see each other's, no duplicates, and
 //   nothing of the killer's side); the killer picks and sees the survivors' picks; when
-//   everyone has locked in, the killer starts the game.
+//   everyone has locked in, the killer starts the game (the host, when a bot is the killer).
+//   Bots: the host seats them in the lobby; they are always ready and get drawn characters.
 import { computed, ref, watch } from 'vue'
 import { killerById, survivorById } from '../../data'
 import { asset, cssUrl } from '../../i18n'
@@ -13,7 +14,11 @@ import { sfx } from '../../sound'
 import { fxSound } from '../fx/audio'
 import { KILLER_PLAYER } from '../engine/seats'
 import {
+  addBot,
   backToLobby,
+  botSeat,
+  mayStart,
+  removeBot,
   confirmPerks,
   lockBans,
   myBans,
@@ -163,7 +168,7 @@ const colorHolder = (color: string) => {
 }
 /** The seated players (a side taken): only they say ready; the others watch the game. */
 const seated = computed(() => memberList.value.filter((m) => m.side))
-const readyCount = computed(() => seated.value.filter((m) => m.ready).length)
+const readyCount = computed(() => seated.value.filter((m) => m.ready || m.bot).length)
 /** The silhouettes on the slots: the figure on the Sprint card, the skull on a card's back. */
 // each survivor seat shows one of the four movement cards (Sneak, Sprint, Crouch, Vault), the killer's the skull
 const SEAT_CARDS = ['sneak', 'sprint', 'crouch', 'vault'] as const
@@ -217,6 +222,16 @@ function takeSlot(s: 'killer' | 'survivor', slot?: number) {
   void setSide(s, slot)
 }
 
+/** Host: a bot takes the killer's side or the first free survivor slot. */
+function seatBot(s: 'killer' | 'survivor') {
+  sfx.click()
+  void addBot(s)
+}
+function dropBot(id: string) {
+  sfx.click()
+  void removeBot(id)
+}
+
 function toggleReady() {
   sfx.select()
   void setReady(!me.value?.ready)
@@ -263,10 +278,10 @@ const survivorSlots = computed(() =>
     return {
       slot,
       player,
-      who: data.value.seats[String(player)]?.name ?? '',
+      who: (botSeat(data.value, player) ? '🤖 ' : '') + (data.value.seats[String(player)]?.name ?? ''),
       mine: player === mySeat.value,
       character: id ? survivorById.get(id) : undefined,
-      locked: !!data.value.locked[String(player)],
+      locked: !!data.value.locked[String(player)] || botSeat(data.value, player),
     }
   }),
 )
@@ -277,7 +292,10 @@ const takenByOthers = computed(
 )
 
 /** Who picks the board, for the read-only card. */
-const boardChooser = computed(() => ({ killer: 'ฆาตกร', secret: 'ฆาตกร', host: 'หัวห้อง', random: 'สุ่ม' })[roomSettings.value.map])
+// a bot killer picks no map: it was drawn
+const boardChooser = computed(() =>
+  botSeat(data.value, KILLER_PLAYER) && roomSettings.value.map !== 'host' ? 'สุ่ม' : { killer: 'ฆาตกร', secret: 'ฆาตกร', host: 'หัวห้อง', random: 'สุ่ม' }[roomSettings.value.map],
+)
 
 /** The killer's pick, for the survivors when the room shows it. */
 const shownKiller = computed(() => (roomSettings.value.showKiller && data.value.picks.killer ? killerById.get(data.value.picks.killer) : undefined))
@@ -350,7 +368,7 @@ function start() {
 const barTotal = computed(() => (amKiller.value || roomSettings.value.showKiller ? data.value.players : data.value.players - 1))
 const barDone = computed(() =>
   Array.from({ length: data.value.players }, (_, i) => i + 1).filter(
-    (p) => data.value.locked[String(p)] && (p !== KILLER_PLAYER || amKiller.value || roomSettings.value.showKiller),
+    (p) => (data.value.locked[String(p)] || botSeat(data.value, p)) && (p !== KILLER_PLAYER || amKiller.value || roomSettings.value.showKiller),
   ).length,
 )
 const picksMissing = computed(() => (amKiller.value ? (data.value.picks.killer ? 0 : 1) : mySlots.value.length - myPicks.value.length))
@@ -358,7 +376,7 @@ const picksMissing = computed(() => (amKiller.value ? (data.value.picks.killer ?
 // ---------- the bans ----------
 
 const myBansLocked = computed(() => !!mySeat.value && !!data.value.bansLocked?.[String(mySeat.value)])
-const banWaiting = computed(() => Array.from({ length: data.value.players }, (_, i) => String(i + 1)).filter((p) => !data.value.bansLocked?.[p]).length)
+const banWaiting = computed(() => Array.from({ length: data.value.players }, (_, i) => String(i + 1)).filter((p) => !data.value.bansLocked?.[p] && !botSeat(data.value, p)).length)
 function toggleBans() {
   if (myBansLocked.value) fxSound.charUnconfirm()
   else fxSound.charConfirm()
@@ -390,15 +408,17 @@ const seatStatus = computed(() =>
   Array.from({ length: data.value.players }, (_, i) => i + 1).map((player) => {
     const killer = player === KILLER_PLAYER
     const hidden = stage.value === 'chars' && killer && !amKiller.value && !roomSettings.value.showKiller
-    const done =
-      stage.value === 'bans'
+    // a bot has nothing to do before the game
+    const done = botSeat(data.value, player)
+      ? true
+      : stage.value === 'bans'
         ? !!data.value.bansLocked?.[String(player)]
         : stage.value === 'chars'
           ? !!data.value.locked[String(player)]
           : stage.value === 'perks'
             ? perkChars.value.filter((c) => playerOfKey(c.key) === player).every((c) => perkDone(c.key))
             : true
-    return { player, killer, name: data.value.seats[String(player)]?.name ?? '', mine: player === mySeat.value, done: hidden ? null : done }
+    return { player, killer, bot: botSeat(data.value, player), name: data.value.seats[String(player)]?.name ?? '', mine: player === mySeat.value, done: hidden ? null : done }
   }),
 )
 
@@ -439,7 +459,7 @@ const seatStatus = computed(() =>
           <component
             :is="killerMember ? 'div' : 'button'"
             class="seat killer"
-            :class="{ empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready, leavable: leavable(killerMember?.id), talking: talking(killerMember?.id) }"
+            :class="{ empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready || killerMember?.bot, bot: killerMember?.bot, leavable: leavable(killerMember?.id), talking: talking(killerMember?.id) }"
             :disabled="!killerMember && session.busy ? true : undefined"
             :title="leavable(killerMember?.id) ? 'คลิกเพื่อออกจากฝั่ง Killer' : undefined"
             @click="clickSeat('killer', killerMember?.id)"
@@ -449,10 +469,11 @@ const seatStatus = computed(() =>
               <span v-if="killerMember.id === data.host" class="crown" title="หัวห้อง">👑</span>
               <button v-if="killerMember.id === session.me" type="button" class="seat-name mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ killerMember.name }} <i>✎</i></button>
               <span v-else class="seat-name">{{ killerMember.name }}</span>
-              <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />{{ killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}<i v-if="voice.roster[killerMember.id]" class="vc-ico" :title="voiceTitle(killerMember.id)">{{ voice.roster[killerMember.id].m ? '🔇' : '🎙️' }}</i></span>
+              <span class="seat-sub"><i v-if="!killerMember.bot" class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />{{ killerMember.bot ? '🤖 บอท' : killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}<i v-if="voice.roster[killerMember.id]" class="vc-ico" :title="voiceTitle(killerMember.id)">{{ voice.roster[killerMember.id].m ? '🔇' : '🎙️' }}</i></span>
               <span v-if="talking(killerMember.id)" class="talk-pill">🔊 กำลังพูด</span>
               <span v-if="leavable(killerMember.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
-              <button v-if="canKick(killerMember.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(killerMember.id)">✕ เตะ</button>
+              <button v-if="canKick(killerMember.id) && killerMember.bot" type="button" class="kick" title="เอาบอทออก" @click.stop="dropBot(killerMember.id)">✕ เอาออก</button>
+              <button v-else-if="canKick(killerMember.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(killerMember.id)">✕ เตะ</button>
             </template>
             <template v-else>
               <span class="plus" aria-hidden="true">+</span>
@@ -470,7 +491,7 @@ const seatStatus = computed(() =>
             v-for="(m, i) in survivorMembers"
             :key="m?.id ?? `empty-${i}`"
             class="seat survivor"
-            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready, leavable: leavable(m?.id), talking: talking(m?.id) }"
+            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready || m?.bot, bot: m?.bot, leavable: leavable(m?.id), talking: talking(m?.id) }"
             :style="{ '--i': i, '--art': seatArt(i) }"
             :disabled="!m && session.busy ? true : undefined"
             :title="leavable(m?.id) ? 'คลิกเพื่อออกจากฝั่ง Survivor' : undefined"
@@ -481,7 +502,7 @@ const seatStatus = computed(() =>
               <span v-if="m.id === data.host" class="crown" title="หัวห้อง">👑</span>
               <button v-if="m.id === session.me" type="button" class="seat-name mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ m.name }} <i>✎</i></button>
               <span v-else class="seat-name">{{ m.name }}</span>
-              <span class="seat-sub"><i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}<i v-if="voice.roster[m.id]" class="vc-ico" :title="voiceTitle(m.id)">{{ voice.roster[m.id].m ? '🔇' : '🎙️' }}</i></span>
+              <span class="seat-sub"><i v-if="!m.bot" class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.bot ? '🤖 บอท' : m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}<i v-if="voice.roster[m.id]" class="vc-ico" :title="voiceTitle(m.id)">{{ voice.roster[m.id].m ? '🔇' : '🎙️' }}</i></span>
               <span v-if="talking(m.id)" class="talk-pill">🔊 กำลังพูด</span>
               <!-- 3 survivor players: one of them plays two survivors -->
               <button
@@ -496,7 +517,8 @@ const seatStatus = computed(() =>
                 {{ doubleId === m.id ? '👥 คุม 2 ตัว' : 'ให้คุม 2 ตัว' }}
               </button>
               <span v-if="leavable(m.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
-              <button v-if="canKick(m.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕ เตะ</button>
+              <button v-if="canKick(m.id) && m.bot" type="button" class="kick" title="เอาบอทออก" @click.stop="dropBot(m.id)">✕ เอาออก</button>
+              <button v-else-if="canKick(m.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕ เตะ</button>
             </template>
             <template v-else>
               <span class="plus" aria-hidden="true">+</span>
@@ -507,6 +529,12 @@ const seatStatus = computed(() =>
           </component>
         </div>
 
+        <p v-if="isHost" class="bot-add">
+          <span class="muted">🤖 เพิ่มบอท</span>
+          <button type="button" class="bot-btn" :disabled="session.busy || !!killerMember" @click="seatBot('killer')">+ Killer</button>
+          <button type="button" class="bot-btn" :disabled="session.busy || survivorCount >= 4" @click="seatBot('survivor')">+ Survivor</button>
+          <small class="muted">บอทพร้อมเสมอ ได้ตัวละครแบบสุ่ม ยังไม่ใช้ Perk — เครื่องหัวห้องเป็นคนเล่นให้</small>
+        </p>
         <p v-if="bench.length" class="bench">
           <span class="muted">ยังไม่เลือกฝั่ง:</span>
           <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me, talking: talking(m.id) }">
@@ -546,7 +574,7 @@ const seatStatus = computed(() =>
       <footer class="ready-bar">
         <div class="rb-status">
           <span class="ready-line">
-            <span class="ready-pips" aria-hidden="true"><i v-for="m in seated" :key="m.id" :class="{ on: m.ready }" /></span>
+            <span class="ready-pips" aria-hidden="true"><i v-for="m in seated" :key="m.id" :class="{ on: m.ready || m.bot }" /></span>
             พร้อม {{ readyCount }}/{{ seated.length }}
           </span>
           <small class="muted">{{ lobbyBlocker || (isHost ? 'ผู้เล่นพร้อมแล้ว — ดำเนินเกมได้เลย' : 'ผู้เล่นพร้อมแล้ว — รอหัวห้องดำเนินเกม') }}{{ seated.length < memberList.length ? ` · คนที่ยังไม่เลือกฝั่ง ${memberList.length - seated.length} คนจะเป็นผู้ชม` : '' }}</small>
@@ -573,7 +601,7 @@ const seatStatus = computed(() =>
       <section v-if="seatStatus.length" class="who-done" aria-label="สถานะผู้เล่น">
         <span v-for="p in seatStatus" :key="p.player" class="pchip" :class="{ ok: p.done, killer: p.killer, me: p.mine }">
           <b>{{ p.done === null ? '·' : p.done ? '✓' : '…' }}</b>
-          {{ p.killer ? '🔪 ' : '' }}{{ p.name }}{{ p.mine ? ' (คุณ)' : '' }}
+          {{ p.killer ? '🔪 ' : '' }}{{ p.bot ? '🤖 ' : '' }}{{ p.name }}{{ p.mine ? ' (คุณ)' : '' }}
         </span>
       </section>
 
@@ -758,16 +786,19 @@ const seatStatus = computed(() =>
           <p class="muted">รอ{{ boardChooser }}เลือกแผนที่…</p>
         </section>
 
-        <StageBar v-if="mySeat">
+        <!-- a bot killer: the host starts, even watching -->
+        <StageBar v-if="mySeat || mayStart">
           {{
             !mapDone
               ? `รอ${boardChooser}เลือกแผนที่`
-              : amKiller
+              : mayStart
                 ? 'ทุกอย่างพร้อมแล้ว — เริ่มเกมได้'
-                : 'ทุกอย่างพร้อมแล้ว — รอ Killer ดำเนินเกม'
+                : botSeat(data, KILLER_PLAYER)
+                  ? 'ทุกอย่างพร้อมแล้ว — รอหัวห้องเริ่มเกม'
+                  : 'ทุกอย่างพร้อมแล้ว — รอ Killer ดำเนินเกม'
           }}
           <template #actions>
-            <button v-if="amKiller" class="primary big-go" :disabled="!startable || session.busy" @click="start">
+            <button v-if="mayStart" class="primary big-go" :disabled="!startable || session.busy" @click="start">
               {{ startable ? 'ดำเนินเกม — เริ่ม Trial' : 'เลือกแผนที่ก่อน' }}
             </button>
           </template>
@@ -1266,6 +1297,18 @@ button.seat-name.mine:hover i {
     0 0 18px rgb(79 179 106 / 0.25);
 }
 
+/* the host seats bots: one row under the lineup */
+.bot-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin: 0.2rem 0 0;
+}
+.bot-btn {
+  padding: 0.2rem 0.8rem;
+  font-size: 0.9rem;
+}
 .bench {
   display: flex;
   flex-wrap: wrap;

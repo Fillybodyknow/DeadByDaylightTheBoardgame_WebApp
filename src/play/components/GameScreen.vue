@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anim, settings } from '../../settings'
-import { botAction, botTurn, botsOnly, botsWaitedOn, peopleOnBothSides } from '../bots'
+import { botAction, botTurn, botsOnly, botsWaitedOn, onlineBotMove, peopleOnBothSides } from '../bots'
 import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
@@ -11,11 +11,11 @@ import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
 import { openHands } from '../hands'
 import CardHand, { type HandCard } from './CardHand.vue'
-import { canUndo, controls, dispatch, myTurn, online, quitGame, tutorial, undo } from '../game'
+import { canUndo, controls, dispatch, dispatchBot, myTurn, online, quitGame, tutorial, undo } from '../game'
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
-import { closeOnlineGame, isHost, leaveRoom, pingColors, returnToLobby, roomSettings, session } from '../online/session'
+import { botDriver, closeOnlineGame, isHost, leaveRoom, pingColors, returnToLobby, roomSettings, session } from '../online/session'
 import { pingHex } from '../online/pingColors'
 import { canPing, pingArmed, pingWait } from '../pings'
 import { timeoutActions } from '../online/timeout'
@@ -412,7 +412,7 @@ const waitingOn = computed(() => {
   const names = actorsOf(st).map((p) => {
     const seat = session.data?.seats[String(p)]
     const chars = p === 1 ? [st.killer.name] : st.survivors.filter((_, i) => st.handPlayers[st.survivors[i].hand] === p).map((sv) => sv.name)
-    return `ผู้เล่น ${p}${seat ? ` (${seat.name})` : ''} — ${chars.join(' + ')}`
+    return `${seat?.bot ? '🤖 ' : ''}ผู้เล่น ${p}${seat ? ` (${seat.name})` : ''} — ${chars.join(' + ')}`
   })
   return names
 })
@@ -835,7 +835,7 @@ watch(
 )
 onBeforeUnmount(() => clockTimer !== null && clearInterval(clockTimer))
 
-// ---------- bots on one device (bots.ts) ----------
+// ---------- bots (bots.ts): on one device, or online from the host's ----------
 // A bot moves once the screen has caught up (the dice, cards and board of the move before it
 // played), after a short pause, so the people see each move as they would a person's.
 
@@ -843,18 +843,26 @@ onBeforeUnmount(() => clockTimer !== null && clearInterval(clockTimer))
 const BOT_PAUSE_MS = 700
 let botTimer: number | null = null
 watch(
-  [() => props.st, view, fxBusy, () => fx.starts],
+  [() => props.st, view, fxBusy, () => fx.starts, botDriver],
   () => {
     if (botTimer !== null) clearTimeout(botTimer)
     botTimer = null
     const st = props.st
-    if (online.value || tutorial.value || !st.bots?.length || st.phase === 'over') return
+    if (tutorial.value || !st.bots?.length || st.phase === 'over') return
+    // online, one device plays the bots (the host's): it sends their moves as each player sends theirs
+    const o = online.value
+    if (o && session.me !== botDriver.value) return
     if (view.value !== st || fxBusy.value || fx.starts) return
-    if (!botTurn(st)) return
+    if (o ? !onlineBotMove(st) : !botTurn(st)) return
     botTimer = window.setTimeout(() => {
       botTimer = null
-      // the game moved on meanwhile (an undo): it is looked at again from there
+      // the game moved on meanwhile (an undo, or a move from the room): it is looked at again from there
       if (props.st !== st) return
+      if (o) {
+        const m = onlineBotMove(st)
+        if (m) dispatchBot(m.player, m.action)
+        return
+      }
       const a = botAction(st)
       if (a) dispatch(a, true)
     }, anim(BOT_PAUSE_MS))
@@ -872,7 +880,7 @@ const timeLeft = computed(() => {
 /** Who the room waits on, by name, for everyone else's timer pill. */
 const waitingNames = computed(() => {
   const seats = session.data?.seats ?? {}
-  return actorsOf(props.st).map((p) => seats[String(p)]?.name ?? `ผู้เล่น ${p}`)
+  return actorsOf(props.st).map((p) => (seats[String(p)]?.bot ? '🤖 ' : '') + (seats[String(p)]?.name ?? `ผู้เล่น ${p}`))
 })
 
 let timedOut = ''

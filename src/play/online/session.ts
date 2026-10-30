@@ -19,7 +19,7 @@ import { firebaseBackend, firebaseConfigured } from './firebase'
 import { localBackend } from './local'
 import { PING_COLORS, freeColor, memberColors } from './pingColors'
 import { settingsOf, playableKillers, playableSurvivors, type RoomSettings } from './settings'
-import { clientId, newRoomCode, type Backend, type Room, type RoomData, type RoomListing, type Side } from './transport'
+import { clientId, newRoomCode, type Backend, type Member, type Room, type RoomData, type RoomListing, type Side } from './transport'
 
 /** Firebase when configured (.env.local), otherwise the same-browser test backend. */
 export const backend: Backend = firebaseConfigured ? firebaseBackend : localBackend
@@ -65,6 +65,11 @@ export const memberList = computed(() =>
     .sort((a, b) => a.joinedAt - b.joinedAt),
 )
 
+/** A member who has said ready: a person who pressed it, or a bot (always ready). */
+const isReady = (m: Member) => m.ready || !!m.bot
+/** The computer plays this seat (player number, or its key). */
+export const botSeat = (d: RoomData, player: number | string) => !!d.seats[String(player)]?.bot
+
 /** Why the host can't leave the lobby yet (empty when they can). */
 export const lobbyBlocker = computed(() => {
   const ms = memberList.value
@@ -73,7 +78,7 @@ export const lobbyBlocker = computed(() => {
   if (killers !== 1) return 'ต้องมี Killer 1 คน'
   if (survivors < MIN_SURVIVOR_PLAYERS) return `ต้องมีผู้เล่นฝั่ง Survivor อย่างน้อย ${MIN_SURVIVOR_PLAYERS} คน`
   // members without a side don't hold the game up: they watch it
-  if (ms.some((m) => m.side && !m.ready)) return 'รอผู้เล่นที่นั่งแล้วกดพร้อม'
+  if (ms.some((m) => m.side && !isReady(m))) return 'รอผู้เล่นที่นั่งแล้วกดพร้อม'
   return ''
 })
 
@@ -87,7 +92,7 @@ export function slotsOf(player: number, players = session.data?.players ?? 0): n
 export const pickWaiting = computed(() => {
   const d = session.data
   if (!d || d.phase !== 'pick') return []
-  return Array.from({ length: d.players }, (_, i) => i + 1).filter((p) => !d.locked[String(p)])
+  return Array.from({ length: d.players }, (_, i) => i + 1).filter((p) => !d.locked[String(p)] && !botSeat(d, p))
 })
 
 /** The player's name, from their profile (the top bar's profile button, src/profile.ts). */
@@ -338,7 +343,8 @@ export function leaveRoom() {
   const d = session.data
   // the last one out of a lobby closes the room: its data goes with it, not left on the server
   // (members whose connection is gone don't count: nobody is left to use the room)
-  const lastOut = !!room && !!d && d.phase === 'lobby' && !d.game && Object.keys(d.members).every((id) => id === session.me || d.dropped?.[id])
+  // (nor bots: they only play for the people)
+  const lastOut = !!room && !!d && d.phase === 'lobby' && !d.game && Object.entries(d.members).every(([id, m]) => id === session.me || d.dropped?.[id] || m.bot)
   // In the lobby, leaving frees the place; once seated, the member stays so they can come back.
   // The host leaving hands the room to whoever joined first, and puts the listing right on the
   // board (the new host's device keeps it from then on).
@@ -358,6 +364,18 @@ export function leaveRoom() {
         }
       })
       .catch(() => {})
+  } else if (room && d && d.members[session.me]) {
+    // In the picks or a game the seat stays theirs to come back to, but the room is told they are
+    // gone, as when a connection drops: their tile says so, and back in the lobby they are let go.
+    // The host's part (the bots, ending the game) passes on.
+    void room
+      .updateRoom((cur) => {
+        if (!cur.members[session.me] || (cur.phase === 'lobby' && !cur.game)) return null
+        const dropped = { ...(cur.dropped ?? {}), [session.me]: Date.now() }
+        const host = cur.host === session.me ? (nextHost(cur.members, dropped) ?? cur.host) : cur.host
+        return { ...cur, dropped, host }
+      })
+      .catch(() => {})
   }
   unsubscribe?.()
   unsubscribe = null
@@ -373,11 +391,23 @@ export function leaveRoom() {
   restoreLocal()
 }
 
-/** Who takes over as host: the member in the room longest whose connection isn't gone. */
+/** Who takes over as host: the person in the room longest whose connection isn't gone. */
 function nextHost(members: RoomData['members'], dropped: RoomData['dropped'] = {}): string | null {
-  const left = Object.entries(members).filter(([id]) => !dropped?.[id]).sort((a, b) => a[1].joinedAt - b[1].joinedAt)
+  const left = Object.entries(members)
+    .filter(([id, m]) => !dropped?.[id] && !m.bot)
+    .sort((a, b) => a[1].joinedAt - b[1].joinedAt)
   return left[0]?.[0] ?? null
 }
+
+/**
+ * The device that plays the bots in the game: the host's, or while the host's connection is gone,
+ * the person in the room longest who is still here. Every device works it out alike, so one plays.
+ */
+export const botDriver = computed(() => {
+  const d = session.data
+  if (!d) return null
+  return d.members[d.host] && !d.dropped?.[d.host] ? d.host : nextHost(d.members, d.dropped)
+})
 
 // ---------- the room board ----------
 
@@ -388,7 +418,8 @@ function publish(code: string, d: RoomData) {
     code,
     name: d.name || `ห้อง ${code}`,
     host: d.members[d.host]?.name ?? '',
-    members: Object.keys(d.members).length,
+    // the people in it: bots fill seats, but nobody is there to talk to
+    members: Object.values(d.members).filter((m) => !m.bot).length,
     phase: d.game ? 'game' : d.phase,
     locked: !!d.passwordHash,
   }
@@ -488,6 +519,37 @@ export function kickMember(id: string) {
   })
 }
 
+/**
+ * Host, in the lobby: a bot takes a side — the killer's, or a survivor slot (`seat`, else the first
+ * free). It is always ready, and named "บอท n".
+ */
+export function addBot(side: Side, seat?: number) {
+  return update((cur) => {
+    if (session.me !== cur.host || cur.phase !== 'lobby' || cur.game) return null
+    const ms = Object.values(cur.members)
+    const survivors = ms.filter((m) => m.side === 'survivor')
+    if (side === 'killer' ? ms.some((m) => m.side === 'killer') : survivors.length >= MAX_SURVIVOR_PLAYERS) return null
+    const names = new Set(ms.map((m) => m.name))
+    let n = 1
+    while (names.has(`บอท ${n}`)) n++
+    const taken = new Set(survivors.flatMap((m) => (m.seat !== undefined ? [m.seat] : [])))
+    const at = side !== 'survivor' ? undefined : seat !== undefined && seat >= 0 && seat < MAX_SURVIVOR_PLAYERS && !taken.has(seat) ? seat : [0, 1, 2, 3].find((x) => !taken.has(x))
+    const id = `bot-${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`
+    const bot: Member = { name: `บอท ${n}`, side, ready: true, joinedAt: Date.now(), bot: true, ...(at !== undefined ? { seat: at } : {}) }
+    return { ...cur, members: { ...cur.members, [id]: bot } }
+  })
+}
+
+/** Host, in the lobby: take a bot out of its seat (and the room). */
+export function removeBot(id: string) {
+  return update((cur) => {
+    if (session.me !== cur.host || cur.phase !== 'lobby' || cur.game || !cur.members[id]?.bot) return null
+    const members = { ...cur.members }
+    delete members[id]
+    return { ...cur, members, ...(cur.double === id ? { double: undefined } : {}) }
+  })
+}
+
 export function setDouble(id: string) {
   return update((cur) => {
     const target = cur.members[id]
@@ -525,6 +587,34 @@ function drawPicks(s: RoomSettings, banned: string[]): Record<string, string> {
 }
 
 /**
+ * The bots' characters, drawn into the room's picks (the people's kept): none banned, and none a
+ * teammate holds unless repeats are allowed. Drawn as the characters stage opens, before anyone
+ * picks, so a bot never takes what a person already chose.
+ */
+function drawBotPicks(d: RoomData, s: RoomSettings, banned: string[]): Record<string, string> {
+  const picks = { ...d.picks }
+  for (const [p, seat] of Object.entries(d.seats)) {
+    if (!seat.bot) continue
+    if (Number(p) === KILLER_PLAYER) {
+      const ks = playableKillers()
+        .map((c) => c.id)
+        .filter((id) => !banned.includes(id))
+      if (!picks.killer && ks.length) picks.killer = draw(ks)
+      continue
+    }
+    for (const slot of slotsOf(Number(p), d.players)) {
+      if (picks[String(slot)]) continue
+      const held = Object.entries(picks).flatMap(([k, v]) => (k === 'killer' ? [] : [v]))
+      const pool = playableSurvivors()
+        .map((c) => c.id)
+        .filter((id) => !banned.includes(id) && (s.dupes || !held.includes(id)))
+      if (pool.length) picks[String(slot)] = draw(pool)
+    }
+  }
+  return picks
+}
+
+/**
  * Host: seat everyone (killer = player 1, survivors in join order, the one playing two survivors
  * first as player 2) and go to character picks.
  */
@@ -537,13 +627,15 @@ export function proceedToPick() {
     // player 2 plays the first hand, which holds two survivors when there are 3 survivor players
     const double = survivors.length === 3 ? survivors.findIndex(([id]) => id === cur.double) : -1
     if (double > 0) survivors.unshift(...survivors.splice(double, 1))
-    if (!killer || survivors.length < MIN_SURVIVOR_PLAYERS || ms.some(([, m]) => m.side && !m.ready)) return null
-    const seats: RoomData['seats'] = { [KILLER_PLAYER]: { id: killer[0], name: killer[1].name } }
-    survivors.forEach(([id, m], i) => (seats[String(i + 2)] = { id, name: m.name }))
+    if (!killer || survivors.length < MIN_SURVIVOR_PLAYERS || ms.some(([, m]) => m.side && !isReady(m))) return null
+    const seatOfMember = (id: string, m: Member) => ({ id, name: m.name, ...(m.bot ? { bot: true } : {}) })
+    const seats: RoomData['seats'] = { [KILLER_PLAYER]: seatOfMember(...killer) }
+    survivors.forEach(([id, m], i) => (seats[String(i + 2)] = seatOfMember(id, m)))
     const s = settingsOf(cur.settings)
     // drawn at once, so everyone sees the result while confirming: the board, and with random
     // characters every pick (none banned; teammates differ unless repeats are allowed)
-    const board = s.map === 'random' ? draw(Object.keys(boards)) : undefined
+    // a bot killer picks no map: it is drawn too
+    const board = s.map === 'random' || (killer[1].bot && s.map !== 'host') ? draw(Object.keys(boards)) : undefined
     // with a Banlist the characters are drawn once the bans are in (lockBans)
     const picks = s.random && !s.banlist ? drawPicks(s, []) : {}
     const perkSeed = Math.floor(Math.random() * 0x7fffffff) + 1
@@ -564,6 +656,8 @@ export function proceedToPick() {
     // the map is picked in its own stage, after the characters (and perks): none until then
     if (board) next.board = board
     else delete next.board
+    // the bots' characters, unless the bans come first (then they are drawn once those are in)
+    if (!s.banlist) next.picks = drawBotPicks(next, s, [])
     return next
   })
 }
@@ -573,7 +667,8 @@ export function proceedToPick() {
 const listOf = (s: string | undefined) => (s ? s.split(',').filter(Boolean) : [])
 /** Every character banned, both sides' lists together. */
 export const bannedOf = (d: RoomData | null): string[] => (d ? [...listOf(d.banPicks?.killer), ...listOf(d.banPicks?.survivors)] : [])
-const bansDoneOf = (d: RoomData) => Array.from({ length: d.players }, (_, i) => String(i + 1)).every((p) => d.bansLocked?.[p])
+// a bot bans nothing: its side's list is the people's
+const bansDoneOf = (d: RoomData) => Array.from({ length: d.players }, (_, i) => String(i + 1)).every((p) => d.bansLocked?.[p] || botSeat(d, p))
 const seatOf = (d: RoomData) => Object.entries(d.seats).find(([, v]) => v.id === session.me)?.[0]
 
 /** The bans are final (everyone confirmed), or the room has none. */
@@ -619,7 +714,7 @@ export function lockBans(on: boolean) {
     if (on) bansLocked[seat] = true
     else delete bansLocked[seat]
     const next: RoomData = { ...cur, bansLocked }
-    if (on && s.random && bansDoneOf(next)) next.picks = drawPicks(s, bannedOf(next))
+    if (on && bansDoneOf(next)) next.picks = s.random ? drawPicks(s, bannedOf(next)) : drawBotPicks(next, s, bannedOf(next))
     return next
   })
 }
@@ -689,7 +784,9 @@ function keysOf(d: RoomData, seat: string): string[] {
   return player === KILLER_PLAYER ? ['killer'] : slotsOf(player, d.players).map(String)
 }
 
-const everyoneLocked = (d: RoomData) => Array.from({ length: d.players }, (_, i) => String(i + 1)).every((p) => d.locked[p])
+const everyoneLocked = (d: RoomData) => Array.from({ length: d.players }, (_, i) => String(i + 1)).every((p) => d.locked[p] || botSeat(d, p))
+/** The characters the bots play (their loadout keys): they keep their printed perks. */
+const botKeysOf = (d: RoomData) => Object.entries(d.seats).flatMap(([p, v]) => (v.bot ? keysOf(d, p) : []))
 
 /** Perks are set once every character is locked in: Bloodweb deals from all of them at once. */
 export const perkStage = computed(() => roomSettings.value.mode !== 'adept' && allLocked.value)
@@ -706,7 +803,12 @@ export const myPerkKeys = computed(() => {
   return d && seat ? keysOf(d, String(seat)) : []
 })
 /** Characters whose perks aren't confirmed yet. */
-export const perksWaiting = computed(() => (perkStage.value ? perkChars.value.filter((c) => !session.data?.perksDone?.[c.key]) : []))
+export const perksWaiting = computed(() => {
+  const d = session.data
+  if (!d || !perkStage.value) return []
+  const bots = botKeysOf(d)
+  return perkChars.value.filter((c) => !d.perksDone?.[c.key] && !bots.includes(c.key))
+})
 /** Everyone is in: characters locked and, in Bloodweb or Devout, every loadout confirmed. */
 export const allReady = computed(() => allLocked.value && (roomSettings.value.mode === 'adept' || perksWaiting.value.length === 0))
 
@@ -787,10 +889,17 @@ export function setBoard(id: string) {
   })
 }
 
+/** Who starts the game: the killer, or the host when a bot is the killer. */
+export const mayStart = computed(() => {
+  const d = session.data
+  if (!d) return false
+  return botSeat(d, KILLER_PLAYER) ? isHost.value : mySeat.value === KILLER_PLAYER
+})
+
 /** The killer starts the game once everyone has locked in. The seed is drawn here, once. */
 export function startOnlineGame() {
   const d = session.data
-  if (!d || !startable.value || mySeat.value !== KILLER_PLAYER) return
+  if (!d || !startable.value || !mayStart.value) return
   const perks = roomSettings.value.mode === 'adept' ? {} : loadoutsOf(d)
   const survivors = [0, 1, 2, 3].map((i) => d.picks[String(i)])
   const killer = d.picks.killer
@@ -809,6 +918,9 @@ export function startOnlineGame() {
         players: d.players as 2 | 3 | 4 | 5,
         startBp: { survivor: roomSettings.value.survivorBp, killer: roomSettings.value.killerBp },
         seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
+        bots: Object.keys(d.seats)
+          .filter((p) => botSeat(d, p))
+          .map(Number),
       }),
     ),
   )

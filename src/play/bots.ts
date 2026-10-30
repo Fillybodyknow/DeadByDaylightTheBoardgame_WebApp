@@ -80,6 +80,20 @@ export function botAction(st: GameState): Action | null {
 }
 
 /**
+ * Online: a bot the game waits on and its move. Each player sends their own moves online, a bot's
+ * too (a hand's plan at a time, the killer's alongside), from the device that plays the bots.
+ */
+export function onlineBotMove(st: GameState): { player: number; action: Action } | null {
+  if (!st.bots?.length || st.phase === 'over') return null
+  for (const p of actorsOf(st)) {
+    if (!isBot(st, p)) continue
+    const action = botMove(st, p)
+    if (action) return { player: p, action }
+  }
+  return null
+}
+
+/**
  * Whether a person at the device may make this move (the bots' are theirs): a move one of the
  * people's players may send, or the survivors' planning on one device while a person plans in it.
  */
