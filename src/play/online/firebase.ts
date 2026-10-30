@@ -79,6 +79,7 @@ function lobbyOf(r: RoomData): Lobby {
     ...(r.passwordHash ? { passwordHash: r.passwordHash } : {}),
     ...(r.kicked && Object.keys(r.kicked).length ? { kicked: r.kicked } : {}),
     ...(r.dropped && Object.keys(r.dropped).length ? { dropped: r.dropped } : {}),
+    ...(r.standIn && Object.keys(r.standIn).length ? { standIn: r.standIn } : {}),
     ...(r.loadouts ? { loadouts: r.loadouts } : {}),
     ...(r.perksDone ? { perksDone: r.perksDone } : {}),
     ...(r.perkSeed ? { perkSeed: r.perkSeed } : {}),

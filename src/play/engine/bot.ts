@@ -104,8 +104,14 @@ function tracks(st: GameState, known: Set<string>): number {
     if (p.kind === 'exitGate') v -= 90 * p.progress
   }
   if (powered) v -= 150
-  return v + 3 * st.killer.bp
+  return v + bpWorth(st.killer.bp)
 }
+
+/**
+ * The killer's ▲: 3 each up to 8. Above that they are worth little: the track stops at 12, and what
+ * he earns past it spills over unused (a bot spends them only on bonus turns and powers).
+ */
+const bpWorth = (bp: number) => 3 * Math.min(bp, 8) + Math.max(0, bp - 8)
 
 /** Rooms of the generators still to repair (or, powered, the exit gates) that the bot knows of. */
 function goals(st: GameState, known: Set<string>): string[] {
@@ -139,6 +145,15 @@ function killerPlace(st: GameState, known: Set<string>): number {
   return v
 }
 
+/**
+ * A survivor standing at the work (a generator to repair, or a powered exit gate): what the turn's
+ * interaction there is worth, beyond being a room closer. Without it a card that ends at the work
+ * looked barely better than one ending next to it, and the bots spent their turns elsewhere.
+ */
+const WORK_HERE = 24
+/** Each room between a survivor and the nearest work. */
+const WORK_PULL = 8
+
 /** Where everyone stands, for the survivors: away from the killer, at the work, near who needs them. */
 function survivorPlace(st: GameState, known: Set<string>): number {
   const reach = threat(st)
@@ -158,7 +173,12 @@ function survivorPlace(st: GameState, known: Set<string>): number {
     // the killer moves twice after the survivors: two moves away is still within his reach
     const d = Math.round(reach.get(sv.room) ?? FAR)
     v -= (sv.wounded ? [50, 30, 12][d] ?? 0 : [30, 16, 6][d] ?? 0) * (hidden ? 0.35 : 1)
-    if (work.length) v -= 4 * nearest(st, sv.room, work)
+    if (work.length) {
+      const d = nearest(st, sv.room, work)
+      // at the work, the turn's interaction is a repair (or the gate): worth more than a room closer
+      v -= WORK_PULL * d
+      if (d === 0 && !hidden) v += WORK_HERE
+    }
     if (unseen.length) v -= explore * nearest(st, sv.room, unseen)
     // a wounded survivor wants someone to heal them: the killer can't pick them up the round they
     // were hurt (p.15), so a teammate has a round to get there
@@ -333,13 +353,17 @@ function tried(st: GameState, acts: Action[], killer: boolean): { a: Action; v: 
   // a survivor's own turn is played on through (plainTurn): which survivor's it is
   const step = st.step
   const own = !killer && OWN_TURN.has(step.t) && 's' in step ? step.s : null
+  // the killer's choice is played on to the end of that turn of his (a power that leads to a move
+  // or a pick is worth what comes of it), with fewer tries inside, and no deeper
+  const turn = killer && !playingOn && 'turn' in step ? step.turn : null
   return acts.map((a, i) => {
     const samples: { v: number; step: string }[] = []
     // an interaction mostly rolls dice (a move may lead to one): enough tries that a run of bad
     // luck doesn't hide its worth
-    const n = a.t === 'interact' || (own !== null && a.t === 'move') ? 6 : 2
+    const n = playingOn ? (a.t === 'interact' ? 2 : 1) : a.t === 'interact' || (own !== null && a.t === 'move') ? 6 : 2
     for (let k = 0; k < n; k++) {
-      const s = tryOut(st, a, k, own, known)
+      let s = tryOut(st, a, k, own, known)
+      if (s && turn !== null) s = killerTurnOn(s, turn)
       if (s) samples.push({ v: score(s, killer, known), step: s.step.t })
     }
     // a tiny nudge so equal choices aren't always the first one
@@ -606,12 +630,77 @@ export function botMove(st: GameState, player: number): Action | null {
   if (step.t === 'revealProp' || step.t === 'setupReveal') return revealPick(st, acts, killer)
   // a survivor's bonus turn costs a card for the round: taken when a card leads to something better
   if (step.t === 'bonusOffer') return bonusPick(st, step.s, knownProps(st)) ?? acts.find((a) => a.t === 'declineBonus') ?? acts[0]
-  if (step.t === 'killerBonusOffer' && !step.free) {
-    // 4 ▲ for a third turn: worth it when a survivor is close
-    const near = nearest(st, st.killer.room, st.survivors.filter((sv) => sv.status === 'board').map((sv) => sv.room))
-    if (st.killer.bp < 6 || near > 2) return acts.find((a) => a.t === 'declineBonus') ?? acts[0]
-  }
+  if (step.t === 'killerBonusOffer') return killerBonusPick(st, acts)
   return bestTried(st, acts, killer)
+}
+
+/**
+ * The killer's bonus turn (4 ▲ for a third card, or Slipstream's for free): each card played on
+ * through the whole turn it gives — the move, then what he does there — against stopping now.
+ * Tried only up to the bonus, it never looked worth it: 4 ▲ gone, nothing done yet.
+ */
+function killerBonusPick(st: GameState, acts: Action[]): Action {
+  const known = knownProps(st)
+  let best = acts[0]
+  let bestV = -Infinity
+  for (const [i, a] of acts.entries()) {
+    let total = 0
+    let n = 0
+    for (let k = 0; k < BONUS_TRIES; k++) {
+      // a copy with its own dice: the real ones stay unknown
+      let s: GameState | null
+      try {
+        s = apply({ ...st, rng: reseed(st, 40 + k) }, a)
+      } catch {
+        continue
+      }
+      s = killerTurnOn(s)
+      if (s) (total += score(s, true, known)), n++
+    }
+    const v = n ? total / n + ((st.rng >>> (i % 24)) & 7) * 0.01 : -Infinity
+    if (v > bestV) (bestV = v), (best = a)
+  }
+  return best
+}
+
+/** How many times each bonus card is played out (its turn rolls dice). */
+const BONUS_TRIES = 3
+
+/** Set while a killer's turn is being played on: the choices inside it aren't played on again. */
+let playingOn = false
+
+/**
+ * The killer's turn played on to its end (`turn`: only that card's turn; unset: all he has left):
+ * his own decisions each his best tried one (no deeper), the rest plainly (rolls, reveals, offers,
+ * reactions). Stops at anyone else's real decision.
+ */
+function killerTurnOn(s: GameState, turn?: number): GameState | null {
+  const was = playingOn
+  playingOn = true
+  try {
+    for (let i = 0; i < 30 && s.phase !== 'over'; i++) {
+      const step = s.step
+      if (FORCED.has(step.t)) {
+        const f = forced(s)
+        if (!f) break
+        s = apply(s, f)
+        continue
+      }
+      // his turn is over: the next card's turn, the next round's planning, or someone else's move
+      if (step.t === 'planKiller' || step.t === 'planSurvivors' || step.t === 'killerBonusOffer') break
+      if (turn !== undefined && 'turn' in step && step.turn !== turn) break
+      const who = actorsOf(s)
+      if (who.length !== 1 || who[0] !== KILLER_PLAYER) break
+      const acts = legalActions(s).filter((a) => mayAct(s, KILLER_PLAYER, a) && a.t !== 'reroll' && !(a.t === 'perk' && a.use))
+      if (!acts.length) break
+      s = apply(s, acts.length === 1 ? acts[0] : bestTried(s, acts, true))
+    }
+  } catch {
+    return null
+  } finally {
+    playingOn = was
+  }
+  return s
 }
 
 /**

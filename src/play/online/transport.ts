@@ -119,6 +119,11 @@ export interface RoomData {
    * (`Room.presence`) and cleared when they are back. In the lobby the member is taken out too.
    */
   dropped?: Record<string, number>
+  /**
+   * Seats a bot plays for now (player number → true): the host handed them over while their
+   * player's connection was gone. Only while it stays gone: back, they play again.
+   */
+  standIn?: Record<string, boolean>
   /** Player number → who sits there; set when leaving the lobby (1 = killer, 2.. = survivors). */
   seats: Record<string, SeatInfo>
   /** Number of players (3–5) once seated; 0 in the lobby. */

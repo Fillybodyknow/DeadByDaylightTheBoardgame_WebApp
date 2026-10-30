@@ -378,7 +378,8 @@ host seats them in the lobby, and the host's device plays them.
   tracks, the cards left in each hand. Never the face-down cards, the props still hidden or the
   dice to come.
 - **How it decides:** planning scores each card by the rooms it can lead to. A survivor wants a
-  generator (or, powered, an exit gate), distance from the killer (the killer moves twice after the
+  generator (or, powered, an exit gate: 8 for each room nearer, 24 for standing at it, the turn's
+  interaction there being a repair), distance from the killer (the killer moves twice after the
   survivors, so two rooms away is still close), a teammate to heal, a hooked survivor to rescue,
   and no crowd. The killer foresees where the survivors go (they move first): the plans a team
   would make with the cards left in their hands (no secret at the table), the near-best 20 of them
@@ -403,8 +404,20 @@ host seats them in the lobby, and the host's device plays them.
     turn), then survival (a locker, a chest), then objective.
   - An item is used when trying it shows it helps, and an item in hand counts (what a chest is
     worth). A bonus turn is taken when a card leads somewhere better.
-- **Not yet:** perks (each offer is declined for the round), a key's re-roll. The killer's bonus
-  turn (4 ▲) only with 6 ▲ and a survivor two rooms away.
+  - The killer's bonus turn (4 ▲): each card in hand is played out through the whole turn it gives
+    (the move, then his best interaction there), 3 times with fresh dice, against stopping
+    (`killerBonusPick`). His ▲ are worth 3 each up to 8 and 1 above (`bpWorth`): the track stops
+    at 12 and the rest spills over. Tried only up to paying for it, a bonus turn had looked like
+    4 ▲ for nothing: 88 games, 4 taken of 939 offered, and 54% of the rounds began with 12 ▲.
+    Now 350 of 702, a survivor hit or carried in 241 of them, 8% of rounds begin full, and the
+    killer won 45 (22 before, with the survivors' pull to the work raised).
+  - The killer's other choices are played on to the end of that card's turn too (`killerTurnOn`,
+    its own choices tried once or twice and no deeper): a power that leads to a move or a pick
+    was scored before it, as nothing. 88 games, how often a usable power was used: The Blight 0%
+    → 20%, The Dredge 14% → 31%, The Hillbilly 29% → 37%, The Huntress 54% → 65%. Powers whose
+    worth comes later (traps, Madness, Sickness, drones, guards) are still seldom used (2–9%):
+    the position scores nothing they leave on the board.
+- **Not yet:** perks (each offer is declined for the round), a key's re-roll.
 - **On one device** (`play/bots.ts`, driven from `GameScreen`): a bot moves once the screen has
   caught up with the move before it, after a short pause, so the people see each one. The side
   panel says which bot is thinking.
@@ -423,6 +436,12 @@ host seats them in the lobby, and the host's device plays them.
   host's connection is gone the person in the room longest): `onlineBotMove` (`play/bots.ts`) gives
   a bot's move as that player would send it (a hand's plan at a time), sent by `dispatchBot`
   (`play/game.ts`) after the host's screen has caught up, like a person's move.
+  - **Standing in for someone gone:** when the game waits on a player whose connection has been
+    gone a minute or more (`dropped`, or they left with the button), the waiting panel offers the
+    device that plays the bots "🤖 ให้บอทเล่นแทน" (a countdown until then; the others are told the
+    host may). The room keeps it in `standIn` (`setStandIn`); a bot plays that seat (`standIns`,
+    passed to `onlineBotMove`) only while its player is still gone: back, they play on at once,
+    and their device clears the mark. It can be called off, and the lobby clears it.
 - **Balance** (bots against bots, MacMillan, 5 players). The survivors planning as a team, 44 games
   (every killer twice): the killer won 11, the survivors 33, in 12 rounds on average. Two wounded
   survivors in three are healed.
@@ -431,6 +450,12 @@ host seats them in the lobby, and the host's device plays them.
   rooms (25 of 88): they always move before him. With the survivors' self-help (reveals in
   danger, cards that go nowhere only to wait for a healer), 88 games: the killer won 40, the
   survivors 48; one survivor turn in 4,590 went nowhere.
+  The pull to the work was 4 a room and nothing for standing at it: a card ending at a generator
+  scored barely above one ending beside it, and before the gates had power the survivors stood at
+  one in 49% of their turns and repaired in 40% (88 games, the survivors won 57). With 8 a room and
+  24 at it: at a generator 61%, repairing 44%, the survivors won 66, in 12.5 rounds (13.5). At a
+  generator and not repairing, they mostly heal a wounded teammate, drop a pallet with the killer
+  close, touch a crow or rescue someone hooked.
 - `engine/bot.test.ts` plays every killer for a few rounds and five whole games (every player
   count, other boards); `play/bots.test.ts` checks the one-device rules.
 

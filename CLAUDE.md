@@ -92,7 +92,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   copy with a fresh dice seed). No perks yet. Offline the players step marks bots
   (`GameState.bots`) and `play/bots.ts` drives them from `GameScreen`. Online the host seats them
   in the lobby (members with `bot: true`; places that mean people skip them) and the host's device
-  plays them (`botDriver`, `onlineBotMove`, `dispatchBot`). Details and balance in
+  plays them (`botDriver`, `onlineBotMove`, `dispatchBot`), and a person gone a minute or more
+  when the host says so (`standIn` in the room, `setStandIn`). Details and balance in
   `src/play/README.md` → Bots.
 
 ### Perks on boards, perk cards, and the game modes

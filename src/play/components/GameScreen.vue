@@ -15,7 +15,7 @@ import { canUndo, controls, dispatch, dispatchBot, myTurn, online, quitGame, tut
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
-import { botDriver, closeOnlineGame, isHost, leaveRoom, pingColors, returnToLobby, roomSettings, session } from '../online/session'
+import { STAND_IN_AFTER_MS, botDriver, closeOnlineGame, goneSince, isHost, leaveRoom, pingColors, returnToLobby, roomSettings, session, setStandIn, standIns } from '../online/session'
 import { pingHex } from '../online/pingColors'
 import { canPing, pingArmed, pingWait } from '../pings'
 import { timeoutActions } from '../online/timeout'
@@ -843,24 +843,25 @@ onBeforeUnmount(() => clockTimer !== null && clearInterval(clockTimer))
 const BOT_PAUSE_MS = 700
 let botTimer: number | null = null
 watch(
-  [() => props.st, view, fxBusy, () => fx.starts, botDriver],
+  [() => props.st, view, fxBusy, () => fx.starts, botDriver, standIns],
   () => {
     if (botTimer !== null) clearTimeout(botTimer)
     botTimer = null
     const st = props.st
-    if (tutorial.value || !st.bots?.length || st.phase === 'over') return
-    // online, one device plays the bots (the host's): it sends their moves as each player sends theirs
+    // online, one device plays the bots (the host's): it sends their moves as each player sends
+    // theirs, and plays for anyone a bot stands in for (their player gone)
     const o = online.value
+    if (tutorial.value || st.phase === 'over' || (!o && !st.bots?.length)) return
     if (o && session.me !== botDriver.value) return
     if (view.value !== st || fxBusy.value || fx.starts) return
-    if (o ? !onlineBotMove(st) : !botTurn(st)) return
+    if (o ? !onlineBotMove(st, standIns.value) : !botTurn(st)) return
     botTimer = window.setTimeout(() => {
       botTimer = null
       // the game moved on meanwhile (an undo, or a move from the room): it is looked at again from there
       if (props.st !== st) return
       if (o) {
-        const m = onlineBotMove(st)
-        if (m) dispatchBot(m.player, m.action)
+        const m = onlineBotMove(st, standIns.value)
+        if (m) dispatchBot(m.player, m.action, !st.bots?.includes(m.player))
         return
       }
       const a = botAction(st)
@@ -870,6 +871,39 @@ watch(
   { immediate: true },
 )
 onBeforeUnmount(() => botTimer !== null && clearTimeout(botTimer))
+
+// ---------- online: a bot for a player who is gone (session.ts `setStandIn`) ----------
+
+/** Ticks while online, for how long someone has been gone. */
+const goneClock = ref(Date.now())
+let goneTimer: number | null = null
+watch(
+  () => !!online.value,
+  (on) => {
+    if (goneTimer !== null) clearInterval(goneTimer)
+    goneTimer = on ? window.setInterval(() => (goneClock.value = Date.now()), 1000) : null
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => goneTimer !== null && clearInterval(goneTimer))
+
+/** The players the game waits on whose connection is gone: whether a bot plays for them, and how long until one may. */
+const goneWaiting = computed(() => {
+  const d = session.data
+  if (!online.value || !d?.game || over.value) return []
+  return actorsOf(view.value).flatMap((p) => {
+    const since = goneSince(d, p)
+    if (since === null || d.seats[String(p)]?.bot) return []
+    const wait = Math.max(0, Math.ceil((STAND_IN_AFTER_MS - (goneClock.value - since)) / 1000))
+    return [{ player: p, name: d.seats[String(p)]?.name ?? `ผู้เล่น ${p}`, standIn: standIns.value.includes(p), wait }]
+  })
+})
+/** This device plays the bots, so it decides who a bot plays for. */
+const mayStandIn = computed(() => !!online.value && session.me === botDriver.value)
+function standIn(player: number, on: boolean) {
+  sfx.click()
+  void setStandIn(player, on)
+}
 
 /** Seconds left on this decision; null without a timer (or while animations play). */
 const timeLeft = computed(() => {
@@ -1194,6 +1228,17 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           <p class="muted small">กำลังรอ</p>
           <strong v-for="w in waitingOn" :key="w">{{ w }}</strong>
           <span class="dots" aria-hidden="true"><i /><i /><i /></span>
+          <!-- someone waited on is gone: a bot may play for them until they are back -->
+          <div v-for="g in goneWaiting" :key="g.player" class="gone">
+            <p class="small">⚠ {{ g.name }} หลุดการเชื่อมต่อ{{ g.standIn ? ' — 🤖 บอทเล่นแทนจนกว่าจะกลับมา' : '' }}</p>
+            <template v-if="mayStandIn">
+              <button v-if="g.standIn" type="button" class="small-btn" @click="standIn(g.player, false)">ยกเลิก — รอให้กลับมาเล่นเอง</button>
+              <button v-else type="button" class="small-btn" :disabled="g.wait > 0 || session.busy" @click="standIn(g.player, true)">
+                🤖 ให้บอทเล่นแทน{{ g.wait > 0 ? ` (อีก ${g.wait} วิ)` : '' }}
+              </button>
+            </template>
+            <p v-else-if="!g.standIn" class="muted small">หัวห้องให้บอทเล่นแทนได้เมื่อหลุดเกิน 1 นาที</p>
+          </div>
         </section>
         <!-- while the start-room rolls play on the map, nobody is asked anything: the panel stays empty
              (else the step waiting next — a killer perk at the start of planning — showed to everyone) -->
@@ -1711,6 +1756,20 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
 }
 .waiting p {
   margin: 0;
+}
+/* a player waited on is gone: a bot may stand in */
+.waiting .gone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  width: 100%;
+}
+.waiting .small-btn {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
 }
 .plan-sent {
   display: flex;

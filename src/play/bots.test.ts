@@ -94,4 +94,13 @@ describe('bots online', () => {
     const m = onlineBotMove(game([2, 3, 4, 5]))
     expect(m).toMatchObject({ player: 2, action: { t: 'planHand' } })
   })
+
+  it("plays a person's seat only while a bot stands in for them", () => {
+    // nobody is a bot: nothing to play, until the host hands player 3 to one (gone a while)
+    const st = game([])
+    expect(onlineBotMove(st)).toBeNull()
+    const m = onlineBotMove(st, [3])
+    expect(m).toMatchObject({ player: 3, action: { t: 'planHand' } })
+    expect(mayAct(st, 3, m!.action)).toBe(true)
+  })
 })

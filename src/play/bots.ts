@@ -82,11 +82,12 @@ export function botAction(st: GameState): Action | null {
 /**
  * Online: a bot the game waits on and its move. Each player sends their own moves online, a bot's
  * too (a hand's plan at a time, the killer's alongside), from the device that plays the bots.
+ * `standIns`: people's seats a bot plays for now (their player gone, session.ts).
  */
-export function onlineBotMove(st: GameState): { player: number; action: Action } | null {
-  if (!st.bots?.length || st.phase === 'over') return null
+export function onlineBotMove(st: GameState, standIns: number[] = []): { player: number; action: Action } | null {
+  if ((!st.bots?.length && !standIns.length) || st.phase === 'over') return null
   for (const p of actorsOf(st)) {
-    if (!isBot(st, p)) continue
+    if (!isBot(st, p) && !standIns.includes(p)) continue
     const action = botMove(st, p)
     if (action) return { player: p, action }
   }

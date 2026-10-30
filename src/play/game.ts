@@ -98,10 +98,13 @@ function send(o: Online, seat: number, action: Action): boolean {
   return true
 }
 
-/** Online: a bot's move, sent by the device that plays the bots (session.ts `botDriver`). */
-export function dispatchBot(player: number, action: Action): boolean {
+/**
+ * Online: a bot's move, sent by the device that plays the bots (session.ts `botDriver`); `standIn`:
+ * for a person whose seat a bot plays while they are gone.
+ */
+export function dispatchBot(player: number, action: Action, standIn = false): boolean {
   const o = online.value
-  return !!o && !!game.value?.bots?.includes(player) && send(o, player, action)
+  return !!o && (standIn || !!game.value?.bots?.includes(player)) && send(o, player, action)
 }
 
 /**

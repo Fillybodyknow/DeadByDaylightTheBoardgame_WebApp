@@ -153,7 +153,9 @@ function settle(room: Room, data: RoomData | null) {
       if (!cur.dropped?.[me]) return null
       const dropped = { ...cur.dropped }
       delete dropped[me]
-      return { ...cur, dropped }
+      // a bot playing for them stops: their seat is theirs again
+      const standIn = Object.fromEntries(Object.entries(cur.standIn ?? {}).filter(([p]) => cur.seats[p]?.id !== me))
+      return { ...cur, dropped, standIn }
     })
   // Back in the lobby, whoever lost their connection during the game is let go (a member who is
   // here clears their own mark; one taken out by mistake comes straight back in).
@@ -403,11 +405,46 @@ function nextHost(members: RoomData['members'], dropped: RoomData['dropped'] = {
  * The device that plays the bots in the game: the host's, or while the host's connection is gone,
  * the person in the room longest who is still here. Every device works it out alike, so one plays.
  */
-export const botDriver = computed(() => {
-  const d = session.data
-  if (!d) return null
+export const botDriver = computed(() => (session.data ? driverOf(session.data) : null))
+function driverOf(d: RoomData): string | null {
   return d.members[d.host] && !d.dropped?.[d.host] ? d.host : nextHost(d.members, d.dropped)
+}
+
+/** How long a player must be gone before a bot may play for them. */
+export const STAND_IN_AFTER_MS = 60_000
+
+/** When the person at `player`'s seat lost their connection (or left), or null while they are here. */
+export function goneSince(d: RoomData, player: number): number | null {
+  const id = d.seats[String(player)]?.id
+  return (id && d.dropped?.[id]) || null
+}
+
+/** The seats a bot plays for now: handed over by the host, their player still gone. */
+export const standIns = computed(() => {
+  const d = session.data
+  if (!d?.game) return []
+  return Object.keys(d.standIn ?? {})
+    .map(Number)
+    .filter((p) => goneSince(d, p) !== null)
 })
+
+/**
+ * The device that plays the bots (the host's): a bot plays for a player gone a minute or more, or
+ * stops. Their coming back stops it by itself.
+ */
+export function setStandIn(player: number, on: boolean) {
+  return update((cur) => {
+    if (!cur.game || session.me !== driverOf(cur) || !cur.seats[String(player)] || botSeat(cur, player)) return null
+    const standIn = { ...(cur.standIn ?? {}) }
+    if (on) {
+      const since = goneSince(cur, player)
+      // (a few seconds' grace: the clocks of this device and the server's mark may differ)
+      if (since === null || Date.now() - since < STAND_IN_AFTER_MS - 5000) return null
+      standIn[String(player)] = true
+    } else delete standIn[String(player)]
+    return { ...cur, standIn }
+  })
+}
 
 // ---------- the room board ----------
 
@@ -965,6 +1002,7 @@ export function closeOnlineGame() {
       locked: {},
       loadouts: {},
       perksDone: {},
+      standIn: {},
       // everyone un-ready, and no one left waiting (the database takes no undefined: `back` is dropped)
       members: Object.fromEntries(Object.entries(cur.members).map(([id, { back, ...m }]) => (void back, [id, { ...m, ready: false }]))),
     }))
