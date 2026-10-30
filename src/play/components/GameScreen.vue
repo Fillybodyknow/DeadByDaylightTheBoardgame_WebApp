@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
-import { settings } from '../../settings'
+import { anim, settings } from '../../settings'
+import { botAction, botTurn, botsOnly, botsWaitedOn, peopleOnBothSides } from '../bots'
 import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
@@ -347,7 +348,8 @@ const boardFocus = computed(() => {
  * one who just moved. `myTurn` stays for what must react at once (the "your turn" cues).
  */
 // (and not while the minis are still being placed on the map: nobody is asked anything yet)
-const viewTurn = computed(() => !fx.starts && (!online.value || actorsOf(view.value).includes(online.value.seat)))
+// On one device with bots: not while only bots are waited on (their moves come by themselves).
+const viewTurn = computed(() => !fx.starts && (online.value ? actorsOf(view.value).includes(online.value.seat) : !botsOnly(view.value)))
 
 /** Everything clickable on the board now, and the shapes the board takes them in. */
 const actions = computed(() => boardActions(view.value, modes))
@@ -400,8 +402,13 @@ function undoPlan() {
 /** Online: who the game is waiting on, for the side panel. */
 const waitingOn = computed(() => {
   const o = online.value
-  if (!o || viewTurn.value || fx.starts) return null
+  if (viewTurn.value || fx.starts) return null
   const st = view.value
+  // one device: the bots are thinking
+  if (!o)
+    return botsOnly(st)
+      ? botsWaitedOn(st).map((p) => `🤖 บอท — ${p === 1 ? st.killer.name : st.survivors.filter((sv) => st.handPlayers[sv.hand] === p).map((sv) => sv.name).join(' + ')}`)
+      : null
   const names = actorsOf(st).map((p) => {
     const seat = session.data?.seats[String(p)]
     const chars = p === 1 ? [st.killer.name] : st.survivors.filter((_, i) => st.handPlayers[st.survivors[i].hand] === p).map((sv) => sv.name)
@@ -828,6 +835,34 @@ watch(
 )
 onBeforeUnmount(() => clockTimer !== null && clearInterval(clockTimer))
 
+// ---------- bots on one device (bots.ts) ----------
+// A bot moves once the screen has caught up (the dice, cards and board of the move before it
+// played), after a short pause, so the people see each move as they would a person's.
+
+/** The pause before a bot's move: long enough to see whose turn it is. */
+const BOT_PAUSE_MS = 700
+let botTimer: number | null = null
+watch(
+  [() => props.st, view, fxBusy, () => fx.starts],
+  () => {
+    if (botTimer !== null) clearTimeout(botTimer)
+    botTimer = null
+    const st = props.st
+    if (online.value || tutorial.value || !st.bots?.length || st.phase === 'over') return
+    if (view.value !== st || fxBusy.value || fx.starts) return
+    if (!botTurn(st)) return
+    botTimer = window.setTimeout(() => {
+      botTimer = null
+      // the game moved on meanwhile (an undo): it is looked at again from there
+      if (props.st !== st) return
+      const a = botAction(st)
+      if (a) dispatch(a, true)
+    }, anim(BOT_PAUSE_MS))
+  },
+  { immediate: true },
+)
+onBeforeUnmount(() => botTimer !== null && clearTimeout(botTimer))
+
 /** Seconds left on this decision; null without a timer (or while animations play). */
 const timeLeft = computed(() => {
   if (!turnLimit.value || fxBusy.value) return null
@@ -979,7 +1014,10 @@ const secretWhat = computed(() => {
 })
 // Online every player has their own screen: no hand-off curtain needed.
 // (a tutorial plays the other sides itself: nothing to hand over)
-const secret = computed(() => !online.value && !tutorial.value && secretFor.value !== null && !secretSeen.value)
+// (with bots: only between people of both sides, and never for a bot's own choice)
+const secret = computed(
+  () => !online.value && !tutorial.value && secretFor.value !== null && !secretSeen.value && peopleOnBothSides(view.value) && !botsOnly(view.value),
+)
 watch(
   () => view.value.step,
   () => (secretSeen.value = false),

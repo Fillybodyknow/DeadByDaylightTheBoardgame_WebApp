@@ -13,6 +13,7 @@ import { KILLER_PLAYER, handsToPlan } from '../engine/seats'
 import type { GameState, MoveCard } from '../engine/types'
 import { choicePreview, preview } from '../focus'
 import { dispatch, online, tutorial } from '../game'
+import { botPlanCards, isBot, peopleOnBothSides } from '../bots'
 import { pathPick, pathPickFor } from '../pathPick'
 import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, cardImage, cardLabel, killerMini, playerOf, survivorMini } from '../labels'
 import CardHand, { type HandCard } from './CardHand.vue'
@@ -67,11 +68,12 @@ function confirmStridor() {
 }
 
 // Online every player has their own screen, so there is no curtain to pass behind; nor in a
-// tutorial, which plays the killer itself.
-const curtainOpen = ref(!!online.value || !!tutorial.value)
+// tutorial, which plays the killer itself; nor with bots on one side (nobody to hide it from).
+const noCurtain = () => !!online.value || !!tutorial.value || !peopleOnBothSides(props.st)
+const curtainOpen = ref(noCurtain())
 watch(
   () => props.st.step.t,
-  () => (curtainOpen.value = !!online.value || !!tutorial.value),
+  () => (curtainOpen.value = noCurtain()),
 )
 
 function hover(card: MoveCard | null, owner: number | 'killer') {
@@ -96,9 +98,12 @@ const myHand = computed(() => {
 })
 
 const planners = computed(() =>
-  turnOrder(props.st).filter(
-    (i) => props.st.survivors[i].status !== 'hooked' && props.st.survivors[i].planned === null && (!online.value || props.st.survivors[i].hand === myHand.value),
-  ),
+  turnOrder(props.st).filter((i) => {
+    const sv = props.st.survivors[i]
+    if (sv.status === 'hooked' || sv.planned !== null) return false
+    // online: this player's hand; on one device: everyone's but the bots' (they set their own)
+    return online.value ? sv.hand === myHand.value : !isBot(props.st, props.st.handPlayers[sv.hand])
+  }),
 )
 
 /** The survivor the hand is being played for (a tab per survivor when there are several). */
@@ -141,8 +146,9 @@ function pickSurvivorCard(card: MoveCard) {
 const survivorsLeft = computed(() => planners.value.filter((s) => !picks.value[s]).length)
 
 function confirmSurvivors() {
-  // on a hook, or already face up from Stridor: no card from here
-  const cards = props.st.survivors.map((sv, i) => (sv.status === 'hooked' || sv.planned !== null ? null : picks.value[i]))
+  // on a hook, or already face up from Stridor: no card from here; a bot's survivor: the bot's
+  const bots = online.value ? [] : botPlanCards(props.st)
+  const cards = props.st.survivors.map((sv, i) => (sv.status === 'hooked' || sv.planned !== null ? null : (picks.value[i] ?? bots[i] ?? null)))
   const action = online.value && myHand.value !== null ? { t: 'planHand' as const, hand: myHand.value, cards } : { t: 'planSurvivors' as const, cards }
   if (dispatch(action)) {
     sfx.select()
@@ -399,10 +405,16 @@ function confirmKiller() {
       </button>
     </div>
     <p v-for="(sv, i) in st.survivors" v-show="sv.status === 'hooked'" :key="i" class="muted small">{{ sv.name }} อยู่บน Hook — ไม่วางการ์ด</p>
+    <!-- one device: the bots' survivors get their cards when this plan is confirmed -->
+    <template v-if="!online">
+      <p v-for="(sv, i) in st.survivors" v-show="sv.status !== 'hooked' && sv.planned === null && isBot(st, playerOf(st, i))" :key="'bot' + i" class="muted small">
+        🤖 {{ sv.name }} — บอทวางการ์ดเอง
+      </p>
+    </template>
 
     <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดูเส้นทางบนแผนที่ · คลิกเพื่อเลือก (คลิกซ้ำเพื่อเก็บคืน)</p>
     <button class="primary" :disabled="survivorsLeft > 0" @click="confirmSurvivors">
-      {{ survivorsLeft > 0 ? `เลือกอีก ${survivorsLeft} ตัว` : online ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน แล้วส่งให้ฆาตกร' }}
+      {{ survivorsLeft > 0 ? `เลือกอีก ${survivorsLeft} ตัว` : online ? 'ยืนยัน (คว่ำการ์ดไว้)' : isBot(st, KILLER_PLAYER) ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน แล้วส่งให้ฆาตกร' }}
     </button>
 
     <CardHand

@@ -178,6 +178,8 @@ export interface GameConfig {
   seed: number
   /** Starting ▲ when the table changes them (online room settings); else the rulebook's (p.6). */
   startBp?: { survivor: number; killer: number }
+  /** Players the computer plays (1 = the killer), see `GameState.bots`. */
+  bots?: number[]
 }
 
 /** Survivor hand index for each of the 4 survivors, by player count (p.6, p.19). */
@@ -292,6 +294,7 @@ export function createGame(config: GameConfig): GameState {
     redeemer: null,
     rng: config.seed >>> 0 || 1,
     log: [],
+    ...(config.bots?.length ? { bots: [...config.bots] } : {}),
   }
 
   // Step 5: shuffle the props of each category face down into the rooms' slots.

@@ -2,6 +2,7 @@
 // shared room's state (see online/session.ts).
 
 import { computed, shallowRef } from 'vue'
+import { botsOnly, peopleMay } from './bots'
 import { createGame, tryApply, type GameConfig } from './engine/engine'
 import { KILLER_PLAYER, actorsOf, mayAct } from './engine/seats'
 import type { Action, GameState } from './engine/types'
@@ -75,8 +76,11 @@ function save() {
   }
 }
 
-/** Apply an action; false when it is not legal right now (or, online, not this player's). */
-export function dispatch(action: Action): boolean {
+/**
+ * Apply an action; false when it is not legal right now (or, online, not this player's; on one
+ * device with bots, a bot's — unless `byBot`, the bot driver's own).
+ */
+export function dispatch(action: Action, byBot = false): boolean {
   const cur = game.value
   if (!cur) return false
   const o = online.value
@@ -98,6 +102,7 @@ export function dispatch(action: Action): boolean {
     return true
   }
   if (tutorial.value && !tutorial.value.allow(cur, action)) return false
+  if (!byBot && !peopleMay(cur, action)) return false
   const next = tryApply(cur, action)
   if (!next) return false
   history.value = [...history.value.slice(-MAX_UNDO + 1), cur]
@@ -124,10 +129,13 @@ export function receive(st: GameState | null) {
 }
 
 export function undo() {
-  const h = history.value
+  const h = [...history.value]
   if (!h.length || online.value) return
-  game.value = h[h.length - 1]
-  history.value = h.slice(0, -1)
+  // back to the people's last move: a state waiting on bots would only be played again at once
+  let back = h.pop()!
+  while (botsOnly(back) && h.length) back = h.pop()!
+  game.value = back
+  history.value = h
   save()
 }
 

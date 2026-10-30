@@ -87,6 +87,11 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   optional (`field?:`), or bump the version together with the check in `src/play/game.ts`.
 - When the rulebook is unclear, pick a ruling, write it in `src/play/README.md` (Rulings), and
   tell the user. House rules (the user's own changes to the rules) go under House rules there.
+- **Bots** (`bot.ts`, `botMove(st, player)`): a seat the computer plays. It sees only what its
+  player would: never face-down cards, hidden props or the dice to come (a choice is tried on a
+  copy with a fresh dice seed). No perks yet. Offline the players step marks bots
+  (`GameState.bots`) and `play/bots.ts` drives them from `GameScreen`. Details and balance in
+  `src/play/README.md` → Bots.
 
 ### Perks on boards, perk cards, and the game modes
 

@@ -867,6 +867,11 @@ export interface GameState {
   rushCard?: PathKind | null
   rng: number
   log: LogEntry[]
+  /**
+   * Players (1 = the killer) the computer plays (bot.ts). Not part of the rules: the engine never
+   * reads it; the screens and the bot driver do. Missing in games from before bots.
+   */
+  bots?: number[]
   /** Online planning: cards set so far by survivor index (`planHand`), until every hand is in. */
   planDraft?: (MoveCard | null)[]
   /**

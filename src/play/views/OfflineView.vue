@@ -65,6 +65,23 @@ const MODES: { id: GameMode; label: string; note: string }[] = [
 const mode = ref<GameMode>('adept')
 
 const players = ref<2 | 3 | 4 | 5>(5)
+/** Players the computer plays (1 = the killer), set with the player count. */
+const bots = ref<number[]>([])
+const isBotPlayer = (p: number) => bots.value.includes(p)
+/** Every player, with what they play: the killer, then the survivor seats of each hand. */
+const playerRows = computed(() => [
+  { p: 1, what: 'Killer' },
+  ...[...new Set(seatPlayer.value)].map((p) => ({
+    p,
+    what: seatPlayer.value.flatMap((q, seat) => (q === p ? [`Survivor ${seat + 1}`] : [])).join(' + '),
+  })),
+])
+function toggleBot(p: number) {
+  sfx.click()
+  bots.value = isBotPlayer(p) ? bots.value.filter((x) => x !== p) : [...bots.value, p].sort()
+}
+/** Somebody must play: a table of bots only has nobody to show the game to. */
+const allBots = computed(() => playerRows.value.every((r) => isBotPlayer(r.p)))
 const confirmed = ref(false)
 const picks = ref<(string | null)[]>([null, null, null, null])
 const killer = ref<string | null>(null)
@@ -93,9 +110,14 @@ const seatingNote = computed(() => {
 })
 
 const chooser = computed(() => {
-  if (step.value === 'survivors' && currentSeat.value !== null)
-    return `ผู้เล่น ${seatPlayer.value[currentSeat.value]} เลือก Survivor ตัวที่ ${currentSeat.value + 1}`
-  if (step.value === 'killer') return 'ผู้เล่น 1 (Killer) เลือกฆาตกร'
+  if (step.value === 'survivors' && currentSeat.value !== null) {
+    const p = seatPlayer.value[currentSeat.value]
+    // a bot's character is picked for it by the people (or drawn with 🎲)
+    return isBotPlayer(p)
+      ? `เลือก Survivor ตัวที่ ${currentSeat.value + 1} ให้บอท (ผู้เล่น ${p})`
+      : `ผู้เล่น ${p} เลือก Survivor ตัวที่ ${currentSeat.value + 1}`
+  }
+  if (step.value === 'killer') return isBotPlayer(1) ? 'เลือกฆาตกรให้บอท (ผู้เล่น 1)' : 'ผู้เล่น 1 (Killer) เลือกฆาตกร'
   return ''
 })
 
@@ -107,6 +129,8 @@ function setMode(m: GameMode) {
 function setPlayers(n: 2 | 3 | 4 | 5) {
   sfx.click()
   players.value = n
+  // the players that are no more can't stay bots
+  bots.value = bots.value.filter((p) => p <= n)
 }
 
 function confirmPlayers() {
@@ -145,10 +169,15 @@ function goToStep(i: number) {
 
 // ---------- perks (Bloodweb, Devout): each player in turn, the device handed over ----------
 
-/** Every character, survivors in seat order then the killer: the order the perks are set in. */
+/**
+ * Every character the people play, survivors in seat order then the killer: the order the perks are
+ * set in. A bot's keep the perks printed on its board (it uses none for now).
+ */
 const perkChars = computed<(LoadoutCharacter & { who: string })[]>(() => [
-  ...picks.value.map((id, seat) => ({ key: String(seat), side: 'survivor' as const, id: id ?? '', who: `ผู้เล่น ${seatPlayer.value[seat]}` })),
-  { key: 'killer', side: 'killer' as const, id: killer.value ?? '', who: 'ผู้เล่น 1 (Killer)' },
+  ...picks.value.flatMap((id, seat) =>
+    isBotPlayer(seatPlayer.value[seat]) ? [] : [{ key: String(seat), side: 'survivor' as const, id: id ?? '', who: `ผู้เล่น ${seatPlayer.value[seat]}` }],
+  ),
+  ...(isBotPlayer(1) ? [] : [{ key: 'killer', side: 'killer' as const, id: killer.value ?? '', who: 'ผู้เล่น 1 (Killer)' }]),
 ])
 const perkTurn = ref(0)
 /** The curtain is up between two players. */
@@ -201,6 +230,7 @@ function start() {
     killer: { id: killer.value, name: killerById.get(killer.value)!.name, perks: mode.value === 'adept' ? undefined : loadouts.value.killer },
     players: players.value,
     seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
+    bots: bots.value,
   })
 }
 
@@ -242,7 +272,7 @@ function start() {
           <img v-if="killer" class="aura-killer" :src="asset(killerById.get(killer)?.images.mini)" alt="" />
           <span v-else class="empty">🔪</span>
           <div>
-            <small class="muted">Killer · ผู้เล่น 1</small>
+            <small class="muted">Killer · ผู้เล่น 1{{ isBotPlayer(1) ? ' · 🤖 บอท' : '' }}</small>
             <strong>{{ killer ? killerById.get(killer)?.name : '—' }}</strong>
           </div>
         </div>
@@ -250,7 +280,7 @@ function start() {
           <img v-if="id" class="aura-survivor" :src="asset(survivorById.get(id)?.images.mini)" alt="" />
           <span v-else class="empty">{{ seat + 1 }}</span>
           <div>
-            <small class="muted">Survivor {{ seat + 1 }} · ผู้เล่น {{ seatPlayer[seat] }}</small>
+            <small class="muted">Survivor {{ seat + 1 }} · ผู้เล่น {{ seatPlayer[seat] }}{{ isBotPlayer(seatPlayer[seat]) ? ' · 🤖 บอท' : '' }}</small>
             <strong>{{ id ? survivorById.get(id)?.name : '—' }}</strong>
           </div>
           <button v-if="id && step === 'survivors'" type="button" class="x" title="เลือกใหม่" @click="clearSeat(seat)">✕</button>
@@ -274,6 +304,18 @@ function start() {
             <button v-for="n in [2, 3, 4, 5] as const" :key="n" type="button" :class="{ active: players === n }" @click="setPlayers(n)">{{ n }} คน</button>
           </div>
           <p class="muted">ผู้เล่น 1 = Killer · {{ seatingNote }}</p>
+          <h2>ใครเป็นบอท?</h2>
+          <p class="muted small">กดเพื่อสลับคน / บอท — บอทเล่นตาของตัวเองให้อัตโนมัติ (ยังไม่ใช้ Perk)</p>
+          <div class="bot-rows">
+            <button v-for="r in playerRows" :key="r.p" type="button" class="bot-row" :class="{ bot: isBotPlayer(r.p) }" :aria-pressed="isBotPlayer(r.p)" @click="toggleBot(r.p)">
+              <span class="who">
+                <b>ผู้เล่น {{ r.p }}</b>
+                <small>{{ r.what }}</small>
+              </span>
+              <span class="kind">{{ isBotPlayer(r.p) ? '🤖 บอท' : '🧑 คน' }}</span>
+            </button>
+          </div>
+          <p v-if="allBots" class="warn small">ต้องมีคนเล่นอย่างน้อย 1 คน</p>
           <h2>โหมดเกม</h2>
           <div class="modes">
             <button v-for="m in MODES" :key="m.id" type="button" class="mode" :class="{ active: mode === m.id }" @click="setMode(m.id)">
@@ -282,7 +324,7 @@ function start() {
             </button>
           </div>
           <div class="actions">
-            <button type="button" class="primary big" @click="confirmPlayers">เริ่มเลือกตัวละคร →</button>
+            <button type="button" class="primary big" :disabled="allBots" @click="confirmPlayers">เริ่มเลือกตัวละคร →</button>
           </div>
         </section>
       </template>
@@ -374,6 +416,43 @@ function start() {
 .mode.active {
   border-color: var(--blood);
   box-shadow: 0 0 0 2px var(--blood) inset;
+}
+/* who plays each seat: a person or a bot */
+.bot-rows {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-bottom: 0.5rem;
+}
+.bot-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+}
+.bot-row .who {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.bot-row small {
+  color: var(--muted);
+}
+.bot-row .kind {
+  white-space: nowrap;
+  font-weight: 700;
+}
+.bot-row.bot {
+  border-color: rgb(110 170 255 / 0.7);
+  box-shadow: 0 0 0 1px rgb(110 170 255 / 0.5) inset;
+  background: rgb(110 170 255 / 0.08);
+}
+.bot-row.bot .kind {
+  color: #9cc4ff;
+}
+.warn {
+  color: var(--warn);
 }
 .handoff {
   display: flex;

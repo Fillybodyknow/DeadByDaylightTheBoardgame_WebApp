@@ -21,7 +21,9 @@ npm run build    # type-check + build into dist/
 | `src/play/engine/types.ts` | Game state, steps, actions (plain data, JSON-safe) |
 | `src/play/engine/boards.ts` | Board graphs: rooms, printed prop slots, paths, walls, coordinates |
 | `src/play/engine/engine.ts` | The rules: `createGame`, `apply(state, action)`, legal-option queries |
-| `src/play/engine/legal.ts` | Every legal action in a state (tests, future bots) |
+| `src/play/engine/legal.ts` | Every legal action in a state (tests, bots) |
+| `src/play/engine/bot.ts` | The bot: a move for one player (`botMove`), from what that player can see |
+| `src/play/bots.ts` | Bots on one device (offline): who they are, when they move, what the people may do |
 | `src/play/engine/engine.test.ts` | Rule tests plus random full playthroughs |
 | `src/play/game.ts` | Current game, undo history, save to localStorage |
 | `src/play/components/` | Setup screen, board (with its animations), action panel, planning, status, log, and the modals: dice, banners, details, round summary, end summary |
@@ -363,8 +365,64 @@ Burst's paths and For the People's generator look just like an ordinary move or 
 players clicking them by habit used the perk by mistake. Usable perks glow and pulse until one is
 armed. The killer's offers still put their targets on the map at once.
 
-Next: the other killers and survivors, Devout / Bloodweb perk choice, the other boards (each
-needs its graph in `boards.ts`), then bots from the automated rules.
+### Bots
+
+A seat can be played by the computer (`engine/bot.ts`). Offline, the players step marks which
+players are bots (`GameState.bots`, saved with the game; the engine never reads it). Online is not
+in yet: the host's device will play the bots' seats.
+
+- **What a bot knows:** what its player would at the table. Positions, the props face up, the
+  tracks, the cards left in each hand. Never the face-down cards, the props still hidden or the
+  dice to come.
+- **How it decides:** planning scores each card by the rooms it can lead to. A survivor wants a
+  generator (or, powered, an exit gate), distance from the killer (the killer moves twice after the
+  survivors, so two rooms away is still close), a teammate to heal, a hooked survivor to rescue,
+  and no crowd. The killer foresees where the survivors go (they move first): the plans a team
+  would make with the cards left in their hands (no secret at the table), the near-best 20 of them
+  weighed alike (`likelyTeams`); never the cards they chose.
+  The bot survivors plan as one team (`teamPlan`): every way of sharing their cards is scored by
+  where it leaves the whole team, so a wounded survivor meets a teammate who can heal them. A card
+  that goes nowhere (the turn's interaction lost) is played only by someone wounded staying put
+  for a healer, with the killer more than two moves away. The team picks one of its
+  near-best plans at random, so the killer can't read it off. Every
+  other decision tries each legal choice on a copy of the game, with a fresh dice seed so the real
+  dice stay unknown, plays on through what follows by itself (rolls, reveals, perk offers) and
+  scores the position: interactions with dice are tried 6 times. That serves every killer's power
+  without code of its own.
+  - A survivor's choice is played on through the rest of their own turn, plainly (`plainTurn`):
+    a move is worth what can be done where it leads, a crow the bonus turn it gives.
+  - The killer's threat counts his moves: a pallet on the way costs him one more, so a pallet
+    between him and a survivor is worth dropping.
+  - A locker is safe but gets nothing done: the work still waits, scored from the locker's room.
+  - A prop to reveal is picked by its colour in the rulebook's order: survivors objective,
+    survival, altruism, boldness (the generators first); the killer boldness first. With the
+    killer two moves away a survivor looks for what saves them: altruism (a pallet, a crow's bonus
+    turn), then survival (a locker, a chest), then objective.
+  - An item is used when trying it shows it helps, and an item in hand counts (what a chest is
+    worth). A bonus turn is taken when a card leads somewhere better.
+- **Not yet:** perks (each offer is declined for the round), a key's re-roll. The killer's bonus
+  turn (4 ▲) only with 6 ▲ and a survivor two rooms away.
+- **On one device** (`play/bots.ts`, driven from `GameScreen`): a bot moves once the screen has
+  caught up with the move before it, after a short pause, so the people see each one. The side
+  panel says which bot is thinking.
+  - The survivors still plan together: a person's plan takes the bots' cards with it
+    (`botPlanCards`), and when every hand is a bot's they plan by themselves.
+  - The people may only make their own moves (`peopleMay` in `dispatch`).
+  - The hand-off curtains are only for people of both sides.
+  - Undo goes back to the people's last move.
+- **Balance** (bots against bots, MacMillan, 5 players). The survivors planning as a team, 44 games
+  (every killer twice): the killer won 11, the survivors 33, in 12 rounds on average. Two wounded
+  survivors in three are healed.
+  With the killer reading the team's likely plans, 88 games (every killer four times): the killer
+  won 46, the survivors 42. Weighing where the survivors stand now as well made him chase empty
+  rooms (25 of 88): they always move before him. With the survivors' self-help (reveals in
+  danger, cards that go nowhere only to wait for a healer), 88 games: the killer won 40, the
+  survivors 48; one survivor turn in 4,590 went nowhere.
+- `engine/bot.test.ts` plays every killer for a few rounds and five whole games (every player
+  count, other boards); `play/bots.test.ts` checks the one-device rules.
+
+Next: the other killers and survivors, the other boards (each needs its graph in `boards.ts`), and
+bots online.
 
 ## House rules
 

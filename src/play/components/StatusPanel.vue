@@ -7,6 +7,7 @@ import { asset } from '../../i18n'
 import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, killerCardCount, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, twoPlayer, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse, MoveCard, PathKind } from '../engine/types'
 import { itemHidden, myTurn, online } from '../game'
+import { isBot } from '../bots'
 import { KILLER_PLAYER } from '../engine/seats'
 import { seatVoice } from '../voice'
 import type { InspectTarget } from '../inspect'
@@ -208,7 +209,7 @@ function onPowerSlot() {
       <div class="head">
         <Mini class="mini aura-killer" :src="asset(killerMini(st))" :alt="st.killer.name" />
         <div class="names">
-          <strong class="name" :class="{ me: mine.includes('killer') }">{{ st.killer.name }}<span v-if="seatVoice[KILLER_PLAYER]" class="vc" :title="seatVoice[KILLER_PLAYER].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[KILLER_PLAYER].speaking ? '🔊' : seatVoice[KILLER_PLAYER].micOff ? '🔇' : '🎙️' }}</span></strong>
+          <strong class="name" :class="{ me: mine.includes('killer') }">{{ st.killer.name }}<span v-if="isBot(st, KILLER_PLAYER)" class="bot-tag" title="บอทเล่น">🤖</span><span v-if="seatVoice[KILLER_PLAYER]" class="vc" :title="seatVoice[KILLER_PLAYER].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[KILLER_PLAYER].speaking ? '🔊' : seatVoice[KILLER_PLAYER].micOff ? '🔇' : '🎙️' }}</span></strong>
         </div>
       </div>
       <div class="line small">
@@ -279,7 +280,7 @@ function onPowerSlot() {
           <img v-if="st.survivors[s].sacrificeToken" class="token" :src="asset(components.sacrificeProgress.image)" alt="" title="ยังมี sacrifice token บนกระดาน" />
         </div>
         <div class="names">
-          <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}<span v-if="seatVoice[playerOf(st, s)]" class="vc" :title="seatVoice[playerOf(st, s)].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[playerOf(st, s)].speaking ? '🔊' : seatVoice[playerOf(st, s)].micOff ? '🔇' : '🎙️' }}</span></strong>
+          <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}<span v-if="isBot(st, playerOf(st, s))" class="bot-tag" title="บอทเล่น">🤖</span><span v-if="seatVoice[playerOf(st, s)]" class="vc" :title="seatVoice[playerOf(st, s)].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[playerOf(st, s)].speaking ? '🔊' : seatVoice[playerOf(st, s)].micOff ? '🔇' : '🎙️' }}</span></strong>
         </div>
       </div>
       <div class="line small">
@@ -768,7 +769,8 @@ button.slot:hover .slot-crop {
 /* online voice: in the channel, a mic after the name. Speaking: the row turns green (over a
    wounded row's red, which hid a ring on the portrait), a pulsing green ring outside the portrait's
    wound ring, and the mic becomes a green "speaking" pill. */
-.vc {
+.vc,
+.bot-tag {
   margin-left: 0.3rem;
   font-size: 0.75em;
   opacity: 0.8;
