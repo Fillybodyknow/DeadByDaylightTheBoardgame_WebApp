@@ -383,7 +383,13 @@ host seats them in the lobby, and the host's device plays them.
   survivors, so two rooms away is still close), a teammate to heal, a hooked survivor to rescue,
   and no crowd. The killer foresees where the survivors go (they move first): the plans a team
   would make with the cards left in their hands (no secret at the table), the near-best 20 of them
-  weighed alike (`likelyTeams`); never the cards they chose.
+  weighed alike (`likelyTeams`); never the cards they chose. A card set face down is one of the
+  cards its hand held (those left, and those set face down from it), so planning after the
+  survivors (on one device, and online too: a bot killer waits for the survivors' cards) changes
+  nothing he knows; a card set face up (the Clown's Tonic, Stridor) is known, and that survivor
+  goes where it best takes them. Planning after them, he used to count only the cards left in the
+  hands: nobody had one left to choose, so he took every survivor to stay where they stood. 88
+  games on one device, the killer won 17; read as above, 46 (attack wounds 437 → 654).
   The bot survivors plan as one team (`teamPlan`): every way of sharing their cards is scored by
   where it leaves the whole team, so a wounded survivor meets a teammate who can heal them. A card
   that goes nowhere (the turn's interaction lost) is played only by someone wounded staying put
@@ -400,8 +406,30 @@ host seats them in the lobby, and the host's device plays them.
   - A locker is safe but gets nothing done: the work still waits, scored from the locker's room.
   - A prop to reveal is picked by its colour in the rulebook's order: survivors objective,
     survival, altruism, boldness (the generators first); the killer boldness first. With the
-    killer two moves away a survivor looks for what saves them: altruism (a pallet, a crow's bonus
-    turn), then survival (a locker, a chest), then objective.
+    killer a move away (two, for someone wounded) a survivor looks for what saves them: altruism
+    (a pallet, a crow's bonus turn), then survival (a locker, a chest), then objective. Two moves
+    away for everyone was nearly always: 88 games (MacMillan and Forsaken Boneyard, every killer
+    twice each), with a yellow prop face down and no generator known in the room and the killer two
+    rooms off, they turned up yellow 92 times and another colour 384; now 207 and 42, and the
+    survivors won 43 (41), in 10.1 rounds (11.9).
+  - With the gates powered a generator isn't repaired (it did happen, 24 times in those games),
+    and a gate further on pulls harder (10 a step of progress) and is worth more than its steps
+    (`GATE_WORTH`: 80, 190, 330), so they open one gate, not two halves. The same pull on a
+    generator's progress lost them games (34 won): the killer guards the one furthest on.
+  - The killer's reach (`FEAR`), for someone wounded 0, 1 or 2 of his moves away: 100, 70, 25
+    (was 50, 30, 12; a healthy survivor stays at 30, 16, 6). Within his reach, wounded, they are
+    picked up and hooked, but a repair (30) beat a pallet dropped between them: in a reported game
+    two wounded walked next to him to heal, repaired beside a pallet, and were both hooked that
+    round. 88 games (MacMillan and Autohaven): a wounded survivor a room from him with a pallet
+    or locker to hand repaired 66 times (117), dropped the pallet 99 (82), hid 34 (18); hooks
+    170 (192); the survivors won 54 (53). Fearing more lost games: wounded at 160, 110, 40 hid so
+    much (66) that they won 44; healthy ones fearing more too, 45–49.
+  - The last rescue (`LAST_RESCUE`): each round's cleanup adds a sacrifice progress for everyone on
+    a hook, so when that would fill the track the game ends with the round unless someone gets
+    them down. The pull to the hook is then 300 a room (22 otherwise). In a reported game, at 7 of
+    8, a survivor next door opened an exit gate at 0 and the killer won at the cleanup. 88 games:
+    31 such rounds, survived 11 → 16; at the hook they rescue (32 of 35). The others mostly fall to
+    the killer moving after them: the one got down is wounded and close, and hung again.
   - An item is used when trying it shows it helps, and an item in hand counts (what a chest is
     worth). A bonus turn is taken when a card leads somewhere better.
   - The killer's bonus turn (4 ▲): each card in hand is played out through the whole turn it gives
@@ -414,9 +442,25 @@ host seats them in the lobby, and the host's device plays them.
   - The killer's other choices are played on to the end of that card's turn too (`killerTurnOn`,
     its own choices tried once or twice and no deeper): a power that leads to a move or a pick
     was scored before it, as nothing. 88 games, how often a usable power was used: The Blight 0%
-    → 20%, The Dredge 14% → 31%, The Hillbilly 29% → 37%, The Huntress 54% → 65%. Powers whose
-    worth comes later (traps, Madness, Sickness, drones, guards) are still seldom used (2–9%):
-    the position scores nothing they leave on the board.
+    → 20%, The Dredge 14% → 31%, The Hillbilly 29% → 37%, The Huntress 54% → 65%.
+  - What a power leaves on the board, scored (`trapsLeft`, `MADNESS`): a bear trap or a Phantasm
+    Trap is worth 4, 5 more for each survivor in or next to its room (a path: its two rooms,
+    halved) and 4 more at work to be done; a survivor with Madness 14 (to both sides: a survivor
+    pays 1 ▲ to stop Carter's Spark). Trying a spark plays the survivors' answer as they mostly
+    give it (pay, with a ▲). 8 games each, before → after: The Trapper's power used 5% → 30%,
+    traps sprung 4 → 23 (12 wounds); The Hag's 6% → 32%, Phantasm Traps set 10 → 52, hooks 14 →
+    23; The Doctor's 8% → 30%, hooks 18 → 28. Over all killers (88 games) he still won 44.
+  - The same for a Vile Purge in a room (The Plague), the Assassin, and (with the work there
+    counted double: they act on skill checks) the Jailer and a face-up Drone; the Carnifex 4
+    wherever it is. A survivor carrying Vile Purges or Knives: 8 for one, 18 for two (the third
+    wounds: counted as a wound). 8 games each, before → after: The Plague's power used 10% → 52%,
+    Purges taken 24 → 106, 16 wounds (1), won 6 (3); The Trickster's 12% → 59%, Knives 52 → 132,
+    won 7 (4), in 9 rounds; The Knight's 16% → 37%, 23 wounds by Guards (7), won 5 (3); The Skull
+    Merchant's 5% → 8% (his passive does most). Over all killers (88 games) he won 47. The
+    Trickster may be too strong now (11 of 12 games won, in 8–9 rounds): his power, used, Knives
+    everyone in his room and next door.
+  - The Clown's Tonic: 5 for each survivor in its room (they plan face up, for him to read). His
+    power used 7% → 26%. Not scored: the Antidote (a move on for anyone, either side).
 - **Not yet:** perks (each offer is declined for the round), a key's re-roll.
 - **On one device** (`play/bots.ts`, driven from `GameScreen`): a bot moves once the screen has
   caught up with the move before it, after a short pause, so the people see each one. The side

@@ -9,10 +9,10 @@
 // every killer's power without code of its own. Perks are left alone for now; items are used when
 // trying one shows it helps.
 
-import { apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, survivorMoves, twoPlayer } from './engine'
+import { SACRIFICE_TO_WIN, apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, pathState, survivorMoves, twoPlayer } from './engine'
 import { legalActions } from './legal'
 import { KILLER_PLAYER, actorsOf, handsToPlan, mayAct } from './seats'
-import type { Action, GameState, MoveCard } from './types'
+import type { Action, GameState, MoveCard, PathState } from './types'
 
 // ---------- distances ----------
 
@@ -92,6 +92,11 @@ function tracks(st: GameState, known: Set<string>): number {
     else if (sv.status === 'carried') v += 60
     // wounded is one hit from the hook
     if (sv.wounded && sv.status !== 'hooked') v += 36
+    // The Doctor's Madness: their skill checks use the danger die, and his bonus turn costs less
+    if (sv.madness && sv.status !== 'hooked') v += MADNESS
+    // The Plague's Vile Purges and the Trickster's Knives, carried: each one nearer the third, which wounds
+    v += CARRIED[(sv.purged ?? []).length] ?? 0
+    v += CARRIED[sv.knives ?? 0] ?? CARRIED[3]
     v -= 2 * sv.bp
     // an item in hand is a repair, a heal or a way out to come: what a chest is worth
     if (sv.item) v -= 8
@@ -101,7 +106,8 @@ function tracks(st: GameState, known: Set<string>): number {
     if (!known.has(p.id) || p.removed) continue
     // once the gates have power, more generators are worth nothing
     if (p.kind === 'generator' && !p.done && !powered) v -= 30 * p.progress
-    if (p.kind === 'exitGate') v -= 90 * p.progress
+    // a gate is worth more the nearer it is to open: one gate opened beats two half done
+    if (p.kind === 'exitGate') v -= GATE_WORTH[p.progress] ?? GATE_WORTH[3]
   }
   if (powered) v -= 150
   return v + bpWorth(st.killer.bp)
@@ -112,6 +118,59 @@ function tracks(st: GameState, known: Set<string>): number {
  * he earns past it spills over unused (a bot spends them only on bonus turns and powers).
  */
 const bpWorth = (bp: number) => 3 * Math.min(bp, 8) + Math.max(0, bp - 8)
+
+/** An exit gate with 0–3 progress (was 90 a step: 1 and 1 on two gates scored as 2 on one). */
+const GATE_WORTH = [0, 80, 190, 330]
+
+/** A survivor with The Doctor's Madness. */
+const MADNESS = 14
+
+/**
+ * A survivor carrying 0–3 of The Plague's Vile Purges or the Trickster's Knives: the third wounds
+ * (counted as a wound), and three Knives also stop every heal.
+ */
+const CARRIED = [0, 8, 18, 18]
+
+/**
+ * What his power has left on the board, for the killer: a bear trap on a path (The Trapper), a
+ * Phantasm Trap in a room (The Hag), a Vile Purge in a room (The Plague), a Guard (The Knight), a
+ * Drone face up (The Skull Merchant). Each is worth more where the survivors are, or will come (a
+ * generator to repair): one far from everyone waits for nobody. The Jailer and a Drone act on the
+ * skill checks rolled in their room: the work there counts double.
+ */
+function trapsLeft(st: GameState, known: Set<string>): number {
+  const drones = st.killer.characterId === 'skullmerchant' ? st.props.filter((p) => p.kind === 'drone' && p.revealed && !p.removed && p.room) : []
+  const guards = st.guards ?? {}
+  const tonic = st.afterpiece?.tonic
+  if (st.killer.characterId !== 'trapper' && !st.phantasm.length && !st.purge?.length && !drones.length && !guards.assassin && !guards.jailer && !guards.carnifex && !tonic) return 0
+  const free = st.survivors.flatMap((sv) => (sv.status === 'board' ? [sv.room] : []))
+  const work = goals(st, known)
+  const at = (room: string, workWorth = TRAP.work) => TRAP.base + TRAP.near * free.filter((r) => dist(st, r, room) <= 1).length + (work.includes(room) ? workWorth : 0)
+  let v = 0
+  for (const room of st.purge ?? []) v += at(room)
+  for (const p of drones) v += at(p.room!, 2 * TRAP.work)
+  if (guards.assassin) v += at(guards.assassin)
+  if (guards.jailer) v += at(guards.jailer, 2 * TRAP.work)
+  // the Carnifex clears the pallets and lockers where it stands: worth having out
+  if (guards.carnifex) v += TRAP.base
+  // the Clown's Tonic: whoever plans in its room sets their card face up, for him to read
+  if (tonic) v += TRAP.near * free.filter((r) => r === tonic).length
+  if (st.killer.characterId === 'trapper') {
+    // forks share one icon: a trap on it counts once
+    const seen = new Set<PathState>()
+    for (const p of boardOf(st).paths) {
+      const ps = pathState(st, p.id)
+      if (!ps?.trap || seen.has(ps)) continue
+      seen.add(ps)
+      v += (at(p.a) + at(p.b)) / 2
+    }
+  }
+  for (const room of st.phantasm) v += at(room)
+  return v
+}
+
+/** A trap's worth: its own, each survivor in or next to it, and work there. */
+const TRAP = { base: 4, near: 5, work: 4 }
 
 /** Rooms of the generators still to repair (or, powered, the exit gates) that the bot knows of. */
 function goals(st: GameState, known: Set<string>): string[] {
@@ -142,7 +201,7 @@ function killerPlace(st: GameState, known: Set<string>): number {
     const top = Math.max(...gens.map((p) => p.progress))
     v -= 3 * top * nearest(st, k, gens.filter((p) => p.progress === top).map((p) => p.room!))
   }
-  return v
+  return v + trapsLeft(st, known)
 }
 
 /**
@@ -153,11 +212,43 @@ function killerPlace(st: GameState, known: Set<string>): number {
 const WORK_HERE = 24
 /** Each room between a survivor and the nearest work. */
 const WORK_PULL = 8
+/**
+ * Each step of progress already on an exit gate: the further along, the stronger the pull (finish
+ * one gate, not two halves). Not on a generator: the killer guards the one furthest on, and
+ * flocking to it cost the survivors games (88 games: 34 won, against 43 without).
+ */
+const WORK_STEP = { generator: 0, exitGate: 10 }
+
+/** The work the bot knows of (generators to repair, or with power the exit gates), each with what its progress adds. */
+function workSites(st: GameState, known: Set<string>): { room: string; worth: number }[] {
+  const powered = gatesPowered(st)
+  return st.props.flatMap((p) => {
+    if (!known.has(p.id) || p.removed || p.room === null) return []
+    if (powered ? p.kind !== 'exitGate' : p.kind !== 'generator' || p.done) return []
+    return [{ room: p.room, worth: WORK_STEP[p.kind as 'generator' | 'exitGate'] * p.progress }]
+  })
+}
+
+/**
+ * A survivor 0, 1 or 2 of the killer's moves away (he moves twice after them), wounded or not.
+ * Someone wounded within his reach is picked up and hooked: at 50/30/12 a repair (30) beat a pallet
+ * dropped between them, and two wounded walked next to him to heal and were both hooked that round.
+ */
+const FEAR = { wounded: [100, 70, 25], healthy: [30, 16, 6] }
+
+/**
+ * Each room between someone hooked and the nearest survivor free to get them down; much more when
+ * the hooks' progress at the end of this round would fill the track (it ends the game). At 22
+ * always, a survivor next door opened an exit gate at 0 instead, and the killer won at the cleanup.
+ */
+const RESCUE = 22
+const LAST_RESCUE = 300
 
 /** Where everyone stands, for the survivors: away from the killer, at the work, near who needs them. */
 function survivorPlace(st: GameState, known: Set<string>): number {
   const reach = threat(st)
   const work = goals(st, known)
+  const sites = workSites(st, known)
   // rooms with props still face down may hide the generators (or exit gates) not found yet: the
   // pull is stronger with nothing known to work on
   const unseen = [...new Set(st.props.flatMap((p) => (!known.has(p.id) && !p.removed && p.room ? [p.room] : [])))]
@@ -172,21 +263,29 @@ function survivorPlace(st: GameState, known: Set<string>): number {
     if (hidden) v -= 12
     // the killer moves twice after the survivors: two moves away is still within his reach
     const d = Math.round(reach.get(sv.room) ?? FAR)
-    v -= (sv.wounded ? [50, 30, 12][d] ?? 0 : [30, 16, 6][d] ?? 0) * (hidden ? 0.35 : 1)
-    if (work.length) {
-      const d = nearest(st, sv.room, work)
-      // at the work, the turn's interaction is a repair (or the gate): worth more than a room closer
-      v -= WORK_PULL * d
-      if (d === 0 && !hidden) v += WORK_HERE
+    v -= (sv.wounded ? FEAR.wounded[d] ?? 0 : FEAR.healthy[d] ?? 0) * (hidden ? 0.35 : 1)
+    if (sites.length) {
+      // the best work for them: at it, the turn's interaction is a repair (or the gate), worth more
+      // than a room closer; and work already well on pulls harder (finish one gate, not two halves)
+      let best = -Infinity
+      for (const w of sites) {
+        const d = dist(st, sv.room, w.room)
+        best = Math.max(best, w.worth - WORK_PULL * d + (d === 0 && !hidden ? WORK_HERE : 0))
+      }
+      v += best
     }
     if (unseen.length) v -= explore * nearest(st, sv.room, unseen)
     // a wounded survivor wants someone to heal them: the killer can't pick them up the round they
     // were hurt (p.15), so a teammate has a round to get there
     if (sv.wounded) v -= 16 * nearest(st, sv.room, free.filter((j) => j !== i).map((j) => st.survivors[j].room))
   })
-  // someone on a hook wants a rescuer: every round there is a sacrifice progress
+  // someone on a hook wants a rescuer: every round there is a sacrifice progress. When the round's
+  // progress would fill the track, the game ends with this round unless someone gets them down:
+  // nothing else matters then
+  const hooked = st.survivors.filter((sv) => sv.status === 'hooked').length
+  const rescue = st.sacrifice + hooked >= SACRIFICE_TO_WIN ? LAST_RESCUE : RESCUE
   for (const sv of st.survivors)
-    if (sv.status === 'hooked') v -= 22 * nearest(st, sv.room, free.map((j) => st.survivors[j].room))
+    if (sv.status === 'hooked') v -= rescue * nearest(st, sv.room, free.map((j) => st.survivors[j].room))
   // spread out: more than two in a room is one killer's visit for all of them
   const crowd = new Map<string, number>()
   for (const i of free) crowd.set(st.survivors[i].room, (crowd.get(st.survivors[i].room) ?? 0) + 1)
@@ -204,13 +303,16 @@ const knownProps = (st: GameState) => new Set(st.props.filter((p) => p.revealed)
 // ---------- trying a choice ----------
 
 /** The steps a tried choice is played on through by itself; the rest are someone's real decision. */
-const FORCED = new Set(['roll', 'revealProp', 'setupReveal', 'offer', 'turnStart', 'reaction', 'keepItem', 'pickItem', 'carryDice', 'carryMove'])
+const FORCED = new Set(['roll', 'revealProp', 'setupReveal', 'offer', 'turnStart', 'reaction', 'keepItem', 'pickItem', 'carryDice', 'carryMove', 'sparkChoice'])
 
 /** The plain answer to a forced step, while trying a choice (no thinking ahead of its own). */
 function forced(st: GameState): Action | null {
   const acts = legalActions(st)
   const s = st.step
   switch (s.t) {
+    // Carter's Spark (and Dragon's Grip, Whispers): a survivor with ▲ pays it off, as they mostly do
+    case 'sparkChoice':
+      return acts.find((a) => a.t === 'spark' && a.pay) ?? acts[0] ?? null
     case 'roll':
       return acts.find((a) => a.t === 'acceptRoll') ?? acts.find((a) => a.t === 'passRoll') ?? null
     case 'offer':
@@ -316,7 +418,8 @@ function usefulHere(st: GameState, s: number, acts: Action[]): Action | null {
     // a rescue: the hook with someone on it
     (a) => kind(a) === 'sabotage' && prop(a)?.occupant !== null && prop(a)?.occupant !== undefined,
     (a) => kind(a) === 'heal',
-    (a) => kind(a) === 'repair',
+    // (with the gates powered, more generators do nothing)
+    (a) => kind(a) === 'repair' && !gatesPowered(st),
     // a pallet toward the killer, while he is close
     (a) => near && a.t === 'interact' && a.i.k === 'dropPallet' && (reach.get(across(st, a.i.path, sv.room) ?? '') ?? FAR) < (reach.get(sv.room) ?? FAR),
     (a) => kind(a) === 'cleanse',
@@ -460,21 +563,30 @@ function teamPlan(st: GameState, hands: number[], salt: number): (MoveCard | nul
 
 /**
  * Every way the survivors of `hands` could share their cards, each scored for the team, with
- * where it leaves them (`at`) and how many it plans for (`n`). `drafts`: the cards already set
- * count (the survivors' own planning); the killer doesn't see them.
+ * where it leaves them (`at`) and how many it plans for (`n`). `drafts`: the survivors' own
+ * planning, where the cards already set count. Otherwise it is the killer's view: a card set face
+ * up (the Clown's Tonic, Stridor) is known, and one set face down is one of the cards its hand
+ * held (the ones left, and those set face down from it): as if still to choose.
  */
 function teamPlans(st: GameState, hands: number[], drafts: boolean): { v: number; x: (MoveCard | null)[]; at: GameState; n: number }[] {
   const known = knownProps(st)
-  const draft = drafts ? (st.planDraft ?? []) : []
-  // the cards already set (online, a hand at a time): those survivors counted where theirs take them
+  const set: (MoveCard | null)[] = drafts ? (st.planDraft ?? []) : st.survivors.map((sv) => (sv.planned !== null && sv.plannedRevealed && sv.status !== 'hooked' ? sv.planned : null))
+  // the cards known to be set (online drafts, a hand at a time; to the killer, those face up):
+  // those survivors counted where theirs take them
   let base = st
-  draft.forEach((c, i) => {
+  set.forEach((c, i) => {
     if (!c) return
     const dests = survivorDests(st, i, c)
     if (dests.length) base = withSurvivorAt(base, i, dests.reduce((a, b) => (survivorPlace(withSurvivorAt(st, i, b), known) > survivorPlace(withSurvivorAt(st, i, a), known) ? b : a)))
   })
-  const who = st.survivors.flatMap((sv, i) => (hands.includes(sv.hand) && sv.status !== 'hooked' && sv.planned === null && !draft[i] ? [i] : []))
-  const pools = new Map<number, MoveCard[]>(hands.map((h) => [h, st.survivorHands[h].filter((c) => c !== 'wait')]))
+  const facedown = (i: number) => !drafts && st.survivors[i].planned !== null && !st.survivors[i].plannedRevealed
+  const who = st.survivors.flatMap((sv, i) => (hands.includes(sv.hand) && sv.status !== 'hooked' && (sv.planned === null || facedown(i)) && !set[i] ? [i] : []))
+  const pools = new Map<number, MoveCard[]>(
+    hands.map((h) => [
+      h,
+      [...st.survivorHands[h], ...st.survivors.flatMap((sv, i) => (sv.hand === h && facedown(i) ? [sv.planned!] : []))].filter((c) => c !== 'wait'),
+    ]),
+  )
   const opts = new Map(who.map((s) => [s, planOptions(st, s, pools.get(st.survivors[s].hand) ?? [], known)]))
   const plans: { v: number; x: (MoveCard | null)[]; at: GameState; n: number }[] = []
   const chosen: PlanOption[] = []
@@ -618,8 +730,12 @@ export function botMove(st: GameState, player: number): Action | null {
   if (step.t === 'planStridor') return { t: 'planStridor', card: survivorPick(st, step.s, st.survivorHands[st.survivors[step.s].hand]) }
 
   // Perks are left alone, and a key's re-roll. A perk offered is declined for the round. An item
-  // is used when trying it shows it helps (a toolbox's repair, a medkit's heal).
-  const acts = legalActions(st).filter((a) => mayAct(st, player, a) && a.t !== 'reroll' && !(a.t === 'perk' && a.use))
+  // is used when trying it shows it helps (a toolbox's repair, a medkit's heal). With the gates
+  // powered, a generator isn't repaired: it does nothing.
+  const powered = gatesPowered(st)
+  const acts = legalActions(st).filter(
+    (a) => mayAct(st, player, a) && a.t !== 'reroll' && !(a.t === 'perk' && a.use) && !(powered && a.t === 'interact' && a.i.k === 'repair'),
+  )
   if (!acts.length) return legalActions(st).find((a) => mayAct(st, player, a)) ?? null
   if (step.t === 'offer') return acts.find((a) => a.t === 'perk' && a.quiet) ?? acts[0]
   // a roll another survivor could change: this one lets it be
@@ -716,10 +832,14 @@ const REVEAL_ORDER = {
 const REVEAL_IN_DANGER = ['altruism', 'survival', 'objective', 'boldness'] as const
 
 function revealPick(st: GameState, acts: Action[], killer: boolean): Action {
-  // with the killer two moves away, a survivor looks for what saves them first: altruism (a pallet
-  // to drop in his way, a crow's bonus turn to get away), then survival (a locker, a chest's medkit)
-  const room = st.step.t === 'revealProp' ? st.step.room : null
-  const danger = !killer && room !== null && (threat(st).get(room) ?? FAR) <= 2
+  // with the killer a move away (two, for someone wounded), a survivor looks for what saves them
+  // first: altruism (a pallet to drop in his way, a crow's bonus turn to get away), then survival (a
+  // locker, a chest's medkit). Two moves away was danger for everyone: nearly always so, and the
+  // generators stayed face down while the bots turned up crows.
+  const step = st.step
+  const room = step.t === 'revealProp' ? step.room : null
+  const who = step.t === 'revealProp' && typeof step.who === 'number' ? st.survivors[step.who] : null
+  const danger = !killer && room !== null && (threat(st).get(room) ?? FAR) <= (who?.wounded ? 2 : 1)
   const order: readonly string[] = danger ? REVEAL_IN_DANGER : REVEAL_ORDER[killer ? 'killer' : 'survivor']
   const rank = (a: Action) => {
     const id = a.t === 'reveal' || a.t === 'setupReveal' ? a.prop : null

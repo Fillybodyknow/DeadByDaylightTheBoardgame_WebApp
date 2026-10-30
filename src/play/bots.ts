@@ -88,6 +88,9 @@ export function onlineBotMove(st: GameState, standIns: number[] = []): { player:
   if ((!st.bots?.length && !standIns.length) || st.phase === 'over') return null
   for (const p of actorsOf(st)) {
     if (!isBot(st, p) && !standIns.includes(p)) continue
+    // a bot killer plans once the survivors' cards are in, as on one device: a card set face up
+    // (the Clown's Tonic) is his to read then
+    if (p === KILLER_PLAYER && st.step.t === 'planSurvivors' && !twoPlayer(st) && handsToPlan(st).length) continue
     const action = botMove(st, p)
     if (action) return { player: p, action }
   }
