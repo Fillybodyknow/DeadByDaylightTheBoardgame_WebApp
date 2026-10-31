@@ -325,6 +325,10 @@ game, reset the tutorial, reset settings). Settings live in `src/settings.ts` (`
 ## Git and deploy
 
 - Commit and push only when the user asks. Don't commit `dist/` or `dist-play/` (build output).
+- Two branches: **`dev`** for the work, **`main`** for production. Work happens on `dev`; nothing
+  on `dev` deploys (it is tried locally, `npm run dev`). A release is `dev` merged into `main`
+  (fast-forward when it can be) and both pushed. Hotfixes too go through `dev`, so the two never
+  part ways.
 - Every push to `main` deploys to GitHub Pages (`.github/workflows/deploy.yml`), and the repo is
   public. Card art and sound clips are copyrighted material: say so before publishing new assets.
 - If git has no identity on this machine, commit as the repo's existing author for that commit

@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.24.1',
+    date: '2026-10-31',
+    items: [
+      'ผู้ชม: สรุปรอบที่ปิดเองไม่กลับไปนับเวลาใหม่เมื่อมี Action แทรก — นับต่อจากที่อ่านไปแล้ว',
+    ],
+  },
+  {
     version: '1.24.0',
     date: '2026-10-31',
     items: [

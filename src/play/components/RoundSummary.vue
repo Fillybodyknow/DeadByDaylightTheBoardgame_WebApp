@@ -7,17 +7,21 @@ import type { GameState } from '../engine/types'
 import { roundSummary } from '../stats'
 import BpText from '../../components/BpText.vue'
 
-const props = defineProps<{ st: GameState; round: number; auto?: number }>()
-const emit = defineEmits<{ close: [] }>()
+const props = defineProps<{ st: GameState; round: number; auto?: number; read?: number }>()
+const emit = defineEmits<{ close: []; read: [ms: number] }>()
 
 /** What is left of the time to read it (1 → 0), while closing by itself. */
 const left = ref(1)
 let timer: number | null = null
 if (props.auto) {
-  const start = Date.now()
+  // shown again after stepping aside for an animation: the time already read stays read
+  const start = Date.now() - (props.read ?? 0)
+  left.value = Math.max(0, 1 - (props.read ?? 0) / props.auto)
   // a timer, not a CSS animation: reading time isn't scaled with the animation speed setting
   timer = window.setInterval(() => {
-    left.value = Math.max(0, 1 - (Date.now() - start) / props.auto!)
+    const read = Date.now() - start
+    emit('read', read)
+    left.value = Math.max(0, 1 - read / props.auto!)
     if (left.value === 0) emit('close')
   }, 100)
 }

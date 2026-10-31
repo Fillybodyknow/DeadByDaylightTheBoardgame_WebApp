@@ -634,6 +634,11 @@ const onlyWatching = computed(() => {
 })
 /** How long a watcher has to read the summary (reading time: not scaled with the animations). */
 const SUMMARY_READ_MS = 5000
+/**
+ * How much of it has been read: the summary steps aside while a move arriving plays its animation,
+ * and comes back with the time it had left (it started over each time, and never closed).
+ */
+const summaryRead = ref(0)
 
 watch(
   () => view.value.log.length,
@@ -646,7 +651,7 @@ watch(
         flash('gold')
         showBanner({ title: 'Exit Gate มีไฟแล้ว!', sub: 'ซ่อม Generator ครบ 4 เครื่อง — ไปเปิดประตู', tone: 'game' })
       }
-      if (ev?.k === 'round' && ev.round > 1) summaryRound.value = ev.round - 1
+      if (ev?.k === 'round' && ev.round > 1) (summaryRound.value = ev.round - 1), (summaryRead.value = 0)
     }
   },
 )
@@ -1314,7 +1319,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     <PerkPrompt :st="view" :hidden="secret || !!over || !viewTurn" :on-board="onBoard" />
     <DiceModal />
     <!-- (and not before a rise waiting for the board: the round's summary comes after its reveal) -->
-    <RoundSummary v-if="summaryRound !== null && !over && !holdPanel && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" :auto="onlyWatching ? SUMMARY_READ_MS : 0" @close="summaryRound = null" />
+    <RoundSummary v-if="summaryRound !== null && !over && !holdPanel && !fx.boardBusy && !fx.dice.length && !fx.perks.length" :st="view" :round="summaryRound" :auto="onlyWatching ? SUMMARY_READ_MS : 0" :read="summaryRead" @read="summaryRead = $event" @close="summaryRound = null" />
     <DetailModal v-if="inspecting" :st="view" :target="inspecting" @close="inspecting = null" />
     <!-- (not before the game's last beat: a finale waiting for the board holds it back too) -->
     <EndSummary v-if="over && showOver && !holdPanel && !fx.finale" :st="view" :winner="over" :online="!!online" @close="showOver = false" @again="playAgain" />
