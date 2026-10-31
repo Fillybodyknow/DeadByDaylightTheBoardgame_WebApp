@@ -9,7 +9,7 @@
 // every killer's power without code of its own. Perks are left alone for now; items are used when
 // trying one shows it helps.
 
-import { SACRIFICE_TO_WIN, apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, pathState, survivorMoves, twoPlayer } from './engine'
+import { SACRIFICE_TO_WIN, apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, pathState, survivorMoves, twoPlayer, unknownRooms } from './engine'
 import { legalActions } from './legal'
 import { KILLER_PLAYER, actorsOf, handsToPlan, mayAct } from './seats'
 import type { Action, GameState, MoveCard, PathState } from './types'
@@ -18,7 +18,11 @@ import type { Action, GameState, MoveCard, PathState } from './types'
 
 const distCache = new Map<string, Map<string, Map<string, number>>>()
 
-/** Rooms apart on the board, by any path either way (walls and one-way paths aside). */
+/**
+ * Moves from one room to another (`all.get(from).get(to)`), walls aside: a vault path only along
+ * its arrow. Taken both ways, a pallet on a vault path looked like it stopped a killer coming
+ * against the arrow, who can't come that way at all.
+ */
 function distances(st: GameState): Map<string, Map<string, number>> {
   const board = boardOf(st)
   const hit = distCache.get(board.id)
@@ -27,7 +31,7 @@ function distances(st: GameState): Map<string, Map<string, number>> {
   for (const r of board.rooms) next.set(r.id, [])
   for (const p of board.paths) {
     next.get(p.a)?.push(p.b)
-    next.get(p.b)?.push(p.a)
+    if (p.kind !== 'vault') next.get(p.b)?.push(p.a)
   }
   const all = new Map<string, Map<string, number>>()
   for (const r of board.rooms) {
@@ -52,20 +56,43 @@ function nearest(st: GameState, from: string, rooms: string[]): number {
   return best
 }
 
+/** The nearest of `rooms` the other way: how soon someone there can come to `to`. */
+function nearestTo(st: GameState, rooms: string[], to: string): number {
+  let best = FAR
+  for (const r of rooms) best = Math.min(best, dist(st, r, to))
+  return best
+}
+
+/** Rooms with a killer mini in them: his own, and Victor's or the other Unknowns'. */
+function killerRooms(st: GameState): string[] {
+  const k = st.killer
+  if (k.unknowns) return [...new Set(unknownRooms(st).filter((r): r is string => r !== null))]
+  return k.victorRoom && k.victorRoom !== k.room ? [k.room, k.victorRoom] : [k.room]
+}
+
+/**
+ * What an Unknown more on the board is worth to him, beyond where it stands: a card of its own
+ * every round. (Victor is worth only where he stands: a worth of his own had the Twins place him
+ * instead of attacking, and lose more: 32 games, 15 won at 0, 12 at 20, 11 at 40.)
+ */
+const UNKNOWN_WORTH = 40
+
 /**
  * How far the killer is from each room, in his moves: a pallet on a path costs him one more (he
  * removes it and stays, p.14), so a pallet between him and a survivor buys them a move.
  */
 function threat(st: GameState): Map<string, number> {
   const board = boardOf(st)
-  const d = new Map<string, number>([[st.killer.room, 0]])
+  // from each of his minis (Victor, the Unknowns)
+  const d = new Map<string, number>(killerRooms(st).map((r) => [r, 0]))
   const pallet = new Set(st.props.flatMap((p) => (p.kind === 'pallet' && p.path && !p.removed ? [p.path] : [])))
   // a few rooms: settle the shortest distances by relaxing the paths until nothing changes
   for (let changed = true, round = 0; changed && round < board.rooms.length; round++) {
     changed = false
     for (const p of board.paths) {
       const cost = pallet.has(p.id) || pallet.has(p.token ?? '') ? 2 : 1
-      for (const [a, b] of [
+      // a vault path only along its arrow
+      for (const [a, b] of p.kind === 'vault' ? [[p.a, p.b]] : [
         [p.a, p.b],
         [p.b, p.a],
       ]) {
@@ -188,19 +215,29 @@ function goals(st: GameState, known: Set<string>): string[] {
  */
 function killerPlace(st: GameState, known: Set<string>): number {
   const k = st.killer.room
+  // every mini of his counts where he stands (Victor, each Unknown): the nearest one to a survivor
+  const minis = killerRooms(st)
+  const near = (rooms: string[]) => Math.min(...minis.map((m) => nearest(st, m, rooms)))
   const free = st.survivors.filter((sv) => sv.status === 'board')
   let v = 0
   if (free.length) {
-    v -= 10 * nearest(st, k, free.map((sv) => sv.room))
+    v -= 10 * near(free.map((sv) => sv.room))
     const hurt = free.filter((sv) => sv.wounded)
-    if (hurt.length) v -= 6 * nearest(st, k, hurt.map((sv) => sv.room))
-    for (const sv of free) if (sv.room === k) v += 8
+    if (hurt.length) v -= 6 * near(hurt.map((sv) => sv.room))
+    for (const sv of free) if (minis.includes(sv.room)) v += 8
   }
   const gens = st.props.filter((p) => p.kind === 'generator' && known.has(p.id) && !p.done && !p.removed && p.progress > 0 && p.room)
   if (gens.length) {
     const top = Math.max(...gens.map((p) => p.progress))
-    v -= 3 * top * nearest(st, k, gens.filter((p) => p.progress === top).map((p) => p.room!))
+    v -= 3 * top * near(gens.filter((p) => p.progress === top).map((p) => p.room!))
   }
+  // an Unknown more on the board: a card and a turn more every round
+  if (st.killer.unknowns) v += UNKNOWN_WORTH * (minis.length - 1)
+  // mid-round, a room his next card can't leave costs that card's turn: he moves elsewhere (The
+  // Unknown: the next card is played from the next Unknown's room)
+  const next = st.phase === 'killer' ? st.killer.planned[st.killer.revealedCount] : undefined
+  const from = st.killer.unknowns ? unknownRooms(st)[st.killer.revealedCount] : k
+  if (next && from && killerDests(st, from, next).failed) v -= FAILED_MOVE
   return v + trapsLeft(st, known)
 }
 
@@ -277,7 +314,7 @@ function survivorPlace(st: GameState, known: Set<string>): number {
     if (unseen.length) v -= explore * nearest(st, sv.room, unseen)
     // a wounded survivor wants someone to heal them: the killer can't pick them up the round they
     // were hurt (p.15), so a teammate has a round to get there
-    if (sv.wounded) v -= 16 * nearest(st, sv.room, free.filter((j) => j !== i).map((j) => st.survivors[j].room))
+    if (sv.wounded) v -= 16 * nearestTo(st, free.filter((j) => j !== i).map((j) => st.survivors[j].room), sv.room)
   })
   // someone on a hook wants a rescuer: every round there is a sacrifice progress. When the round's
   // progress would fill the track, the game ends with this round unless someone gets them down:
@@ -285,7 +322,7 @@ function survivorPlace(st: GameState, known: Set<string>): number {
   const hooked = st.survivors.filter((sv) => sv.status === 'hooked').length
   const rescue = st.sacrifice + hooked >= SACRIFICE_TO_WIN ? LAST_RESCUE : RESCUE
   for (const sv of st.survivors)
-    if (sv.status === 'hooked') v -= rescue * nearest(st, sv.room, free.map((j) => st.survivors[j].room))
+    if (sv.status === 'hooked') v -= rescue * nearestTo(st, free.map((j) => st.survivors[j].room), sv.room)
   // spread out: more than two in a room is one killer's visit for all of them
   const crowd = new Map<string, number>()
   for (const i of free) crowd.set(st.survivors[i].room, (crowd.get(st.survivors[i].room) ?? 0) + 1)
@@ -392,6 +429,12 @@ function across(st: GameState, path: string, room: string): string | null {
   return p ? (p.a === room ? p.b : p.a) : null
 }
 
+/** Whether someone across `path` can come along it into `room` (a vault path only along its arrow). */
+function comesAlong(st: GameState, path: string, room: string): boolean {
+  const p = boardOf(st).paths.find((x) => x.id === path)
+  return !!p && (p.kind !== 'vault' || p.b === room)
+}
+
 /**
  * A survivor's turn played plainly, while a choice is tried (no thinking ahead of its own): the
  * best room to move to, a bonus turn when a card leads to work, then the most useful thing there.
@@ -431,8 +474,9 @@ function usefulHere(st: GameState, s: number, acts: Action[]): Action | null {
     (a) => kind(a) === 'heal',
     // (with the gates powered, more generators do nothing)
     (a) => kind(a) === 'repair' && !gatesPowered(st),
-    // a pallet toward the killer, while he is close
-    (a) => near && a.t === 'interact' && a.i.k === 'dropPallet' && (reach.get(across(st, a.i.path, sv.room) ?? '') ?? FAR) < (reach.get(sv.room) ?? FAR),
+    // a pallet toward the killer, while he is close, on a path he could come along (not a vault
+    // path pointing away from here)
+    (a) => near && a.t === 'interact' && a.i.k === 'dropPallet' && comesAlong(st, a.i.path, sv.room) && (reach.get(across(st, a.i.path, sv.room) ?? '') ?? FAR) < (reach.get(sv.room) ?? FAR),
     (a) => kind(a) === 'cleanse',
     (a) => kind(a) === 'rummage' && !sv.item,
     (a) => (reach.get(sv.room) ?? FAR) <= 1 && kind(a) === 'hide',
@@ -470,6 +514,9 @@ function tried(st: GameState, acts: Action[], killer: boolean): { a: Action; v: 
   // the killer's choice is played on to the end of that turn of his (a power that leads to a move
   // or a pick is worth what comes of it), with fewer tries inside, and no deeper
   const turn = killer && !playingOn && 'turn' in step ? step.turn : null
+  // Slipstream trades the turns still set for a bonus turn with any card: only the rest of his
+  // round, both ways, shows which is better (to the end of this turn it looked free)
+  const round = turn !== null && acts.some((a) => a.t === 'interact' && a.i.k === 'slipstream')
   return acts.map((a, i) => {
     const samples: { v: number; step: string }[] = []
     // an interaction mostly rolls dice (a move may lead to one): enough tries that a run of bad
@@ -477,7 +524,7 @@ function tried(st: GameState, acts: Action[], killer: boolean): { a: Action; v: 
     const n = playingOn ? (a.t === 'interact' ? 2 : 1) : a.t === 'interact' || (own !== null && a.t === 'move') ? 6 : 2
     for (let k = 0; k < n; k++) {
       let s = tryOut(st, a, k, own, known)
-      if (s && turn !== null) s = killerTurnOn(s, turn)
+      if (s && turn !== null) s = killerTurnOn(s, round ? undefined : turn)
       if (s) samples.push({ v: score(s, killer, known), step: s.step.t })
     }
     // a tiny nudge so equal choices aren't always the first one
@@ -704,13 +751,18 @@ function planKiller(st: GameState): MoveCard[] {
   }
   const walk = (room: string, cards: MoveCard[]): number => {
     if (!cards.length) return 0
+    // a card with nowhere to go is a Wait without the turn's interaction: at 6 the bots still
+    // planned them, a room they liked to stay in outweighing it
     const { to, failed } = killerDests(st, room, cards[0])
-    return Math.max(...to.map((r) => at(r) - (failed ? 6 : 0) + 0.8 * walk(r, cards.slice(1))))
+    return Math.max(...to.map((r) => at(r) - (failed ? FAILED_MOVE : 0) + 0.8 * walk(r, cards.slice(1))))
   }
+  // The Unknown: each card is played by its own Unknown, from where that one stands
+  const unknowns = st.killer.unknowns ? unknownRooms(st) : null
+  const each = (cards: MoveCard[]) => cards.reduce((t, c, i) => t + walk(unknowns![i] ?? st.killer.room, [c]), 0)
   let best = plans[0]
   let bestV = -Infinity
   plans.forEach((cards, i) => {
-    const v = walk(st.killer.room, cards) + ((st.rng >>> (i % 24)) & 7) * 0.01
+    const v = (unknowns ? each(cards) : walk(st.killer.room, cards)) + ((st.rng >>> (i % 24)) & 7) * 0.01
     if (v > bestV) (bestV = v), (best = cards)
   })
   return best
@@ -807,12 +859,25 @@ function killerTurnOn(s: GameState, turn?: number): GameState | null {
   const was = playingOn
   playingOn = true
   try {
-    for (let i = 0; i < 30 && s.phase !== 'over'; i++) {
+    for (let i = 0; i < (turn === undefined ? 90 : 30) && s.phase !== 'over'; i++) {
       const step = s.step
       if (FORCED.has(step.t)) {
         const f = forced(s)
         if (!f) break
         s = apply(s, f)
+        continue
+      }
+      // Slipstream's bonus turn is his to take: the card to the best room he knows of (each card
+      // played out in full here took a decision up to 1.5 s), played on as well
+      if (step.t === 'killerBonusOffer' && step.free && turn === undefined) {
+        const known = knownProps(s)
+        const room = (card: MoveCard) => {
+          const { to, failed } = killerDests(s, s.killer.room, card)
+          return Math.max(...to.map((r) => killerPlace({ ...s, killer: { ...s.killer, room: r } }, known))) - (failed ? FAILED_MOVE : 0)
+        }
+        const cards = legalActions(s).flatMap((a) => (a.t === 'bonus' ? [a] : []))
+        if (!cards.length) break
+        s = apply(s, cards.reduce((b, a) => (room(a.card) > room(b.card) ? a : b)))
         continue
       }
       // his turn is over: the next card's turn, the next round's planning, or someone else's move

@@ -402,7 +402,23 @@ host seats them in the lobby, and the host's device plays them.
   - A survivor's choice is played on through the rest of their own turn, plainly (`plainTurn`):
     a move is worth what can be done where it leads, a crow the bonus turn it gives.
   - The killer's threat counts his moves: a pallet on the way costs him one more, so a pallet
-    between him and a survivor is worth dropping.
+    between him and a survivor is worth dropping. Every distance the bots use takes a vault path
+    only along its arrow: counted both ways, they dropped pallets on a vault path the killer was
+    against, which he can't come along anyway (2 in 44 games, none after).
+  - A card the killer plans with nowhere to go costs what a survivor's failed card does (25): it is
+    a Wait without the interaction. At 6, a room he liked to stay in outweighed it. Mid-round, a
+    room his next card can't leave costs the same. 44 games: 24 failed cards in 426, 15 after; the
+    rest come from being moved mid-turn (a Firecracker, carrying someone to a hook, a power).
+  - Every killer mini counts where it stands (`killerRooms`): Victor, each Unknown. The killer's
+    place is scored from the nearest one, the survivors' fear from all of them. An Unknown more on
+    the board is worth 40 (a card and a turn more every round), and The Unknown plans each card from
+    its own Unknown's room. 32 games: Hallucination used 31 times (96 after), won 0 (8). Victor is
+    worth only where he stands: a worth of his own had the Twins place him instead of attacking
+    and lose more (15 won at 0, 12 at 20, 11 at 40; 14 before).
+  - Slipstream trades the turns still set for a bonus turn: tried only to the end of the turn it
+    looked free, and wasn't (61 uses in 32 games). With it among the choices, every choice is
+    played on to the end of his round, Slipstream's bonus card picked by the best room it reaches
+    (each card played out took a decision up to 1.5 s; this way 0.8 s). 32 games: 252 uses, won 5 (4).
   - A locker is safe but gets nothing done: the work still waits, scored from the locker's room.
   - A prop to reveal is picked by its colour in the rulebook's order: survivors objective,
     survival, altruism, boldness (the generators first); the killer boldness first. With the
@@ -460,7 +476,12 @@ host seats them in the lobby, and the host's device plays them.
     Trickster may be too strong now (11 of 12 games won, in 8–9 rounds): his power, used, Knives
     everyone in his room and next door.
   - The Clown's Tonic: 5 for each survivor in its room (they plan face up, for him to read). His
-    power used 7% → 26%. Not scored: the Antidote (a move on for anyone, either side).
+    power used 7% → 26%. Not scored: the Antidote (a move on for anyone, either side). Tried
+    (worth to him near his way, less for each survivor by it): he set it up to 80 times in 32 games
+    instead of 5, but the survivors moved on with it as often as he did, and he won no more (64
+    games: 18 without, 17 at the best weights; 4 when it took the Tonic's place).
+  - The Blight needs nothing of his own: with the vault paths one-way and cards that go nowhere
+    avoided (above), Blighted Corruption used 149 → 176 times in 32 games, won 5 → 13.
   - The Redeemer: the survivor's guess is blind (`blindGuess`, one of the five by a draw of the
     bot's own), and trying the power plays that guess out. Before, the guess was each card tried on
     the real game, which read the face-down card: right 5 times in 5, and he hardly used it (5 of
