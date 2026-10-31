@@ -123,7 +123,7 @@ function tracks(st: GameState, known: Set<string>): number {
     if (sv.madness && sv.status !== 'hooked') v += MADNESS
     // The Plague's Vile Purges and the Trickster's Knives, carried: each one nearer the third, which wounds
     v += CARRIED[(sv.purged ?? []).length] ?? 0
-    v += CARRIED[sv.knives ?? 0] ?? CARRIED[3]
+    v += KNIVES[sv.knives ?? 0] ?? KNIVES[3]
     v -= 2 * sv.bp
     // an item in hand is a repair, a heal or a way out to come: what a chest is worth
     if (sv.item) v -= 8
@@ -157,6 +157,12 @@ const MADNESS = 14
  * (counted as a wound), and three Knives also stop every heal.
  */
 const CARRIED = [0, 8, 18, 18]
+/**
+ * The Trickster's Knives: the third wounds (counted as a wound) and no heal comes while they stay;
+ * each one after is a sacrifice progress. At 18 for three, the survivors kept them: 141 fourth
+ * Knives in 32 games, and they won 4.
+ */
+const KNIVES = [0, 8, 18, 60]
 
 /**
  * What his power has left on the board, for the killer: a bear trap on a path (The Trapper), a
@@ -281,6 +287,44 @@ const FEAR = { wounded: [100, 70, 25], healthy: [30, 16, 6] }
 const RESCUE = 22
 const LAST_RESCUE = 300
 
+/**
+ * What The Trickster's Showstopper and The Plague's Vile Purges may cost a survivor where they
+ * stand: the next Knife from his power this round (it reaches his room and every room next to it,
+ * after he moves), the Purge waiting in their room (taken on entering it); and with two of either a
+ * locker to go to, which sheds them.
+ */
+function marked(st: GameState, s: number, reach: Map<string, number>): number {
+  const sv = st.survivors[s]
+  const k = st.killer
+  // the next one: the third wounds (already wounded, no heal any more), the fourth hooks a progress
+  const next = (n: number) => (n >= 3 ? SACRIFICE_COST : n === 2 ? (sv.wounded ? KNIVES[3] : 36 + KNIVES[3]) : MARK_STEP)
+  let v = 0
+  if (k.characterId === 'trickster' && !k.powerUsed) {
+    // he moves (up to twice), then his power reaches the rooms next to where he stands
+    const d = reach.get(sv.room) ?? FAR
+    v += next(sv.knives ?? 0) * (SHOWSTOPPER_ODDS[Math.round(d)] ?? 0)
+  }
+  if ((st.purge ?? []).includes(sv.room)) {
+    const n = (sv.purged ?? []).length
+    v += n >= 2 ? (sv.wounded ? SACRIFICE_COST : 36) : MARK_STEP
+  }
+  // two Knives or Purges: a locker sheds them (Knives all, a Purge one)
+  if ((sv.knives ?? 0) >= 2 || (sv.purged ?? []).length >= 2) {
+    const lockers = st.props.filter((p) => p.kind === 'locker' && p.revealed && !p.removed && p.occupant === null && p.room).map((p) => p.room!)
+    if (lockers.length) v += LOCKER_PULL * nearest(st, sv.room, lockers)
+  }
+  return v
+}
+
+/** Each Knife or Purge before the one that wounds. */
+const MARK_STEP = 10
+/** A sacrifice progress, as the tracks count it. */
+const SACRIFICE_COST = 140
+/** How likely the Showstopper reaches someone this many of his moves away (it hits next door to him). */
+const SHOWSTOPPER_ODDS = [1, 1, 0.8, 0.4]
+/** Each room to the nearest free locker, carrying two Knives or Purges. */
+const LOCKER_PULL = 8
+
 /** Where everyone stands, for the survivors: away from the killer, at the work, near who needs them. */
 function survivorPlace(st: GameState, known: Set<string>): number {
   const reach = threat(st)
@@ -315,6 +359,7 @@ function survivorPlace(st: GameState, known: Set<string>): number {
     // a wounded survivor wants someone to heal them: the killer can't pick them up the round they
     // were hurt (p.15), so a teammate has a round to get there
     if (sv.wounded) v -= 16 * nearestTo(st, free.filter((j) => j !== i).map((j) => st.survivors[j].room), sv.room)
+    if (!hidden) v -= marked(st, i, reach)
   })
   // someone on a hook wants a rescuer: every round there is a sacrifice progress. When the round's
   // progress would fill the track, the game ends with this round unless someone gets them down:
@@ -477,6 +522,8 @@ function usefulHere(st: GameState, s: number, acts: Action[]): Action | null {
     // a pallet toward the killer, while he is close, on a path he could come along (not a vault
     // path pointing away from here)
     (a) => near && a.t === 'interact' && a.i.k === 'dropPallet' && comesAlong(st, a.i.path, sv.room) && (reach.get(across(st, a.i.path, sv.room) ?? '') ?? FAR) < (reach.get(sv.room) ?? FAR),
+    // two Knives or Purges: a locker sheds them before the third
+    (a) => kind(a) === 'hide' && ((sv.knives ?? 0) >= 2 || (sv.purged ?? []).length >= 2),
     (a) => kind(a) === 'cleanse',
     (a) => kind(a) === 'rummage' && !sv.item,
     (a) => (reach.get(sv.room) ?? FAR) <= 1 && kind(a) === 'hide',

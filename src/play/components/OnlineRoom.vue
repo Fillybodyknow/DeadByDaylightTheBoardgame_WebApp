@@ -19,6 +19,7 @@ import {
   botSeat,
   mayStart,
   removeBot,
+  setBotPick,
   confirmPerks,
   lockBans,
   myBans,
@@ -73,6 +74,7 @@ import SyncBadge from './SyncBadge.vue'
 import VoiceButton from './VoiceButton.vue'
 import LfgPostDialog from './LfgPostDialog.vue'
 import { lobbyLacks } from '../online/lfg'
+import { playableKillers } from '../online/settings'
 import { openProfile } from '../../profile'
 import { voice } from '../voice'
 
@@ -226,6 +228,12 @@ function takeSlot(s: 'killer' | 'survivor', slot?: number) {
 function seatBot(s: 'killer' | 'survivor') {
   sfx.click()
   void addBot(s)
+}
+/** The killers a bot can play, for the host's pick on its seat. */
+const botKillers = playableKillers()
+function pickBotKiller(id: string, pick: string) {
+  sfx.click()
+  void setBotPick(id, pick || null)
 }
 function dropBot(id: string) {
   sfx.click()
@@ -470,6 +478,19 @@ const seatStatus = computed(() =>
               <button v-if="killerMember.id === session.me" type="button" class="seat-name mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ killerMember.name }} <i>✎</i></button>
               <span v-else class="seat-name">{{ killerMember.name }}</span>
               <span class="seat-sub"><i v-if="!killerMember.bot" class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />{{ killerMember.bot ? '🤖 บอท' : killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}<i v-if="voice.roster[killerMember.id]" class="vc-ico" :title="voiceTitle(killerMember.id)">{{ voice.roster[killerMember.id].m ? '🔇' : '🎙️' }}</i></span>
+              <!-- the host picks the bot killer's character, or leaves it to the draw (only the host sees it) -->
+              <select
+                v-if="killerMember.bot && isHost"
+                class="bot-pick"
+                :value="killerMember.pick ?? ''"
+                :disabled="session.busy"
+                title="ตัวละครของบอท Killer"
+                @click.stop
+                @change="pickBotKiller(killerMember.id, ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="">🎲 สุ่ม Killer</option>
+                <option v-for="k in botKillers" :key="k.id" :value="k.id">{{ k.name }}</option>
+              </select>
               <span v-if="talking(killerMember.id)" class="talk-pill">🔊 กำลังพูด</span>
               <span v-if="leavable(killerMember.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
               <button v-if="canKick(killerMember.id) && killerMember.bot" type="button" class="kick" title="เอาบอทออก" @click.stop="dropBot(killerMember.id)">✕ เอาออก</button>
@@ -533,7 +554,7 @@ const seatStatus = computed(() =>
           <span class="muted">🤖 เพิ่มบอท</span>
           <button type="button" class="bot-btn" :disabled="session.busy || !!killerMember" @click="seatBot('killer')">+ Killer</button>
           <button type="button" class="bot-btn" :disabled="session.busy || survivorCount >= 4" @click="seatBot('survivor')">+ Survivor</button>
-          <small class="muted">บอทพร้อมเสมอ ได้ตัวละครแบบสุ่ม ยังไม่ใช้ Perk — เครื่องหัวห้องเป็นคนเล่นให้</small>
+          <small class="muted">บอทพร้อมเสมอ ได้ตัวละครแบบสุ่ม (Killer เลือกได้ที่ช่องของบอท) ยังไม่ใช้ Perk — เครื่องหัวห้องเป็นคนเล่นให้</small>
         </p>
         <p v-if="bench.length" class="bench">
           <span class="muted">ยังไม่เลือกฝั่ง:</span>
@@ -1070,6 +1091,16 @@ button.seat-name.mine:hover i {
 .seat-sub {
   font-size: 0.85rem;
   color: rgb(var(--tone));
+}
+/* the host's pick of a bot killer's character */
+.bot-pick {
+  max-width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.85rem;
+  border: 1px solid rgb(var(--tone) / 0.6);
+  background: rgb(0 0 0 / 0.7);
+  color: #fff;
 }
 /* the host's kick: on the seat's top-right, where a player's own "leave" hint sits for themselves */
 .kick {

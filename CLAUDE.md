@@ -91,7 +91,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   player would: never face-down cards, hidden props or the dice to come (a choice is tried on a
   copy with a fresh dice seed). No perks yet. Offline the players step marks bots
   (`GameState.bots`) and `play/bots.ts` drives them from `GameScreen`. Online the host seats them
-  in the lobby (members with `bot: true`; places that mean people skip them) and the host's device
+  in the lobby (members with `bot: true`; places that mean people skip them; a bot killer's
+  character is the host's pick on its seat, `pick`, or drawn) and the host's device
   plays them (`botDriver`, `onlineBotMove`, `dispatchBot`), and a person gone a minute or more
   when the host says so (`standIn` in the room, `setStandIn`). Details and balance in
   `src/play/README.md` → Bots.

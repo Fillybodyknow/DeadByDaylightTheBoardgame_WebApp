@@ -44,6 +44,8 @@ export interface Member {
    * In the game the host's device plays it (`botDriver` in session.ts).
    */
   bot?: boolean
+  /** A bot killer's character, set by the host in the lobby (a killer id); unset: drawn. */
+  pick?: string
 }
 
 /**

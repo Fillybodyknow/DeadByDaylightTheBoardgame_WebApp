@@ -475,6 +475,18 @@ host seats them in the lobby, and the host's device plays them.
     Merchant's 5% → 8% (his passive does most). Over all killers (88 games) he won 47. The
     Trickster may be too strong now (11 of 12 games won, in 8–9 rounds): his power, used, Knives
     everyone in his room and next door.
+  - The survivors' answer to them (`marked`): where a survivor stands costs them the next Knife the
+    Showstopper may bring this round (by how many of his moves away they are: 1, 1, 0.8, 0.4 — it
+    reaches next door to where he ends up), and the Purge waiting in their room; each before the one
+    that wounds is 10, that one a wound, a fourth Knife (or a third Purge on someone wounded) a
+    sacrifice progress. With two of either they are pulled to the nearest free locker (8 a room),
+    and hide there in a plain turn. Three Knives are 60 in the tracks, not 18 (no heal while they
+    stay). 64 games against each (two seed sets), before → after: The Trickster won 56 → 50, fourth
+    Knives 265 → 142, hiding with Knives 83 → 254; The Plague won 19 → 22, wounds from the third
+    Purge 113 → 55. The Trickster stays the strongest: his power is the card's ("each Survivor in
+    your space and connected spaces gains a Knife"), every round, and a locker is where his next
+    turn finds them. Looking for lockers first (blue props) with two Knives changed nothing (12
+    won in 64, against 14).
   - The Clown's Tonic: 5 for each survivor in its room (they plan face up, for him to read). His
     power used 7% → 26%. Not scored: the Antidote (a move on for anyone, either side). Tried
     (worth to him near his way, less for each survivor by it): he set it up to 80 times in 32 games
@@ -500,8 +512,11 @@ host seats them in the lobby, and the host's device plays them.
   never the host, no ping colour, no chat notice, not counted in the room's listing, and its seat
   carries `bot` too. Its character is drawn as the characters stage opens (after the bans, if any),
   before anyone picks, so it never takes a person's; it bans nothing, locks at once and keeps its
-  printed perks. A bot killer picks no map (it is drawn, unless the host picks it), and the host
-  starts the game. In the game one device plays every bot (`botDriver`: the host, or while the
+  printed perks. A bot killer's character may be the host's choice instead, from a list on its
+  seat in the lobby (`pick` on the member, `setBotPick`; only the host sees it, since the
+  survivors may not be meant to know the killer before the picks): kept with random characters
+  too, drawn after all if the survivors ban it. A bot killer picks no map (it is drawn, unless
+  the host picks it), and the host starts the game. In the game one device plays every bot (`botDriver`: the host, or while the
   host's connection is gone the person in the room longest): `onlineBotMove` (`play/bots.ts`) gives
   a bot's move as that player would send it (a hand's plan at a time), sent by `dispatchBot`
   (`play/game.ts`) after the host's screen has caught up, like a person's move.

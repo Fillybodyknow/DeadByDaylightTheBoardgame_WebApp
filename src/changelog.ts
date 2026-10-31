@@ -12,6 +12,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.25.0',
+    date: '2026-11-01',
+    items: [
+      'บอทผู้รอดชีวิตรับมือ The Trickster ได้ดีขึ้น: หลบระยะ Showstopper, มี Knife 2 เล่มขึ้นไปจะรีบไปซ่อนตู้ทิ้ง Knife',
+      'บอทผู้รอดชีวิตรับมือ The Plague ได้ดีขึ้น: เลี่ยงห้องที่มี Vile Purge และไปซ่อนตู้ทิ้ง Purge ก่อนอันที่ 3',
+      'ออนไลน์: หัวห้องเลือกตัว Killer ให้บอทได้ที่ช่อง Killer ในล็อบบี้ (หรือปล่อยเป็นสุ่ม) — เห็นแค่หัวห้อง',
+    ],
+  },
+  {
     version: '1.24.1',
     date: '2026-10-31',
     items: [

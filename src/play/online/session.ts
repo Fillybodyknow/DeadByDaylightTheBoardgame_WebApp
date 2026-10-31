@@ -577,6 +577,18 @@ export function addBot(side: Side, seat?: number) {
   })
 }
 
+/** Host, in the lobby: the character a bot killer plays (null: drawn when the characters stage opens). */
+export function setBotPick(id: string, pick: string | null) {
+  return update((cur) => {
+    const m = cur.members[id]
+    if (session.me !== cur.host || cur.phase !== 'lobby' || cur.game || !m?.bot || m.side !== 'killer') return null
+    const next: Member = { ...m }
+    if (pick) next.pick = pick
+    else delete next.pick
+    return { ...cur, members: { ...cur.members, [id]: next } }
+  })
+}
+
 /** Host, in the lobby: take a bot out of its seat (and the room). */
 export function removeBot(id: string) {
   return update((cur) => {
@@ -624,6 +636,28 @@ function drawPicks(s: RoomSettings, banned: string[]): Record<string, string> {
 }
 
 /**
+ * A bot killer's character: the one the host set in the lobby, unless it is banned; else drawn
+ * (none banned). Undefined: no bot killer, or nothing left to draw.
+ */
+function botKiller(d: RoomData, banned: string[]): string | undefined {
+  const seat = d.seats[String(KILLER_PLAYER)]
+  if (!seat?.bot) return undefined
+  const ks = playableKillers()
+    .map((c) => c.id)
+    .filter((id) => !banned.includes(id))
+  const want = d.members[seat.id]?.pick
+  return want && ks.includes(want) ? want : ks.length ? draw(ks) : undefined
+}
+
+/** Random characters for everyone: the host's choice for a bot killer still stands (if not banned). */
+function drawAll(d: RoomData, s: RoomSettings, banned: string[]): Record<string, string> {
+  const picks = drawPicks(s, banned)
+  const want = d.members[d.seats[String(KILLER_PLAYER)]?.id ?? '']?.pick
+  if (botSeat(d, KILLER_PLAYER) && want && !banned.includes(want) && playableKillers().some((c) => c.id === want)) picks.killer = want
+  return picks
+}
+
+/**
  * The bots' characters, drawn into the room's picks (the people's kept): none banned, and none a
  * teammate holds unless repeats are allowed. Drawn as the characters stage opens, before anyone
  * picks, so a bot never takes what a person already chose.
@@ -633,10 +667,7 @@ function drawBotPicks(d: RoomData, s: RoomSettings, banned: string[]): Record<st
   for (const [p, seat] of Object.entries(d.seats)) {
     if (!seat.bot) continue
     if (Number(p) === KILLER_PLAYER) {
-      const ks = playableKillers()
-        .map((c) => c.id)
-        .filter((id) => !banned.includes(id))
-      if (!picks.killer && ks.length) picks.killer = draw(ks)
+      if (!picks.killer) picks.killer = botKiller(d, banned) ?? picks.killer
       continue
     }
     for (const slot of slotsOf(Number(p), d.players)) {
@@ -674,7 +705,7 @@ export function proceedToPick() {
     // a bot killer picks no map: it is drawn too
     const board = s.map === 'random' || (killer[1].bot && s.map !== 'host') ? draw(Object.keys(boards)) : undefined
     // with a Banlist the characters are drawn once the bans are in (lockBans)
-    const picks = s.random && !s.banlist ? drawPicks(s, []) : {}
+    const picks = s.random && !s.banlist ? drawAll({ ...cur, seats }, s, []) : {}
     const perkSeed = Math.floor(Math.random() * 0x7fffffff) + 1
     const next: RoomData = {
       ...cur,
@@ -751,7 +782,7 @@ export function lockBans(on: boolean) {
     if (on) bansLocked[seat] = true
     else delete bansLocked[seat]
     const next: RoomData = { ...cur, bansLocked }
-    if (on && bansDoneOf(next)) next.picks = s.random ? drawPicks(s, bannedOf(next)) : drawBotPicks(next, s, bannedOf(next))
+    if (on && bansDoneOf(next)) next.picks = s.random ? drawAll(next, s, bannedOf(next)) : drawBotPicks(next, s, bannedOf(next))
     return next
   })
 }
