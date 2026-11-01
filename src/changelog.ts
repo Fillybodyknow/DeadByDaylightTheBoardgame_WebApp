@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.26.1',
+    date: '2026-11-01',
+    items: [
+      'หน้าเลือก Offering: กด 🔍 ที่มุมการ์ดเพื่อดูการ์ดใหญ่พร้อมคำอธิบาย และเลือกจากตรงนั้นได้เลย',
+    ],
+  },
+  {
     version: '1.26.0',
     date: '2026-11-01',
     items: [
