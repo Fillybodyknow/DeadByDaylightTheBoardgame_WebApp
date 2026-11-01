@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Offline: the full game on one device passed around the table (hot-seat). Before a game: players and game mode, survivors pick first, then the killer, then
-// (Bloodweb, Devout) each player's perks in turn behind a hand-off curtain, then the map.
+// (Bloodweb, Devout) each player's perks in turn behind a hand-off curtain, then each side's offerings
+// (when the table burns them, p.19), then the map.
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { killerById, survivorById } from '../../data'
@@ -18,6 +19,10 @@ import { handLayout } from '../engine/engine'
 import { bloodwebHands, cardChoices, loadoutProblem, printedOf, takenBy, type GameMode, type LoadoutCharacter } from '../engine/loadout'
 import { PERKS, type PerkId } from '../engine/perks'
 import PerkLoadout from '../components/PerkLoadout.vue'
+import OfferingPicker from '../components/OfferingPicker.vue'
+import OfferingSettings from '../components/OfferingSettings.vue'
+import { offeringName, offeringProblem, offeringSlots, type OfferingId, type OfferingPlan } from '../engine/offerings'
+import type { Side } from '../engine/loadout'
 import { game, newGame } from '../game'
 import { leaveRoom, session } from '../online/session'
 
@@ -47,12 +52,13 @@ watch(
   },
 )
 
-type Step = 'players' | 'survivors' | 'killer' | 'perks' | 'start'
+type Step = 'players' | 'survivors' | 'killer' | 'perks' | 'offerings' | 'start'
 const STEPS = computed<{ id: Step; label: string }[]>(() => [
   { id: 'players', label: 'ผู้เล่น' },
   { id: 'survivors', label: 'Survivor เลือกตัว' },
   { id: 'killer', label: 'Killer เลือกตัว' },
   ...(mode.value === 'adept' ? [] : [{ id: 'perks' as const, label: 'แต่ง Perk' }]),
+  ...(offeringSides.value.length ? [{ id: 'offerings' as const, label: 'เลือก Offering' }] : []),
   { id: 'start', label: 'เข้าสู่ Trial' },
 ])
 
@@ -95,6 +101,7 @@ const step = computed<Step>(() => {
   if (currentSeat.value !== null) return 'survivors'
   if (!killer.value) return 'killer'
   if (mode.value !== 'adept' && perkTurn.value < perkChars.value.length) return 'perks'
+  if (offeringTurn.value < offeringSides.value.length) return 'offerings'
   return 'start'
 })
 const stepIndex = computed(() => STEPS.value.findIndex((x) => x.id === step.value))
@@ -162,7 +169,8 @@ function goToStep(i: number) {
   }
   if (!confirm(`ย้อนไปขั้น "${STEPS.value[i].label}"? ตัวเลือกหลังจากขั้นนี้จะถูกล้าง`)) return
   clearPerks()
-  if (STEPS.value[i].id === 'perks') return
+  clearOfferings()
+  if (STEPS.value[i].id === 'perks' || STEPS.value[i].id === 'offerings') return
   if (i <= 1) picks.value = [null, null, null, null]
   killer.value = null
 }
@@ -218,6 +226,53 @@ function clearPerks() {
   perkSeed.value = (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0
 }
 
+// ---------- offerings (p.19): each side that burns them picks in turn, the device handed over ----------
+
+const offeringPlan = ref<OfferingPlan>('none')
+const offeringCount = ref(1)
+const offeringRandom = ref(false)
+const slots = computed(() => offeringSlots(offeringPlan.value, offeringCount.value))
+/** A side the bots play whole draws its offerings instead. */
+const botSide = (side: Side) => (side === 'killer' ? isBotPlayer(1) : seatPlayer.value.every(isBotPlayer))
+/** The sides that pick, survivors first: those burning any, unless drawn. */
+const offeringSides = computed<Side[]>(() => (offeringRandom.value ? [] : (['survivor', 'killer'] as const).filter((side) => slots.value[side] > 0 && !botSide(side))))
+const offeringTurn = ref(0)
+const offeringOpen = ref(false)
+const offeringPicks = ref<Partial<Record<Side, OfferingId[]>>>({})
+const offeringDraft = ref<OfferingId[]>([])
+const offeringSide = computed(() => offeringSides.value[offeringTurn.value])
+const offeringWho = computed(() => (offeringSide.value === 'killer' ? 'ผู้เล่น 1 (Killer)' : 'ฝั่ง Survivor'))
+
+function beginOfferings() {
+  sfx.select()
+  offeringDraft.value = [...(offeringPicks.value[offeringSide.value] ?? [])]
+  offeringOpen.value = true
+}
+
+function confirmOfferings(on: boolean) {
+  const side = offeringSide.value
+  if (!on || offeringProblem(side, offeringDraft.value, slots.value[side])) return
+  sfx.select()
+  offeringPicks.value = { ...offeringPicks.value, [side]: [...offeringDraft.value] }
+  offeringOpen.value = false
+  offeringTurn.value++
+}
+
+function clearOfferings() {
+  offeringPicks.value = {}
+  offeringTurn.value = 0
+  offeringOpen.value = false
+}
+
+/** The offerings shown before the trial: the picked ones by name; the drawn ones are a surprise. */
+const offeringSummary = computed(() =>
+  (['survivor', 'killer'] as const).flatMap((side) => {
+    if (!slots.value[side]) return []
+    const picked = offeringPicks.value[side]
+    return [{ side, text: picked?.length ? picked.map(offeringName).join(' · ') : `🎲 สุ่ม ${slots.value[side]} ใบตอนเริ่มเกม` }]
+  }),
+)
+
 const board = ref(macmillan.id)
 
 function start() {
@@ -231,6 +286,8 @@ function start() {
     players: players.value,
     seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
     bots: bots.value,
+    offerings: offeringSides.value.flatMap((side) => offeringPicks.value[side] ?? []),
+    drawOfferings: Object.fromEntries((['survivor', 'killer'] as const).filter((side) => slots.value[side] > 0 && !offeringSides.value.includes(side)).map((side) => [side, slots.value[side]])),
   })
 }
 
@@ -323,6 +380,10 @@ function start() {
               <small>{{ m.note }}</small>
             </button>
           </div>
+          <h2>Offering</h2>
+          <div class="offering-row">
+            <OfferingSettings v-model:plan="offeringPlan" v-model:count="offeringCount" v-model:random="offeringRandom" />
+          </div>
           <div class="actions">
             <button type="button" class="primary big" :disabled="allBots" @click="confirmPlayers">เริ่มเลือกตัวละคร →</button>
           </div>
@@ -367,7 +428,17 @@ function start() {
         />
       </template>
 
-      <!-- 5. the map, and in -->
+      <!-- 5. offerings: each side that burns them, the device handed over first -->
+      <template v-else-if="step === 'offerings' && offeringSide">
+        <section v-if="!offeringOpen" class="card handoff">
+          <h2>ส่งเครื่องให้{{ offeringWho }}</h2>
+          <p class="muted">เลือก Offering {{ slots[offeringSide] }} ใบ — อีกฝั่งห้ามดูจอ</p>
+          <button type="button" class="primary big" @click="beginOfferings">👁 ฉันคือ{{ offeringWho }} — เลือก Offering</button>
+        </section>
+        <OfferingPicker v-else v-model="offeringDraft" :side="offeringSide" :slots="slots[offeringSide]" :problem="offeringProblem(offeringSide, offeringDraft, slots[offeringSide])" :confirmed="false" @confirm="confirmOfferings" />
+      </template>
+
+      <!-- 6. the map, and in -->
       <template v-else>
         <!-- the perks set, revealed together (p.19) -->
         <section v-if="mode !== 'adept'" class="card reveal">
@@ -376,6 +447,15 @@ function start() {
             <div v-for="c in perkChars" :key="c.key" class="reveal-row">
               <strong>{{ (c.side === 'killer' ? killerById.get(c.id) : survivorById.get(c.id))?.name }}</strong>
               <span class="muted">{{ perkNames(c) }}</span>
+            </div>
+          </div>
+        </section>
+        <section v-if="offeringSummary.length" class="card reveal">
+          <h2>🔥 Offering</h2>
+          <div class="reveal-grid">
+            <div v-for="o in offeringSummary" :key="o.side" class="reveal-row">
+              <strong>{{ o.side === 'killer' ? 'Killer' : 'Survivor' }}</strong>
+              <span class="muted">{{ o.text }}</span>
             </div>
           </div>
         </section>
@@ -393,6 +473,12 @@ function start() {
 <style scoped>
 .offline-view {
   display: contents;
+}
+.offering-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.8rem;
 }
 .modes {
   display: grid;

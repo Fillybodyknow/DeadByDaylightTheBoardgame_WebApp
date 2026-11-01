@@ -385,7 +385,7 @@ const knownProps = (st: GameState) => new Set(st.props.filter((p) => p.revealed)
 // ---------- trying a choice ----------
 
 /** The steps a tried choice is played on through by itself; the rest are someone's real decision. */
-const FORCED = new Set(['roll', 'revealProp', 'setupReveal', 'offer', 'turnStart', 'reaction', 'keepItem', 'pickItem', 'carryDice', 'carryMove', 'sparkChoice', 'redeemerGuess'])
+const FORCED = new Set(['roll', 'revealProp', 'setupReveal', 'vigo', 'whiteWard', 'offer', 'turnStart', 'reaction', 'keepItem', 'pickItem', 'carryDice', 'carryMove', 'sparkChoice', 'redeemerGuess'])
 
 /**
  * A guess at the card behind the Redeemer, blind: one of the five, by a draw of the bot's own (the
@@ -859,7 +859,27 @@ export function botMove(st: GameState, player: number): Action | null {
   // a survivor's bonus turn costs a card for the round: taken when a card leads to something better
   if (step.t === 'bonusOffer') return bonusPick(st, step.s, knownProps(st)) ?? acts.find((a) => a.t === 'declineBonus') ?? acts[0]
   if (step.t === 'killerBonusOffer') return killerBonusPick(st, acts)
+  if (step.t === 'cutCoin' || step.t === 'shrikeWreath' || step.t === 'shroudRoom') return setupOfferingPick(st, acts)
+  // Vigo's Blueprint and White Ward: bots let them be, as they do perks
+  if (step.t === 'vigo' || step.t === 'whiteWard') return acts[0]
   return bestTried(st, acts, killer)
+}
+
+/**
+ * The setup offerings (p.19), plainly: Cut Coin takes the face-down survival props where most
+ * survivors stand (their lockers and chests); Shrike Wreath marks the first survivors offered;
+ * Shroud of Union starts everyone in the room with the most face-up generators.
+ */
+function setupOfferingPick(st: GameState, acts: Action[]): Action {
+  const score = (a: Action): number => {
+    if (a.t === 'cutCoin') {
+      const room = st.props.find((p) => p.id === a.prop)?.room
+      return st.survivors.filter((sv) => sv.status === 'board' && sv.room === room).length
+    }
+    if (a.t === 'shroudRoom') return st.props.filter((p) => p.kind === 'generator' && p.revealed && !p.removed && !p.done && p.room === a.room).length
+    return 0
+  }
+  return acts.reduce((b, a) => (score(a) > score(b) ? a : b))
 }
 
 /**

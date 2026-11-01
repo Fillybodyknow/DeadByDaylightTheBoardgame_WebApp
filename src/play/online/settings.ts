@@ -6,6 +6,7 @@ import { killers, survivors } from '../../data'
 import { PLAYABLE_KILLERS, PRINTED_PERKS } from '../engine/perks'
 import { KILLER_BP, SURVIVOR_BP } from '../engine/engine'
 import type { GameMode } from '../engine/loadout'
+import type { OfferingPlan } from '../engine/offerings'
 
 export interface RoomSettings {
   /** p.19: Adept (printed perks), Bloodweb (5 cards drawn, up to 3 laid over), Devout (3 picked). */
@@ -33,6 +34,10 @@ export interface RoomSettings {
   /** Starting ▲, to balance a table with new players (the rulebook's are 2 and 4, p.6). */
   survivorBp: number
   killerBp: number
+  /** Offerings (p.19): which side burns them, how many for a side alone (1–2), and whether they are drawn. */
+  offerings: OfferingPlan
+  offeringCount: number
+  offeringRandom: boolean
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -46,6 +51,9 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   banCount: 2,
   survivorBp: SURVIVOR_BP.start,
   killerBp: KILLER_BP.start,
+  offerings: 'none',
+  offeringCount: 1,
+  offeringRandom: false,
 }
 
 export const TIMER_CHOICES = [0, 60, 90, 120]
@@ -76,6 +84,10 @@ export function settingsChips(s: RoomSettings): string[] {
   if (s.showKiller) out.push('👁 เห็นฆาตกรที่เลือก')
   if (s.dupes) out.push('👯 Survivor ซ้ำได้')
   if (s.banlist) out.push(`🚫 Banlist ${s.banCount} ตัว/ฝั่ง`)
+  if (s.offerings !== 'none') {
+    const who = s.offerings === 'both' ? 'ฝั่งละ 1' : `${s.offerings === 'killer' ? 'Killer' : 'Survivor'} ${s.offeringCount} ใบ`
+    out.push(`🔥 Offering ${who}${s.offeringRandom ? ' (สุ่ม)' : ''}`)
+  }
   if (s.survivorBp !== DEFAULT_SETTINGS.survivorBp || s.killerBp !== DEFAULT_SETTINGS.killerBp) out.push(`▲ เริ่ม ${s.survivorBp} / ${s.killerBp}`)
   return out
 }

@@ -8,6 +8,7 @@ import { sfx } from '../../sound'
 import { isHost, roomSettings, session, setSettings } from '../online/session'
 import { BAN_COUNT_RANGE, KILLER_BP_RANGE, SURVIVOR_BP_RANGE, TIMER_CHOICES, settingsChips, type RoomSettings } from '../online/settings'
 import BpIcon from '../../components/BpIcon.vue'
+import OfferingSettings from './OfferingSettings.vue'
 
 const s = computed(() => roomSettings.value)
 const chips = computed(() => settingsChips(s.value))
@@ -62,6 +63,10 @@ function describe(key: keyof RoomSettings, v: RoomSettings): string {
       return `BP เริ่มต้น Survivor → ${v.survivorBp}`
     case 'killerBp':
       return `BP เริ่มต้น Killer → ${v.killerBp}`
+    case 'offerings':
+    case 'offeringCount':
+    case 'offeringRandom':
+      return v.offerings === 'none' ? 'Offering → ไม่ใช้' : (settingsChips(v).find((c) => c.startsWith('🔥')) ?? '')
   }
 }
 
@@ -178,6 +183,19 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
           <button type="button" :disabled="busy || s.killerBp >= KILLER_BP_RANGE[1]" @click="step('killerBp', 1)">+</button>
         </span>
         <small class="muted hint">ตามเล่ม: Survivor 2 · Killer 4 (หน้า 6)</small>
+      </div>
+
+      <div class="row">
+        <span class="label">🔥 Offering</span>
+        <OfferingSettings
+          :plan="s.offerings"
+          :count="s.offeringCount"
+          :random="s.offeringRandom"
+          :disabled="busy"
+          @update:plan="set({ offerings: $event })"
+          @update:count="set({ offeringCount: $event })"
+          @update:random="set({ offeringRandom: $event })"
+        />
       </div>
     </div>
   </section>

@@ -83,6 +83,8 @@ function lobbyOf(r: RoomData): Lobby {
     ...(r.loadouts ? { loadouts: r.loadouts } : {}),
     ...(r.perksDone ? { perksDone: r.perksDone } : {}),
     ...(r.perkSeed ? { perkSeed: r.perkSeed } : {}),
+    ...(r.offeringPicks && Object.keys(r.offeringPicks).length ? { offeringPicks: r.offeringPicks } : {}),
+    ...(r.offeringsDone && Object.keys(r.offeringsDone).length ? { offeringsDone: r.offeringsDone } : {}),
   }
 }
 interface GameNode {

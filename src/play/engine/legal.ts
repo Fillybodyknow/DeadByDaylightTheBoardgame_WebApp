@@ -29,6 +29,9 @@ import {
   propsIn,
   rerollers,
   rollHelpers,
+  cutCoinTargets,
+  vigoGenerators,
+  WARD_COST,
   survivorInteractions,
   survivorMoves,
   twoPlayer,
@@ -42,6 +45,24 @@ export function legalActions(st: GameState): Action[] {
   switch (step.t) {
     case 'setupReveal':
       for (const p of faceDown(st)) out.push({ t: 'setupReveal', prop: p })
+      break
+    // declining first: what a bot (or a timeout) picks
+    case 'vigo':
+      out.push({ t: 'vigo', gen: null })
+      for (const p of vigoGenerators(st)) out.push({ t: 'vigo', gen: p.id })
+      break
+    case 'whiteWard':
+      out.push({ t: 'ward', pay: false }, { t: 'ward', pay: false, mute: true })
+      if (st.survivors[step.s].bp >= WARD_COST) out.push({ t: 'ward', pay: true })
+      break
+    case 'shroudRoom':
+      for (const r of boards[st.board].rooms) out.push({ t: 'shroudRoom', room: r.id })
+      break
+    case 'cutCoin':
+      for (const p of cutCoinTargets(st)) out.push({ t: 'cutCoin', prop: p.id })
+      break
+    case 'shrikeWreath':
+      st.survivors.forEach((_, s) => !step.chosen.includes(s) && out.push({ t: 'shrike', s }))
       break
     case 'revealProp':
       for (const p of propsIn(st, step.room)) if (!p.revealed) out.push({ t: 'reveal', prop: p.id })

@@ -15,6 +15,7 @@ import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MAD
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import ObjectiveHud from './ObjectiveHud.vue'
+import OfferingStrip from './OfferingStrip.vue'
 import PerkDiamonds from './PerkDiamonds.vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
@@ -278,6 +279,8 @@ function onPowerSlot() {
           </span>
           <img v-if="st.survivors[s].madness" class="madness" :src="asset(MADNESS_IMAGE)" alt="บ้าคลั่ง" title="บ้าคลั่ง: ทอย Danger Die แทน Skill Check" />
           <img v-if="st.survivors[s].sacrificeToken" class="token" :src="asset(components.sacrificeProgress.image)" alt="" title="ยังมี sacrifice token บนกระดาน" />
+          <!-- Shrike Wreath's, on top of their own -->
+          <img v-for="n in st.survivors[s].extraSacrifice ?? 0" :key="`x${n}`" class="token" :style="{ right: `${-6 + n * 8}px` }" :src="asset(components.sacrificeProgress.image)" alt="" title="Sacrifice Progress เพิ่ม (พวงดอกไม้นกอีเสือ) — เข้ารางตอนถูกแขวนครั้งแรก" />
         </div>
         <div class="names">
           <strong class="name" :class="{ me: mine.includes(s) }">{{ st.survivors[s].name }}<span v-if="isBot(st, playerOf(st, s))" class="bot-tag" title="บอทเล่น">🤖</span><span v-if="seatVoice[playerOf(st, s)]" class="vc" :title="seatVoice[playerOf(st, s)].micOff ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง'">{{ seatVoice[playerOf(st, s)].speaking ? '🔊' : seatVoice[playerOf(st, s)].micOff ? '🔇' : '🎙️' }}</span></strong>
@@ -345,6 +348,8 @@ function onPowerSlot() {
 
     <!-- both sides' goals at the foot of the column: the bottom-left corner, as in the PC game -->
     <ObjectiveHud class="objectives" :st="st" />
+    <!-- the offerings burnt for the game (p.19), under the goals -->
+    <OfferingStrip class="offerings" :st="st" />
 
     <!-- under the goals: the item of whoever plays now, or the killer's power; a click uses it -->
     <button
@@ -1246,6 +1251,7 @@ button.item img {
     grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   }
   .objectives,
+  .offerings,
   .slot {
     margin-top: 0;
     align-self: center;

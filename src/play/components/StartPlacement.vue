@@ -43,7 +43,8 @@ function playMini() {
     s.shown++
     later(LANDED_MS, next)
   }
-  if (reducedMotion.value) return land()
+  // Shroud of Union: the survivors picked their room, so there is no die to roll
+  if (reducedMotion.value || mini.chosen) return land()
   const frames = Math.floor(TUMBLE_MS / FRAME_MS)
   for (let f = 0; f < frames; f++)
     later(f * FRAME_MS, () => {
@@ -100,15 +101,15 @@ onBeforeUnmount(() => {
           <b>{{ current.name }}</b>
           <small>{{ current.player }}</small>
         </div>
-        <img class="die" :src="asset(skillFaceImage(shownFace))" alt="" />
+        <img v-if="!current.chosen" class="die" :src="asset(skillFaceImage(shownFace))" alt="" />
       </div>
       <div v-else-if="landed && starts.shown > 0" class="roller landed" :class="{ killer: starts.minis[starts.shown - 1].killer }">
         <img class="who" :src="asset(starts.minis[starts.shown - 1].image)" :alt="starts.minis[starts.shown - 1].name" />
         <div class="who-text">
           <b>{{ starts.minis[starts.shown - 1].name }}</b>
-          <small>→ {{ starts.minis[starts.shown - 1].room }}</small>
+          <small>→ {{ starts.minis[starts.shown - 1].room }}{{ starts.minis[starts.shown - 1].chosen ? ' (เลือกเอง)' : '' }}</small>
         </div>
-        <img class="die" :src="asset(skillFaceImage(starts.minis[starts.shown - 1].face))" alt="" />
+        <img v-if="!starts.minis[starts.shown - 1].chosen" class="die" :src="asset(skillFaceImage(starts.minis[starts.shown - 1].face))" alt="" />
       </div>
     </div>
   </transition>

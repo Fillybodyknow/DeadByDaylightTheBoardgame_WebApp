@@ -1,6 +1,7 @@
 // Screen-level effects queued by the game screen: the dice roll, banners and flashes.
 
 import { reactive } from 'vue'
+import type { OfferingId } from '../engine/offerings'
 import type { PerkId } from '../engine/perks'
 import type { Die, MoveCard, PerkOwner } from '../engine/types'
 
@@ -34,6 +35,8 @@ export interface StartMini {
   player: string
   room: string
   face: number
+  /** Shroud of Union: the survivors picked this room, nothing was rolled. */
+  chosen?: boolean
 }
 
 export type SkillVerdict = 'great' | 'good' | 'fail'
@@ -50,11 +53,12 @@ export interface Banner {
 }
 
 /** A perk just used: its card is shown big in the middle of the screen. */
-/** A card to show big: a perk being used, or an item (`item` set, `perk` absent). */
+/** A card to show big: a perk being used, an item (`item` set), or an offering at work (`offering` set). */
 export interface PerkShow {
   id: number
   perk?: PerkId
   item?: string
+  offering?: OfferingId
   owner: PerkOwner
   /** What it did, from the log line ("ผลัก Meg"…). */
   detail: string
@@ -93,6 +97,8 @@ export const fx = reactive({
   flash: null as { id: number; tone: 'red' | 'gold' | 'white' } | null,
   /** The minis' start-room rolls, on the map: `shown` of them are placed so far. */
   starts: null as { id: number; minis: StartMini[]; shown: number; face: number; landed: boolean } | null,
+  /** The offerings burnt for the game (p.19), shown in a row and burnt at its start, before the minis come in. */
+  offerings: null as { id: number; list: OfferingId[] } | null,
   /** The game just ended: its last beat (FinaleReveal) shows after everything queued before it. */
   finale: null as { id: number; winner: 'survivors' | 'killer' } | null,
   /** The board is animating what just happened (walks, hits, hooks): questions wait for it. */
@@ -144,6 +150,10 @@ export function showStarts(minis: StartMini[]) {
   fx.starts = { id: ++id, minis, shown: 0, face: 0, landed: false }
 }
 
+export function showOfferings(list: OfferingId[]) {
+  fx.offerings = { id: ++id, list: [...list] }
+}
+
 export function showFinale(winner: 'survivors' | 'killer') {
   fx.finale = { id: ++id, winner }
 }
@@ -159,5 +169,6 @@ export function clearFx() {
   fx.flash = null
   fx.finale = null
   fx.starts = null
+  fx.offerings = null
   fx.boardBusy = false
 }

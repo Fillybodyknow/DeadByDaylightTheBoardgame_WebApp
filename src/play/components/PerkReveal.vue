@@ -1,9 +1,12 @@
 <script setup lang="ts">
-// A perk or an item being used: its card flips into the middle of the screen with light rays
-// behind it — purple for a survivor's perk, red for the killer's, gold for an item. One at a
+// A perk or an item being used, or an offering at work: its card flips into the middle of the screen
+// with light rays behind it — purple for a survivor's perk, red for the killer's, gold for an item,
+// fire for an offering. One at a
 // time; a tap skips ahead.
 import { computed, onBeforeUnmount, watch } from 'vue'
-import { asset } from '../../i18n'
+import { asset, lang } from '../../i18n'
+import { offerings as OFFERING_CARDS } from '../../data'
+import { offeringName } from '../engine/offerings'
 import { PERKS } from '../engine/perks'
 import type { GameState } from '../engine/types'
 import { fxSound } from '../fx/audio'
@@ -27,11 +30,16 @@ const current = computed(() => {
 })
 const killer = computed(() => current.value?.owner === 'killer')
 const isItem = computed(() => !!current.value?.item)
+const isOffering = computed(() => !!current.value?.offering)
 
 /** Image, name, label and price of what is shown. */
 const card = computed(() => {
   const c = current.value
   if (!c) return null
+  if (c.offering) {
+    const o = OFFERING_CARDS.find((x) => x.id === c.offering)!
+    return { image: (lang.value === 'th' ? o.image.th : o.image.en) ?? o.image.en, name: offeringName(c.offering), label: killer.value ? 'Killer offering' : 'Survivor offering', price: 'Offering', text: '' }
+  }
   if (c.item) return { image: itemImage(c.item), name: ITEM_NAMES[c.item] ?? c.item, label: 'Item', price: 'ทิ้งหลังใช้', text: '' }
   const p = PERKS[c.perk!]
   return { image: perkImage(c.perk!), name: p.name, label: killer.value ? 'Killer perk' : 'Survivor perk', price: p.cost ? `−${p.cost} ▲` : 'ฟรี', text: perkText(c.perk!) }
@@ -69,7 +77,7 @@ const face = computed(() => {
 
 <template>
   <transition name="reveal">
-    <div v-if="current && card" :key="current.id" class="perk-reveal" :class="{ killer, item: isItem }" role="status" aria-live="polite" @click="next">
+    <div v-if="current && card" :key="current.id" class="perk-reveal" :class="{ killer, item: isItem, offering: isOffering }" role="status" aria-live="polite" @click="next">
       <div class="rays" aria-hidden="true" />
       <div class="stage">
         <div class="who">
@@ -81,7 +89,7 @@ const face = computed(() => {
         </div>
 
         <div class="card-wrap">
-          <img v-if="card.image" class="card" :class="{ 'item-card': isItem }" :src="asset(card.image)" :alt="card.name" />
+          <img v-if="card.image" class="card" :class="{ 'item-card': isItem, 'offering-card': isOffering }" :src="asset(card.image)" :alt="card.name" />
           <div v-else class="card text-card">
             <strong>{{ card.name }}</strong>
             <p><PerkRichText :text="card.text" /></p>
@@ -120,6 +128,11 @@ const face = computed(() => {
 .perk-reveal.killer {
   --glow: 255 50 50;
   --deep: 80 6 12;
+}
+/* an offering burns: fire light, whichever side it is */
+.perk-reveal.offering {
+  --glow: 255 140 40;
+  --deep: 70 24 4;
 }
 
 /* light rays turning slowly behind the card */
@@ -186,6 +199,11 @@ const face = computed(() => {
     glow 1.6s ease-in-out 0.75s infinite;
 }
 /* item cards are a touch wider than perk cards: keep the height, let the width follow */
+/* an offering card: its own proportions */
+.card.offering-card {
+  aspect-ratio: auto;
+  width: auto;
+}
 .card.item-card {
   aspect-ratio: auto;
 }

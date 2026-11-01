@@ -11,8 +11,9 @@ import { playerName } from '../../profile'
 import { createGame, handLayout } from '../engine/engine'
 import { boards, macmillan } from '../engine/boards'
 import { KILLER_PLAYER } from '../engine/seats'
-import { bloodwebHands, choicesFor, loadoutProblem, packLoadout, takenBy, unpackLoadout, type LoadoutCharacter } from '../engine/loadout'
+import { bloodwebHands, choicesFor, loadoutProblem, packLoadout, takenBy, unpackLoadout, type LoadoutCharacter, type Side as LoadoutSide } from '../engine/loadout'
 import type { PerkId } from '../engine/perks'
+import { offeringProblem, offeringSlots, offeringsOf, packOfferings, unpackOfferings, type OfferingId } from '../engine/offerings'
 import type { GameState } from '../engine/types'
 import { game, online, receive, restoreLocal } from '../game'
 import { firebaseBackend, firebaseConfigured } from './firebase'
@@ -717,6 +718,8 @@ export function proceedToPick() {
       loadouts: {},
       perksDone: {},
       perkSeed,
+      offeringPicks: {},
+      offeringsDone: {},
       boardSet: !!board,
       banPicks: { killer: '', survivors: '' },
       bansLocked: {},
@@ -878,7 +881,7 @@ export const perksWaiting = computed(() => {
   return perkChars.value.filter((c) => !d.perksDone?.[c.key] && !bots.includes(c.key))
 })
 /** Everyone is in: characters locked and, in Bloodweb or Devout, every loadout confirmed. */
-export const allReady = computed(() => allLocked.value && (roomSettings.value.mode === 'adept' || perksWaiting.value.length === 0))
+export const allReady = computed(() => allLocked.value && (roomSettings.value.mode === 'adept' || perksWaiting.value.length === 0) && offeringsWaiting.value.length === 0)
 
 /** Why this loadout can't be confirmed ('' when it can): the room's rules, as of now. */
 export function perkProblem(key: string, perks: PerkId[]): string {
@@ -928,10 +931,88 @@ export function confirmPerks(key: string, on: boolean) {
   })
 }
 
+// ---------- offerings (p.19) ----------
+
+/** A side the bots play whole: the killer's seat, or every survivor seat. */
+function botSide(d: RoomData, side: LoadoutSide): boolean {
+  const seats = Object.keys(d.seats).filter((p) => (Number(p) === KILLER_PLAYER) === (side === 'killer'))
+  return seats.length > 0 && seats.every((p) => botSeat(d, p))
+}
+
+/** The sides that choose their offerings: those burning any, unless they are drawn (or a bot's side, drawn too). */
+function pickingSides(d: RoomData): LoadoutSide[] {
+  const s = settingsOf(d.settings)
+  if (s.offeringRandom) return []
+  const slots = offeringSlots(s.offerings, s.offeringCount)
+  return (['survivor', 'killer'] as const).filter((side) => slots[side] > 0 && !botSide(d, side))
+}
+
+function offeringPicksOf(d: RoomData, side: LoadoutSide): OfferingId[] {
+  return unpackOfferings(d.offeringPicks?.[side])
+}
+
+/** The side this player picks offerings for: the killer's seat, or any survivor seat. */
+function offeringSideOf(d: RoomData): LoadoutSide | null {
+  const seat = Object.entries(d.seats).find(([, v]) => v.id === session.me)?.[0]
+  return !seat ? null : Number(seat) === KILLER_PLAYER ? 'killer' : 'survivor'
+}
+
+/** Offerings are chosen after the perks (the cards on the table don't change with them). */
+const offeringOpen = (d: RoomData) => d.phase === 'pick' && everyoneLocked(d)
+
+/** How many offerings each side burns, by the room's settings. */
+export const offeringSlotsNow = computed(() => offeringSlots(roomSettings.value.offerings, roomSettings.value.offeringCount))
+/** Sides whose offerings aren't confirmed yet (once the characters and perks are in). */
+export const offeringsWaiting = computed<LoadoutSide[]>(() => {
+  const d = session.data
+  if (!d || !allLocked.value || perksWaiting.value.length) return []
+  return pickingSides(d).filter((side) => !d.offeringsDone?.[side])
+})
+/** This device's side for the offerings, and what that side has picked so far. */
+export const myOfferingSide = computed(() => (session.data ? offeringSideOf(session.data) : null))
+export const myOfferings = computed(() => (session.data && myOfferingSide.value ? offeringPicksOf(session.data, myOfferingSide.value) : []))
+export const myOfferingsDone = computed(() => !!(myOfferingSide.value && session.data?.offeringsDone?.[myOfferingSide.value]))
+
+/** Set this player's side's offerings (any survivor player sets the survivors'). */
+export function setOfferings(list: OfferingId[]) {
+  return update((cur) => {
+    const side = offeringSideOf(cur)
+    if (!side || !offeringOpen(cur) || !pickingSides(cur).includes(side) || cur.offeringsDone?.[side]) return null
+    const slots = offeringSlots(settingsOf(cur.settings).offerings, settingsOf(cur.settings).offeringCount)[side]
+    const picks = [...new Set(list)].filter((o) => offeringsOf(side).includes(o)).slice(0, slots)
+    return { ...cur, offeringPicks: { ...(cur.offeringPicks ?? {}), [side]: packOfferings(picks) } }
+  })
+}
+
+/** Confirm (or reopen) this player's side's offerings; confirming needs the full count. */
+export function confirmOfferings(on: boolean) {
+  return update((cur) => {
+    const side = offeringSideOf(cur)
+    if (!side || !offeringOpen(cur) || !pickingSides(cur).includes(side)) return null
+    const slots = offeringSlots(settingsOf(cur.settings).offerings, settingsOf(cur.settings).offeringCount)[side]
+    if (on && offeringProblem(side, offeringPicksOf(cur, side), slots)) return null
+    const done = { ...(cur.offeringsDone ?? {}) }
+    if (on) done[side] = true
+    else delete done[side]
+    return { ...cur, offeringsDone: done }
+  })
+}
+
+/** The game's offerings: the sides' picks, and the draws of the sides that don't pick. */
+function offeringConfig(d: RoomData): { offerings: OfferingId[]; drawOfferings: Partial<Record<LoadoutSide, number>> } {
+  const s = settingsOf(d.settings)
+  const slots = offeringSlots(s.offerings, s.offeringCount)
+  const picking = pickingSides(d)
+  return {
+    offerings: picking.flatMap((side) => offeringPicksOf(d, side)),
+    drawOfferings: Object.fromEntries((['survivor', 'killer'] as const).filter((side) => slots[side] > 0 && !picking.includes(side)).map((side) => [side, slots[side]])),
+  }
+}
+
 /** Which stage of the picks the room is in: characters, then perks (Bloodweb, Devout), then the map. */
-export type PickStage = 'bans' | 'chars' | 'perks' | 'map'
+export type PickStage = 'bans' | 'chars' | 'perks' | 'offerings' | 'map'
 export const pickStage = computed<PickStage>(() =>
-  !bansDone.value ? 'bans' : !allLocked.value ? 'chars' : perksWaiting.value.length ? 'perks' : 'map',
+  !bansDone.value ? 'bans' : !allLocked.value ? 'chars' : perksWaiting.value.length ? 'perks' : offeringsWaiting.value.length ? 'offerings' : 'map',
 )
 /** The map is settled: drawn at the start of the picks, or picked by whoever the room lets. */
 export const mapDone = computed(() => !!session.data?.boardSet)
@@ -985,6 +1066,7 @@ export function startOnlineGame() {
         killer: { id: killer, name: killerById.get(killer)!.name, perks: perks.killer },
         players: d.players as 2 | 3 | 4 | 5,
         startBp: { survivor: roomSettings.value.survivorBp, killer: roomSettings.value.killerBp },
+        ...offeringConfig(d),
         seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
         bots: Object.keys(d.seats)
           .filter((p) => botSeat(d, p))
@@ -997,7 +1079,7 @@ export function startOnlineGame() {
 /** Host: back to the lobby from the character picks. */
 export function backToLobby() {
   if (!isHost.value) return
-  return update((cur) => ({ ...cur, phase: 'lobby', seats: {}, players: 0, picks: {}, locked: {}, loadouts: {}, perksDone: {}, boardSet: false, banPicks: { killer: '', survivors: '' }, bansLocked: {} }))
+  return update((cur) => ({ ...cur, phase: 'lobby', seats: {}, players: 0, picks: {}, locked: {}, loadouts: {}, perksDone: {}, offeringPicks: {}, offeringsDone: {}, boardSet: false, banPicks: { killer: '', survivors: '' }, bansLocked: {} }))
 }
 
 /**
@@ -1033,6 +1115,8 @@ export function closeOnlineGame() {
       locked: {},
       loadouts: {},
       perksDone: {},
+      offeringPicks: {},
+      offeringsDone: {},
       standIn: {},
       // everyone un-ready, and no one left waiting (the database takes no undefined: `back` is dropped)
       members: Object.fromEntries(Object.entries(cur.members).map(([id, { back, ...m }]) => (void back, [id, { ...m, ready: false }]))),

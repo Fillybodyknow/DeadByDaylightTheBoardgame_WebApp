@@ -46,7 +46,7 @@ and the host starts the game.
 - **The way into a game** (`OnlineRoom`, `session.ts`): Lobby (sides, ready) → the picks, a stage
   at a time → the killer starts. A stage opens when everyone has finished the one before
   (`pickStage`, derived from the room's data, so there is no stage field to drift): **characters**
-  (everyone confirms; a **Banlist** stage comes before it when the room sets one) → **perks** (only when the room's mode is Bloodweb or Devout) → **map**
+  (everyone confirms; a **Banlist** stage comes before it when the room sets one) → **perks** (only when the room's mode is Bloodweb or Devout) → **offerings** (only when the room burns them and a side picks) → **map**
   (picked by whoever the setting says; drawn maps are settled at once — `boardSet`, so a map is
   never "default MacMillan" by omission). The start button waits for the map. A step bar shows
   where the room is and chips show who is done. A stage only goes forward: a player may take back
@@ -328,6 +328,19 @@ Entity speaking (`src/play/tutorial/`). The list has a tab per side (remembered 
   step): once every character is picked, each player sets their 3 perks on a loadout screen in the
   PC game's style (`PerkLoadout.vue`; offline one player at a time behind a hand-off card). The
   rules live in `engine/loadout.ts`; `createGame` takes each character's `perks`.
+- **Offerings** (p.19, `engine/offerings.ts`): the room setting `offerings` online, the players step
+  offline: nobody, the survivors (1–2), the killer (1–2) or one each, picked or drawn (🎲). A side
+  that picks does so after the perks (`OfferingPicker`; online any survivor player sets the
+  survivors', hidden from the killer until the game starts; offline behind a hand-off card); a
+  side drawn, or played by bots alone, takes the top cards of its shuffled offerings at the start
+  (`drawOfferings`, from the game's seed). `GameState.offerings` holds them; they show under the
+  goals (`OfferingStrip`). All ten are played (`READY_OFFERINGS`): five that ask nobody (Ebony
+  Memento Mori, Murky Reagent, Torn Blueprint, Chalk Pouch, Sweet William Sachet), three asked at
+  setup — Shroud of Union (step `shroudRoom`, before the start rolls), Cut Coin (`cutCoin`) and
+  Shrike Wreath (`shrikeWreath`) after them (`afterReveals`, `setupOfferings`) — and two asked in
+  the game: Vigo's Blueprint (`vigo`, put in front of whatever the game waits for by `run`, which
+  it then goes back to: `resume`) and White Ward (`whiteWard`, a task after the discard's perks).
+  An offering at work shows its card (the `offering` event).
 - 2–5 players. With 3–4 players one player controls two survivors sharing one hand (p.19).
   **Two players** (p.6): one player controls all four survivors (`handLayout(2)`: one hand).
   Each planning, two sets of survivor cards are shuffled into a deck (`survivorDeck`) and three
@@ -1150,6 +1163,28 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   all of them); reopening a character clears every loadout. A card someone sets shows as taken to
   the rest of their side at once (first come); Devout's picks are otherwise hidden until the game
   starts.
+- Offerings (p.19): who burns them is a room setting, not a decision at the table each game; the
+  rulebook's "the side behind" is left to the players. A side's offerings are different cards.
+  Ebony Memento Mori pays back any bonus turn paid for (The Doctor's cheaper one too), not
+  Slipstream's free one. Torn Blueprint removes the first generator turned face up, in setup or
+  later; the survivors still need 4 of the 7 left. Chalk Pouch turns a skill die's "4" into a 5
+  on the roll to get free of a carry (the log shows the 5). Sweet William Sachet: sabotaging a
+  hook (a rescue too) or trying to cleanse a totem, whatever the roll; the first survivor each
+  round gains the ▲ (`offeringsUsed`). Murky Reagent skips the setup reveals: the minis roll their
+  rooms at once.
+  Shroud of Union: the first player in turn order picks the room (online, that survivor's player);
+  any room, a start room or not; the killer still rolls his. Cut Coin: the killer picks the tiles
+  face down (he doesn't see whether a chest or a locker), so only the room matters; Singularity's
+  EMPs, dealt among the survival props, may be taken too. Shrike Wreath: 2 different survivors; the
+  extra progress (`extraSacrifice`) goes to the track with their own at their first hanging, all at
+  once; perks that ask whether a board still holds sacrifice progress count it (`tokensOn`). Cut
+  Coin comes before Shrike Wreath, both after the start rolls.
+  Vigo's Blueprint: asked of the survivor who revealed the gate (setup reveals too), each time a
+  gate is revealed, when a face-up generator with no progress is on the board; the two tiles swap
+  rooms. White Ward: every discard (after use or not), once Built to Last and Appraisal have had
+  their say (if one keeps the item, nothing is asked); asked of the survivors in turn order who have
+  2 ▲ and aren't on a hook, until one pays; "ไม่ต้องถามฉันอีก" stops asking that survivor for the
+  game (`wardMuted`). The item goes on top of the item deck, the next drawn.
 - No One Left Behind: its owner's interaction, in a room with a revealed exit gate (powered or
   not). One survivor of their choice — themselves included — moves along any one path, as after a
   rescue: any colour, one way on a vault, never through a wall or the Entity.

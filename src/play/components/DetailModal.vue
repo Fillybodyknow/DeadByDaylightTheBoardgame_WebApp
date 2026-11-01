@@ -88,6 +88,7 @@ const item = computed(() => {
           <li v-if="survivor.sv.knives" :class="{ bad: survivor.sv.knives === 3 }">Knife {{ survivor.sv.knives }}/3 — <BpIcon /> สูงสุด −{{ 2 * survivor.sv.knives }}{{ survivor.sv.knives === 3 ? ' · หายบาดเจ็บไม่ได้' : '' }} (เข้า Locker เพื่อทิ้ง)</li>
           <li>{{ survivor.sv.item ? (itemHidden(st, survivor.s) ? 'ถือ item อยู่ (ไม่เปิดเผย)' : `ถือ ${ITEM_NAMES[survivor.sv.item]}`) : 'ไม่มี item' }}</li>
           <li>{{ survivor.sv.sacrificeToken ? 'ยังไม่เคยถูกแขวน' : 'เคยถูกแขวนแล้ว' }}</li>
+          <li v-if="survivor.sv.extraSacrifice">Sacrifice Progress เพิ่มบนบอร์ด {{ survivor.sv.extraSacrifice }} อัน (พวงดอกไม้นกอีเสือ)</li>
         </ul>
         <p v-if="!perkList.length" class="muted small">ตัวละครนี้ยังไม่มี Perk ในโหมดนี้</p>
       </template>

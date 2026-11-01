@@ -163,6 +163,9 @@ export interface RoomData {
   perksDone?: Record<string, boolean>
   /** Bloodweb's shuffle, drawn when the picks open: every device deals the same cards. */
   perkSeed?: number
+  /** Offerings (settings `offerings`): each side's picks ("a,b", by side) and whether they are confirmed. */
+  offeringPicks?: Record<string, string>
+  offeringsDone?: Record<string, boolean>
   game: GameState | null
   /** Moves played so far (the checkpoint's own count plus the ones replayed on top). */
   rev: number

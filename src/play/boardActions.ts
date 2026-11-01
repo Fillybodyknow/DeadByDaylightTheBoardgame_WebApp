@@ -27,11 +27,14 @@ import {
   phantasmInteractions,
   propsIn,
   roomName,
+  cutCoinTargets,
+  vigoGenerators,
   survivorInteractions,
   survivorMoves,
   touchingPaths,
 } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
+import { boards } from './engine/boards'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
 import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
@@ -296,6 +299,19 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   switch (s.t) {
     case 'setupReveal':
       for (const p of faceDown()) add(`prop:${p.id}`, 'เปิด prop นี้', go({ t: 'setupReveal', prop: p.id }, sfx.select), 'flip')
+      break
+    // the setup offerings (p.19): a room for everyone, face-down survival props out, survivors marked
+    case 'shroudRoom':
+      for (const r of boards[st.board].rooms) add(`room:${r.id}`, `ทุกคนเริ่มที่ ${roomName(st, r.id)}`, go({ t: 'shroudRoom', room: r.id }, sfx.drop))
+      break
+    case 'vigo':
+      for (const p of vigoGenerators(st)) add(`prop:${p.id}`, `สลับกับ Exit Gate (${roomName(st, p.room!)})`, go({ t: 'vigo', gen: p.id }, sfx.select), 'act')
+      break
+    case 'cutCoin':
+      for (const p of cutCoinTargets(st)) add(`prop:${p.id}`, 'เอา prop นี้ออกจากเกม', go({ t: 'cutCoin', prop: p.id }, sfx.select), 'act')
+      break
+    case 'shrikeWreath':
+      st.survivors.forEach((sv, t) => !s.chosen.includes(t) && add(`s:${t}`, `Sacrifice Progress เพิ่มบนบอร์ดของ ${sv.name}`, go({ t: 'shrike', s: t }, sfx.select), 'act', t))
       break
     case 'revealProp':
       for (const p of faceDown(s.room)) add(`prop:${p.id}`, 'เปิด prop นี้', go({ t: 'reveal', prop: p.id }, sfx.select), 'flip')

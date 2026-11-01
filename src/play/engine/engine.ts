@@ -9,6 +9,8 @@
 import { boards } from './boards'
 import { deckOf, layLoadout } from './loadout'
 import { PERKS, type PerkId } from './perks'
+import { OFFERING_SIDE, offeringName, offeringsOf, type OfferingId } from './offerings'
+import type { Side } from './loadout'
 import type {
   Action,
   Guard,
@@ -180,6 +182,10 @@ export interface GameConfig {
   startBp?: { survivor: number; killer: number }
   /** Players the computer plays (1 = the killer), see `GameState.bots`. */
   bots?: number[]
+  /** Offerings the sides picked (p.19). */
+  offerings?: OfferingId[]
+  /** Offerings drawn at random, by side: the top cards of that side's shuffled offerings (p.19). */
+  drawOfferings?: Partial<Record<Side, number>>
 }
 
 /** Survivor hand index for each of the 4 survivors, by player count (p.6, p.19). */
@@ -323,11 +329,41 @@ export function createGame(config: GameConfig): GameState {
   // Step 2: first player marker.
   st.firstPlayer = Math.floor(random(st) * 4)
 
+  burnOfferings(st, config)
+
   // Step 5 (cont.): each survivor, in turn order, reveals one prop anywhere. The minis come onto
   // the board after that (step 11), so nobody reveals knowing where anyone starts.
   st.startPending = true
+  // Murky Reagent: the survivors reveal no props during setup
+  if (hasOffering(st, 'murky-reagent')) {
+    afterReveals(st)
+    if (st.step.t === 'idle') run(st)
+    return st
+  }
   st.step = { t: 'setupReveal', s: st.firstPlayer }
   return st
+}
+
+/** The game's offerings (p.19): the picked ones, then each drawing side's top cards of its shuffled ones. */
+function burnOfferings(st: GameState, config: GameConfig) {
+  const out: OfferingId[] = [...new Set(config.offerings ?? [])]
+  for (const side of ['survivor', 'killer'] as const) {
+    const n = config.drawOfferings?.[side] ?? 0
+    if (n > 0) out.push(...shuffle(st, offeringsOf(side).filter((o) => !out.includes(o))).slice(0, n))
+  }
+  if (!out.length) return
+  st.offerings = out
+  for (const o of out) log(st, `เผา Offering: ${offeringName(o)}`, OFFERING_SIDE[o] === 'killer' ? 'killer' : 'game')
+}
+
+/** Sacrifice progress on a survivor's board: their own token, and Shrike Wreath's. */
+export function tokensOn(sv: SurvivorState): number {
+  return (sv.sacrificeToken ? 1 : 0) + (sv.extraSacrifice ?? 0)
+}
+
+/** This offering was burnt for the game. */
+export function hasOffering(st: GameState, o: OfferingId): boolean {
+  return st.offerings?.includes(o) ?? false
 }
 
 /**
@@ -411,18 +447,49 @@ export function merchantDrones(st: GameState): Prop[] {
   return st.props.filter((p) => p.kind === 'drone' && p.merchant)
 }
 
-/** Setup step 11 (p.6): every mini rolls a skill check die for its start room. */
-function rollStartRooms(st: GameState) {
+/**
+ * Every survivor has revealed a prop (or none did: Murky Reagent). Shroud of Union asks the
+ * survivors their room first; then the minis come onto the board and the killer has his setup
+ * offerings.
+ */
+function afterReveals(st: GameState) {
+  if (hasOffering(st, 'shroud-of-union') && st.startPending) return wait(st, { t: 'shroudRoom', s: turnOrder(st)[0] })
+  rollStartRooms(st)
+  setupOfferings(st)
+}
+
+/** "After setup" (p.19): Cut Coin, then Shrike Wreath, each once; then the first planning. */
+function setupOfferings(st: GameState) {
+  const once = (o: OfferingId) => hasOffering(st, o) && !st.offeringsUsed?.includes(o) && !!(st.offeringsUsed = [...(st.offeringsUsed ?? []), o])
+  if (once('cut-coin') && cutCoinTargets(st).length) return wait(st, { t: 'cutCoin', left: Math.min(2, cutCoinTargets(st).length) })
+  if (once('shrike-wreath')) return wait(st, { t: 'shrikeWreath', chosen: [] })
+  startPlanning(st)
+}
+
+/** Cut Coin's choices: every face-down survival prop on the board. */
+export function cutCoinTargets(st: GameState): Prop[] {
+  return st.props.filter((p) => p.category === 'survival' && p.room !== null && !p.revealed && !p.removed)
+}
+
+/**
+ * Setup step 11 (p.6): every mini rolls a skill check die for its start room. `together`: Shroud
+ * of Union's room, where every survivor starts instead (start room or not); the killer still rolls.
+ */
+function rollStartRooms(st: GameState, together?: string) {
   // a game saved mid-setup before this order came in has its minis placed already
   if (!st.startPending) return
   delete st.startPending
   const board = boardOf(st)
   const startRoom = (face: number) => board.rooms.find((r) => r.startFace === face)!.id
-  st.survivors.forEach((sv, i) => {
-    const face = rollFace(st)
-    sv.room = startRoom(face)
-    log(st, `${sv.name} ทอยได้ ${face} เริ่มที่ ${roomName(st, sv.room)}`, i)
-  })
+  if (together) {
+    for (const sv of st.survivors) sv.room = together
+    log(st, `${offeringName('shroud-of-union')}: ผู้รอดชีวิตทุกคนเริ่มที่ ${roomName(st, together)}`, 'game')
+  } else
+    st.survivors.forEach((sv, i) => {
+      const face = rollFace(st)
+      sv.room = startRoom(face)
+      log(st, `${sv.name} ทอยได้ ${face} เริ่มที่ ${roomName(st, sv.room)}`, i)
+    })
   const kf = rollFace(st)
   st.killer.room = startRoom(kf)
   placeDrones(st)
@@ -816,6 +883,18 @@ function run(st: GameState) {
     if (!task) fail('nothing to do')
     runTask(st, task)
   }
+  // Vigo's Blueprint: the survivor who revealed an exit gate is asked before anything else, the
+  // decision the game waits for kept for after (a reveal sits in the middle of a move or a setup)
+  const v = st.vigoPending
+  if (v) {
+    delete st.vigoPending
+    if (st.phase !== 'over' && vigoGenerators(st).length) st.step = { t: 'vigo', s: v.s, gate: v.gate, resume: st.step }
+  }
+}
+
+/** Vigo's Blueprint's choices: face-up generators on the board with no progress. */
+export function vigoGenerators(st: GameState): Prop[] {
+  return st.props.filter((p) => p.kind === 'generator' && p.room !== null && p.revealed && !p.removed && !p.done && p.progress === 0)
 }
 
 function log(st: GameState, text: string, who: LogWho, extra: { dice?: Die[]; ev?: GameEvent } = {}) {
@@ -853,11 +932,56 @@ function handle(st: GameState, a: Action) {
       revealProp(st, p, step.s)
       const next = turnOrder(st).indexOf(step.s) + 1
       if (next < 4) wait(st, { t: 'setupReveal', s: turnOrder(st)[next] })
-      else {
-        rollStartRooms(st)
-        startPlanning(st)
-      }
+      else afterReveals(st)
       return
+    }
+    case 'vigo': {
+      if (a.t !== 'vigo') break
+      if (a.gen !== null) {
+        const gen = vigoGenerators(st).find((p) => p.id === a.gen) ?? fail('not a face-up generator without progress')
+        const gate = st.props.find((p) => p.id === step.gate)!
+        ;[gate.room, gen.room] = [gen.room, gate.room]
+        log(st, `${offeringName('vigos-blueprint')}: ${st.survivors[step.s].name} สลับ Exit Gate ไป ${roomName(st, gate.room!)} กับ Generator ไป ${roomName(st, gen.room!)}`, step.s, { ev: { k: 'offering', who: step.s, id: 'vigos-blueprint' } })
+      }
+      st.step = step.resume
+      return
+    }
+    case 'whiteWard': {
+      if (a.t !== 'ward') break
+      const sv = st.survivors[step.s]
+      if (a.pay) {
+        if (sv.bp < WARD_COST) fail('not enough ▲')
+        sv.bp -= WARD_COST
+        st.itemDeck.unshift(step.item)
+        log(st, `${offeringName('white-ward')}: ${sv.name} จ่าย ${WARD_COST} ▲ — ${ITEM_NAMES[step.item]} กลับไปบนสุดของกอง Item`, step.s, { ev: { k: 'offering', who: step.s, id: 'white-ward' } })
+        return
+      }
+      if (a.mute) st.wardMuted = [...(st.wardMuted ?? []), step.s]
+      return askWard(st, step.item, [...step.asked, step.s])
+    }
+    case 'shroudRoom': {
+      if (a.t !== 'shroudRoom') break
+      if (!boardOf(st).rooms.some((r) => r.id === a.room)) fail('no such room')
+      rollStartRooms(st, a.room)
+      return setupOfferings(st)
+    }
+    case 'cutCoin': {
+      if (a.t !== 'cutCoin') break
+      const p = cutCoinTargets(st).find((x) => x.id === a.prop) ?? fail('not a face-down survival prop')
+      p.removed = true
+      log(st, `${offeringName('cut-coin')}: ${st.killer.name} เอา prop สีน้ำเงินที่คว่ำอยู่ใน ${roomName(st, p.room!)} ออกจากเกม`, 'killer', { ev: { k: 'offering', who: 'killer', id: 'cut-coin' } })
+      if (step.left > 1 && cutCoinTargets(st).length) return wait(st, { t: 'cutCoin', left: step.left - 1 })
+      return setupOfferings(st)
+    }
+    case 'shrikeWreath': {
+      if (a.t !== 'shrike') break
+      if (!st.survivors[a.s] || step.chosen.includes(a.s)) fail('pick another survivor')
+      const sv = st.survivors[a.s]
+      sv.extraSacrifice = (sv.extraSacrifice ?? 0) + 1
+      log(st, `${offeringName('shrike-wreath')}: Sacrifice Progress เพิ่มบนบอร์ดของ ${sv.name}`, 'killer', { ev: { k: 'offering', who: 'killer', id: 'shrike-wreath' } })
+      const chosen = [...step.chosen, a.s]
+      if (chosen.length < 2) return wait(st, { t: 'shrikeWreath', chosen })
+      return setupOfferings(st)
     }
     case 'planStridor': {
       if (a.t !== 'planStridor') break
@@ -1227,6 +1351,11 @@ function handle(st: GameState, a: Action) {
       k.bonusUsed = true
       k.bonusAt = k.planned.length - 1
       log(st, step.free ? `${k.name} เล่น Bonus Turn (สลิปสตรีม) ด้วย ${CARD_NAMES[a.card]}` : `${k.name} จ่าย ${cost} ▲ เล่น Bonus Turn`, 'killer')
+      // Ebony Memento Mori: a bonus turn paid for (not Slipstream's free one) gives a ▲ back
+      if (!step.free && hasOffering(st, 'ebony-memento-mori')) {
+        gainKiller(st, 1)
+        log(st, `${offeringName('ebony-memento-mori')}: ${k.name} +1 ▲`, 'killer', { ev: { k: 'offering', who: 'killer', id: 'ebony-memento-mori' } })
+      }
       st.queue.push({ k: 'killerTurn', turn: k.planned.length - 1 })
       return
     }
@@ -1384,6 +1513,8 @@ function same(a: object, b: object): boolean {
 
 function runTask(st: GameState, task: Task) {
   switch (task.k) {
+    case 'whiteWard':
+      return askWard(st, task.item, [])
     case 'survivorTurn': {
       const sv = st.survivors[task.s]
       // Forced Hesitation took their card: no turn of their own, on to the next one's
@@ -1917,6 +2048,15 @@ function revealOnEnter(st: GameState, room: string, who: number | 'killer', aske
 function revealProp(st: GameState, p: Prop, who: LogWho) {
   p.revealed = true
   log(st, `เปิด ${PROP_NAMES[p.kind]} ที่ ${roomName(st, p.room!)}`, who, { ev: { k: 'reveal', prop: p.id, kind: p.kind, room: p.room! } })
+  // Vigo's Blueprint: a survivor's exit gate (the question waits for the game to: `run`)
+  if (p.kind === 'exitGate' && typeof who === 'number' && hasOffering(st, 'vigos-blueprint')) st.vigoPending = { s: who, gate: p.id }
+  // Torn Blueprint: the first generator revealed this game is removed (in setup too). It is the
+  // only one face up then: a generator never turns face down again.
+  if (p.kind === 'generator' && hasOffering(st, 'torn-blueprint') && st.props.filter((g) => g.kind === 'generator' && g.revealed).length === 1) {
+    p.removed = true
+    log(st, `${offeringName('torn-blueprint')}: เอา Generator ที่ ${roomName(st, p.room!)} ออกจากเกม`, 'killer', { ev: { k: 'offering', who: 'killer', id: 'torn-blueprint' } })
+    return
+  }
   // Spies from the Shadows: the crows tell the killer, whoever turned the tile over.
   if (p.kind === 'crow' && st.phase !== 'setup' && perkReady(st, 'killer', 'spies_from_the_shadows')) {
     payPerk(st, 'killer', 'spies_from_the_shadows', '+1 ▲')
@@ -2021,6 +2161,7 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       const hooked = prop!.occupant
       if (hooked === null) {
         log(st, `${sv.name} วาง Entity บน Hook`, s)
+        sweetWilliam(st, s)
         kindred(st, s, null)
         trigger(st, { k: 'afterSabotage', s })
         return
@@ -2031,6 +2172,7 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       r.room = sv.room
       gainSurvivor(st, s, 1)
       log(st, `${sv.name} ช่วย ${r.name} ลงจาก Hook (+1 ▲)`, s, { ev: { k: 'rescue', s: hooked, by: s } })
+      sweetWilliam(st, s)
       kindred(st, s, hooked)
       // The rescuer moves along any path, then the rescued survivor does (p.13).
       st.queue.unshift({ k: 'anyMove', s }, { k: 'anyMove', s: hooked })
@@ -2038,6 +2180,19 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       return
     }
   }
+}
+
+/**
+ * Sweet William Sachet: once per round, a survivor who interacts with a boldness prop (sabotaging a
+ * hook, trying to cleanse a totem, whatever the roll) gains a ▲.
+ */
+function sweetWilliam(st: GameState, s: number) {
+  const o: OfferingId = 'sweet-william-sachet'
+  if (!hasOffering(st, o) || st.offeringsUsed?.includes(o)) return
+  st.offeringsUsed = [...(st.offeringsUsed ?? []), o]
+  const before = st.survivors[s].bp
+  gainSurvivor(st, s, 1)
+  log(st, `${offeringName(o)}: ${st.survivors[s].name} +${st.survivors[s].bp - before} ▲`, s, { ev: { k: 'offering', who: s, id: o } })
 }
 
 function placeEntity(st: GameState, place: EntityPlace) {
@@ -2357,6 +2512,13 @@ function hang(st: GameState, s: number, hook: Prop, asked = false) {
     sv.sacrificeToken = false
     addSacrifice(st, 1)
   }
+  // Shrike Wreath's: all of them at their first hanging, with their own
+  if (sv.extraSacrifice && st.phase !== 'over') {
+    const n = sv.extraSacrifice
+    sv.extraSacrifice = 0
+    log(st, `${offeringName('shrike-wreath')}: ${sv.name} — Sacrifice Progress +${n}`, 'killer', { ev: { k: 'offering', who: 'killer', id: 'shrike-wreath' } })
+    addSacrifice(st, n)
+  }
   // Grim Embrace: the ▲ on their board, each a sacrifice progress
   if (sv.embrace && st.phase !== 'over') {
     const n = sv.embrace
@@ -2478,7 +2640,7 @@ function cleanup(st: GameState) {
     bonusAt: null,
     shown: [],
   })
-  Object.assign(st, { perksUsed: [], perksMuted: [], healedWith: [], genBy: {}, empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, geneticLimits: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
+  Object.assign(st, { perksUsed: [], offeringsUsed: [], perksMuted: [], healedWith: [], genBy: {}, empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, geneticLimits: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
   startPlanning(st)
@@ -2576,6 +2738,12 @@ function joltDie(ctx: RollContext, d: Die): boolean {
 
 /** `jolted`: the killer has already been asked about Jolt for this roll. */
 function resolveRoll(st: GameState, ctx: RollContext, dice: Die[], failBp?: number, jolted = false) {
+  // Chalk Pouch: on the roll to get free of the killer's carry, a skill die's "4" is a great success
+  const chalk = (d: Die) => d.kind === 'skill' && d.face === 4 && !d.asFailure
+  if (ctx.k === 'carry' && hasOffering(st, 'chalk-pouch') && dice.some(chalk)) {
+    dice = dice.map((d) => (chalk(d) ? { ...d, face: 5 } : d))
+    log(st, `${offeringName('chalk-pouch')}: "4" → สำเร็จอย่างยิ่ง`, ctx.s, { ev: { k: 'offering', who: ctx.s, id: 'chalk-pouch' } })
+  }
   if (!jolted && dice.some((d) => joltDie(ctx, d))) {
     const w: PerkWindow = { k: 'rolled', s: ctx.s, ctx: ctx.k, dice }
     if (perkCandidates(st, w, []).length) {
@@ -2663,6 +2831,7 @@ function finishRoll(st: GameState, ctx: RollContext, dice: Die[], fails: number,
       return
     }
     case 'cleanse': {
+      sweetWilliam(st, s)
       if (!ok) return
       st.props.find((p) => p.id === ctx.prop)!.removed = true
       const before = sv.bp
@@ -2841,6 +3010,24 @@ function discardItem(st: GameState, s: number, item: string, used: boolean) {
   if (st.survivors[s].item === item) st.survivors[s].item = null
   trigger(st, { k: 'itemDiscard', s, item })
   if (used) trigger(st, { k: 'itemUsed', s, item })
+  // White Ward: asked after those (Built to Last or Appraisal keeping the item takes it off)
+  if (hasOffering(st, 'white-ward')) st.queue.splice(used ? 2 : 1, 0, { k: 'whiteWard', s, item })
+}
+
+/** White Ward's price (p.19). */
+export const WARD_COST = 2
+
+/** White Ward: the next survivor in turn order who may pay for `item` (not on a hook, 2 ▲, not muted). */
+function askWard(st: GameState, item: string, asked: number[]) {
+  const s = turnOrder(st).find(
+    (i) => !asked.includes(i) && !st.wardMuted?.includes(i) && st.survivors[i].status !== 'hooked' && st.survivors[i].bp >= WARD_COST,
+  )
+  if (s !== undefined) wait(st, { t: 'whiteWard', s, item, asked })
+}
+
+/** The item is kept after all (Built to Last, Appraisal): White Ward has nothing to save. */
+function wardDone(st: GameState, s: number, item: string) {
+  st.queue = st.queue.filter((t) => !(t.k === 'whiteWard' && t.s === s && t.item === item))
 }
 
 function applyItem(st: GameState, s: number, use: ItemUse) {
@@ -3226,7 +3413,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     case 'genetic_limits':
       // a survivor with their sacrifice progress still on their board
       if (w.k !== 'planningEnd') return []
-      return st.survivors.flatMap((sv, i) => (sv.sacrificeToken && st.geneticLimits !== i ? [{ target: i }] : []))
+      return st.survivors.flatMap((sv, i) => (tokensOn(sv) && st.geneticLimits !== i ? [{ target: i }] : []))
     case 'forced_hesitation':
       // Wait still in his hand (not set): a survivor on the board with a card set
       if (w.k !== 'planningEnd' || !k.hand.includes('wait')) return []
@@ -3645,7 +3832,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
     case 'blood_rush':
       // the end of any turn of his (a bonus turn's too: a house rule), with no sacrifice progress on his board
-      if ((w.k !== 'turnEnd' && w.k !== 'bonusEnd') || w.s !== o || me!.status !== 'board' || me!.sacrificeToken) return []
+      if ((w.k !== 'turnEnd' && w.k !== 'bonusEnd') || w.s !== o || me!.status !== 'board' || tokensOn(me!)) return []
       return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
     // ----- Gabriel -----
     case 'scavenger':
@@ -3672,7 +3859,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // at the start of her turn: a wounded survivor on the board (anywhere) with no sacrifice
       // progress left on their board
       if (w.k !== 'turnStart' || w.s !== o) return []
-      return st.survivors.flatMap((sv, i) => (sv.status === 'board' && !sv.sacrificeToken && healable(st, i) ? [{ target: i }] : []))
+      return st.survivors.flatMap((sv, i) => (sv.status === 'board' && !tokensOn(sv) && healable(st, i) ? [{ target: i }] : []))
     case 'weaving_spiders': {
       // her interaction for the turn: 6 ▲ from the survivors in her room, for a face-up generator
       if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract) return []
@@ -4643,6 +4830,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       const old = me.item
       payPerk(st, o, perk, `รับ ${ITEM_NAMES[item]} ที่ ${name(s)} ทิ้ง${old ? ` แล้วทิ้ง ${ITEM_NAMES[old]} ของตัวเอง` : ''}`)
       me.item = item
+      wardDone(st, s, item)
       return
     }
     case 'residual_manifest': {
@@ -4687,6 +4875,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, `เก็บ ${ITEM_NAMES[item]} ไว้ — ใช้อีกไม่ได้ในเทิร์นนี้`)
       st.survivors[s].item = item
       st.itemLock = s
+      wardDone(st, s, item)
       st.kept = [...(st.kept ?? []), { s, item }]
       return
     }

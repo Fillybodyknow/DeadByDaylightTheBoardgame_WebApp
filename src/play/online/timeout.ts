@@ -22,6 +22,11 @@ function answer(st: GameState, seat: number): Action | null {
       return { t: 'declineBonus' }
     case 'turnStart':
       return { t: 'continue' }
+    // the offerings asked in the game: no swap, nothing paid
+    case 'vigo':
+      return mine(s.s) ? { t: 'vigo', gen: null } : null
+    case 'whiteWard':
+      return mine(s.s) ? { t: 'ward', pay: false } : null
     case 'phantasmChoice':
       return { t: 'phantasm', teleport: false }
     case 'twinChoice':

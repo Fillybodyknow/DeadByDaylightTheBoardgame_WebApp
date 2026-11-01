@@ -23,6 +23,9 @@ export function stepOwner(st: GameState): PerkOwner | null {
   const s = st.step
   switch (s.t) {
     case 'setupReveal':
+    case 'shroudRoom':
+    case 'vigo':
+    case 'whiteWard':
     case 'planStridor':
     case 'survivorMove':
     case 'innerFocus':
@@ -48,6 +51,8 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'roll':
       return s.ctx.s
     case 'planKiller':
+    case 'cutCoin':
+    case 'shrikeWreath':
     case 'killerMove':
     case 'killerAnyMove':
     case 'killerInteract':

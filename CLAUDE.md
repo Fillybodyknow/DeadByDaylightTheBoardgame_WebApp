@@ -53,6 +53,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 | `src/play/engine/` | Rules engine: `engine.ts` (pure reducer), `types.ts`, `perks.ts`, `legal.ts`, `seats.ts`, `boards.ts` (board graphs, read from the map art; `boards.test.ts` checks them), tests |
 | `src/play/components/` | Game UI: `GameScreen` (layout), `Board`, `ActionPanel`, `PerkPrompt`, `Planning`, `CardHand`, `StatusPanel` (player tiles), `ObjectiveHud` (both sides' goals, under the tiles), modals |
 | `src/play/engine/loadout.ts` | Game modes Adept / Bloodweb / Devout (p.19): the perk-card deck, Bloodweb's draws, what a loadout may hold; `createGame` takes each character's `perks` |
+| `src/play/engine/offerings.ts` | Offerings (p.19): ids, sides, all ten played (`READY_OFFERINGS`), how many a side burns. Room settings `offerings` / `offeringCount` / `offeringRandom`; `createGame` takes `offerings` and `drawOfferings`; effects in `engine.ts` (`hasOffering`) |
 | `src/play/components/PerkLoadout.vue` | The perk loadout screen (PC game style): 3 slots, a honeycomb of perk cards with cost badges, a details box (`PerkRichText` lights key words) |
 | `src/play/boardActions.ts` | Everything clickable on the board right now |
 | `src/play/focus.ts` | Board highlights and the facts listed for a decision |
@@ -147,6 +148,12 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 - **The game's last beat shows before the summary:** Sacrifice filling up or the exit gate
   opening (`FinaleReveal`, `fx.finale`, queued on the `gameOver` event after the cards and rolls
   before it); the screen holds the old state until it is done.
+- **The offerings burn first** (`OfferingBurn`, `fx.offerings`): a game with offerings opens on
+  them dealt into a row one by one, a moment to read, then all burnt together like paper, each from one of
+  its corners, the edge ragged (`fx/paperBurn.ts`, a canvas), with embers; a click skips. Once per game (`OFFERINGS_SEEN`), before the start-room rolls, and
+  nobody is asked anything meanwhile (`opening` in GameScreen).
+- **An offering at work shows its card** as a perk's does (`PerkReveal`, fire-orange rays): the
+  engine logs an `offering` event with each effect, and GameScreen queues it (`showPerk({ offering })`).
 - **The start-room rolls are on the map, not in a modal** (`StartPlacement`, `fx.starts`): after the
   last prop reveal each mini's die tumbles in a strip at the panel's place and the mini drops onto
   its room (`Board`'s `hideMinis`); nobody is asked anything until all are placed. Once per game

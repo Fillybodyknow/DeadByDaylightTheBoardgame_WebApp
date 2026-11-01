@@ -2,11 +2,13 @@
 // What the current player can do now. Every button dispatches one engine action; moves can
 // also be made by clicking the highlighted paths on the board.
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
+import { offeringName } from '../engine/offerings'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { boardOf,
   CARD_NAMES,
   ITEM_NAMES,
+  WARD_COST,
   antidoteKillerMoves,
   bonusCost,
   charlotteRoom,
@@ -100,11 +102,17 @@ function act(a: Action) {
   if (dispatch(a)) sfx.click()
 }
 
+/** The room a prop stands in, by name (Vigo's Blueprint names the exit gate's). */
+const propRoom = (id: string) => roomName(props.st, props.st.props.find((p) => p.id === id)?.room ?? '')
+
 /** Who has to act for this step: a survivor index or 'killer'. */
 const actor = computed<number | 'killer' | null>(() => {
   const s = step.value
   switch (s.t) {
     case 'setupReveal':
+    case 'shroudRoom':
+    case 'vigo':
+    case 'whiteWard':
     case 'survivorMove':
     case 'innerFocus':
     case 'empathyAsk':
@@ -121,6 +129,8 @@ const actor = computed<number | 'killer' | null>(() => {
     case 'turnStart':
       return s.s
     case 'pickSurvivor':
+    case 'cutCoin':
+    case 'shrikeWreath':
     case 'carnifexProp':
     case 'carnifexMove':
     case 'reignPath':
@@ -391,6 +401,37 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <template v-if="step.t === 'setupReveal'">
       <p>เตรียมเกม: คลิก <b>ไทล์คว่ำ</b> ที่ใดก็ได้บนแผนที่ เพื่อเปิด prop 1 อัน — สีบอกหมวด (หน้า 6)</p>
       <p class="muted small">เปิดครบทุกคนแล้ว ทุกตัวละครจะทอยเต๋าหาห้องเริ่มแล้วลงกระดาน</p>
+    </template>
+
+    <!-- the setup offerings (p.19) -->
+    <template v-else-if="step.t === 'shroudRoom'">
+      <p><b>{{ offeringName('shroud-of-union') }}</b>: ฝั่ง Survivor เลือกห้อง 1 ห้องที่ทุกคนจะเริ่มด้วยกัน — ห้องไหนก็ได้ ไม่ต้องเป็นห้องเริ่ม</p>
+      <p class="board-hint">🎯 คลิกห้องบนแผนที่ · ฆาตกรยังทอยหาห้องเริ่มตามปกติ</p>
+    </template>
+    <template v-else-if="step.t === 'vigo'">
+      <p><b>{{ offeringName('vigos-blueprint') }}</b>: เปิดเจอ Exit Gate ที่ {{ propRoom(step.gate) }} — สลับกับ Generator ที่หงายอยู่และยังไม่มีความคืบหน้าไหม?</p>
+      <p class="board-hint">🎯 คลิก Generator ที่กระพริบบนแผนที่เพื่อสลับ</p>
+      <div class="buttons">
+        <button class="ghost" @click="act({ t: 'vigo', gen: null })">ไม่สลับ</button>
+      </div>
+    </template>
+    <template v-else-if="step.t === 'whiteWard'">
+      <p><b>{{ offeringName('white-ward') }}</b>: {{ ITEM_NAMES[step.item] }} กำลังจะถูกทิ้ง — จ่าย {{ WARD_COST }} ▲ เพื่อวางไว้บนสุดของกอง Item ไหม? (มี {{ st.survivors[step.s].bp }} ▲)</p>
+      <div class="buttons">
+        <button class="primary" :disabled="st.survivors[step.s].bp < WARD_COST" @click="act({ t: 'ward', pay: true })">จ่าย {{ WARD_COST }} ▲ เก็บไว้บนกอง</button>
+        <button class="ghost" @click="act({ t: 'ward', pay: false })">ไม่จ่าย</button>
+        <button class="ghost" @click="act({ t: 'ward', pay: false, mute: true })">ไม่ต้องถามฉันอีก</button>
+      </div>
+    </template>
+    <template v-else-if="step.t === 'cutCoin'">
+      <p><b>{{ offeringName('cut-coin') }}</b>: เอา prop <b>สีน้ำเงิน</b> ที่คว่ำอยู่ออกจากเกม อีก {{ step.left }} อัน</p>
+      <p class="board-hint">🎯 คลิกไทล์สีน้ำเงินที่คว่ำอยู่บนแผนที่ — ไม่รู้ว่าเป็น Chest หรือ Locker</p>
+    </template>
+    <template v-else-if="step.t === 'shrikeWreath'">
+      <p><b>{{ offeringName('shrike-wreath') }}</b>: เลือกผู้รอดชีวิตอีก {{ 2 - step.chosen.length }} คน วาง Sacrifice Progress เพิ่มบนบอร์ด — ไปเข้าราง Sacrifice ตอนเขาถูกแขวนครั้งแรก</p>
+      <div class="buttons">
+        <button v-for="(sv, s) in st.survivors" v-show="!step.chosen.includes(s)" :key="s" class="primary" @click="act({ t: 'shrike', s })"><FaceLabel :st="st" :who="s" :text="sv.name" /></button>
+      </div>
     </template>
 
     <template v-else-if="step.t === 'revealProp'">

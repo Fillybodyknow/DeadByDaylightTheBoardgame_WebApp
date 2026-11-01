@@ -31,6 +31,13 @@ import {
   perkProblem,
   perkStage,
   perksWaiting,
+  offeringsWaiting,
+  offeringSlotsNow,
+  myOfferingSide,
+  myOfferings,
+  myOfferingsDone,
+  setOfferings,
+  confirmOfferings,
   roomLoadouts,
   setLoadout,
   doubleId,
@@ -67,6 +74,8 @@ import CharacterPicker from './CharacterPicker.vue'
 import StageBar from './StageBar.vue'
 import { PING_COLORS, pingHex } from '../online/pingColors'
 import PerkLoadout from './PerkLoadout.vue'
+import OfferingPicker from './OfferingPicker.vue'
+import { offeringProblem, type OfferingId } from '../engine/offerings'
 import MapPicker from './MapPicker.vue'
 import Mini from './Mini.vue'
 import RoomSettingsCard from './RoomSettingsCard.vue'
@@ -356,6 +365,22 @@ function confirmLoadout(key: string, on: boolean) {
   void confirmPerks(key, on)
 }
 
+// ---------- offerings (p.19): this player's side's, once the characters and perks are in ----------
+
+/** This side's slots, when it picks its offerings now (null: nothing to pick here). */
+const myOfferingSlots = computed(() => {
+  const side = myOfferingSide.value
+  return side && offeringsWaiting.value.concat(myOfferingsDone.value ? [side] : []).includes(side) ? offeringSlotsNow.value[side] : null
+})
+const myOfferingProblem = computed(() => (myOfferingSide.value && myOfferingSlots.value ? offeringProblem(myOfferingSide.value, myOfferings.value, myOfferingSlots.value) : ''))
+function pickOfferings(list: OfferingId[]) {
+  void setOfferings(list)
+}
+function confirmMyOfferings(on: boolean) {
+  sfx.select()
+  void confirmOfferings(on)
+}
+
 function toggleLock() {
   // a character changing deals the perks again: everyone sets theirs anew
   if (locked.value && perkStage.value && !confirm('เปลี่ยนตัวละครจะล้าง Perk ที่ทุกคนแต่งไว้ ให้แต่งใหม่ทั้งหมด — ต่อไหม?')) return
@@ -399,6 +424,7 @@ const steps = computed(() => [
   ...(roomSettings.value.banlist ? [{ id: 'bans', label: 'แบนตัวละคร' }] : []),
   { id: 'chars', label: 'เลือกตัวละคร' },
   ...(roomSettings.value.mode !== 'adept' ? [{ id: 'perks', label: 'แต่ง Perk' }] : []),
+  ...(roomSettings.value.offerings !== 'none' && !roomSettings.value.offeringRandom ? [{ id: 'offerings', label: 'เลือก Offering' }] : []),
   { id: 'map', label: 'เลือกแผนที่' },
 ])
 const stepIndex = computed(() => Math.max(0, steps.value.findIndex((s) => s.id === stage.value)))
@@ -425,7 +451,9 @@ const seatStatus = computed(() =>
           ? !!data.value.locked[String(player)]
           : stage.value === 'perks'
             ? perkChars.value.filter((c) => playerOfKey(c.key) === player).every((c) => perkDone(c.key))
-            : true
+            : stage.value === 'offerings'
+              ? !offeringsWaiting.value.includes(killer ? 'killer' : 'survivor')
+              : true
     return { player, killer, bot: botSeat(data.value, player), name: data.value.seats[String(player)]?.name ?? '', mine: player === mySeat.value, done: hidden ? null : done }
   }),
 )
@@ -789,6 +817,27 @@ const seatStatus = computed(() =>
         </section>
         <section v-if="mySeat" class="card actions">
           <p class="muted center">{{ perksWaiting.length ? `รอทุกคนแต่ง Perk (${perksWaiting.length} ตัว)` : '' }}</p>
+        </section>
+      </template>
+
+      <!-- ===== 3 · offerings (room settings): each side that burns them picks, hidden from the other ===== -->
+      <template v-else-if="stage === 'offerings'">
+        <OfferingPicker
+          v-if="myOfferingSide && myOfferingSlots"
+          :model-value="myOfferings"
+          :side="myOfferingSide"
+          :slots="myOfferingSlots"
+          :problem="myOfferingProblem"
+          :confirmed="myOfferingsDone"
+          @update:model-value="pickOfferings"
+          @confirm="confirmMyOfferings"
+        />
+        <section v-else class="card wait-card">
+          <h2>🔥 กำลังเลือก Offering</h2>
+          <p class="muted">{{ offeringsWaiting.includes('killer') ? 'Killer' : 'ฝั่ง Survivor' }} กำลังเลือก Offering — จะรู้ตอนเริ่มเกม</p>
+        </section>
+        <section v-if="mySeat" class="card actions">
+          <p class="muted center">{{ offeringsWaiting.length ? 'รอเลือก Offering ให้ครบ' : '' }}</p>
         </section>
       </template>
 

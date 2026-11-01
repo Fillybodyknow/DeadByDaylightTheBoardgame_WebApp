@@ -3,9 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anim, settings } from '../../settings'
 import { botAction, botTurn, botsOnly, botsWaitedOn, onlineBotMove, peopleOnBothSides } from '../bots'
-import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
-import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
+import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showOfferings, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
 import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
@@ -31,7 +31,9 @@ import FinaleReveal from './FinaleReveal.vue'
 import SacrificeReveal from './SacrificeReveal.vue'
 import RushReveal from './RushReveal.vue'
 import StartPlacement from './StartPlacement.vue'
-import { SEEN, firstTime, gameKey, startMinis, startsRolled } from '../intro'
+import OfferingBurn from './OfferingBurn.vue'
+import { offeringName } from '../engine/offerings'
+import { OFFERINGS_SEEN, SEEN, firstTime, gameKey, startMinis, startsRolled } from '../intro'
 import BannerHost from './BannerHost.vue'
 import Board from './Board.vue'
 import ChoiceMenu from './ChoiceMenu.vue'
@@ -140,6 +142,8 @@ watch(
         } else showFinale(ev.winner)
       }
       if (ev?.k === 'perk') showPerk({ perk: ev.perk, owner: ev.who, detail: e.text.split(' — ').slice(1).join(' — ') })
+      // an offering at work: its card, as a perk's (the log line after ": " says what it did)
+      if (ev?.k === 'offering') showPerk({ offering: ev.id, owner: ev.who, detail: e.text.split(': ').slice(1).join(': ') })
       // A roll already shown while it waited for a decision, and kept as it was, isn't shown twice.
       if (e.dice && ev?.k === 'roll' && JSON.stringify(e.dice) !== pendingShown)
         showDice({
@@ -181,18 +185,37 @@ watch(
   },
 )
 
-// ---------- the minis' start-room rolls, played on the map ----------
+// ---------- the game's opening: the offerings burnt, then the minis' start-room rolls on the map ----------
 
 watch(
   () => props.st,
   (st) => {
-    if (fx.starts || !startsRolled(st) || !firstTime(SEEN, gameKey(st))) return
+    if (fx.offerings || st.round !== 1 || !st.offerings?.length || !firstTime(OFFERINGS_SEEN, gameKey(st))) return
+    showOfferings(st.offerings)
+  },
+  { immediate: true },
+)
+
+/** The opening is playing: nobody is asked anything until it is done. */
+const opening = computed(() => !!fx.starts || !!fx.offerings)
+
+watch(
+  [() => props.st, () => fx.offerings] as const,
+  ([st]) => {
+    if (fx.starts || fx.offerings || !startsRolled(st) || !firstTime(SEEN, gameKey(st))) return
     showStarts(startMinis(st))
   },
   { immediate: true },
 )
 /** The minis the rolls have not placed yet are off the map. */
-const startHidden = computed(() => (fx.starts ? fx.starts.minis.slice(fx.starts.shown).map((m) => m.key) : undefined))
+const startHidden = computed(() =>
+  fx.starts
+    ? fx.starts.minis.slice(fx.starts.shown).map((m) => m.key)
+    : // the rooms are rolled already (Murky Reagent): the minis stay off the map until their rolls
+      fx.offerings && startsRolled(props.st)
+      ? startMinis(props.st).map((m) => m.key)
+      : undefined,
+)
 const startArrive = computed(() => (fx.starts && fx.starts.shown > 0 ? fx.starts.minis[fx.starts.shown - 1].key : undefined))
 
 // ---------- board targets ----------
@@ -349,7 +372,7 @@ const boardFocus = computed(() => {
  */
 // (and not while the minis are still being placed on the map: nobody is asked anything yet)
 // On one device with bots: not while only bots are waited on (their moves come by themselves).
-const viewTurn = computed(() => !fx.starts && (online.value ? actorsOf(view.value).includes(online.value.seat) : !botsOnly(view.value)))
+const viewTurn = computed(() => !opening.value && (online.value ? actorsOf(view.value).includes(online.value.seat) : !botsOnly(view.value)))
 
 /** Everything clickable on the board now, and the shapes the board takes them in. */
 const actions = computed(() => boardActions(view.value, modes))
@@ -402,7 +425,7 @@ function undoPlan() {
 /** Online: who the game is waiting on, for the side panel. */
 const waitingOn = computed(() => {
   const o = online.value
-  if (viewTurn.value || fx.starts) return null
+  if (viewTurn.value || opening.value) return null
   const st = view.value
   // one device: the bots are thinking
   if (!o)
@@ -729,6 +752,16 @@ const askWhat = computed(() => {
   switch (s.t) {
     case 'setupReveal':
       return 'เตรียมเกม — เปิด prop 1 อันบนแผนที่'
+    case 'shroudRoom':
+      return `${offeringName('shroud-of-union')} — เลือกห้องที่ทุกคนเริ่ม`
+    case 'vigo':
+      return `${offeringName('vigos-blueprint')} — สลับ Exit Gate กับ Generator ไหม?`
+    case 'whiteWard':
+      return `${offeringName('white-ward')} — จ่าย 2 ▲ เก็บ ${ITEM_NAMES[s.item]} ไว้ไหม?`
+    case 'cutCoin':
+      return `${offeringName('cut-coin')} — เอา prop สีน้ำเงินที่คว่ำอยู่ออก`
+    case 'shrikeWreath':
+      return `${offeringName('shrike-wreath')} — เลือกผู้รอดชีวิต`
     case 'planSurvivors':
     case 'planKiller':
       return 'วางแผน — เลือกการ์ดเคลื่อนที่'
@@ -834,7 +867,7 @@ watch(
 // a move or a plan stays theirs, and the whole room is told they are over time.
 
 const turnLimit = computed(() => (online.value && props.st.phase !== 'over' ? roomSettings.value.timer : 0))
-const fxBusy = computed(() => fx.dice.length > 0 || fx.perks.length > 0 || !!fx.finale || !!fx.starts || fx.boardBusy)
+const fxBusy = computed(() => fx.dice.length > 0 || fx.perks.length > 0 || !!fx.finale || opening.value || fx.boardBusy)
 /** Changes with every new decision (or new set of players being waited on). */
 const waitKey = computed(() => JSON.stringify([props.st.step, actorsOf(props.st)]))
 const turnStarted = ref(Date.now())
@@ -859,7 +892,7 @@ onBeforeUnmount(() => clockTimer !== null && clearInterval(clockTimer))
 const BOT_PAUSE_MS = 700
 let botTimer: number | null = null
 watch(
-  [() => props.st, view, fxBusy, () => fx.starts, botDriver, standIns, summaryRound],
+  [() => props.st, view, fxBusy, opening, botDriver, standIns, summaryRound],
   () => {
     if (botTimer !== null) clearTimeout(botTimer)
     botTimer = null
@@ -871,7 +904,7 @@ watch(
     if (o && session.me !== botDriver.value) return
     // on one device the round's summary is read first (it closes by itself when only bots play)
     if (!o && summaryRound.value !== null) return
-    if (view.value !== st || fxBusy.value || fx.starts) return
+    if (view.value !== st || fxBusy.value || opening.value) return
     if (o ? !onlineBotMove(st, standIns.value) : !botTurn(st)) return
     botTimer = window.setTimeout(() => {
       botTimer = null
@@ -1261,7 +1294,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <!-- while the start-room rolls play on the map, nobody is asked anything: the panel stays empty
              (else the step waiting next — a killer perk at the start of planning — showed to everyone) -->
         <ActionPanel
-          v-else-if="!over && !fx.starts && !holdPanel"
+          v-else-if="!over && !opening && !holdPanel"
           :st="view"
           :power-on="powerOn"
           :undying-on="undyingOn"
@@ -1308,13 +1341,14 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       </button>
     </Teleport>
 
-    <BannerHost :paused="summaryRound !== null || !!over || fx.dice.length > 0 || fx.perks.length > 0 || !!fx.finale || !!fx.starts" />
+    <BannerHost :paused="summaryRound !== null || !!over || fx.dice.length > 0 || fx.perks.length > 0 || !!fx.finale || opening" />
     <ChoiceMenu v-if="menu" :st="view" :actions="menu.actions" :x="menu.x" :y="menu.y" @close="menu = null" />
     <PerkReveal :st="view" />
     <ActionReveal :st="view" />
     <SacrificeReveal :st="view" />
     <RushReveal :st="view" />
     <FinaleReveal :st="props.st" />
+    <OfferingBurn />
     <StartPlacement />
     <PerkPrompt :st="view" :hidden="secret || !!over || !viewTurn" :on-board="onBoard" />
     <DiceModal />

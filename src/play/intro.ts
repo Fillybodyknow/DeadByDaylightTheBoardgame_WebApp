@@ -1,4 +1,4 @@
-// What the game's opening plays once per game: the minis' start-room rolls.
+// What the game's opening plays once per game: the offerings burnt, then the minis' start-room rolls.
 // "Once" is per browser session and per game, so a reload or a second device doesn't replay it.
 
 import { ref } from 'vue'
@@ -24,6 +24,8 @@ import type { GameState } from './engine/types'
 import type { StartMini } from './fx/bus'
 
 export const SEEN = 'dbdl-play-intro-seen'
+/** The offerings' burning, once per game as the start rolls. */
+export const OFFERINGS_SEEN = 'dbdl-play-offerings-seen'
 
 /**
  * A game just started: 'beat' while the alarm plays over the page as it was (the page keeps its
@@ -68,6 +70,7 @@ export function startMinis(st: GameState): StartMini[] {
         player: `ผู้เล่น ${st.handPlayers[sv.hand]}`,
         room: roomName(sv.room),
         face: faceOf(sv.room),
+        ...(st.offerings?.includes('shroud-of-union') ? { chosen: true } : {}),
       }
     }),
     {

@@ -1,4 +1,5 @@
 import type { PerkId } from './perks'
+import type { OfferingId } from './offerings'
 
 // Game state for the full playable version. Everything here is plain data (no classes,
 // no functions) so a state can be cloned, saved to localStorage and replayed.
@@ -94,6 +95,8 @@ export interface SurvivorState {
   item: string | null
   /** Sacrifice progress token still on the identity board (p.6, p.15). */
   sacrificeToken: boolean
+  /** Shrike Wreath: more sacrifice progress on this board; it all goes to the track when they are hung. */
+  extraSacrifice?: number
   /** Grim Embrace: ▲ on this board, each a sacrifice progress when they are hung. */
   embrace?: number
   /** Index into `survivorHands` (players controlling 2 survivors share one hand, p.19). */
@@ -436,6 +439,16 @@ export type Step =
   /** Internal: between steps, while the task queue runs. */
   | { t: 'idle' }
   | { t: 'setupReveal'; s: number }
+  /** Shroud of Union: the survivors pick the one room they all start in (asked of survivor `s`, the first player). */
+  | { t: 'shroudRoom'; s: number }
+  /** Cut Coin: after setup the killer removes face-down survival props, `left` more. */
+  | { t: 'cutCoin'; left: number }
+  /** Shrike Wreath: after setup the killer puts a sacrifice progress on 2 survivors' boards (`chosen` so far). */
+  | { t: 'shrikeWreath'; chosen: number[] }
+  /** Vigo's Blueprint: survivor `s` revealed exit gate `gate`; swap it with a face-up generator? Then back to `resume`. */
+  | { t: 'vigo'; s: number; gate: string; resume: Step }
+  /** White Ward: `item` is discarded; survivor `s` may pay 2 ▲ to put it on top of the item deck (`asked` already). */
+  | { t: 'whiteWard'; s: number; item: string; asked: number[] }
   /** Entering a room: pick which face-down prop (colour) to flip. */
   | { t: 'revealProp'; who: number | 'killer'; room: string }
   /** Stridor: this survivor plays their card face up before anyone else plans. */
@@ -547,6 +560,8 @@ export type Step =
 
 /** Queued work that runs once the current step has its input. */
 export type Task =
+  /** White Ward's question, once the perks on the discard (Built to Last, Appraisal) have had theirs. */
+  | { k: 'whiteWard'; s: number; item: string }
   | { k: 'survivorTurn'; s: number }
   | { k: 'survivorInteract'; s: number }
   | { k: 'endSurvivorTurn'; s: number }
@@ -640,6 +655,12 @@ export type Task =
 
 export type Action =
   | { t: 'setupReveal'; prop: string }
+  | { t: 'shroudRoom'; room: string }
+  | { t: 'cutCoin'; prop: string }
+  | { t: 'shrike'; s: number }
+  | { t: 'vigo'; gen: string | null }
+  /** White Ward: pay or not; `mute`: don't ask this survivor again this game. */
+  | { t: 'ward'; pay: boolean; mute?: boolean }
   /** Stridor: the chosen survivor's card, played face up before the others plan. */
   | { t: 'planStridor'; card: MoveCard }
   | { t: 'reveal'; prop: string }
@@ -741,6 +762,8 @@ export type GameEvent =
   /** The Plague's Vile Purge: `n` is how many they hold now (3: cleared, and wounded). */
   | { k: 'purge'; s: number; n: number }
   | { k: 'perk'; who: PerkOwner; perk: PerkId }
+  /** An offering's effect just happened (p.19): `who` it worked for. */
+  | { k: 'offering'; who: PerkOwner; id: OfferingId }
   | { k: 'heal'; s: number; by: number }
   | { k: 'pickUp'; s: number }
   | { k: 'carryEscape'; s: number }
@@ -863,6 +886,14 @@ export interface GameState {
   itemLock?: number | null
   /** Built to Last this round: who kept which item (its offer on a later turn says why it is back). */
   kept?: { s: number; item: string }[]
+  /** Offerings burnt for this game (p.19), both sides'. Missing in games from before them. */
+  offerings?: OfferingId[]
+  /** Offerings used up this round (Sweet William Sachet: once per round for the survivors). */
+  offeringsUsed?: OfferingId[]
+  /** Vigo's Blueprint: a survivor just revealed this exit gate; asked as soon as the game waits (`run`). */
+  vigoPending?: { s: number; gate: string }
+  /** White Ward: survivors who said not to ask them again. */
+  wardMuted?: number[]
   /** The Blight's power: the card it drew, while that move is being made. */
   rushCard?: PathKind | null
   rng: number
