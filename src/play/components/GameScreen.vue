@@ -110,6 +110,8 @@ watch(
     let hung = false
     // Blighted Corruption's draws: after the power's own card (the leftover one, pushed after the loop)
     const rushes: NonNullable<Parameters<typeof showRush>[0]>[] = []
+    // Chalk Pouch acts on a roll's dice before the roll is logged: its card waits for the roll
+    let afterRoll: Parameters<typeof showPerk>[0] | null = null
     for (const [n, e] of fresh.entries()) {
       const ev = e.ev
       if (ev?.k === 'rushDraw') rushes.push({ card: ev.card, hand: ev.hand, ...(ev.stuck ? { stuck: true } : {}) })
@@ -143,7 +145,11 @@ watch(
       }
       if (ev?.k === 'perk') showPerk({ perk: ev.perk, owner: ev.who, detail: e.text.split(' — ').slice(1).join(' — ') })
       // an offering at work: its card, as a perk's (the log line after ": " says what it did)
-      if (ev?.k === 'offering') showPerk({ offering: ev.id, owner: ev.who, detail: e.text.split(': ').slice(1).join(': ') })
+      if (ev?.k === 'offering') {
+        const card = { offering: ev.id, owner: ev.who, detail: e.text.split(': ').slice(1).join(': ') }
+        if (ev.id === 'chalk-pouch') afterRoll = card
+        else showPerk(card)
+      }
       // A roll already shown while it waited for a decision, and kept as it was, isn't shown twice.
       if (e.dice && ev?.k === 'roll' && JSON.stringify(e.dice) !== pendingShown)
         showDice({
@@ -153,7 +159,12 @@ watch(
           ...skillCheck(ev.ctx, e.dice, rollProgress(prev, ev.ctx, ev.prop, fresh.slice(n + 1))),
           icon: rollIcon(st, ev.ctx, ev.s, ev.target),
         })
+      if (ev?.k === 'roll' && afterRoll) {
+        showPerk(afterRoll)
+        afterRoll = null
+      }
     }
+    if (afterRoll) showPerk(afterRoll)
     const leftover = casts.leftover()
     if (leftover) showAction(leftover)
     for (const r of rushes) showRush(r)

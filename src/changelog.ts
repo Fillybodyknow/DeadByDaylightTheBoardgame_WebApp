@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.26.2',
+    date: '2026-11-01',
+    items: [
+      'การ์ด Offering ถุงชอล์กเด้งขึ้นหลังทอย Skill Check แล้ว ไม่ขึ้นก่อนลูกเต๋าอีก',
+    ],
+  },
+  {
     version: '1.26.1',
     date: '2026-11-01',
     items: [
