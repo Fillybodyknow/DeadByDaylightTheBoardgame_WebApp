@@ -1,11 +1,15 @@
 <script setup lang="ts">
-// Movement cards held in a fan floating in the bottom-right corner. At rest the hand is sunk
+// Movement cards held in a fan floating at the foot of the screen: where they cover neither the
+// map nor the panel's buttons nor the players (GameScreen measures the stretch: under the side
+// panel in its own column, or under the map; settings: handPlace 'auto'), always under the map
+// ('map'), or in the bottom-right corner over the panel's foot ('corner', as it was first). At rest the hand is sunk
 // with only the names showing, so the map stays in sight; pointing at a card raises the hand and
 // draws that card up to look at; clicking picks it — it stays drawn up, glowing, until the choice
 // is confirmed in the panel (or clicked again to put it back).
 //
-// On a tablet (no pointer to hover with) the hand rests sunk too: a tap on it raises it, the next
-// tap on a card picks, and a tap anywhere else puts it down. It stays up while a perk asks for a card.
+// On a tablet (no pointer to hover with) a hand to pick from comes up by itself, so one tap picks;
+// a tap anywhere else puts it down, and a tap on it raises it again. A hand only to look at rests
+// sunk: a tap raises it.
 //
 // Each card is a button that never moves (its rotation in the fan aside); only the card face
 // inside it slides up. So the pointer stays on the button while the card rises, and the card
@@ -15,7 +19,8 @@ import { asset } from '../../i18n'
 import type { MoveCard } from '../engine/types'
 import { CARD_NAMES } from '../engine/engine'
 import { CARD_TH, cardImage, cardLabel } from '../labels'
-import { openHands } from '../hands'
+import { handZone, openHands } from '../hands'
+import { settings } from '../../settings'
 import BpText from '../../components/BpText.vue'
 
 export interface HandCard {
@@ -43,16 +48,53 @@ const props = defineProps<{ cards: HandCard[]; label: string; prompt?: string; p
 /** `pick`: the card, and its place in `cards` (The Blight's hand holds two of each). */
 const emit = defineEmits<{ pick: [card: MoveCard, index: number]; hover: [card: MoveCard | null] }>()
 
-/** Each card's place in the fan: a little turned and lower towards the ends. */
+/**
+ * How the cards are laid (settings: handLayout): each one's margin on either side (negative: they
+ * overlap), as a share of the card's width plus a few pixels, and whether they fan out.
+ */
+const LAYOUTS = {
+  fan: { share: 0, px: -6, turn: true },
+  row: { share: 0, px: 4, turn: false },
+  // each card's left half shows, its name moved there
+  stack: { share: -0.25, px: 0, turn: false },
+} as const
+const layout = computed(() => LAYOUTS[settings.handLayout] ?? LAYOUTS.fan)
+
+/** The cards' width: up to 4 at full size; 5 (the killer's hand) smaller; 8 (The Blight's) smaller still. */
+const cardW = computed(() => {
+  const n = props.cards.length
+  let w = n > 6 ? 84 : n > 4 ? 114 : 134
+  if (handZone.value !== null) {
+    // placed in a measured stretch: narrowed to it. Each card takes its width and both margins
+    // (the last one its whole width), and the fan's ends need room for their tilt.
+    const { share, px, turn } = layout.value
+    const step = 1 + 2 * share
+    const fits = (handZone.value - (turn ? 56 : 16) - 2 * px * n) / (step * n + (1 - step))
+    w = Math.max(64, Math.min(w, Math.floor(fits)))
+  }
+  return w
+})
+/** Narrow cards show the English name only: the Thai one under it no longer fits. */
+const narrow = computed(() => cardW.value < 96)
+
+/** Each card's place in the hand: in a fan, a little turned and lower towards the ends. */
 const fan = computed(() => {
   const mid = (props.cards.length - 1) / 2
+  const { share, px, turn } = layout.value
   return props.cards.map((_, i) => {
-    const off = i - mid
-    // up to 4 cards at full size; 5 (the killer's hand) smaller; 8 (The Blight's) smaller still
-    const w = props.cards.length > 6 ? 84 : props.cards.length > 4 ? 114 : 134
-    return { '--w': `${w}px`, '--rot': `${off * 3}deg`, '--arc': `${Math.abs(off) * Math.abs(off) * 2}px`, zIndex: String(i + 1) }
+    const off = turn ? i - mid : 0
+    return {
+      '--w': `${cardW.value}px`,
+      '--gap': `${Math.round(cardW.value * share + px)}px`,
+      '--rot': `${off * 3}deg`,
+      '--arc': `${Math.abs(off) * Math.abs(off) * 2}px`,
+      zIndex: String(i + 1),
+    }
   })
 })
+
+/** The player's settings for the hand, as classes the CSS reads. */
+const looks = computed(() => [`lay-${settings.handLayout}`, `hover-${settings.handHover}`, { 'pick-sink': settings.handPicked === 'sink' }])
 
 // While a hand is out, the side panel stops above it (GameScreen). Counted on the body, as one
 // hand can mount before the previous one unmounts.
@@ -71,18 +113,35 @@ onBeforeUnmount(() => hands(-1))
 
 const touch = typeof matchMedia === 'function' && matchMedia('(hover: none)').matches
 const raised = ref(false)
-/** Up: raised by a tap, or a perk is asking for a card. (A pointer raises it by hovering, in CSS.) */
-const up = computed(() => touch && (raised.value || !!props.prompt))
+/** A hand to pick from, put down by a tap elsewhere (it comes up by itself otherwise). */
+const lowered = ref(false)
+/**
+ * Up, on a tablet: a hand to pick from, unless a tap put it down (or the player turned that off:
+ * settings handTouchRaise); a hand to look at, raised by a tap; any hand a perk is asking a card
+ * of. (A pointer raises it by hovering, in CSS.)
+ */
+const up = computed(() => touch && (!!props.prompt || raised.value || (!props.passive && settings.handTouchRaise && !lowered.value)))
+// a new choice from the hand: it comes up again
+watch(
+  () => props.cards.map((c) => c.card).join(),
+  () => (lowered.value = false),
+)
 
 function onSlot(card: MoveCard, index: number) {
-  // the first tap only brings the hand up, so a card isn't picked blind by the tap that raised it
-  if (touch && !up.value) return void (raised.value = true)
+  // a tap on a hand that is down only brings it up, so a card isn't picked blind by that tap
+  if (touch && !up.value) {
+    raised.value = true
+    lowered.value = false
+    return
+  }
   if (props.passive) return
   emit('pick', card, index)
 }
 
 function lowerOnOutside(e: MouseEvent) {
-  if (raised.value && !(e.target as Element | null)?.closest('.hand')) raised.value = false
+  if (!up.value || (e.target as Element | null)?.closest('.hand')) return
+  raised.value = false
+  lowered.value = true
 }
 onMounted(() => document.addEventListener('click', lowerOnOutside, true))
 onBeforeUnmount(() => {
@@ -97,7 +156,7 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
   <Teleport to="body">
     <!-- The hand rests sunk, names showing, and rises while the pointer is on it — also when a
          perk asks for a card (it glows, and its prompt sits just above the names). -->
-    <div class="hand" :class="{ ask: !!prompt, passive, up }" role="group" :aria-label="label">
+    <div class="hand card-hand" :class="[{ ask: !!prompt, passive, up }, looks]" role="group" :aria-label="label">
       <p v-if="prompt" class="prompt">⚡ <BpText :text="prompt" /></p>
       <div class="fan">
         <button
@@ -105,7 +164,7 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
           :key="`${c.card}-${i}`"
           type="button"
           class="slot"
-          :class="{ picked: c.picked, taken: !!c.takenBy }"
+          :class="{ picked: c.picked, taken: !!c.takenBy, narrow }"
           :style="fan[i]"
           :title="cardLabel(c.card)"
           :aria-pressed="c.picked"
@@ -128,7 +187,7 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
       </div>
     </div>
     <!-- a soft shadow under the hand, so it reads over the map (after it: it follows its state) -->
-    <div class="tray" :class="{ ask: !!prompt, up }" aria-hidden="true" />
+    <div class="tray card-hand-tray" :class="{ ask: !!prompt, up }" aria-hidden="true" />
   </Teleport>
 </template>
 
@@ -185,6 +244,28 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
     filter: brightness(1.45);
   }
 }
+/* Placed by GameScreen (settings: handPlace 'auto' or 'map'): in the stretch it measured (under the side
+   panel in its column, or under the map), its foot at the screen's or above what is below it.
+   Below that foot nothing of it shows. Written whole as :global (Vue drops what follows a
+   :global() in a scoped selector), on the hand's own class names; they outweigh the corner's. */
+:global(body.hand-at-map .card-hand),
+:global(body.hand-at-map .card-hand-tray) {
+  left: var(--hand-left, 0px);
+  right: var(--hand-right, 0px);
+  bottom: var(--hand-bottom, 0px);
+  width: auto;
+  translate: none;
+  clip-path: inset(-100vh -100vw 0 -100vw);
+}
+:global(body.hand-at-map .card-hand .fan) {
+  padding-right: 0;
+}
+:global(body.hand-at-map .card-hand-tray) {
+  background: radial-gradient(ellipse 50% 70% at 50% 100%, rgb(4 5 7 / 0.92), rgb(4 5 7 / 0.6) 55%, transparent 75%);
+}
+:global(body.hand-at-map .card-hand-tray.ask) {
+  background: radial-gradient(ellipse 50% 70% at 50% 100%, rgb(60 20 90 / 0.95), rgb(20 8 34 / 0.7) 55%, transparent 75%);
+}
 .prompt {
   margin: 0 0 0.3rem;
   padding: 0.2rem 0.7rem;
@@ -233,7 +314,7 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
   flex: none;
   width: var(--w, 134px);
   height: 246px;
-  margin: 0 -6px;
+  margin: 0 var(--gap, -6px);
   padding: 0;
   border: none;
   background: none;
@@ -248,9 +329,10 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
   z-index: 50 !important;
 }
 /* The card itself: resting sunk, only its name showing over the screen's edge, so the map
-   stays in sight; it slides up inside its button when the hand rises. */
+   stays in sight; it slides up inside its button when the hand rises. Sunk by its height less the
+   strip that shows (54 px), so a card narrowed to fit still shows its name. */
 .face {
-  --lift: 132px;
+  --lift: calc(var(--w, 134px) / 0.72 - 54px);
   pointer-events: auto;
   position: absolute;
   left: 0;
@@ -259,10 +341,22 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
   aspect-ratio: 0.72;
   border-radius: 9px;
   transform: translateY(var(--lift));
+  /* rising and sinking go a little past their place and settle back */
   transition:
-    transform 0.2s cubic-bezier(0.2, 1.2, 0.4, 1),
-    filter 0.2s;
+    transform 0.3s cubic-bezier(0.34, 1.5, 0.64, 1),
+    filter 0.25s;
   filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.7));
+}
+/* An unseen reach below the card: drawn up, its foot leaves the screen's edge, and a pointer held
+   there would fall off it, sink it back under the pointer, and so on — a card bouncing for good.
+   This keeps the pointer on it down to the edge. */
+.face::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 48px;
 }
 .face img {
   display: block;
@@ -299,17 +393,70 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
     height: 270px;
   }
 }
-/* picked, not confirmed: stays drawn up */
+/* The pointer on a card (settings: handHover): the hand rises halfway (between sunk and full, so
+   a narrow card still rises), or stays sunk while only that card draws up. */
+@media (hover: hover) {
+  .hand.hover-half:has(.face:hover) .face {
+    --lift: calc((var(--w, 134px) / 0.72 - 40px) / 2);
+  }
+  .hand.hover-one:has(.face:hover) .face {
+    --lift: calc(var(--w, 134px) / 0.72 - 54px);
+  }
+  .hand.hover-half:has(.face:hover) + .tray {
+    height: 190px;
+  }
+}
+/* picked, not confirmed: stays drawn up, glowing (settings handPicked 'sink': glowing only, in
+   the hand with the others) */
 .hand .slot.picked .face {
-  --lift: -6px;
   filter: drop-shadow(0 0 14px rgb(255 214 140 / 0.85)) drop-shadow(0 8px 12px rgb(0 0 0 / 0.7));
 }
-.slot.picked .face::after {
+.hand:not(.pick-sink) .slot.picked .face {
+  --lift: -6px;
+}
+/* overlapping cards: a picked one comes before its neighbours */
+.hand.lay-stack .slot.picked {
+  z-index: 40 !important;
+}
+/* The gold edge of a picked card: on every card, shown when picked, so putting a card back fades
+   it out. Picking pops the card (pressed in, then a little past its size: `scale`, apart from the
+   transform that raises it) and flashes its edge. */
+.face::after {
   content: '';
   position: absolute;
   inset: 0;
   border: 3px solid #ffe9b0;
   border-radius: 9px;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.slot.picked .face {
+  animation: pick-pop 0.38s ease-out;
+}
+.slot.picked .face::after {
+  opacity: 1;
+  animation: pick-flash 0.6s ease-out;
+}
+@keyframes pick-pop {
+  /* not pressed in far: a pointer near the card's edge stays on it */
+  30% {
+    scale: 0.94;
+  }
+  65% {
+    scale: 1.06;
+  }
+}
+@keyframes pick-flash {
+  0% {
+    box-shadow:
+      0 0 0 0 rgb(255 233 176 / 0.95),
+      inset 0 0 28px rgb(255 214 140 / 0.9);
+  }
+  100% {
+    box-shadow:
+      0 0 0 16px rgb(255 233 176 / 0),
+      inset 0 0 0 rgb(255 214 140 / 0);
+  }
 }
 .slot.taken .face {
   filter: grayscale(0.7) brightness(0.6) drop-shadow(0 6px 10px rgb(0 0 0 / 0.7));
@@ -360,9 +507,37 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
 .tag.wait {
   --tag: #55585f;
 }
-/* The Blight's small cards: the English name only */
-.slot[style*="--w: 84px"] .tag small {
+/* The Blight's small cards, and cards narrowed to fit: the English name only */
+.slot[style*="--w: 84px"] .tag small,
+.slot.narrow .tag small {
   display: none;
+}
+/* a narrow card's name shrinks with it, so CROUCH stays on its own card */
+.slot.narrow .tag b {
+  font-size: max(0.62rem, calc(var(--w, 134px) * 0.15));
+  letter-spacing: 0.01em;
+}
+/* Overlapping cards show only their left half: the name, the badge and whose card it is go there. */
+.hand.lay-stack .tag {
+  left: 4%;
+  right: auto;
+  max-width: 44%;
+  justify-items: start;
+  padding-inline: 0.2rem;
+}
+.hand.lay-stack .tag b {
+  font-size: min(0.85rem, calc(var(--w, 134px) * 0.105));
+  letter-spacing: 0;
+}
+.hand.lay-stack .tag small {
+  display: none;
+}
+.hand.lay-stack .badge {
+  left: 25%;
+}
+.hand.lay-stack .face .taken-by {
+  right: auto;
+  left: calc(50% - 34px);
 }
 .badge {
   position: absolute;
@@ -376,6 +551,14 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
   font-family: var(--font-display);
   font-size: 0.72rem;
   white-space: nowrap;
+  animation: badge-in 0.3s 0.12s ease-out backwards;
+}
+@keyframes badge-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+    scale: 0.7;
+  }
 }
 .face .taken-by {
   position: absolute;
@@ -408,10 +591,14 @@ watch(up, (on) => document.body.classList.toggle('hand-raised', on))
   color: var(--muted);
 }
 @media (prefers-reduced-motion: reduce) {
-  .face {
+  .face,
+  .face::after {
     transition: none;
   }
-  .tray.ask {
+  .tray.ask,
+  .slot.picked .face,
+  .slot.picked .face::after,
+  .badge {
     animation: none;
   }
 }

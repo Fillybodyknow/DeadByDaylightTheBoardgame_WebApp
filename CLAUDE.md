@@ -220,12 +220,36 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   where it goes), click to pick (it stays up), confirm in the side panel. In planning and on a
   bonus turn a path out of the room on the map picks the card of its colour too (`pathPick.ts`). This covers planning,
   bonus turns, every perk that picks a card, Predator and the Redeemer guess. A player with
-  several survivors switches between them with tabs. The hand floats in the bottom-right corner,
-  sunk so only the card names show (the side panel stops above them), and rises while the pointer is on a card (or when
-  a perk asks for one; on a tablet a tap raises it, the next tap picks and a tap elsewhere puts it down). It has no label of its own. Each card's button stays still and only the card face inside it moves, so the card
+  several survivors switches between them with tabs. Where the hand floats is a setting
+  (`handPlace`, Settings → Display):
+  - **Auto** (the default): where it covers neither the map nor the panel's buttons nor the
+    players, in a stretch GameScreen measures (`measureHandZone`, body variables `--hand-left`,
+    `--hand-right`, `--hand-bottom`, class `hand-at-map`; `handZone` in `hands.ts`); its cards
+    narrow to fit (narrow ones show the English name only). With the panel in its own column
+    beside the map (a wide screen): under the panel, which stops above it (`hand-in-column`).
+    With the panel floating over the map (a tablet): under the map, between the players and the
+    panel. On one column (players and panel under the map): at the screen's foot, above a perk's
+    sheet (and the players' row) when one is open; the page gets room at its end so the panel's
+    buttons scroll clear of it.
+  - **Under the map** (`map`): as Auto, but under the map on a wide screen too, between the
+    players and the panel's column, with room for full-size cards; raised, they cover the map's foot.
+  - **The bottom-right corner** (as it was first): over the panel's foot; the panel stops above it.
+
+  Sunk, only the card names show; it rises while the pointer is on a card (or when a perk asks for
+  one). On a tablet a hand to pick from comes up by itself, so one tap picks; a tap elsewhere puts
+  it down and a tap on it raises it again. The side panel's way on (a plan's confirm, a perk's
+  confirm and "don't use") is sticky at its foot, on a strip of the panel's colour (`.way-on` round
+a plan's confirm, `.choices` in PerkPrompt) so nothing scrolling under it shows through. It has no label of its own. Each card's button stays still and only the card face inside it moves, so the card
   can't bounce under the pointer. Online, while nothing asks for a card, the player's own hand
   rests there anyway, only to look at (`passive`; `openHands` in `hands.ts` says when a hand to
   pick from is out and takes its place).
+
+  How the hand looks is the player's too (Settings → Display, classes on the hand that its CSS
+  reads): `handLayout` (a fan, a straight row, or a stack showing each card's left half with its
+  name moved there; the width fit counts each layout's spacing), `handPicked` (a picked card
+  drawn up, or left sunk in the hand glowing gold), `handHover` (the pointer raises the whole hand,
+  halfway, or only that card) and `handTouchRaise` (off: a tablet's first tap raises the hand,
+  the second picks). The defaults are the fan, drawn up, the whole hand, on.
 - **Your own face-down cards can be peeked at:** click one on the player tiles to see your cards
   big in the middle of the screen (the killer sees all his planned cards); a click anywhere
   turns them face down again. Online only the owner can; on one device anyone can, as at a real
@@ -287,7 +311,8 @@ local backend syncs browser tabs.
 
 The ⚙ button (top bar and the game's rail) opens `src/components/SettingsDialog.vue`, a PC-game
 style window with tabs: Sound (volumes, mute, chase music), Display (animation speed, reduce motion,
-card language), Online (turn sound, background notice, 20 s reminder), Data (clear the offline
+card language, the hand of cards: where it floats, how it is laid, a picked card, the hover height,
+a tablet's auto-raise), Online (turn sound, background notice, 20 s reminder), Data (clear the offline
 game, reset the tutorial, reset settings). Settings live in `src/settings.ts` (`dbdl-settings`).
 
 - **Animation speed:** a JS timer of an animation is written `anim(ms)`; CSS animations and

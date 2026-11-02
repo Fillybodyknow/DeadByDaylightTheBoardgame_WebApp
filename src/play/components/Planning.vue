@@ -331,9 +331,11 @@ function confirmKiller() {
       {{ firstWhy === 'เสียงแหบดัง' ? `ฆาตกรใช้ เสียงแหบดัง กับ ${st.survivors[stridorStep].name}` : `${st.survivors[stridorStep].name} อยู่ห้องเดียวกับ Dire Crow` }} — เลือกการ์ด 1 ใบแล้ว<b>หงายหน้า</b>ให้ทุกคนเห็น ก่อนที่ผู้รอดชีวิตคนอื่นและฆาตกรจะวางแผน
     </p>
     <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทางบนแผนที่ · คลิกเพื่อเลือก</p>
-    <button class="primary" :disabled="!stridorPick" @click="confirmStridor">
-      {{ stridorPick ? `ยืนยัน: ${CARD_NAMES[stridorPick]} (หงายหน้า)` : 'เลือกการ์ดก่อน' }}
-    </button>
+    <div class="way-on">
+      <button class="primary" :disabled="!stridorPick" @click="confirmStridor">
+        {{ stridorPick ? `ยืนยัน: ${CARD_NAMES[stridorPick]} (หงายหน้า)` : 'เลือกการ์ดก่อน' }}
+      </button>
+    </div>
     <CardHand
       :cards="stridorHand"
       :label="`มือของ ${st.survivors[stridorStep].name}`"
@@ -363,9 +365,11 @@ function confirmKiller() {
 
     <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทางของ {{ nextUp !== null ? st.survivors[nextUp].name : '' }} บนแผนที่ · คลิกเพื่อเลือก</p>
     <p class="muted small">เหลือในกอง {{ st.survivorDeck?.length ?? 0 }} ใบ</p>
-    <button class="primary" :disabled="!twoPick || nextUp === null" @click="confirmTwo">
-      {{ twoPick && nextUp !== null ? `วาง ${CARD_NAMES[twoPick]} ให้ ${st.survivors[nextUp].name} แล้วจั่วใบใหม่` : 'เลือกการ์ดก่อน' }}
-    </button>
+    <div class="way-on">
+      <button class="primary" :disabled="!twoPick || nextUp === null" @click="confirmTwo">
+        {{ twoPick && nextUp !== null ? `วาง ${CARD_NAMES[twoPick]} ให้ ${st.survivors[nextUp].name} แล้วจั่วใบใหม่` : 'เลือกการ์ดก่อน' }}
+      </button>
+    </div>
 
     <CardHand
       v-if="nextUp !== null"
@@ -413,9 +417,11 @@ function confirmKiller() {
     </template>
 
     <p class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดูเส้นทางบนแผนที่ · คลิกเพื่อเลือก (คลิกซ้ำเพื่อเก็บคืน)</p>
-    <button class="primary" :disabled="survivorsLeft > 0" @click="confirmSurvivors">
-      {{ survivorsLeft > 0 ? `เลือกอีก ${survivorsLeft} ตัว` : online ? 'ยืนยัน (คว่ำการ์ดไว้)' : isBot(st, KILLER_PLAYER) ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน แล้วส่งให้ฆาตกร' }}
-    </button>
+    <div class="way-on">
+      <button class="primary" :disabled="survivorsLeft > 0" @click="confirmSurvivors">
+        {{ survivorsLeft > 0 ? `เลือกอีก ${survivorsLeft} ตัว` : online ? 'ยืนยัน (คว่ำการ์ดไว้)' : isBot(st, KILLER_PLAYER) ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน แล้วส่งให้ฆาตกร' }}
+      </button>
+    </div>
 
     <CardHand
       v-if="current !== null"
@@ -447,9 +453,11 @@ function confirmKiller() {
     <p v-else-if="directHand" class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูว่าพาไปห้องไหน (ห้องจะกระพริบบนแผนที่) · คลิกเพื่อเลือก (ใบแรก = ซ้าย)</p>
     <p v-else class="hint">👇 ชี้ไพ่บนมือด้านล่างเพื่อดึงขึ้นมาดู · คลิกเพื่อเลือก (ใบแรก = ซ้าย) — หรือคลิกเส้นทางบนแผนที่: ใบซ้ายจากห้องตอนนี้, ใบขวาจากห้องที่ใบซ้ายพาไป (คลิกที่ห้อง = Wait)</p>
     <p class="muted small">คลิกการ์ดในช่องเพื่อเอาใบนั้นออก</p>
-    <button class="primary" :disabled="!killerReady" @click="confirmKiller">
-      {{ st.step.t === 'planSurvivors' && handsToPlan(st).length ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน — เริ่มรอบ' }}
-    </button>
+    <div class="way-on">
+      <button class="primary" :disabled="!killerReady" @click="confirmKiller">
+        {{ st.step.t === 'planSurvivors' && handsToPlan(st).length ? 'ยืนยัน (คว่ำการ์ดไว้)' : 'ยืนยัน — เริ่มรอบ' }}
+      </button>
+    </div>
 
     <CardHand
       :cards="killerHand"
@@ -527,6 +535,10 @@ function confirmKiller() {
 .panel {
   display: grid;
   gap: 0.75rem;
+}
+/* the confirm, in a strip that stays at the side panel's foot (GameScreen) */
+.way-on {
+  display: grid;
 }
 .panel h2 {
   font-size: 1.1rem;

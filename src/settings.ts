@@ -38,9 +38,34 @@ export interface Settings {
   noiseFilter: boolean
   /** A room announced in the looking-for-players chat: a card on any page, a chime (lfgNotify.ts). */
   lfgNotify: boolean
+  /**
+   * Where the hand of movement cards floats (CardHand). `auto`: where it covers neither the map nor
+   * the side panel's buttons nor the players — under the panel, in its column beside the map; or,
+   * the panel floating over the map (a tablet), under the map between the players and the panel.
+   * `map`: under the map on every screen (on a wide one too, where raised cards cover the map's foot).
+   * `corner`: the bottom-right corner, over the panel's foot (as it was first).
+   */
+  handPlace: 'auto' | 'map' | 'corner'
+  /**
+   * How the hand's cards are laid (CardHand): a fan, a little turned and lower towards the ends; a
+   * straight row with a gap between; or overlapping, a strip of each showing, to take less width.
+   */
+  handLayout: 'fan' | 'row' | 'stack'
+  /**
+   * A picked card, until the choice is confirmed: drawn up above the hand, or left in it (sunk with
+   * the others), only glowing gold, so it covers none of the map.
+   */
+  handPicked: 'raise' | 'sink'
+  /**
+   * The pointer on a card: the whole hand rises to full size, halfway, or only that card does (the
+   * others stay sunk). The card pointed at always draws up whole.
+   */
+  handHover: 'full' | 'half' | 'one'
+  /** A tablet: a hand to pick from comes up by itself (one tap picks); off: a first tap raises it, a second picks. */
+  handTouchRaise: boolean
 }
 
-const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true, lfgNotify: true }
+const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true, lfgNotify: true, handPlace: 'auto', handLayout: 'fan', handPicked: 'raise', handHover: 'full', handTouchRaise: true }
 
 const KEY = 'dbdl-settings'
 

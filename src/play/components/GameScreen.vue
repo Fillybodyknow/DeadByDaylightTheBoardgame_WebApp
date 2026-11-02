@@ -9,7 +9,7 @@ import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showO
 import { CastBuilder } from '../casts'
 import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
-import { openHands } from '../hands'
+import { handZone, openHands } from '../hands'
 import CardHand, { type HandCard } from './CardHand.vue'
 import { canUndo, controls, dispatch, dispatchBot, myTurn, online, quitGame, tutorial, undo } from '../game'
 import { PERKS } from '../engine/perks'
@@ -1092,6 +1092,112 @@ watch(
 )
 watch(sideFolded, (f) => !f && (sideNews.value = false))
 
+// ---------- where the hand of cards floats (settings: handPlace) ----------
+// 'auto': where the hand covers neither the map nor the side panel's buttons nor the players. The
+// stretch it may take goes to CardHand as body variables (the hand is teleported to the body): its
+// left and right edges, and its foot.
+// - The panel in a column of its own beside the map (a wide screen): under the panel, in that
+//   column; the panel stops above the hand (body.hand-in-column) and its buttons stay at its foot.
+// - The panel floating over the map's right edge (a tablet): no room beside the map, so under it,
+//   between the players and the panel, at the screen's foot.
+// - One column (map, players, panel down the page): at the screen's foot as it always was there
+//   (on the map's foot it would scroll away with the map from the panel's buttons), and above a
+//   perk's question, which is a sheet along that foot there.
+// 'map': as 'auto', but under the map on a wide screen too (between the players and the panel's
+// column), where there is room for full-size cards; raised, they cover the map's foot.
+
+/** One column: the map, the players under it, the panel under them (the narrow layout). */
+const ONE_COLUMN = '(max-width: 980px)'
+
+function measureHandZone() {
+  const b = document.body
+  const board = document.querySelector<HTMLElement>('.layout .stage > .board')
+  // The classes change only after measuring: taking hand-in-column off first lets the side panel
+  // grow back for that measure, which scrolls it to its top — and this runs on every scroll.
+  if (settings.handPlace === 'corner' || !board) {
+    b.classList.remove('hand-at-map', 'hand-in-column')
+    handZone.value = null
+    return
+  }
+  if (matchMedia(ONE_COLUMN).matches) {
+    // the screen's foot; a perk's question is a sheet along it there (PerkPrompt): then above it,
+    // and above the players' row just over it too (on the map's foot instead)
+    let foot = innerHeight
+    const sheet = document.querySelector<HTMLElement>('aside.dock[role="dialog"]')
+    if (sheet) {
+      foot = sheet.getBoundingClientRect().top - 6
+      const players = document.querySelector<HTMLElement>('.players')?.getBoundingClientRect()
+      if (players && players.bottom > 0 && players.top < foot) foot = players.top - 4
+    }
+    b.style.setProperty('--hand-left', '0px')
+    b.style.setProperty('--hand-right', '0px')
+    b.style.setProperty('--hand-bottom', `${Math.max(0, innerHeight - foot)}px`)
+    b.classList.remove('hand-in-column')
+    b.classList.add('hand-at-map')
+    handZone.value = innerWidth
+    return
+  }
+  const r = board.getBoundingClientRect()
+  let right = r.right
+  const side = document.querySelector<HTMLElement>('.layout .side')
+  // (folded, it is display: none; floating, it is fixed, which has no offsetParent to go by)
+  if (side && getComputedStyle(side).display !== 'none') {
+    const s = side.getBoundingClientRect()
+    if (s.left >= r.right - 2 && settings.handPlace === 'auto') {
+      // the panel's own column: the hand under it there, the map left alone
+      b.style.setProperty('--hand-left', `${Math.max(0, s.left - 8)}px`)
+      b.style.setProperty('--hand-right', '0px')
+      b.style.setProperty('--hand-bottom', '0px')
+      b.classList.add('hand-at-map', 'hand-in-column')
+      handZone.value = Math.round(innerWidth - s.left + 8)
+      return
+    }
+    // the panel floating over the map's right edge (a tablet) takes that part of it
+    if (s.left > r.left && s.left < right) right = s.left - 8
+  }
+  b.style.setProperty('--hand-left', `${Math.max(0, r.left)}px`)
+  b.style.setProperty('--hand-right', `${Math.max(0, innerWidth - right)}px`)
+  // nothing sits under the map here (the players are beside it): the screen's foot, where a wide
+  // screen has room to spare below the map
+  b.style.setProperty('--hand-bottom', '0px')
+  b.classList.remove('hand-in-column')
+  b.classList.add('hand-at-map')
+  handZone.value = Math.round(right - Math.max(0, r.left))
+}
+let zoneFrame = 0
+const remeasure = () => {
+  cancelAnimationFrame(zoneFrame)
+  zoneFrame = requestAnimationFrame(measureHandZone)
+}
+let zoneWatch: ResizeObserver | null = null
+onMounted(() => {
+  void nextTick(measureHandZone)
+  zoneWatch = new ResizeObserver(remeasure)
+  for (const el of document.querySelectorAll('.layout .stage > .board, .layout .side')) zoneWatch.observe(el)
+  window.addEventListener('resize', remeasure)
+  window.addEventListener('scroll', remeasure, true)
+})
+onBeforeUnmount(() => {
+  cancelAnimationFrame(zoneFrame)
+  zoneWatch?.disconnect()
+  window.removeEventListener('resize', remeasure)
+  window.removeEventListener('scroll', remeasure, true)
+  document.body.classList.remove('hand-at-map', 'hand-in-column')
+  handZone.value = null
+})
+watch([sideFolded, () => settings.handPlace], () => void nextTick(remeasure))
+// a perk's sheet comes and goes (and slides): measured again whenever the page's parts change
+let zoneMutations: MutationObserver | null = null
+onMounted(() => {
+  zoneMutations = new MutationObserver(remeasure)
+  zoneMutations.observe(document.querySelector('.game') ?? document.body, { childList: true, subtree: true })
+  document.addEventListener('transitionend', remeasure, true)
+})
+onBeforeUnmount(() => {
+  zoneMutations?.disconnect()
+  document.removeEventListener('transitionend', remeasure, true)
+})
+
 // ---------- secret choices (Tinkerer swaps a face-down card) ----------
 
 const secretSeen = ref(false)
@@ -1688,6 +1794,27 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   max-height: calc(var(--vh) - 5rem);
   overflow-y: auto;
 }
+/* The way on (a plan's confirm; a perk's confirm and "don't use") stays at the panel's foot while
+   the rest scrolls under it: on a short screen, or with a hand of cards raised, it is never out of
+   reach below the fold. Each sits on a strip of the panel's colour, so what scrolls under it
+   doesn't show through (a button that can't be pressed yet is see-through, and the cut corners
+   would show it). */
+.side :deep(.way-on),
+.side :deep(.choices) {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+}
+.side :deep(.choices) {
+  padding-top: 0.35rem;
+  background: linear-gradient(transparent, rgb(12 13 17 / 0.96) 0.35rem);
+}
+/* the plan's confirm (Planning): the strip spans the card's width and covers its padding below */
+.side :deep(.way-on) {
+  margin: 0 -1rem -1rem;
+  padding: 0.6rem 1rem 1rem;
+  background: linear-gradient(transparent, rgb(17 19 23) 0.6rem);
+}
 /* Screens narrower than 16:9 (a tablet): the map is limited by the width, so it takes the whole
    row and the side panel floats over its right edge (fold it to a tab to see that edge). */
 @media (min-width: 981px) and (max-aspect-ratio: 1777/1000) {
@@ -1748,25 +1875,26 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   }
 }
 @media (min-width: 981px) and (max-aspect-ratio: 1777/1000) {
-  :global(body.hand-open .layout .side) {
+  :global(body.hand-open:not(.hand-at-map) .layout .side) {
     max-height: calc(var(--vh) - 3.4rem - 80px);
   }
 }
-/* The hand of cards rests sunk in the bottom-right corner (CardHand), its names showing: the
-   panel stops above them (a raised hand covers its foot only while the pointer is on it). On a
-   tablet a tap raises the hand (body.hand-raised) and the panel stops above all of it then. */
+/* The hand of cards in the bottom-right corner (CardHand, settings: handPlace 'corner') rests sunk,
+   its names showing: the panel stops above them (a raised hand covers its foot only while the
+   pointer is on it). On a tablet a raised hand (body.hand-raised) has the panel stop above all of
+   it. Under the map (body.hand-at-map) the hand keeps clear of the panel: nothing to make room for. */
 @media (min-width: 981px) {
-  :global(body.hand-open .side) {
+  :global(body.hand-open:not(.hand-at-map) .side) {
     max-height: calc(var(--vh) - 4rem - 70px);
   }
 }
 @media (min-width: 981px) and (min-aspect-ratio: 16/9) {
-  :global(body.hand-open .side) {
+  :global(body.hand-open:not(.hand-at-map) .side) {
     max-height: calc(var(--vh) - 1rem - 70px);
   }
 }
 @media (min-width: 981px) and (hover: none) {
-  :global(body.hand-raised .side) {
+  :global(body.hand-raised:not(.hand-at-map) .side) {
     max-height: calc(var(--vh) - 4rem - 250px);
   }
 }
@@ -1796,6 +1924,30 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
   :global(body.hand-open .board-bars) {
     bottom: 16.5rem;
   }
+}
+/* One column: the hand at the screen's foot covers the end of the page (the panel's buttons): the
+   page gets that much more room at its end, so they scroll up clear of it. */
+@media (max-width: 980px) {
+  :global(body.hand-open .layout) {
+    padding-bottom: 8rem;
+  }
+  :global(body.hand-raised .layout) {
+    padding-bottom: 17.5rem;
+  }
+}
+/* The hand in the panel's own column (body.hand-in-column): the panel stops above all of it, as a
+   picked card stays drawn up; what doesn't fit scrolls, its buttons pinned at its foot. */
+@media (min-width: 981px) {
+  :global(body.hand-open.hand-in-column .side) {
+    max-height: calc(var(--vh) - 4rem - 280px);
+  }
+}
+/* the hand under the map, where the bars are: they go above its names, above all of it raised */
+:global(body.hand-open.hand-at-map:not(.hand-in-column) .board-bars) {
+  bottom: calc(var(--hand-bottom, 0px) + 7.5rem);
+}
+:global(body.hand-raised.hand-at-map:not(.hand-in-column) .board-bars) {
+  bottom: calc(var(--hand-bottom, 0px) + 17rem);
 }
 .reveal-bar {
   display: flex;

@@ -4,7 +4,7 @@
 // device (settings.ts, and sound.ts / i18n.ts for the volumes and the card language).
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { lang } from '../i18n'
-import { settings, resetSettings, type AnimSpeed } from '../settings'
+import { settings, resetSettings, type AnimSpeed, type Settings } from '../settings'
 import { muted, sfx, volumes, type Volumes } from '../sound'
 import { game, online, quitGame } from '../play/game'
 import { TAKEN_KEYS, keyLabel, micList, startMicTest, stopMicTest, voice } from '../play/voice'
@@ -105,6 +105,29 @@ const SPEEDS: { id: AnimSpeed; label: string; sub: string }[] = [
   { id: 'normal', label: 'ปกติ', sub: 'แอนิเมชันเต็ม' },
   { id: 'fast', label: 'เร็ว', sub: 'เร็วขึ้นเท่าตัว' },
   { id: 'skip', label: 'ข้าม', sub: 'เห็นผลแทบทันที' },
+]
+
+const HAND_PLACES: { id: Settings['handPlace']; label: string; sub: string }[] = [
+  { id: 'auto', label: 'อัตโนมัติ', sub: 'ใต้แผงด้านขวาถ้ามีที่ ไม่งั้นใต้แผนที่ — ไม่บังปุ่มและรายชื่อผู้เล่น' },
+  { id: 'map', label: 'ใต้แผนที่', sub: 'กลางจอใต้แผนที่ทุกจอ การ์ดใหญ่ แต่ตอนยกขึ้นบังขอบล่างแผนที่' },
+  { id: 'corner', label: 'มุมขวาล่าง', sub: 'แบบเดิม ทับท้ายแผงด้านข้าง' },
+]
+
+const HAND_LAYOUTS: { id: Settings['handLayout']; label: string; sub: string }[] = [
+  { id: 'fan', label: 'โค้ง', sub: 'เอียงเป็นพัด' },
+  { id: 'row', label: 'แถวตรง', sub: 'ไม่เอียง อ่านชื่อง่าย' },
+  { id: 'stack', label: 'ซ้อน', sub: 'กินที่น้อย การ์ดใหญ่ขึ้น' },
+]
+
+const HAND_PICKED: { id: Settings['handPicked']; label: string; sub: string }[] = [
+  { id: 'raise', label: 'ยกค้างไว้', sub: 'ยกขึ้นเหนือมือจนกว่าจะยืนยัน' },
+  { id: 'sink', label: 'จมอยู่กับมือ', sub: 'เรืองแสงทอง ไม่บังแผนที่' },
+]
+
+const HAND_HOVERS: { id: Settings['handHover']; label: string; sub: string }[] = [
+  { id: 'full', label: 'เต็มใบ', sub: 'ยกทั้งมือขึ้นเต็มใบ' },
+  { id: 'half', label: 'ครึ่งใบ', sub: 'ยกทั้งมือขึ้นครึ่งใบ' },
+  { id: 'one', label: 'เฉพาะใบที่ชี้', sub: 'ใบอื่นจมอยู่' },
 ]
 
 // ---------- online: the system notification's permission ----------
@@ -296,6 +319,82 @@ watch(tab, () => (confirming.value = null))
             <label class="switch">
               <input v-model="settings.reduceMotion" type="checkbox" />
               <span><b>ลดการเคลื่อนไหว</b><small>ปิดการกะพริบ จอสั่น และแสงเต้น (เปิดให้อัตโนมัติถ้าเครื่องตั้งไว้)</small></span>
+            </label>
+            <div class="field">
+              <b>ตำแหน่งการ์ดบนมือ</b>
+              <small>การ์ดเคลื่อนที่ที่เลือกตอนวางแผนและตอนใช้ Perk</small>
+              <div class="choice" role="radiogroup" aria-label="ตำแหน่งการ์ดบนมือ">
+                <button
+                  v-for="h in HAND_PLACES"
+                  :key="h.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="settings.handPlace === h.id"
+                  :class="{ on: settings.handPlace === h.id }"
+                  @click="settings.handPlace = h.id"
+                >
+                  <b>{{ h.label }}</b>
+                  <small>{{ h.sub }}</small>
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <b>การเรียงการ์ดบนมือ</b>
+              <small>รูปแบบการวางการ์ดเคลื่อนที่บนมือ</small>
+              <div class="choice" role="radiogroup" aria-label="การเรียงการ์ดบนมือ">
+                <button
+                  v-for="l in HAND_LAYOUTS"
+                  :key="l.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="settings.handLayout === l.id"
+                  :class="{ on: settings.handLayout === l.id }"
+                  @click="settings.handLayout = l.id"
+                >
+                  <b>{{ l.label }}</b>
+                  <small>{{ l.sub }}</small>
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <b>การ์ดที่เลือกแล้ว</b>
+              <small>ก่อนกดยืนยันในแผงด้านข้าง</small>
+              <div class="choice two" role="radiogroup" aria-label="การ์ดที่เลือกแล้ว">
+                <button
+                  v-for="p in HAND_PICKED"
+                  :key="p.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="settings.handPicked === p.id"
+                  :class="{ on: settings.handPicked === p.id }"
+                  @click="settings.handPicked = p.id"
+                >
+                  <b>{{ p.label }}</b>
+                  <small>{{ p.sub }}</small>
+                </button>
+              </div>
+            </div>
+            <div class="field">
+              <b>ความสูงตอนชี้เมาส์</b>
+              <small>ใบที่ชี้ยกขึ้นเต็มใบเสมอ</small>
+              <div class="choice" role="radiogroup" aria-label="ความสูงตอนชี้เมาส์">
+                <button
+                  v-for="h in HAND_HOVERS"
+                  :key="h.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="settings.handHover === h.id"
+                  :class="{ on: settings.handHover === h.id }"
+                  @click="settings.handHover = h.id"
+                >
+                  <b>{{ h.label }}</b>
+                  <small>{{ h.sub }}</small>
+                </button>
+              </div>
+            </div>
+            <label class="switch">
+              <input v-model="settings.handTouchRaise" type="checkbox" />
+              <span><b>แท็บเล็ต: ยกการ์ดขึ้นรอเมื่อต้องเลือก</b><small>แตะครั้งเดียวก็เลือก — ปิด: แตะแรกยกการ์ดขึ้น แตะสองเลือก</small></span>
             </label>
             <label class="switch">
               <input :checked="lang === 'en'" type="checkbox" @change="lang = lang === 'en' ? 'th' : 'en'" />
