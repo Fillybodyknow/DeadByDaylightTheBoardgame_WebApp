@@ -2767,6 +2767,26 @@ describe('The Artist', () => {
     expect(g.step.t).toBe('planSurvivors')
   })
 
+  it('every survivor by a Dire Crow: once all are face up, the killer plans (nobody is left to)', () => {
+    const st = artist()
+    const dire = st.props.find((p) => p.dire)!
+    Object.assign(dire, { artist: false, removed: false, room: 'shack' })
+    st.survivors.forEach((sv) => Object.assign(sv, { planned: null, plannedRevealed: false }))
+    st.phase = 'planning'
+    st.step = { t: 'turnStart', s: 0 }
+    st.queue = [{ k: 'plan' }]
+    let g = apply(st, { t: 'continue' })
+    for (let n = 0; n < 4; n++) {
+      expect(g.step.t).toBe('planStridor')
+      if (g.step.t !== 'planStridor') break
+      g = apply(g, { t: 'planStridor', card: g.survivorHands[g.survivors[g.step.s].hand].find((c) => c !== 'wait')! })
+    }
+    expect(g.step.t).toBe('planKiller')
+    expect(g.survivors.every((sv) => sv.planned && sv.plannedRevealed)).toBe(true)
+    g = apply(g, legalActions(g)[0])
+    expect(g.phase).not.toBe('planning')
+  })
+
   it('Grim Embrace: a ▲ on the rescuer; hung, each is a sacrifice progress', () => {
     const st = artist('grim_embrace')
     const w = { k: 'afterSabotage', s: 1, rescued: 0 } as const

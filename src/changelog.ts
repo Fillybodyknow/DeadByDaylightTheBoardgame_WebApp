@@ -12,6 +12,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.30.1',
+    date: '2026-11-02',
+    items: ['แก้เกมค้างตอนวางแผน เมื่อ Survivor ทุกคนเปิดการ์ดหงายไปก่อนแล้ว (Dire Crow ของ The Artist) — ตอนนี้ไปที่ฆาตกรวางแผนต่อเลย'],
+  },
+  {
     version: '1.30.0',
     date: '2026-11-02',
     items: [

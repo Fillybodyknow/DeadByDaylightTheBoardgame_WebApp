@@ -1649,8 +1649,14 @@ function runTask(st: GameState, task: Task) {
       // card is set on its own first and everyone else plans knowing it.
       // The Artist's Dire Crows do the same for the survivors in their rooms, one after another.
       const first = [...(st.stridor !== null ? [st.stridor] : []), ...direCrowed(st)].find((i) => st.survivors[i].planned === null && st.survivors[i].status !== 'hooked')
-      if (first !== undefined) wait(st, { t: 'planStridor', s: first })
-      else wait(st, { t: 'planSurvivors' })
+      if (first !== undefined) return wait(st, { t: 'planStridor', s: first })
+      // Every survivor's card is set already (all crowed or Stridor's) or they are hooked: nobody
+      // has a card left to plan, so the killer plans now (else the game waits on no one).
+      if (survivorsPlanned(st, [])) {
+        planSurvivors(st, [null, null, null, null], true)
+        return wait(st, { t: 'planKiller' })
+      }
+      wait(st, { t: 'planSurvivors' })
       return
     }
     case 'roll': {
