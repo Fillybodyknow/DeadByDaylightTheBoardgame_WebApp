@@ -618,7 +618,7 @@ function onBoardIn(st: GameState, room: string): number[] {
   return st.survivors.flatMap((sv, i) => (sv.status === 'board' && sv.room === room ? [i] : []))
 }
 
-function usableHook(st: GameState, room: string): Prop | undefined {
+export function usableHook(st: GameState, room: string): Prop | undefined {
   return propsIn(st, room).find((p) => p.kind === 'hook' && p.revealed && p.occupant === null && !entityOn(st, { prop: p.id }))
 }
 

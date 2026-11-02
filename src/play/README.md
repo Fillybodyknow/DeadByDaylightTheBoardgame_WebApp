@@ -247,7 +247,13 @@ and the host starts the game.
   seating everyone, everyone sees them (with chips for what differs from the defaults). A change
   doesn't reset anyone's ready (the user's call: the host sets several in a row); the others'
   settings card glows and says what changed for a few seconds. Stored in the lobby node as a partial object, so older
-  rooms play with the defaults.
+  rooms play with the defaults. The card (`RoomSettingsCard`): four ready-made settings on top
+  (`SETTINGS_PRESETS`: ตามเล่ม, มือใหม่, แข่งขัน, ปาร์ตี้ / สุ่ม — one press sets every setting; the
+  one the room's are lights up, else "กำหนดเอง"), then three tabs (กติกา: mode, offerings;
+  ตัวละคร & แผนที่: map, picks, dupes, show killer, Banlist; เวลา & สมดุล: timer, starting ▲). A gold
+  dot marks a tab and a row that differ from the rulebook, compared as they play (`sameSettings`:
+  a ban count with no Banlist is no difference); "↺ คืนค่าตามเล่ม" shows when anything does. Hints
+  show only for the choice made; on/off settings are switches. Others see it folded, read-only.
   - **Turn timer** (none / 60 / 90 / 120 s): counted on each device from when a decision shows
     (after its animations). At zero the player's own device answers what can be passed over
     (`online/timeout.ts`: no to a perk, an item or a bonus turn, a roll taken as rolled, nothing

@@ -22,13 +22,14 @@ import { boardOf,
   merchantDrones,
   unknownRooms,
   mustMove,
-  perkButtons,
+  perkButtons,
   propsIn,
   rerollers,
   rollHelpers,
   roomName,
   survivorInteractions,
   survivorMoves,
+  usableHook,
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
@@ -78,6 +79,8 @@ const props = defineProps<{
   trapPath: string | null
   powerCard: MoveCard | null
   onBoard: Set<string>
+  /** Pain Resonance's hook interacted with, its survivor being picked on the board. */
+  painArmed?: boolean
 }>()
 
 // Perk and power choices the board already offers are made there; the panel points at it.
@@ -93,6 +96,8 @@ const emit = defineEmits<{
   undyingRoom: [room: string | null]
   trapPath: [path: string | null]
   powerCard: [card: MoveCard | null]
+  /** Pain Resonance: interact with this hook, then pick the survivor (on the board); null: put back. */
+  painHook: [hook: string | null]
 }>()
 
 const step = computed(() => props.st.step)
@@ -196,13 +201,17 @@ const calmSpirit = computed(() => {
 
 const kInteractions = computed(() => {
   const s = step.value
-  if (s.t !== 'killerInteract' || !s.canInteract) return { plain: [] as KillerInteraction[], undying: [] as KillerInteraction[], traps: [] as KillerInteraction[], powers: [] as KillerInteraction[] }
+  if (s.t !== 'killerInteract' || !s.canInteract)
+    return { plain: [] as KillerInteraction[], undying: [] as KillerInteraction[], traps: [] as KillerInteraction[], powers: [] as KillerInteraction[], painHook: null as string | null }
   const all = killerInteractions(props.st)
   return {
-    plain: s.powerOnly ? [] : all.filter((i) => !isPower(i) && i.k !== 'undying'),
+    // (Pain Resonance goes by its hook first: its card below, or the hook on the board)
+    plain: s.powerOnly ? [] : all.filter((i) => !isPower(i) && i.k !== 'undying' && i.k !== 'painResonance'),
     undying: s.powerOnly ? [] : all.filter((i) => i.k === 'undying'),
     traps: all.filter((i) => i.k === 'power' && !i.remove),
     powers: all.filter(isPower),
+    /** The empty hook Pain Resonance is used at, when it can be. */
+    painHook: !s.powerOnly && all.some((i) => i.k === 'painResonance') ? (usableHook(props.st, props.st.killer.room)?.id ?? null) : null,
   }
 })
 
@@ -809,6 +818,14 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             state="ready"
             text="ทิ้งการ์ด 1 ใบ แล้ว Interact กับ prop ในห้องที่เชื่อมด้วยเส้นทางสีเดียวกับการ์ด"
             @pick="emit('undyingOn', true), sfx.click()"
+          />
+          <!-- Pain Resonance: the hook first (here or on the board), then whom it wounds on the board -->
+          <PerkCard
+            v-if="kInteractions.painHook && !perkPicked"
+            perk="pain_resonance"
+            :state="painArmed ? 'picked' : 'ready'"
+            text="Interact กับ Hook ว่างในห้องนี้ แล้วเลือกผู้รอดชีวิตในห้องที่เชื่อมกัน — คนนั้นบาดเจ็บ"
+            @pick="emit('painHook', painArmed ? null : kInteractions.painHook!), sfx.click()"
           />
           <button v-if="kInteractions.powers.length" class="power" @click="emit('powerOn', true), sfx.click()">⚡ ใช้พลัง: {{ powerName(st) }}</button>
           <span v-else-if="st.killer.powerUsed" class="muted small">ใช้พลังไปแล้วรอบนี้</span>

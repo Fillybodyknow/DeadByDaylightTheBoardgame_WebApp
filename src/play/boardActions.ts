@@ -32,6 +32,7 @@ import {
   survivorInteractions,
   survivorMoves,
   touchingPaths,
+  usableHook,
 } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import { boards } from './engine/boards'
@@ -89,6 +90,8 @@ export interface BoardModes {
   undyingRoom: Ref<string | null>
   /** Diversion (Adam): the killer was clicked — his paths are the targets now. */
   diversion: Ref<boolean>
+  /** Pain Resonance (The Artist): the empty hook interacted with — the survivor next door is picked now. */
+  painHook: Ref<string | null>
 }
 
 type Run = (() => void) & { action?: Action }
@@ -243,6 +246,22 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           modes.calmCrow.value = null
           go({ t: 'interact', i }, sfx.select)()
         })
+    return out
+  }
+
+  // Pain Resonance: the hook interacted with, then the survivor in a connected room it wounds
+  if (modes.painHook.value && s.t === 'killerInteract') {
+    for (const i of killerInteractions(st)) {
+      if (i.k !== 'painResonance') continue
+      const a: Action = { t: 'interact', i }
+      add(
+        `s:${i.target}`,
+        killerInteractionLabel(st, i),
+        Object.assign(() => ((modes.painHook.value = null), go(a, sfx.select)()), { action: a }),
+        'act',
+        i.target,
+      )
+    }
     return out
   }
 
@@ -497,9 +516,13 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       if (!powerMode(st, modes)) {
         const all = killerInteractions(st)
         for (const i of all) {
-          if (isPower(i) || i.k === 'undying') continue
+          if (isPower(i) || i.k === 'undying' || i.k === 'painResonance') continue
           add(spotOf(i), killerInteractionLabel(st, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
         }
+        // Pain Resonance, as its card says: the empty hook here first, then whom it wounds
+        const hook = all.some((i) => i.k === 'painResonance') ? usableHook(st, st.killer.room) : undefined
+        if (hook)
+          add(`prop:${hook.id}`, `${PERKS.pain_resonance.name}: Interact กับ Hook (${PERKS.pain_resonance.cost} ▲) แล้วเลือกผู้รอดชีวิตในห้องที่เชื่อมกัน`, () => ((modes.painHook.value = hook.id), sfx.click()))
         // The killer's own mini: the power and Undying both live there, so clicking it asks which.
         if (all.some(isPower)) add('killer', `ใช้พลัง: ${powerName(st)}`, () => ((modes.powerOn.value = true), sfx.click()))
         if (all.some((i) => i.k === 'undying'))

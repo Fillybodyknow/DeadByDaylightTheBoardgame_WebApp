@@ -56,6 +56,35 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   offeringRandom: false,
 }
 
+/** Ready-made settings for the host to start from (RoomSettingsCard), each whole. */
+export const SETTINGS_PRESETS: { id: string; label: string; sub: string; settings: RoomSettings }[] = [
+  { id: 'rulebook', label: 'ตามเล่ม', sub: 'กติกาตามเล่มทั้งหมด', settings: DEFAULT_SETTINGS },
+  { id: 'new', label: 'มือใหม่', sub: 'Survivor ได้ ▲ เพิ่ม เห็นฆาตกร ไม่จำกัดเวลา', settings: { ...DEFAULT_SETTINGS, survivorBp: 3, showKiller: true } },
+  { id: 'versus', label: 'แข่งขัน', sub: 'Banlist เวลา 90 วิ แผนที่ลับ Offering ฝั่งละ 1', settings: { ...DEFAULT_SETTINGS, banlist: true, banCount: 2, timer: 90, map: 'secret', offerings: 'both' } },
+  { id: 'party', label: 'ปาร์ตี้ / สุ่ม', sub: 'สุ่มตัวละครและแผนที่ Bloodweb เวลา 60 วิ', settings: { ...DEFAULT_SETTINGS, random: true, dupes: true, map: 'random', mode: 'bloodweb', timer: 60 } },
+]
+
+/** Settings as they play: a choice that does nothing as things are (the ban count with no Banlist) at its default. */
+function effective(s: RoomSettings): RoomSettings {
+  const d = DEFAULT_SETTINGS
+  return {
+    ...s,
+    banCount: s.banlist ? s.banCount : d.banCount,
+    offeringCount: s.offerings === 'survivors' || s.offerings === 'killer' ? s.offeringCount : d.offeringCount,
+    offeringRandom: s.offerings !== 'none' ? s.offeringRandom : d.offeringRandom,
+  }
+}
+
+/** Whether `a` and `b` play the same in these settings (all of them by default). */
+export function sameSettings(a: RoomSettings, b: RoomSettings, keys = Object.keys(DEFAULT_SETTINGS) as (keyof RoomSettings)[]): boolean {
+  const ea = effective(a)
+  const eb = effective(b)
+  return keys.every((k) => ea[k] === eb[k])
+}
+
+/** The ready-made settings these are, if any. */
+export const presetOf = (s: RoomSettings) => SETTINGS_PRESETS.find((p) => sameSettings(p.settings, s)) ?? null
+
 export const TIMER_CHOICES = [0, 60, 90, 120]
 export const BAN_COUNT_RANGE = [1, 3] as const
 export const SURVIVOR_BP_RANGE = [0, 4] as const

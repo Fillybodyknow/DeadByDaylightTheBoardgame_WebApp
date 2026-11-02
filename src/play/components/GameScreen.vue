@@ -270,6 +270,8 @@ const itemPick = ref<number | null>(null)
 const breakoutTarget = ref<number | null>(null)
 /** Diversion: the killer was clicked, his paths are the targets. */
 const diversion = ref(false)
+/** Pain Resonance: the empty hook interacted with, waiting for the survivor next door. */
+const painHook = ref<string | null>(null)
 /** A fork's icon was clicked: its moves, waiting for the room to go to. */
 const forkMoves = shallowRef<BoardAction[] | null>(null)
 /** Oppression: generators picked on the board, waiting for confirm. */
@@ -302,7 +304,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
 
 watch(
   () => view.value.step,
@@ -317,6 +319,7 @@ watch(
     fogwiseFrom.value = null
     breakoutTarget.value = null
     diversion.value = false
+    painHook.value = null
     perkPicked.value = null
     itemPick.value = null
     forkMoves.value = null
@@ -490,6 +493,7 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: 'วิญญาณสงบ: คลิกห้องที่จะส่ง Crow ไป', cancel: () => (calmCrow.value = null) }
+  if (painHook.value) return { text: `${PERKS.pain_resonance.name}: คลิกผู้รอดชีวิตในห้องที่เชื่อมกันที่เรืองแสง — คนนั้นบาดเจ็บ`, cancel: () => (painHook.value = null) }
   if (aceFirst.value)
     return view.value.step.t === 'killerInteract'
       ? { text: 'เครื่องทรมานสตรีเหล็ก: คลิก Hook ที่จะสลับกับ Locker นี้', cancel: () => (aceFirst.value = null) }
@@ -1438,6 +1442,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           @power-on="powerOn = $event"
           @trap-path="trapPath = $event"
           @power-card="powerCard = $event"
+          :pain-armed="!!painHook"
+          @pain-hook="painHook = $event"
         />
       </aside>
     </main>
