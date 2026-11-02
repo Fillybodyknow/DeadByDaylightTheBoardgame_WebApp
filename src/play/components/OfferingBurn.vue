@@ -135,11 +135,12 @@ onBeforeUnmount(clearTimers)
             <img :ref="(el) => (pictures[i] = el as HTMLImageElement)" :src="asset(c.image)" :alt="c.name" />
             <canvas :ref="(el) => (papers[i] = el as HTMLCanvasElement)" class="paper" />
           </div>
+          <!-- whose it is, a band across its top in the side's colour: it stays while the card burns -->
+          <span class="ribbon">{{ c.side === 'killer' ? '🔪 KILLER' : '🔦 SURVIVOR' }}</span>
           <span v-if="burning" class="embers" aria-hidden="true">
             <i v-for="(e, k) in EMBERS" :key="k" :style="{ left: e.left, bottom: e.bottom, animationDelay: e.delay, '--drift': e.drift }" />
           </span>
           <b>{{ c.name }}</b>
-          <small>{{ c.side === 'killer' ? 'Killer' : 'Survivor' }}</small>
         </div>
       </div>
       <button type="button" class="skip" @click.stop="finish">ข้าม ⏭</button>
@@ -215,14 +216,40 @@ header h2 {
     transform: none;
   }
 }
+/* each side's colour: the survivors' violet, the killer's red */
+.oc {
+  --side: #8a5cff;
+  --side-glow: rgb(138 92 255 / 0.55);
+}
+.oc.killer {
+  --side: #e0242c;
+  --side-glow: rgb(255 40 40 / 0.55);
+}
 .face {
   position: relative;
   width: 100%;
   border-radius: 8px;
-  box-shadow: 0 0 26px rgb(170 90 255 / 0.35), 0 12px 26px rgb(0 0 0 / 0.7);
+  outline: 3px solid var(--side);
+  outline-offset: 2px;
+  box-shadow: 0 0 30px var(--side-glow), 0 12px 26px rgb(0 0 0 / 0.7);
 }
-.oc.killer .face {
-  box-shadow: 0 0 26px rgb(255 50 50 / 0.35), 0 12px 26px rgb(0 0 0 / 0.7);
+/* the side's band, across the card's top edge (over the picture and the fire alike) */
+.ribbon {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 50%;
+  translate: -50% -55%;
+  padding: 0.25rem 1rem;
+  border-radius: 4px;
+  background: var(--side);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: clamp(0.85rem, 1.6vw, 1.15rem);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+  box-shadow: 0 0 16px var(--side-glow), 0 4px 10px rgb(0 0 0 / 0.6);
 }
 .face img {
   display: block;
@@ -246,6 +273,8 @@ header h2 {
 }
 .oc.burning:not(.faded) .face {
   box-shadow: none;
+  outline-color: transparent;
+  transition: outline-color 0.8s;
 }
 .oc.burning:not(.faded) img {
   visibility: hidden;
@@ -260,12 +289,7 @@ header h2 {
   text-align: center;
   transition: opacity 0.6s 1s;
 }
-.oc small {
-  color: var(--muted);
-  transition: opacity 0.6s 1s;
-}
-.oc.burning b,
-.oc.burning small {
+.oc.burning b {
   opacity: 0.25;
 }
 .embers {

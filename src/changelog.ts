@@ -12,6 +12,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.29.1',
+    date: '2026-11-02',
+    items: ['ฉากเผา Offering: การ์ดแต่ละใบมีแถบสีบอกฝั่ง ม่วง = Survivor แดง = Killer ค้างไว้จนการ์ดไหม้หมด'],
+  },
+  {
     version: '1.29.0',
     date: '2026-11-02',
     items: [
