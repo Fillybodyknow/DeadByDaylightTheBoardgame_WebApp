@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// A side's offerings before a trial (p.19): the side's cards in a row, a click burns one (or puts
-// it back), 🔍 shows it big with its text, and a confirm button once the count is right. Online and
-// on one device alike.
+// A side's offerings before a trial (p.19): the side's cards in a row, a click on one shows it big
+// with its text, the button under it burns it (or puts it back), and a confirm button once the
+// count is right. Online and on one device alike.
 import { computed, ref } from 'vue'
 import { offerings as OFFERING_CARDS } from '../../data'
 import { asset, lang } from '../../i18n'
@@ -52,15 +52,16 @@ function toggle(id: OfferingId) {
           type="button"
           class="offer"
           :class="{ on: picked.includes(c.id), dim: confirmed && !picked.includes(c.id) }"
-          :disabled="confirmed"
-          :title="c.text.replaceAll('{BP}', '▲')"
-          @click="toggle(c.id)"
+          :title="`ดู ${c.name} ใหญ่`"
+          @click="zoomed = c.id"
         >
           <img :src="asset(c.image)" :alt="c.name" loading="lazy" />
           <b>{{ c.name }}</b>
           <small>{{ c.en }}</small>
         </button>
-        <button type="button" class="zoom" :title="`ดู ${c.name} ใหญ่`" :aria-label="`ดู ${c.name} ใหญ่`" @click="zoomed = c.id">🔍</button>
+        <button v-if="!confirmed" type="button" class="pick" :class="{ primary: !picked.includes(c.id) }" @click="toggle(c.id)">
+          {{ picked.includes(c.id) ? '✓ เลือกแล้ว — กดเพื่อเอาออก' : 'เลือกใบนี้' }}
+        </button>
       </div>
     </div>
     <ModalShell :open="!!zoom" :title="zoom?.name ?? ''" width="min(760px, 94vw)" @close="zoomed = null">
@@ -95,24 +96,13 @@ function toggle(id: OfferingId) {
   margin: 12px 0;
 }
 .slot {
-  position: relative;
+  display: flex;
+  flex-direction: column;
 }
-/* the magnifier on the card's corner: big enough to hit on a tablet */
-.zoom {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border-radius: 50%;
-  background: rgb(0 0 0 / 0.65);
-  font-size: 1rem;
-  line-height: 1;
-}
-.zoom:hover {
-  background: rgb(0 0 0 / 0.85);
-  border-color: #d4a640;
+/* the pick under its card: the card itself only shows it big */
+.pick {
+  width: 100%;
+  margin-top: 6px;
 }
 .zoom-body {
   display: flex;
@@ -151,7 +141,7 @@ function toggle(id: OfferingId) {
   cursor: pointer;
   transition: transform 0.15s, border-color 0.15s, opacity 0.15s;
 }
-.offer:hover:not(:disabled) {
+.offer:hover {
   transform: translateY(-3px);
 }
 .offer img {
@@ -167,9 +157,6 @@ function toggle(id: OfferingId) {
 }
 .offer.dim {
   opacity: 0.35;
-}
-.offer:disabled {
-  cursor: default;
 }
 .foot {
   display: flex;

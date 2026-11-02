@@ -11,13 +11,19 @@ import type { OfferingPlan } from '../engine/offerings'
 export interface RoomSettings {
   /** p.19: Adept (printed perks), Bloodweb (5 cards drawn, up to 3 laid over), Devout (3 picked). */
   mode: GameMode
-  /** Seconds a player has for a decision; 0 for no limit. */
+  /** Seconds a player has for a move or the planning (60 by default); 0 for no limit. Running out only tells the room. */
   timer: number
   /**
-   * Who picks the board: the killer (`secret`: without the survivors seeing it until the game
-   * starts), the host, or nobody (drawn when the picks open).
+   * Seconds for a question that can be passed over (a perk, an item, a bonus turn, a roll to keep);
+   * running out answers "no". 0: the same as `timer` (rooms made before it played that way).
    */
-  map: 'killer' | 'secret' | 'host' | 'random'
+  askTimer: number
+  /**
+   * Who picks the board: the killer, the host, or nobody (drawn when the picks open). (A secret
+   * pick by the killer was dropped: the map is the last stage, so the survivors could change
+   * nothing on seeing it. A room that still has it plays it as the killer's: `settingsOf`.)
+   */
+  map: 'killer' | 'host' | 'random'
   /** Survivors see which killer is picked (by default only the killer's own screen shows it). */
   showKiller: boolean
   /** Survivors may pick a survivor a teammate already took. */
@@ -42,7 +48,8 @@ export interface RoomSettings {
 
 export const DEFAULT_SETTINGS: RoomSettings = {
   mode: 'adept',
-  timer: 0,
+  timer: 60,
+  askTimer: 0,
   map: 'killer',
   showKiller: false,
   dupes: false,
@@ -55,14 +62,6 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   offeringCount: 1,
   offeringRandom: false,
 }
-
-/** Ready-made settings for the host to start from (RoomSettingsCard), each whole. */
-export const SETTINGS_PRESETS: { id: string; label: string; sub: string; settings: RoomSettings }[] = [
-  { id: 'rulebook', label: 'ตามเล่ม', sub: 'กติกาตามเล่มทั้งหมด', settings: DEFAULT_SETTINGS },
-  { id: 'new', label: 'มือใหม่', sub: 'Survivor ได้ ▲ เพิ่ม เห็นฆาตกร ไม่จำกัดเวลา', settings: { ...DEFAULT_SETTINGS, survivorBp: 3, showKiller: true } },
-  { id: 'versus', label: 'แข่งขัน', sub: 'Banlist เวลา 90 วิ แผนที่ลับ Offering ฝั่งละ 1', settings: { ...DEFAULT_SETTINGS, banlist: true, banCount: 2, timer: 90, map: 'secret', offerings: 'both' } },
-  { id: 'party', label: 'ปาร์ตี้ / สุ่ม', sub: 'สุ่มตัวละครและแผนที่ Bloodweb เวลา 60 วิ', settings: { ...DEFAULT_SETTINGS, random: true, dupes: true, map: 'random', mode: 'bloodweb', timer: 60 } },
-]
 
 /** Settings as they play: a choice that does nothing as things are (the ban count with no Banlist) at its default. */
 function effective(s: RoomSettings): RoomSettings {
@@ -82,18 +81,24 @@ export function sameSettings(a: RoomSettings, b: RoomSettings, keys = Object.key
   return keys.every((k) => ea[k] === eb[k])
 }
 
-/** The ready-made settings these are, if any. */
-export const presetOf = (s: RoomSettings) => SETTINGS_PRESETS.find((p) => sameSettings(p.settings, s)) ?? null
+/** No limit last: a choice, not the default. */
+export const TIMER_CHOICES = [60, 90, 120, 0]
+/** The question time: 0 = as the turn's. */
+export const ASK_TIMER_CHOICES = [0, 15, 20, 30]
 
-export const TIMER_CHOICES = [0, 60, 90, 120]
+/** Seconds for the decision `st` waits on in these settings (0: no limit). */
+export const timeFor = (s: RoomSettings, question: boolean) => (question && s.askTimer ? s.askTimer : s.timer)
 export const BAN_COUNT_RANGE = [1, 3] as const
 export const SURVIVOR_BP_RANGE = [0, 4] as const
 export const KILLER_BP_RANGE = [2, 6] as const
 
-/** The room's settings with every default filled in (a host's old `bans` list is no longer used). */
-export function settingsOf(stored: (Partial<RoomSettings> & { bans?: unknown }) | undefined): RoomSettings {
-  const { bans: _old, ...rest } = stored ?? {}
-  return { ...DEFAULT_SETTINGS, ...rest }
+/**
+ * The room's settings with every default filled in (a host's old `bans` list is no longer used,
+ * and an old secret map is the killer's pick).
+ */
+export function settingsOf(stored: (Partial<Omit<RoomSettings, 'map'>> & { map?: RoomSettings['map'] | 'secret'; bans?: unknown }) | undefined): RoomSettings {
+  const { bans: _old, map, ...rest } = stored ?? {}
+  return { ...DEFAULT_SETTINGS, ...rest, ...(map ? { map: map === 'secret' ? 'killer' : map } : {}) }
 }
 
 /** Characters the full game can play, by side. */
@@ -105,8 +110,8 @@ export function settingsChips(s: RoomSettings): string[] {
   const out: string[] = []
   if (s.mode === 'bloodweb') out.push('🕸 Bloodweb')
   if (s.mode === 'devout') out.push('🙏 Devout')
-  if (s.timer) out.push(`⏱ ${s.timer} วิ/ตา`)
-  if (s.map === 'secret') out.push('🗺 แผนที่ลับ')
+  if (s.timer !== DEFAULT_SETTINGS.timer) out.push(s.timer ? `⏱ ${s.timer} วิ/ตา` : '⏱ ไม่จำกัดเวลา')
+  if (s.askTimer) out.push(`❔ คำถาม ${s.askTimer} วิ`)
   if (s.map === 'host') out.push('🗺 หัวห้องเลือกแผนที่')
   if (s.map === 'random') out.push('🗺 สุ่มแผนที่')
   if (s.random) out.push('🎲 สุ่มตัวละคร')

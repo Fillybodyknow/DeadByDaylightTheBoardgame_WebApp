@@ -6,7 +6,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { sfx } from '../../sound'
 import { isHost, roomSettings, session, setSettings } from '../online/session'
-import { BAN_COUNT_RANGE, DEFAULT_SETTINGS, KILLER_BP_RANGE, SETTINGS_PRESETS, SURVIVOR_BP_RANGE, TIMER_CHOICES, presetOf, sameSettings, settingsChips, type RoomSettings } from '../online/settings'
+import { BAN_COUNT_RANGE, DEFAULT_SETTINGS, KILLER_BP_RANGE, SURVIVOR_BP_RANGE, TIMER_CHOICES, ASK_TIMER_CHOICES, sameSettings, settingsChips, type RoomSettings } from '../online/settings'
 import BpIcon from '../../components/BpIcon.vue'
 import OfferingSettings from './OfferingSettings.vue'
 
@@ -23,7 +23,6 @@ function set(patch: Partial<RoomSettings>) {
 
 const MAP_CHOICES: { id: RoomSettings['map']; label: string }[] = [
   { id: 'killer', label: 'Killer เลือก' },
-  { id: 'secret', label: 'Killer เลือก (ลับ)' },
   { id: 'host', label: 'หัวห้องเลือก' },
   { id: 'random', label: 'สุ่ม' },
 ]
@@ -38,24 +37,13 @@ function toggleDupes() {
   set({ dupes: !s.value.dupes })
 }
 
-// ---------- the tabs, the ready-made settings, what differs from the rulebook ----------
+// ---------- what differs from the rulebook ----------
+// Every setting shows at once, in three groups (no tabs: a host changing a few things across
+// groups should not have to switch back and forth).
 
-type Tab = 'rules' | 'chars' | 'time'
-const TABS: { id: Tab; label: string; keys: (keyof RoomSettings)[] }[] = [
-  { id: 'rules', label: '🃏 กติกา', keys: ['mode', 'offerings', 'offeringCount', 'offeringRandom'] },
-  { id: 'chars', label: '🎭 ตัวละคร & แผนที่', keys: ['map', 'random', 'dupes', 'showKiller', 'banlist', 'banCount'] },
-  { id: 'time', label: '⏱ เวลา & สมดุล', keys: ['timer', 'survivorBp', 'killerBp'] },
-]
-const tab = ref<Tab>('rules')
-
-/** These settings differ from the rulebook's (a gold dot on their row and tab). */
+/** These settings differ from the rulebook's (a gold dot on their row). */
 const differs = (...keys: (keyof RoomSettings)[]) => !sameSettings(s.value, DEFAULT_SETTINGS, keys)
-const preset = computed(() => presetOf(s.value))
-const isDefault = computed(() => preset.value?.id === 'rulebook')
-
-function usePreset(p: (typeof SETTINGS_PRESETS)[number]) {
-  set({ ...p.settings })
-}
+const isDefault = computed(() => sameSettings(s.value, DEFAULT_SETTINGS))
 
 // ---------- telling the others what the host changed ----------
 
@@ -66,6 +54,8 @@ function describe(key: keyof RoomSettings, v: RoomSettings): string {
       return `โหมดเกม → ${{ adept: 'Adept', bloodweb: 'Bloodweb', devout: 'Devout' }[v.mode]}`
     case 'timer':
       return `เวลาต่อตา → ${v.timer ? `${v.timer} วิ` : 'ไม่จำกัด'}`
+    case 'askTimer':
+      return `เวลาตอบคำถาม → ${v.askTimer ? `${v.askTimer} วิ` : 'เท่าเวลาต่อตา'}`
     case 'map':
       return `แผนที่ → ${MAP_CHOICES.find((m) => m.id === v.map)?.label ?? v.map}`
     case 'random':
@@ -108,7 +98,7 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
     <header>
       <h2>⚙ ตั้งค่าห้อง</h2>
       <span v-if="!isHost" class="muted small">หัวห้องเป็นคนตั้ง</span>
-      <button v-if="isHost && open && !isDefault" type="button" class="reset" :disabled="busy" @click="usePreset(SETTINGS_PRESETS[0])">↺ คืนค่าตามเล่ม</button>
+      <button v-if="isHost && open && !isDefault" type="button" class="reset" :disabled="busy" @click="set({ ...DEFAULT_SETTINGS })">↺ คืนค่าตามเล่ม</button>
       <button type="button" class="fold" :aria-expanded="open" @click="open = !open">{{ open ? 'ซ่อน ▴' : 'ดูทั้งหมด ▾' }}</button>
     </header>
     <Transition name="notice">
@@ -120,33 +110,9 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
     </p>
 
     <div v-show="open" class="body">
-      <!-- ready-made settings: one press sets them all; the one these are lights up -->
-      <p class="presets-head">ชุดตั้งค่าสำเร็จรูป<span v-if="!preset" class="custom"> · ตอนนี้: กำหนดเอง</span></p>
-      <div class="presets" role="radiogroup" aria-label="ชุดตั้งค่าสำเร็จรูป">
-        <button
-          v-for="p in SETTINGS_PRESETS"
-          :key="p.id"
-          type="button"
-          role="radio"
-          :aria-checked="preset?.id === p.id"
-          :class="{ on: preset?.id === p.id }"
-          :disabled="busy"
-          :title="p.sub"
-          @click="usePreset(p)"
-        >
-          <b>{{ p.label }}</b>
-          <small>{{ p.sub }}</small>
-        </button>
-      </div>
-
-      <!-- the settings, a tab at a time; a gold dot: differs from the rulebook -->
-      <div class="tabs" role="tablist">
-        <button v-for="t in TABS" :key="t.id" type="button" role="tab" :aria-selected="tab === t.id" :class="{ on: tab === t.id }" @click="tab = t.id">
-          {{ t.label }}<i v-if="differs(...t.keys)" class="dot" title="ต่างจากค่าตามเล่ม" />
-        </button>
-      </div>
-
-      <div v-if="tab === 'rules'" class="rows" role="tabpanel">
+      <!-- every setting, in three groups; a gold dot: differs from the rulebook -->
+      <h3 class="group">🃏 กติกา</h3>
+      <div class="rows">
         <div class="row">
           <span class="label">โหมดเกม<i v-if="differs('mode')" class="dot" /></span>
           <div class="seg">
@@ -176,13 +142,13 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
         </div>
       </div>
 
-      <div v-else-if="tab === 'chars'" class="rows" role="tabpanel">
+      <h3 class="group">🎭 ตัวละคร & แผนที่</h3>
+      <div class="rows">
         <div class="row">
           <span class="label">🗺 แผนที่<i v-if="differs('map')" class="dot" /></span>
           <div class="seg">
             <button v-for="m in MAP_CHOICES" :key="m.id" type="button" :class="{ on: s.map === m.id }" :disabled="busy" @click="set({ map: m.id })">{{ m.label }}</button>
           </div>
-          <small v-if="s.map === 'secret'" class="muted hint">Survivor ไม่รู้แผนที่จนกว่าเกมจะเริ่ม</small>
         </div>
         <div class="row">
           <span class="label">🎭 ตัวละคร<i v-if="differs('random')" class="dot" /></span>
@@ -219,7 +185,8 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
         </div>
       </div>
 
-      <div v-else class="rows" role="tabpanel">
+      <h3 class="group">⏱ เวลา & สมดุล</h3>
+      <div class="rows">
         <div class="row">
           <span class="label">⏱ เวลาต่อตา<i v-if="differs('timer')" class="dot" /></span>
           <div class="seg">
@@ -227,7 +194,16 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
               {{ t ? `${t} วิ` : 'ไม่จำกัด' }}
             </button>
           </div>
-          <small v-if="s.timer" class="muted hint">หมดเวลา: คำถามที่ข้ามได้ (Perk, Item, Bonus Turn, ลงขัน <BpIcon />) ตอบ "ไม่ใช้" ให้เอง — ตาเดินและวางแผนขึ้นเตือนทั้งห้อง</small>
+          <small v-if="s.timer" class="muted hint">ตาเดินและวางแผน: หมดเวลาแล้วขึ้นเตือนทั้งห้อง</small>
+        </div>
+        <div class="row">
+          <span class="label">❔ เวลาตอบคำถาม<i v-if="differs('askTimer')" class="dot" /></span>
+          <div class="seg">
+            <button v-for="t in ASK_TIMER_CHOICES" :key="t" type="button" :class="{ on: s.askTimer === t }" :disabled="busy" @click="set({ askTimer: t })">
+              {{ t ? `${t} วิ` : 'เท่าเวลาต่อตา' }}
+            </button>
+          </div>
+          <small v-if="s.askTimer || s.timer" class="muted hint">คำถามที่ข้ามได้ (ใช้ Perk, Item, Bonus Turn, ลงขัน <BpIcon />, เก็บผลทอย) — หมดเวลาแล้วตอบ "ไม่ใช้" ให้เอง</small>
         </div>
         <div class="row">
           <span class="label"><BpIcon /> BP เริ่มต้น<i v-if="differs('survivorBp', 'killerBp')" class="dot" /></span>
@@ -315,12 +291,12 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
   gap: 0.5rem 0.8rem;
 }
 .label {
-  min-width: 8rem;
+  min-width: 10rem;
   font-weight: 600;
 }
 .hint {
   flex-basis: 100%;
-  padding-left: 8.8rem;
+  padding-left: 10.8rem;
 }
 .seg {
   display: inline-flex;
@@ -353,67 +329,15 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
 .reset + .fold {
   margin-left: 0;
 }
-/* ready-made settings: four cards in a row, the one in use lit */
-.presets {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-.presets button {
-  display: grid;
-  gap: 0.15rem;
-  align-content: start;
-  padding: 0.5rem 0.6rem;
-  text-align: left;
-  background: rgb(255 255 255 / 0.03);
-}
-.presets button b {
-  font-size: 0.95rem;
-}
-.presets button small {
-  color: var(--muted);
-  font-size: 0.75rem;
-  line-height: 1.3;
-}
-.presets button.on {
-  border-color: var(--blood-bright, #e01d26);
-  background: rgb(224 29 38 / 0.18);
-  opacity: 1;
-}
-.presets button.on small {
-  color: var(--text, #ddd);
-}
-.presets-head {
-  margin: 0 0 0.4rem;
-  color: var(--muted);
-  font-size: 0.8rem;
-  letter-spacing: 0.03em;
-}
-.custom {
-  color: #ffd56a;
-}
-/* the tabs, as the settings window's */
-.tabs {
-  display: flex;
-  gap: 0.2rem;
-  margin: 0.9rem 0 0.75rem;
+/* a group of settings: a small heading over its rows */
+.group {
+  margin: 1rem 0 0.6rem;
+  padding-bottom: 0.3rem;
   border-bottom: 1px solid var(--line-strong);
-}
-.tabs button {
-  position: relative;
-  margin-bottom: -1px;
-  padding: 0.45rem 0.9rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius) var(--radius) 0 0;
-  background: none;
   color: var(--muted);
-}
-.tabs button.on {
-  border-color: var(--line-strong);
-  border-bottom-color: var(--panel-bg, #111317);
-  background: rgb(255 255 255 / 0.04);
-  color: var(--text, #fff);
-  opacity: 1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 /* differs from the rulebook */
 .dot {
@@ -495,13 +419,6 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
 @media (max-width: 700px) {
   .hint {
     padding-left: 0;
-  }
-  .presets {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .tabs button {
-    padding: 0.4rem 0.55rem;
-    font-size: 0.85rem;
   }
 }
 </style>

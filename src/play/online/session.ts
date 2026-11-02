@@ -686,10 +686,11 @@ function drawAll(d: RoomData, s: RoomSettings, banned: string[]): Record<string,
 
 /**
  * The bots' characters, drawn into the room's picks (the people's kept): none banned, and none a
- * teammate holds unless repeats are allowed. Drawn as the characters stage opens, before anyone
- * picks, so a bot never takes what a person already chose.
+ * teammate holds unless repeats are allowed. A bot killer's is drawn as the characters stage
+ * opens; the bot survivors' only once every person has locked in (`survivors`), so a bot never
+ * takes a survivor a person wanted.
  */
-function drawBotPicks(d: RoomData, s: RoomSettings, banned: string[]): Record<string, string> {
+function drawBotPicks(d: RoomData, s: RoomSettings, banned: string[], survivors = everyoneLocked(d)): Record<string, string> {
   const picks = { ...d.picks }
   for (const [p, seat] of Object.entries(d.seats)) {
     if (!seat.bot) continue
@@ -697,6 +698,7 @@ function drawBotPicks(d: RoomData, s: RoomSettings, banned: string[]): Record<st
       if (!picks.killer) picks.killer = botKiller(d, banned) ?? picks.killer
       continue
     }
+    if (!survivors) continue
     for (const slot of slotsOf(Number(p), d.players)) {
       if (picks[String(slot)]) continue
       const held = Object.entries(picks).flatMap(([k, v]) => (k === 'killer' ? [] : [v]))
@@ -854,7 +856,10 @@ export function lockPicks(locked: boolean) {
     if (locked) next[seat] = true
     else delete next[seat]
     // a character may change: the perks (Bloodweb's cards, who plays what) are set again
-    return locked ? { ...cur, locked: next } : { ...cur, locked: next, loadouts: {}, perksDone: {} }
+    if (!locked) return { ...cur, locked: next, loadouts: {}, perksDone: {} }
+    // the last person in: the bot survivors draw from what is left
+    const after = { ...cur, locked: next }
+    return everyoneLocked(after) ? { ...after, picks: drawBotPicks(after, settingsOf(cur.settings), bannedOf(cur), true) } : after
   })
 }
 
@@ -1050,7 +1055,7 @@ export const mayPickBoard = computed(() => {
   const d = session.data
   if (!d || d.phase !== 'pick') return false
   const how = roomSettings.value.map
-  return how === 'killer' || how === 'secret' ? mySeat.value === KILLER_PLAYER : how === 'host' ? isHost.value : false
+  return how === 'killer' ? mySeat.value === KILLER_PLAYER : how === 'host' ? isHost.value : false
 })
 
 /** The board is picked (any time before the game starts); everyone sees it. */
@@ -1059,7 +1064,7 @@ export function setBoard(id: string) {
   return update((cur) => {
     const seat = Object.entries(cur.seats).find(([, v]) => v.id === session.me)?.[0]
     const how = settingsOf(cur.settings).map
-    const may = how === 'killer' || how === 'secret' ? Number(seat) === KILLER_PLAYER : how === 'host' && session.me === cur.host
+    const may = how === 'killer' ? Number(seat) === KILLER_PLAYER : how === 'host' && session.me === cur.host
     return cur.phase === 'pick' && may ? { ...cur, board: id, boardSet: true } : null
   })
 }

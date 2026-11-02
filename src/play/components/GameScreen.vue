@@ -17,8 +17,9 @@ import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
 import { STAND_IN_AFTER_MS, botDriver, closeOnlineGame, goneSince, isHost, leaveRoom, pingColors, returnToLobby, roomSettings, session, setStandIn, standIns } from '../online/session'
 import { pingHex } from '../online/pingColors'
+import { timeFor } from '../online/settings'
 import { canPing, pingArmed, pingWait } from '../pings'
-import { timeoutActions } from '../online/timeout'
+import { isQuestion, timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
 import { STEP_NAME, boardActionKeys, offerPerk, perkPicked, perksToPick, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
@@ -880,10 +881,10 @@ watch(
 
 // ---------- online: the room's turn timer (room settings) ----------
 // Each decision gets the room's time, counted from when it shows (after the animations before
-// it). When it runs out, the player's own device answers what can be passed over (timeout.ts);
+// it): a question that can be passed over its own (shorter) time, if the room set one. When it runs out, the player's own device answers what can be passed over (timeout.ts);
 // a move or a plan stays theirs, and the whole room is told they are over time.
 
-const turnLimit = computed(() => (online.value && props.st.phase !== 'over' ? roomSettings.value.timer : 0))
+const turnLimit = computed(() => (online.value && props.st.phase !== 'over' ? timeFor(roomSettings.value, isQuestion(props.st)) : 0))
 const fxBusy = computed(() => fx.dice.length > 0 || fx.perks.length > 0 || !!fx.finale || opening.value || fx.boardBusy)
 /** Changes with every new decision (or new set of players being waited on). */
 const waitKey = computed(() => JSON.stringify([props.st.step, actorsOf(props.st)]))

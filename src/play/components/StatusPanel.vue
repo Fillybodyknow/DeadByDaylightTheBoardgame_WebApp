@@ -10,6 +10,7 @@ import { itemHidden, myTurn, online, replaying } from '../game'
 import { isBot } from '../bots'
 import { KILLER_PLAYER } from '../engine/seats'
 import { seatVoice } from '../voice'
+import { session } from '../online/session'
 import type { InspectTarget } from '../inspect'
 import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini, roundEffects, perkImage } from '../labels'
 import Mini from './Mini.vue'
@@ -154,6 +155,11 @@ function peek(owner: number | 'killer' | null) {
   peeking.value = owner
 }
 
+/** Online, the name the player in seat `p` plays under; one device has none (P1–P5 then). */
+const seatName = (p: number) => (online.value ? session.data?.seats[String(p)]?.name : undefined)
+/** The tag on a tile: the player's name online, else their number. */
+const ptag = (p: number) => seatName(p) || `P${p}`
+
 /** A player's first tile (in turn order), where their chat bubbles point (ChatDock). */
 const firstOfPlayer = (s: number) => turnOrder(props.st).find((x) => playerOf(props.st, x) === playerOf(props.st, s)) === s
 
@@ -214,7 +220,7 @@ function onPowerSlot() {
         </div>
       </div>
       <div class="line small">
-        <span class="ptag" :class="{ me: mine.includes('killer') }" :title="`ผู้เล่น 1${mine.includes('killer') ? ' (คุณ)' : ''}`">{{ mine.includes('killer') ? 'คุณ' : 'P1' }}</span>
+        <span class="ptag" :class="{ me: mine.includes('killer') }" :title="`ผู้เล่น 1${seatName(1) ? ` · ${seatName(1)}` : ''}${mine.includes('killer') ? ' (คุณ)' : ''}`">{{ ptag(1) }}</span>
         <span class="bp">{{ st.killer.bp }}/{{ KILLER_BP.max }} <BpIcon /></span>
         <span v-if="st.killer.characterId === 'trapper'" class="traps"><img :src="asset(BEAR_TRAP_IMAGE)" alt="" /> ×{{ st.killer.trapsInSupply }}</span>
         <span v-if="st.killer.characterId === 'hag'" class="traps" title="กับดักหลอก ที่ยังวางได้"
@@ -287,7 +293,7 @@ function onPowerSlot() {
         </div>
       </div>
       <div class="line small">
-        <span class="ptag" :class="{ me: mine.includes(s) }" :title="`ผู้เล่น ${playerOf(st, s)}${mine.includes(s) ? ' (คุณ)' : ''}`">{{ mine.includes(s) ? 'คุณ' : `P${playerOf(st, s)}` }}</span>
+        <span class="ptag" :class="{ me: mine.includes(s) }" :title="`ผู้เล่น ${playerOf(st, s)}${seatName(playerOf(st, s)) ? ` · ${seatName(playerOf(st, s))}` : ''}${mine.includes(s) ? ' (คุณ)' : ''}`">{{ ptag(playerOf(st, s)) }}</span>
         <span class="bp">{{ st.survivors[s].bp }}/{{ survivorMax(st, s) }} <BpIcon /></span>
         <!-- The Trickster's Knives: one token each, the ▲ maximum 2 lower for every one -->
         <span v-if="st.survivors[s].knives" class="knives" :class="{ full: st.survivors[s].knives === 3 }" :title="`Knife ${st.survivors[s].knives}/3 — ▲ สูงสุดลดลง ${2 * st.survivors[s].knives!}${st.survivors[s].knives === 3 ? ' · หายบาดเจ็บไม่ได้' : ''} · เข้า Locker เพื่อทิ้ง`">
@@ -740,8 +746,12 @@ button.slot:hover .slot-crop {
   gap: 0.35rem;
   min-width: 0;
 }
+/* the player's number, or online their name (cut short when long) */
 .ptag {
   flex: none;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 0 0.3rem;
   border: 1px solid var(--line-strong);
   border-radius: 4px;

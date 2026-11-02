@@ -247,20 +247,27 @@ and the host starts the game.
   seating everyone, everyone sees them (with chips for what differs from the defaults). A change
   doesn't reset anyone's ready (the user's call: the host sets several in a row); the others'
   settings card glows and says what changed for a few seconds. Stored in the lobby node as a partial object, so older
-  rooms play with the defaults. The card (`RoomSettingsCard`): four ready-made settings on top
-  (`SETTINGS_PRESETS`: ตามเล่ม, มือใหม่, แข่งขัน, ปาร์ตี้ / สุ่ม — one press sets every setting; the
-  one the room's are lights up, else "กำหนดเอง"), then three tabs (กติกา: mode, offerings;
-  ตัวละคร & แผนที่: map, picks, dupes, show killer, Banlist; เวลา & สมดุล: timer, starting ▲). A gold
-  dot marks a tab and a row that differ from the rulebook, compared as they play (`sameSettings`:
+  rooms play with the defaults. The card (`RoomSettingsCard`) shows every setting at once in three groups, each
+  under a small heading (กติกา: mode, offerings; ตัวละคร & แผนที่: map, picks, dupes, show killer,
+  Banlist; เวลา & สมดุล: the two timers, starting ▲). They were tabs once; a player found switching
+  back and forth to change a few things too slow. (Ready-made sets of settings were tried on top
+  and taken out again: the user's call.) A gold dot marks a row that differs from the rulebook, compared as they play (`sameSettings`:
   a ban count with no Banlist is no difference); "↺ คืนค่าตามเล่ม" shows when anything does. Hints
   show only for the choice made; on/off settings are switches. Others see it folded, read-only.
-  - **Turn timer** (none / 60 / 90 / 120 s): counted on each device from when a decision shows
-    (after its animations). At zero the player's own device answers what can be passed over
-    (`online/timeout.ts`: no to a perk, an item or a bonus turn, a roll taken as rolled, nothing
-    put in for Crowd Control); a move, an interaction or a plan stays theirs and the room is
-    told they are over time. A device that is closed answers nothing.
-  - **Map**: picked by the killer (default), by the killer in secret (the survivors learn it
-    when the game starts), by the host, or drawn when the picks open.
+  - **Turn timer** (60 / 90 / 120 s / none, `timer`; 60 by default, no limit the last choice, as
+    a player asked): counted on each device from when a decision
+    shows (after its animations). A move, an interaction or a plan stays the player's: at zero
+    the room is told they are over time.
+  - **Question time** (as the turn's / 15 / 20 / 30 s, `askTimer`): a question that can be passed
+    over (`isQuestion` in `online/timeout.ts`: a perk, an item, a bonus turn, a roll to keep,
+    Crowd Control) has its own, shorter time, so a player not looking at the screen holds the
+    room up for seconds, not the turn's minute and a half. At zero the player's own device
+    answers it (no to a perk, an item or a bonus turn, a roll taken as rolled, nothing put in
+    for Crowd Control). "As the turn's" (0, the default and older rooms) uses `timer`. A device
+    that is closed answers nothing.
+  - **Map**: picked by the killer (default), by the host, or drawn when the picks open. A
+    secret pick by the killer was dropped: the map is the last stage, so the survivors could
+    change nothing on seeing it. A room that still has it set plays it as the killer's.
   - **The killer's pick**: hidden from the survivors (default) or shown to them as it is made.
     Either way it is in the room's data (friends, not strangers).
   - **Characters**: picked, or drawn for everyone when the picks open (players only confirm);
@@ -557,9 +564,10 @@ host seats them in the lobby, and the host's device plays them.
 - **Online** (rooms): in the lobby the host seats a bot on the killer's side or a survivor slot
   (`addBot`, `removeBot` in `online/session.ts`). A bot is a member with `bot: true`: always ready,
   never the host, no ping colour, no chat notice, not counted in the room's listing, and its seat
-  carries `bot` too. Its character is drawn as the characters stage opens (after the bans, if any),
-  before anyone picks, so it never takes a person's; it bans nothing, locks at once and keeps its
-  printed perks. A bot killer's character may be the host's choice instead, from a list on its
+  carries `bot` too. A bot survivor's character is drawn once every person has locked in theirs
+  (with the last lock, `lockPicks`), from what is left, so it never takes a survivor a person
+  wanted; a bot killer's is drawn as the characters stage opens (after the bans, if any). A bot
+  bans nothing, needs no lock of its own and keeps its printed perks. A bot killer's character may be the host's choice instead, from a list on its
   seat in the lobby (`pick` on the member, `setBotPick`; only the host sees it, since the
   survivors may not be meant to know the killer before the picks): kept with random characters
   too, drawn after all if the survivors ban it. A bot killer picks no map (it is drawn, unless

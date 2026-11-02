@@ -297,8 +297,10 @@ const survivorSlots = computed(() =>
       player,
       who: (botSeat(data.value, player) ? '🤖 ' : '') + (data.value.seats[String(player)]?.name ?? ''),
       mine: player === mySeat.value,
+      bot: botSeat(data.value, player),
       character: id ? survivorById.get(id) : undefined,
-      locked: !!data.value.locked[String(player)] || botSeat(data.value, player),
+      // a bot's survivor is drawn once the people are in: locked as soon as it has one
+      locked: !!data.value.locked[String(player)] || (botSeat(data.value, player) && !!id),
     }
   }),
 )
@@ -311,7 +313,7 @@ const takenByOthers = computed(
 /** Who picks the board, for the read-only card. */
 // a bot killer picks no map: it was drawn
 const boardChooser = computed(() =>
-  botSeat(data.value, KILLER_PLAYER) && roomSettings.value.map !== 'host' ? 'สุ่ม' : { killer: 'ฆาตกร', secret: 'ฆาตกร', host: 'หัวห้อง', random: 'สุ่ม' }[roomSettings.value.map],
+  botSeat(data.value, KILLER_PLAYER) && roomSettings.value.map !== 'host' ? 'สุ่ม' : { killer: 'ฆาตกร', host: 'หัวห้อง', random: 'สุ่ม' }[roomSettings.value.map],
 )
 
 /** The killer's pick, for the survivors when the room shows it. */
@@ -706,7 +708,7 @@ const seatStatus = computed(() =>
                 <Mini v-if="s.character" class="mini aura-survivor" :src="asset(s.character.images.mini)" />
                 <span v-else class="empty">?</span>
                 <span class="slot-text">
-                  <strong>{{ s.character?.name ?? (s.mine ? 'เลือกตัวละคร' : 'กำลังเลือก…') }}</strong>
+                  <strong>{{ s.character?.name ?? (s.mine ? 'เลือกตัวละคร' : s.bot ? 'บอทเลือกหลังผู้เล่น' : 'กำลังเลือก…') }}</strong>
                   <small class="muted">ผู้เล่น {{ s.player }} · {{ s.who }}{{ s.mine ? ' (คุณ)' : '' }}</small>
                 </span>
                 <span v-if="s.locked" class="lock">🔒</span>
@@ -845,11 +847,6 @@ const seatStatus = computed(() =>
       <template v-else>
         <!-- whoever picks the board: the killer, or the host -->
         <MapPicker v-if="mayPickBoard" :model-value="data.board ?? ''" @update:model-value="setBoard" />
-        <!-- a secret map (room settings): the survivors learn it when the game starts -->
-        <section v-else-if="roomSettings.map === 'secret'" class="card wait-card">
-          <h2>🗺 แผนที่ลับ</h2>
-          <p class="muted">{{ mapDone ? 'ฆาตกรเลือกแผนที่แล้ว — จะรู้ตอนเริ่มเกม' : 'ฆาตกรกำลังเลือกแผนที่ (แบบลับ) — จะรู้ตอนเริ่มเกม' }}</p>
-        </section>
         <MapPicker v-else-if="mapDone" :model-value="data.board ?? 'macmillan'" :chooser="boardChooser" readonly />
         <section v-else class="card wait-card">
           <h2>🗺 เลือกแผนที่</h2>

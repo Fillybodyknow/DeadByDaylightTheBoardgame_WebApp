@@ -7,6 +7,12 @@ import { pledgedPay, crowdPledges, rollHelpers, tryApply, weavePledges, WEAVING_
 import { mayAct, playerOfOwner, playerOfSurvivor } from '../engine/seats'
 import type { Action, GameState } from '../engine/types'
 
+/** The decisions a timer may answer "no" to (`answer` below): they run on the room's question time. */
+const QUESTIONS = new Set<GameState['step']['t']>(['offer', 'reaction', 'bonusOffer', 'killerBonusOffer', 'turnStart', 'vigo', 'whiteWard', 'phantasmChoice', 'twinChoice', 'roll', 'crowdPay', 'weavePay'])
+
+/** Whether the game waits on a question that can be passed over (a perk, an item, a bonus turn, a roll), not a move or a plan. */
+export const isQuestion = (st: GameState) => QUESTIONS.has(st.step.t)
+
 /** One answer for `seat` in this state, or null when there is none to give for them. */
 function answer(st: GameState, seat: number): Action | null {
   const s = st.step

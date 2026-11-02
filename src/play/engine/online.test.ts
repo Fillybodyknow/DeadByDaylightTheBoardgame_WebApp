@@ -3,7 +3,8 @@ import { apply, createGame, tryApply, type GameConfig } from './engine'
 import { legalActions } from './legal'
 import { actorsOf, handsToPlan, mayAct, playerOfSurvivor } from './seats'
 import type { Action, GameState, MoveCard } from './types'
-import { timeoutActions } from '../online/timeout'
+import { isQuestion, timeoutActions } from '../online/timeout'
+import { DEFAULT_SETTINGS, timeFor } from '../online/settings'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from '../online/logArchive'
 
 const config = (seed = 1, players: GameConfig['players'] = 5): GameConfig => ({
@@ -456,5 +457,18 @@ describe('turn timer (room settings): what runs out of time answers', () => {
     expect(st.step.t).toBe('crowdPay')
     // Meg's player (3): their own nothing, then the confirm
     expect(timeoutActions(st, 3)).toEqual([{ t: 'crowdPledge', s: 1, n: 0 }, { t: 'crowdPay', pay: [] }])
+  })
+
+  it('a question runs on the question time; a plan on the turn time', () => {
+    let st = createGame({ ...config(1, 5), killer: { id: 'trickster', name: 'trickster' } })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    const s = { ...DEFAULT_SETTINGS, timer: 90, askTimer: 20 }
+    expect(isQuestion(st)).toBe(true)
+    expect(timeFor(s, isQuestion(st))).toBe(20)
+    // a room without a question time: the turn's, as before
+    expect(timeFor({ ...s, askTimer: 0 }, isQuestion(st))).toBe(90)
+    st = apply(st, { t: 'perk', perk: 'crowd_control', use: false })
+    expect(isQuestion(st)).toBe(false)
+    expect(timeFor(s, isQuestion(st))).toBe(90)
   })
 })
