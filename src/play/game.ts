@@ -27,9 +27,16 @@ export const online = shallowRef<{ room: Room; seat: number; latest: () => GameS
  */
 export function itemHidden(st: GameState, s: number): boolean {
   const o = online.value
-  if (!o) return false
+  if (!o || replaying.value?.reveal) return false
   return !o.seat || o.seat === KILLER_PLAYER || st.handPlayers[st.survivors[s].hand] !== o.seat
 }
+
+/**
+ * Set while a past game plays back (ReplayView): it is shown as to a spectator online (`online`
+ * holds a room that takes no moves, seat 0), nothing on screen acts, and `exit` leaves it.
+ * `reveal`: the hidden cards shown too (items, and anyone's face-down cards to peek at).
+ */
+export const replaying = shallowRef<{ reveal: boolean; exit(): void } | null>(null)
 
 /** Whether this device plays survivor `s` (always, on one shared device). */
 export function controls(st: GameState, s: number): boolean {

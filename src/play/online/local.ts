@@ -16,7 +16,7 @@ const STORE = 'rooms'
  * What a room holds on disk. Like the Firebase backend it keeps a checkpoint and the moves since,
  * so both run the same protocol and the tests exercise the real one.
  */
-type StoredRoom = Omit<RoomData, 'game' | 'rev'> & {
+type StoredRoom = Omit<RoomData, 'game' | 'rev' | 'trail'> & {
   checkpoint?: GameState | null
   moves?: Action[]
   /** Moves already folded into the checkpoint, so `rev` keeps counting up. */
@@ -26,12 +26,19 @@ type StoredRoom = Omit<RoomData, 'game' | 'rev'> & {
 /** The checkpoint with its moves replayed: what every device sees. */
 function roomOf(stored: StoredRoom): RoomData {
   let game = stored.checkpoint ?? null
+  const applied: Action[] = []
   for (const a of stored.moves ?? []) {
     const next = game && tryApply(game, a)
     if (!next) break
     game = next
+    applied.push(a)
   }
-  return normalizeRoom({ ...stored, game, rev: (stored.base ?? 0) + (stored.moves ?? []).length })
+  return normalizeRoom({
+    ...stored,
+    game,
+    rev: (stored.base ?? 0) + (stored.moves ?? []).length,
+    trail: { base: stored.base ?? 0, start: stored.checkpoint ?? null, moves: applied },
+  })
 }
 
 let dbp: Promise<IDBDatabase> | null = null
@@ -116,19 +123,25 @@ class LocalRoom implements Room {
     return this.write((cur) => (cur.checkpoint ? null : { ...cur, checkpoint: st, moves: [], base: 0 }))
   }
 
-  sendMove(fn: (cur: GameState | null) => Action | null) {
+  async sendMove(fn: (cur: GameState | null) => Action | null) {
     // One IndexedDB transaction reads and writes, so the move lands on the game as it is now —
     // the same promise the Firebase slot transaction makes.
-    return this.write((cur) => {
+    const ok = await this.write((cur) => {
       const room = roomOf(cur)
       const action = fn(room.game)
       if (!action || !room.game) return null
-      const moves = [...(cur.moves ?? []), action]
-      // every so often the moves fold into a fresh checkpoint, as they do online
-      if (moves.length < CHECKPOINT_EVERY) return { ...cur, moves }
-      const next = tryApply(room.game, action)
-      return next ? { ...cur, checkpoint: next, moves: [], base: (cur.base ?? 0) + moves.length } : { ...cur, moves }
+      return { ...cur, moves: [...(cur.moves ?? []), action] }
     })
+    // Every so often the moves fold into a fresh checkpoint, as they do online: after the move
+    // has been seen as a move (the replay's record keeps every one of them, replay.ts).
+    if (ok)
+      await this.write((cur) => {
+        const moves = cur.moves ?? []
+        if (moves.length < CHECKPOINT_EVERY) return null
+        const room = roomOf(cur)
+        return room.game && room.trail?.moves.length === moves.length ? { ...cur, checkpoint: room.game, moves: [], base: (cur.base ?? 0) + moves.length } : null
+      })
+    return ok
   }
 
   async resetGame() {
@@ -139,9 +152,10 @@ class LocalRoom implements Room {
     return this.write((cur) => {
       const next = fn(roomOf(cur))
       if (!next) return null
-      const { game, rev, ...rest } = next
+      const { game, rev, trail, ...rest } = next
       void game
       void rev
+      void trail
       return { ...cur, ...rest }
     })
   }

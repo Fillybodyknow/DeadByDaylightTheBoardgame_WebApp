@@ -230,6 +230,8 @@ const KILLER_COLS = [
         </section>
         <!-- this device's game: report a problem in it -->
         <div v-else class="report-bar">
+          <!-- played back on the board, move by move (games that ended from 1.28.0 on) -->
+          <button v-if="opened.replay" type="button" class="primary replay-btn" @click="router.push({ path: '/replay', query: { id: opened.head.id } })">▶ ดูย้อนหลังบนกระดาน</button>
           <span v-if="opened.reported" class="reported">✓ ส่งรายงานแล้ว: <b>{{ opened.reported }}</b> <button type="button" class="small" @click="copyId(opened.reported)">{{ copied ? '✓ คัดลอกแล้ว' : 'คัดลอก' }}</button></span>
           <button type="button" class="report-btn" @click="openReporting">🐞 รายงานปัญหาในเกมนี้</button>
         </div>
@@ -376,6 +378,7 @@ const KILLER_COLS = [
           <button type="button" class="game" :class="[result(h), h.winner]" @click="openGame(h.id)">
             <span class="thumb" :style="{ backgroundImage: `url(${asset(scene(h.board))})` }" aria-hidden="true">
               <b class="badge">{{ RESULT_TH[result(h)] }}</b>
+              <b v-if="h.replay" class="replay-mark" title="ดูย้อนหลังบนกระดานได้">▶</b>
             </span>
             <span class="info">
               <strong>{{ h.winner === 'survivors' ? 'หนีรอด' : 'ถูกสังเวย' }} · {{ boardName(h.board) }}</strong>
@@ -484,6 +487,20 @@ small {
   background: rgb(var(--tone));
   color: #111;
   font-size: 0.8rem;
+}
+/* the game can be watched again on the board */
+.replay-mark {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.7);
+  color: #ffe9b0;
+  font-size: 0.75rem;
 }
 .info {
   display: grid;
@@ -696,6 +713,10 @@ tr.me td {
 }
 .report-btn {
   border-color: #d9a227;
+}
+/* first in the bar, pushing the report's buttons to the right */
+.replay-btn {
+  margin-right: auto;
 }
 .reported {
   color: #8fd19e;

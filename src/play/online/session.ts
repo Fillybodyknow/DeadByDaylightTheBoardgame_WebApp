@@ -16,6 +16,7 @@ import type { PerkId } from '../engine/perks'
 import { offeringProblem, offeringSlots, offeringsOf, packOfferings, unpackOfferings, type OfferingId } from '../engine/offerings'
 import type { GameState } from '../engine/types'
 import { game, online, receive, restoreLocal } from '../game'
+import { recordTrail } from '../replay'
 import { firebaseBackend, firebaseConfigured } from './firebase'
 import { localBackend } from './local'
 import { PING_COLORS, freeColor, memberColors } from './pingColors'
@@ -194,6 +195,7 @@ function enter(room: Room) {
     }) ?? null
   unsubscribe?.()
   unsubscribe = room.subscribe((data) => {
+    recordTrail(room.code, data)
     session.data = data
     if (!data) return leaveRoom()
     // Taken out of the lobby by the host: back to the entry page, with a notice. (Taken out by its
@@ -471,18 +473,42 @@ function publish(code: string, d: RoomData) {
 
 /** A listing nobody has touched for this long (a few heartbeats) is a room with nobody in it: off the board. */
 export const BOARD_STALE_MS = 15 * 60 * 1000
-/** …and for this long, the room is abandoned: whoever opens the board deletes it from the server. */
-export const ROOM_TTL_MS = 72 * 60 * 60 * 1000
+/**
+ * …and for this long, the room is abandoned: whoever opens the board deletes it from the server.
+ * Every device in a room keeps its listing fresh (the heartbeat), so a quiet one has nobody in
+ * it. A lobby goes sooner; a game left halfway waits a day for its players to come back to it.
+ */
+export const ROOM_TTL_MS = { lobby: 12 * 60 * 60 * 1000, game: 24 * 60 * 60 * 1000 }
 
 const reaped = new Set<string>()
-/** Delete the rooms of the board that nobody has used for `ROOM_TTL_MS` (each tried once per page). */
+/** Delete the rooms of the board that nobody has used for their `ROOM_TTL_MS` (each tried once per page). */
 export function sweepRooms(list: RoomListing[]) {
-  const cutoff = Date.now() - ROOM_TTL_MS
+  const now = Date.now()
   for (const r of list) {
-    if (!r?.code || r.updatedAt >= cutoff || reaped.has(r.code)) continue
+    if (!r?.code || reaped.has(r.code)) continue
+    const cutoff = now - (r.phase === 'game' ? ROOM_TTL_MS.game : ROOM_TTL_MS.lobby)
+    if (r.updatedAt >= cutoff) continue
     reaped.add(r.code)
     void backend.reapRoom(r.code, cutoff).catch(() => {})
   }
+}
+
+let swept = false
+/**
+ * One sweep per visit, from pages that don't watch the board themselves (the menu, the
+ * looking-for-players chat): the board read once, then let go.
+ */
+export function sweepRoomsOnce() {
+  if (swept) return
+  swept = true
+  let done = false
+  const off = backend.listRooms((list) => {
+    if (done) return
+    done = true
+    sweepRooms(list)
+    // (the first call may come before listRooms has returned its unsubscribe)
+    queueMicrotask(() => off())
+  })
 }
 
 const NAME_START = ['คืนหลอนที่', 'หนีตายจาก', 'ปาร์ตี้ที่', 'ล่าท้าผีที่', 'เอาตัวรอดใน', 'หมอกดำเหนือ', 'เสียงกรีดร้องจาก', 'ทริปสยองที่']

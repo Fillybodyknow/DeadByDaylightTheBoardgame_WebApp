@@ -8,7 +8,7 @@ import UpdateBanner from './components/UpdateBanner.vue'
 import WhatsNew from './components/WhatsNew.vue'
 import EntityWelcome from './components/EntityWelcome.vue'
 import { asset, lang } from './i18n'
-import { game, tutorial } from './play/game'
+import { game, replaying, tutorial } from './play/game'
 import { isPhone } from './play/device'
 import { introStage } from './play/intro'
 import { finishedGame, session } from './play/online/session'
@@ -45,7 +45,7 @@ const SUBTITLE: Record<Section, string> = { menu: '', offline: 'Offline', online
 
 /** The full game (Online / Offline) is for computers and tablets; a phone gets a notice. */
 const phone = isPhone()
-const phoneBlocked = computed(() => phone && (route.name === 'offline' || route.name === 'online' || route.name === 'tutorial'))
+const phoneBlocked = computed(() => phone && (route.name === 'offline' || route.name === 'online' || route.name === 'tutorial' || route.name === 'replay'))
 
 /** A full game is on screen: it has its own top bar and takes the whole width. */
 const inGame = computed(
@@ -55,7 +55,8 @@ const inGame = computed(
     introStage.value !== 'beat' &&
     ((route.name === 'offline' && !!game.value && !session.room) ||
       (route.name === 'online' && !!(session.data?.game || finishedGame.value) && !!game.value) ||
-      (route.name === 'tutorial' && !!tutorial.value && !!game.value)),
+      (route.name === 'tutorial' && !!tutorial.value && !!game.value) ||
+      (route.name === 'replay' && !!replaying.value && !!game.value)),
 )
 
 const links = computed(() => [

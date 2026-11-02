@@ -187,6 +187,12 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   this device saw it (another survivor's item got is left out: `maskLog`). The latest 50 stay.
   `#/history` (`HistoryView`, in the top bar) lists them and opens one round by
   round; Settings → Data clears them.
+- **Replay (online):** a game in the history plays back on the board (▶ in the history,
+  `#/replay?id=…`, `ReplayView`): every move is recorded on the device as the game is played
+  (`replay.ts`, from `RoomData.trail`; the room itself drops its moves at each checkpoint), checked
+  to end where the game did, and kept with its history. GameScreen shows it as a spectator
+  (`replaying` in `game.ts`), with a bar at the foot: start, step back / on, play, round, ×1–×4,
+  "เปิดทุกอย่าง" (items and face-down cards). Details in `src/play/README.md` → Replay.
 - **The player's name is set in one place: the top bar's profile** (`ProfileButton`, `src/profile.ts`,
   `dbdl-player-name`), as a PC game's: their initial in a ring and the name; a click opens the
   profile window. No page has a name field of its own. Whatever needs a name (making or joining a

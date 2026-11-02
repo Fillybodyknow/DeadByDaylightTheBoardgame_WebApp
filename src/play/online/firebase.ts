@@ -212,6 +212,13 @@ class FirebaseRoom implements Room {
     if (st && roundsToArchive(st, this.archived).size) this.scheduleArchive(st, 1500)
   }
 
+  /** The moves applied on top of the checkpoint, in order. */
+  private trailMoves(): Action[] {
+    const out: Action[] = []
+    for (let n = this.baseRev + 1; n <= this.applied; n++) out.push(this.moves.get(n)!)
+    return out
+  }
+
   private emit() {
     if (!this.haveLobby) return
     if (!this.lobby) {
@@ -224,6 +231,7 @@ class FirebaseRoom implements Room {
       host: this.lobby.host ?? '',
       game: this.state ? withFullLog(this.state, this.archives, parseArchive) : null,
       rev: this.applied,
+      trail: { base: this.baseRev, start: this.base, moves: this.trailMoves() },
     })
     this.listener?.(this.last)
   }

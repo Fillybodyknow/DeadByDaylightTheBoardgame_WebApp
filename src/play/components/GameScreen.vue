@@ -11,7 +11,7 @@ import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
 import { handZone, openHands } from '../hands'
 import CardHand, { type HandCard } from './CardHand.vue'
-import { canUndo, controls, dispatch, dispatchBot, myTurn, online, quitGame, tutorial, undo } from '../game'
+import { canUndo, controls, dispatch, dispatchBot, myTurn, online, quitGame, replaying, tutorial, undo } from '../game'
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
@@ -50,6 +50,8 @@ import BpText from '../../components/BpText.vue'
 import ChatDock from './ChatDock.vue'
 
 const props = defineProps<{ st: GameState }>()
+/** `settled`: whether everything has been shown (for a replay to step on). */
+const emit = defineEmits<{ settled: [on: boolean] }>()
 
 // ---------- what the screen shows ----------
 // The engine resolves an action at once. While that action's perk cards and dice play, the
@@ -848,7 +850,7 @@ const askPermission = () => {
 }
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisible)
-  if (online.value) window.addEventListener('pointerdown', askPermission, { once: true })
+  if (online.value && !replaying.value) window.addEventListener('pointerdown', askPermission, { once: true })
 })
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisible)
@@ -1264,7 +1266,15 @@ function toggleFullscreen() {
   else void document.documentElement.requestFullscreen().catch(() => {})
 }
 
+/**
+ * Everything shown: the view has caught up with the game and nothing plays or waits to be read.
+ * A replay steps on from here (ReplayView).
+ */
+const settled = computed(() => view.value === props.st && !fxBusy.value && summaryRound.value === null && !fx.starts && !fx.offerings)
+watch(settled, (on) => emit('settled', on), { immediate: true })
+
 function leave() {
+  if (replaying.value) return replaying.value.exit()
   if (online.value) {
     // the host can end the game for everyone; others just leave the room (and can rejoin)
     if (isHost.value && confirm('จบเกมนี้สำหรับทุกคนแล้วกลับไปที่ห้อง?')) void closeOnlineGame()
@@ -1277,7 +1287,8 @@ function leave() {
 /** The summary's "play again": online, this player back to the lobby (the room follows once
  * everyone is); on one device, a new game. */
 function playAgain() {
-  if (online.value) void returnToLobby()
+  if (replaying.value) replaying.value.exit()
+  else if (online.value) void returnToLobby()
   else quitGame()
 }
 
@@ -1311,9 +1322,10 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       </Teleport>
       <Teleport to="#rail-bottom" :disabled="!rail" defer>
       <div class="controls">
-        <SyncBadge v-if="online" />
-        <span v-if="online" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
-        <button v-else :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶<span class="btn-text"> ย้อน</span></button>
+        <span v-if="replaying" class="room-tag">ดูย้อนหลัง</span>
+        <SyncBadge v-else-if="online" />
+        <span v-if="online && !replaying" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
+        <button v-else-if="!online" :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶<span class="btn-text"> ย้อน</span></button>
         <!-- online: ping a spot on the map for everyone (or Alt+click on it) -->
         <button
           v-if="canPing"
@@ -1329,7 +1341,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           📍<b v-if="pingWait" class="ping-count">{{ pingWait }}</b><span v-else class="btn-text"> {{ pingArmed ? 'คลิกบนแผนที่' : 'ปิง' }}</span>
         </button>
         <button v-if="canFullscreen" :title="fullscreen ? 'ออกจากเต็มจอ' : 'เต็มจอ'" @click="toggleFullscreen">{{ fullscreen ? '🗗' : '⛶' }}</button>
-        <VoiceButton v-if="online" />
+        <VoiceButton v-if="online && !replaying" />
         <SettingsDialog />
         <button @click="leave">ออก</button>
       </div>
@@ -1437,7 +1449,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
       <span class="side-tab-text">{{ sideFolded ? 'เปิดแผงควบคุม' : 'พับแผงควบคุม' }}</span>
     </button>
     <!-- online: the room's chat — a 💬 tab above the side panel's, bubbles beside the tiles -->
-    <ChatDock v-if="online" mode="game" />
+    <ChatDock v-if="online && !replaying" mode="game" />
     <!-- online: your own hand, to look at, while no hand to pick from is out -->
     <CardHand v-if="ownHand.length && openHands === 0" :cards="ownHand" label="มือของคุณ" passive />
     <!-- online: the others are waiting on this device — a gold edge (the notice is in the bar) -->

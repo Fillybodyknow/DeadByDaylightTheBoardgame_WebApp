@@ -84,8 +84,10 @@ and the host starts the game.
   its `updatedAt` every 4 minutes (a heartbeat); listings quiet for 15 minutes aren't shown.
   **Clearing stale rooms:** the listing is never removed when a device disconnects — it is how a
   forgotten room is found. The last one out of a lobby deletes the whole room (data and listing),
-  and whoever opens the board deletes the rooms whose listing has been quiet for 3 days
-  (`sweepRooms`, `reapRoom` re-reads the time first). Rooms made before this, whose listing was
+  and whoever opens the board deletes the rooms whose listing has been quiet for 12 hours (a lobby
+  or the picks) or a day (a game left halfway) (`sweepRooms`, `reapRoom` re-reads the time first).
+  So does any device that plays online (a name in its profile, or an online page opened), once a
+  visit, from any page (`sweepRoomsOnce`, started in `lfgNotify.ts`). Rooms made before this, whose listing was
   already removed, can't be found by a device: delete `rooms/<CODE>` in the Firebase console.
   A room is created with a name (a random one on offer, 🎲) and an
   optional password: the room keeps only its SHA-256 hash with the code, and a device already in
@@ -199,6 +201,32 @@ and the host starts the game.
   (`reportAt/<client id>`, written with it). `#/history?report=<id>` (or the box under the list)
   shows a report's game, with a "full log" switch for the unmasked log. "ดาวน์โหลดไฟล์แทน" saves
   the same as a JSON file. **The database rules must be updated** (`reports`, `reportAt`).
+- **Replay** (`src/play/replay.ts`, `views/ReplayView.vue`, `#/replay?id=<history id>`): a game in
+  the history watched again on the board. The room drops its moves at every checkpoint, so each
+  device records its own: `RoomData.trail` (filled in by both backends, never stored) says what the
+  room's game was replayed from, and `recordTrail` (called on every room update in `session.ts`)
+  keeps the first state and every move since, written to IndexedDB (`dbdl-replays`) as it grows, so
+  a reload carries on. One move missing just before a checkpoint is found again among the moves
+  that could be played (`bridge`: legal actions and every plan); more missing (away past a
+  checkpoint, or joined late) and the record starts again from the checkpoint, the replay then
+  starting there ("เริ่มกลางเกม"). When the game ends, `replayFor` hands the record over if it
+  reaches the room's last move (a count: nothing is played back the moment a game ends, on every
+  device), and the history keeps it (`HistoryGame.replay`, about 25–35 KB); the history is saved
+  from the room's confirmed game for that (a move made here shows before the room has it), and a
+  save again (a reload on the summary) keeps the replay that starts earlier. A new game in the same
+  room with the same characters is told by its checkpoint going back, or its first state. The
+  local backend writes a move before folding it into a checkpoint, as Firebase does, so every move
+  is seen. The record is written at most every 1.5 s; one no game ended for goes after 3 days.
+  The view plays the replay through once (`Playback`: its rounds, a state kept every 25 moves, any
+  other played forward from one) and shows it only if it ends where the game did (`endsAt`, against
+  the saved last state). It is GameScreen as a spectator (`online` holds a room that takes no
+  moves, seat 0; `replaying` in `game.ts`): a step forward plays its animations, a step back, the
+  start, the end or a round remounts it on that state at once, and play steps on when GameScreen
+  says everything has shown (`settled`). ×2 / ×4 speed up the animations (`playbackRate` in `settings.ts`).
+  Tests: `replay.test.ts` (recording, a folded move found again, a rematch, watching).
+  "เปิดทุกอย่าง" shows the items (`itemHidden`) and lets anyone's face-down cards be peeked at.
+  Keys: Space, ← →, Home, End. Not while this device is in an online room (that room owns
+  `online`). Games saved before 1.28.0 have no replay.
 - **Presence** (`Room.presence`, `settle` in `session.ts`): Firebase's `onDisconnect` on the lobby
   node. In the lobby a dropped connection (a closed tab, a lost network) takes the member out and
   marks them in `dropped`, so a closed tab never keeps a place; from the picks on it only marks

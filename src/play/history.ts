@@ -5,11 +5,12 @@
 // The log is kept as this device saw it: a line naming the item another survivor got (a chest, a
 // draw, Plunderer's Instinct) has the item left out, as it was secret (`itemHidden`, a house rule).
 
-import { watch } from 'vue'
+import { toRaw, watch } from 'vue'
 import { KILLER_PLAYER } from './engine/seats'
 import type { GameState, LogEntry } from './engine/types'
-import { game, online, tutorial } from './game'
+import { online, replaying, tutorial } from './game'
 import { gameKey } from './intro'
+import { dropTrail, replayFor, type Replay } from './replay'
 import { roomSettings, session } from './online/session'
 import { gameStats, timeline, type TimelineItem } from './stats'
 
@@ -41,6 +42,8 @@ export interface HistoryHead {
   side: 'killer' | 'survivor' | 'spectator'
   killer: HistoryPlayer
   survivors: HistoryPlayer[]
+  /** The game can be watched again on the board (games saved before 1.28.0 can't). */
+  replay?: boolean
 }
 
 export interface HistoryGame {
@@ -55,6 +58,8 @@ export interface HistoryGame {
   state?: string
   /** The id of the report sent about this game, if one was. */
   reported?: string
+  /** Every move from its first state, recorded on this device (replay.ts), to watch it again (ReplayView). */
+  replay?: Replay
 }
 
 // ---------- the log as this device may see it ----------
@@ -153,8 +158,15 @@ export async function saveHistory(g: HistoryGame) {
   const db = await open()
   // a plain copy: the state's arrays may be Vue proxies, which IndexedDB can't store
   const copy = JSON.parse(JSON.stringify(g)) as HistoryGame
-  // saved again (a reload on the summary): a report already sent about it stays marked
-  copy.reported ??= (await getHistory(copy.head.id).catch(() => null))?.reported
+  // saved again (a reload on the summary): a report already sent about it stays marked, and its
+  // replay stays (the record it came from is gone by then: a new one starts at a checkpoint), the
+  // one starting earlier kept
+  const before = await getHistory(copy.head.id).catch(() => null)
+  copy.reported ??= before?.reported
+  if (before?.replay && (!copy.replay || before.replay.from < copy.replay.from)) {
+    copy.replay = before.replay
+    copy.head.replay = true
+  }
   const tx = db.transaction(['heads', 'games'], 'readwrite')
   tx.objectStore('heads').put(copy.head)
   tx.objectStore('games').put(copy)
@@ -165,13 +177,16 @@ export async function saveHistory(g: HistoryGame) {
 
 // ---------- the record of a game that just ended ----------
 
+/** A game's id in the history: its room's and its own. */
+const historyId = (st: GameState) => `${session.room?.code ?? 'room'}:${gameKey(st)}`
+
 function record(st: GameState, seat: number): HistoryGame {
   const d = session.data
   const playerName = (n: number) => d?.seats?.[String(n)]?.name ?? `ผู้เล่น ${n}`
   const side = !seat ? 'spectator' : seat === KILLER_PLAYER ? 'killer' : 'survivor'
   const winner = st.step.t === 'gameOver' ? st.step.winner : st.sacrifice >= 8 ? 'killer' : 'survivors'
   const head: HistoryHead = {
-    id: `${session.room?.code ?? 'room'}:${gameKey(st)}`,
+    id: historyId(st),
     at: Date.now(),
     room: session.room?.code ?? '',
     roomName: d?.name ?? '',
@@ -188,20 +203,30 @@ function record(st: GameState, seat: number): HistoryGame {
       return { id: sv.characterId, name: sv.name, player: playerName(n), seat: n }
     }),
   }
-  return { head, stats: gameStats(st), timeline: timeline(st), log: maskLog(st, seat), state: JSON.stringify(st) }
+  const replay = replayFor(head.room, st, toRaw(d)?.rev ?? -1)
+  if (replay) head.replay = true
+  return { head, stats: gameStats(st), timeline: timeline(st), log: maskLog(st, seat), state: JSON.stringify(st), ...(replay ? { replay } : {}) }
 }
 
 /** Ids saved this visit: a game is saved once, when it ends. */
 const saved = new Set<string>()
 
+// The room's game, not the one on screen: a move made here shows before the room has it, and the
+// replay's record (replay.ts) only has the moves the room has confirmed.
 watch(
-  () => game.value,
-  (st) => {
+  () => session.data?.game,
+  (room) => {
+    const st = room ? toRaw(room) : null
     const o = online.value
-    if (!st || !o || tutorial.value || st.phase !== 'over') return
+    // (a replay ending is a game already in the history)
+    if (!st || !o || tutorial.value || replaying.value || st.phase !== 'over') return
+    // (before the record is made: the room's game changes on every update of an ended room too)
+    const id = historyId(st)
+    if (saved.has(id)) return
+    saved.add(id)
     const g = record(st, o.seat)
-    if (saved.has(g.head.id)) return
-    saved.add(g.head.id)
-    saveHistory(g).catch((e) => console.warn('history: the game was not saved', e))
+    saveHistory(g)
+      .then(() => g.replay && dropTrail(g.head.room))
+      .catch((e) => console.warn('history: the game was not saved', e))
   },
 )

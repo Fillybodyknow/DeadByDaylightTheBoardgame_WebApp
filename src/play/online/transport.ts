@@ -169,6 +169,12 @@ export interface RoomData {
   game: GameState | null
   /** Moves played so far (the checkpoint's own count plus the ones replayed on top). */
   rev: number
+  /**
+   * What `game` was replayed from on this device: the checkpoint (`start`, after `base` moves) and
+   * the moves since, in order. Never stored: the backends fill it in, and the replay recorder
+   * (replay.ts) keeps every move of the game from it, as the room itself drops them.
+   */
+  trail?: { base: number; start: GameState | null; moves: Action[] }
 }
 
 /** A move's slot name: zero-padded so the database sorts them in the order they were played. */

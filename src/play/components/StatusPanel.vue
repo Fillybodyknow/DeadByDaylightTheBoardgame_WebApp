@@ -6,7 +6,7 @@ import { components, items, killerById } from '../../data'
 import { asset } from '../../i18n'
 import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, killerCardCount, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, twoPlayer, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse, MoveCard, PathKind } from '../engine/types'
-import { itemHidden, myTurn, online } from '../game'
+import { itemHidden, myTurn, online, replaying } from '../game'
 import { isBot } from '../bots'
 import { KILLER_PLAYER } from '../engine/seats'
 import { seatVoice } from '../voice'
@@ -146,7 +146,7 @@ watch(
 /** Survivor index, or 'killer', for a face-down card on the tiles. */
 function canPeek(owner: number | 'killer'): boolean {
   const o = online.value
-  if (!o) return true
+  if (!o || replaying.value?.reveal) return true
   return o.seat === (owner === 'killer' ? 1 : playerOf(props.st, owner))
 }
 

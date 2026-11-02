@@ -3,13 +3,17 @@
 import { computed } from 'vue'
 import { asset } from '../../i18n'
 import type { GameState } from '../engine/types'
+import { replaying } from '../game'
 import { killerMini, playerOf, survivorMini } from '../labels'
 import { gameStats, timeline } from '../stats'
 import Mini from './Mini.vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
 
-/** `online`: "play again" takes the room back to its lobby rather than to a new game here. */
+/**
+ * `online`: "play again" takes the room back to its lobby rather than to a new game here (in a
+ * replay, back to the history).
+ */
 const props = defineProps<{ st: GameState; winner: 'survivors' | 'killer'; online?: boolean }>()
 const emit = defineEmits<{ close: []; again: [] }>()
 
@@ -103,7 +107,7 @@ const mvp = computed(() => {
       </section>
 
       <div class="actions">
-        <button class="primary" @click="emit('again')">{{ online ? 'กลับ Lobby' : 'เล่นใหม่' }}</button>
+        <button class="primary" @click="emit('again')">{{ replaying ? 'กลับหน้าประวัติ' : online ? 'กลับ Lobby' : 'เล่นใหม่' }}</button>
         <button @click="emit('close')">ดูกระดาน</button>
       </div>
     </div>

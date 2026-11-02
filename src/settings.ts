@@ -107,7 +107,9 @@ if (typeof document !== 'undefined')
 
 /** What the animations' durations are multiplied by. */
 const SCALE: Record<AnimSpeed, number> = { slow: 1.5, normal: 1, fast: 0.5, skip: 0.05 }
-export const animScale = computed(() => SCALE[settings.animSpeed] ?? 1)
+/** A replay played faster (ReplayView: ×2, ×4), on top of the setting; never saved. */
+export const playbackRate = ref(1)
+export const animScale = computed(() => (SCALE[settings.animSpeed] ?? 1) / playbackRate.value)
 
 /** A duration of the game's animations (ms), at the player's speed. */
 export const anim = (ms: number) => Math.round(ms * animScale.value)

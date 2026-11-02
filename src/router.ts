@@ -19,6 +19,7 @@ export const router = createRouter({
     { path: '/lfg', name: 'lfg', component: () => import('./play/views/LfgView.vue'), meta: { section: 'online' } },
     // online games played to the end on this device
     { path: '/history', name: 'history', component: () => import('./play/views/HistoryView.vue') },
+    { path: '/replay', name: 'replay', component: () => import('./play/views/ReplayView.vue') },
     { path: '/tutorial', name: 'tutorial', component: () => import('./play/tutorial/TutorialView.vue'), meta: { section: 'tutorial' } },
     // references, shared by every mode
     { path: '/cards', name: 'cards', component: () => import('./views/CardsView.vue') },

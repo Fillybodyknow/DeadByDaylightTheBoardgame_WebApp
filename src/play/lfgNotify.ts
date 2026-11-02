@@ -15,7 +15,7 @@ import { playerName } from '../profile'
 import { settings } from '../settings'
 import { sfx } from '../sound'
 import { lfgId, mutedSenders, needLabel } from './online/lfg'
-import { backend, session } from './online/session'
+import { backend, session, sweepRoomsOnce } from './online/session'
 import type { LfgMessage } from './online/transport'
 
 export interface LfgToast {
@@ -94,5 +94,13 @@ watch(
       off = null
     }
   },
+  { immediate: true },
+)
+
+// A device that plays online also clears the server of abandoned rooms, once a visit (whatever
+// the setting above): the room board's own page does it too, but few open it.
+watch(
+  () => !!playerName.value || visitedOnline.value,
+  (plays) => plays && sweepRoomsOnce(),
   { immediate: true },
 )
