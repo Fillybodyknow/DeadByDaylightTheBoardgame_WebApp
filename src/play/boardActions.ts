@@ -32,6 +32,7 @@ import {
   survivorInteractions,
   survivorMoves,
   touchingPaths,
+  unknownRooms,
   usableHook,
 } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
@@ -88,8 +89,11 @@ export interface BoardModes {
   undyingOn: Ref<boolean>
   undyingCard: Ref<MoveCard | null>
   undyingRoom: Ref<string | null>
-  /** Diversion (Adam): the killer was clicked — his paths are the targets now. */
-  diversion: Ref<boolean>
+  /**
+   * Diversion (Adam): the killer was clicked — his paths are the targets now. The Unknown it sends
+   * (its index, when several stand in the room), or -1: the one there, or any other killer.
+   */
+  diversion: Ref<number | null>
   /** Pain Resonance (The Artist): the empty hook interacted with — the survivor next door is picked now. */
   painHook: Ref<string | null>
 }
@@ -125,6 +129,27 @@ export function boardActionKeys(actions: BoardAction[]): Set<string> {
 /** A path's spot is its icon: a fork's pairs share one (several actions there open a menu). */
 function spotKey(st: GameState, key: SpotKey): SpotKey {
   return key.startsWith('path:') ? `path:${tokenOf(boardOf(st), key.slice(5))}` : key
+}
+
+/**
+ * The killer's mini in `room`, for what a survivor there does to him: The Unknown standing there
+ * (`u<n>` for one not standing for him now, as the board draws it), else his own.
+ */
+function killerSpotIn(st: GameState, room: string): SpotKey {
+  if (!st.killer.unknowns) return 'killer'
+  const i = unknownRooms(st).indexOf(room)
+  return i < 0 ? 'killer' : unknownSpot(st, i)
+}
+
+/** The Unknown numbered `i + 1` on the map: the killer's own mini for the one standing for him. */
+function unknownSpot(st: GameState, i: number): SpotKey {
+  return i === (st.killer.unknownAt ?? 0) ? 'killer' : `u${i}`
+}
+
+/** The killer in `room` by name: "The Unknown 2" for one of his minis. */
+function killerNameIn(st: GameState, room: string): string {
+  const i = st.killer.unknowns ? unknownRooms(st).indexOf(room) : -1
+  return i < 0 ? st.killer.name : `The Unknown ${i + 1}`
 }
 
 function spotOf(i: SurvivorInteraction | KillerInteraction): SpotKey {
@@ -379,18 +404,22 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       }
       // Diversion, after clicking the killer: only his paths, each with the room it sends him to
       // (a fork asks which room next, as any move does)
-      if (modes.diversion.value) {
+      if (modes.diversion.value !== null) {
+        // (the killer in the survivor's room goes: for The Unknown, maybe not the one in `room`)
+        const from = st.survivors[s.s].room
         for (const i of survivorInteractions(st, s.s)) {
-          if (i.k !== 'diversion') continue
+          if (i.k !== 'diversion' || (i.unknown ?? -1) !== modes.diversion.value) continue
           add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select))
           const p = pathDef(st, i.path)
-          out[out.length - 1].dest = p.a === st.killer.room ? p.b : p.a
+          out[out.length - 1].dest = p.a === from ? p.b : p.a
         }
         break
       }
       if (s.canInteract) {
         const pallets = new Set<string>()
         const crows = new Set<string>()
+        // what the survivor does to the killer is on the killer's mini in their room
+        const killerSpot = killerSpotIn(st, st.survivors[s.s].room)
         for (const i of survivorInteractions(st, s.s)) {
           if (i.k === 'dropPallet') {
             if (pallets.has(i.prop)) continue
@@ -402,10 +431,16 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             add(spotOf(i), 'วิญญาณสงบ: ย้าย Crow (แล้วเลือกห้อง)', () => ((modes.calmCrow.value = i.prop), sfx.click()))
           } else if (i.k === 'diversion') {
             // Diversion: the killer first, then his paths (in its own mode, above). Once, however
-            // many paths; with Power Struggle on him too, a click asks which.
-            if (!out.some((a) => a.key === 'killer' && a.label.startsWith('Diversion')))
-              add('killer', `หันเหความสนใจ: ส่ง ${st.killer.name} (แล้วเลือกเส้นทาง)`, () => ((modes.diversion.value = true), sfx.click()))
-          } else add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
+            // many paths; with Power Struggle on him too, a click asks which. The Unknown, with
+            // several in the room: each mini sends itself.
+            const name = `${PERKS.diversion.name}: ส่ง`
+            const spot = i.unknown === undefined ? killerSpot : unknownSpot(st, i.unknown)
+            const who = i.unknown === undefined ? killerNameIn(st, st.survivors[s.s].room) : `The Unknown ${i.unknown + 1}`
+            const mode = i.unknown ?? -1
+            if (!out.some((a) => a.key === spotKey(st, spot) && a.label.startsWith(name)))
+              add(spot, `${name} ${who} (แล้วเลือกเส้นทาง)`, () => ((modes.diversion.value = mode), sfx.click()))
+          } else
+            add(i.k === 'powerStruggle' ? killerSpot : spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
         }
       }
       perkSpots(st, out, modes)
@@ -638,7 +673,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
  */
 function perkDest(st: GameState, owner: PerkOwner, c: PerkChoice): string | undefined {
   const mover = c.target ?? owner
-  const from = mover === 'killer' ? st.killer.room : st.survivors[mover].room
+  // (The Unknown: the mini the choice moves, `index`)
+  const from = mover !== 'killer' ? st.survivors[mover].room : c.index !== undefined && st.killer.unknowns ? (unknownRooms(st)[c.index] ?? st.killer.room) : st.killer.room
   const p = pathDef(st, c.path!)
   return p.a === from ? p.b : p.b === from ? p.a : undefined
 }

@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { DIRECT_CARDS, crowdPledges, redeemerTargets, empIn, killerIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { DIRECT_CARDS, crowdPledges, redeemerTargets, empIn, killerIn, killersIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { boards } from './boards'
 import { actorsOf, mayAct, playerOfSurvivor } from './seats'
@@ -177,7 +177,7 @@ describe('The Doctor, The Hag, The Wraith', () => {
     expect(after.survivors[1].wounded).toBe(true)
   })
 
-  it('Madness leaves the roll of a survivor searched in a locker a skill check die (Level 99)', () => {
+  it('Madness: a survivor searched in a locker rolls the danger die; a failure ends it (Level 99)', () => {
     const st = game('doctor')
     only(st)
     killerInteracting(st)
@@ -192,15 +192,20 @@ describe('The Doctor, The Hag, The Wraith', () => {
       for (let n = 0; n < 4 && after.step.t === 'roll'; n++) after = apply(after, { t: 'acceptRoll' })
       return after
     }
+    const caught = (g: GameState) => g.survivors[1].status !== 'locker' && !g.props.find((p) => p.id === locker.id)!.removed
+    let failed = 0
+    let differs = 0
     for (let rng = 1; rng <= 40; rng++) {
       const mad = search(true, rng)
-      const sane = search(false, rng)
-      // the same die, so the same result
-      expect(mad.survivors[1].status, `rng ${rng}`).toBe(sane.survivors[1].status)
-      expect(mad.props.find((p) => p.id === locker.id)!.removed).toBe(sane.props.find((p) => p.id === locker.id)!.removed)
-      // and the roll doesn't end Madness
-      expect(mad.survivors[1].madness).toBe(true)
+      // a skill check (p.14), so Madness makes it the danger die (the passive: all skill checks):
+      // another die than the same roll without it, so some results differ
+      if (caught(mad) !== caught(search(false, rng))) differs++
+      // a failure: picked up, and Madness is gone; a success leaves it
+      if (caught(mad)) failed++
+      expect(mad.survivors[1].madness, `rng ${rng}`).toBe(!caught(mad))
     }
+    expect(failed).toBeGreaterThan(0)
+    expect(differs).toBeGreaterThan(0)
   })
 
   it('a Phantasm Trap makes the survivor roll, then The Hag may teleport', () => {
@@ -3027,6 +3032,223 @@ describe('The Unknown', () => {
     st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false }))
     return st
   }
+
+  describe('every Unknown is the Killer for his perks too, outside his own turn', () => {
+    /**
+     * Unknown 1 standing for him far off, Unknown 2 in the room of survivor 0 (Dwight); the
+     * others far off too. He holds `perk` (from its card, in Bloodweb or Devout).
+     */
+    function twoUnknowns(perk: PerkId) {
+      const st = unknown()
+      st.killer.perks = [perk]
+      const board = boardOf(st)
+      const near = (a: string, b: string) => a === b || connectedRoomsOf(st, a).includes(b)
+      const second = 'shack'
+      const far = board.rooms.map((r) => r.id).find((r) => !near(r, second))!
+      st.killer.room = far
+      st.killer.unknowns = [far, second, null, null]
+      st.killer.unknownAt = 0
+      st.survivors.forEach((sv, i) => Object.assign(sv, { room: i === 0 ? second : far, status: 'board', wounded: false }))
+      // nobody else near: the far ones are near Unknown 1, so move them out of both ranges
+      const away = board.rooms.map((r) => r.id).find((r) => !near(r, second) && !near(r, far))
+      st.survivors.forEach((sv, i) => i && away && (sv.room = away))
+      return { st, second, far }
+    }
+
+    it('Unnerving Presence: a skill check next to Unknown 2', () => {
+      const { st } = twoUnknowns('unnerving_presence')
+      expect(perkChoices(st, 'unnerving_presence', 'killer', { k: 'preRoll', ctx: { k: 'repair', s: 0 } } as PerkWindow).length).toBeGreaterThan(0)
+    })
+
+    it('Overwhelming Presence: an item used next to Unknown 2', () => {
+      const { st } = twoUnknowns('overwhelming_presence')
+      expect(perkChoices(st, 'overwhelming_presence', 'killer', { k: 'preItem', s: 0 } as PerkWindow).length).toBeGreaterThan(0)
+    })
+
+    it('Nemesis: a pallet dropped next to Unknown 2', () => {
+      const { st, second } = twoUnknowns('nemesis')
+      const pallet = placeProp(st, 'pallet', second)
+      expect(perkChoices(st, 'nemesis', 'killer', { k: 'afterPalletLocker', s: 0, prop: pallet.id } as PerkWindow).length).toBeGreaterThan(0)
+    })
+
+    it('Septic Touch: a prop revealed next to Unknown 2', () => {
+      const { st, second } = twoUnknowns('septic_touch')
+      const chest = placeProp(st, 'chest', second)
+      expect(perkChoices(st, 'septic_touch', 'killer', { k: 'afterReveal', s: 0, prop: chest.id } as PerkWindow).length).toBeGreaterThan(0)
+    })
+
+    it('Fearmonger and Dark Devotion: the survivor next to Unknown 2 is a target', () => {
+      const a = twoUnknowns('fearmonger').st
+      expect(perkChoices(a, 'fearmonger', 'killer', { k: 'planningStart' } as PerkWindow).map((c) => c.target)).toContain(0)
+      const b = twoUnknowns('dark_devotion').st
+      expect(perkChoices(b, 'dark_devotion', 'killer', { k: 'cleanupStart' } as PerkWindow).map((c) => c.target)).toContain(0)
+    })
+
+    it('Discordance: every Unknown in the room counts as a killer there', () => {
+      const { st, second } = twoUnknowns('discordance')
+      expect(killersIn(st, second)).toBe(1)
+      expect(killersIn(st, st.killer.room)).toBe(1)
+      st.killer.unknowns = [st.killer.room, second, second, null]
+      expect(killersIn(st, second)).toBe(2)
+    })
+
+    /** Survivor 0 in Unknown 2's room, about to interact, with `perk`. */
+    function nextToSecond(perk: PerkId) {
+      const r = twoUnknowns(perk)
+      const { st } = r
+      st.killer.perks = []
+      st.survivors[0].perks = [perk]
+      st.survivors[0].bp = 6
+      st.phase = 'survivors'
+      st.activeSurvivor = 0
+      st.killer.planned = ['sneak', 'sprint']
+      st.killer.revealedCount = 0
+      st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+      st.queue = [{ k: 'endSurvivorTurn', s: 0 }] as GameState['queue']
+      return r
+    }
+
+    it('Diversion: sends the Unknown in the survivor\'s room, not Unknown 1', () => {
+      const { st, second, far } = nextToSecond('diversion')
+      const i = survivorInteractions(st, 0).find((x) => x.k === 'diversion')!
+      expect(i).toBeDefined()
+      const p = touchingPaths(st, second).find((x) => x.id === (i as { path: string }).path)!
+      const dest = p.a === second ? p.b : p.a
+      const g = apply(st, { t: 'interact', i })
+      expect(unknownRooms(g)[1]).toBe(dest)
+      expect(unknownRooms(g)[0]).toBe(far)
+    })
+
+    it('Power Struggle: shows the card of the Unknown in the room, and that one can\'t interact after it', () => {
+      const { st } = nextToSecond('power_struggle')
+      const i = survivorInteractions(st, 0).find((x) => x.k === 'powerStruggle')!
+      expect(i).toBeDefined()
+      const g = apply(st, { t: 'interact', i })
+      // card 2 is Unknown 2's
+      expect(g.killer.shown).toEqual([1])
+      expect(g.struggle).toBe(true)
+      expect(g.struggleTurn).toBe(1)
+    })
+
+    /** Played on (props revealed on arrival and so on) until the follow and the turn's hand-back are done. */
+    function settle(g: GameState) {
+      for (let n = 0; n < 12 && g.queue.some((t) => t.k === 'killerFollow' || t.k === 'actAs'); n++) g = apply(g, legalActions(g)[0])
+      return g
+    }
+
+    /** A move of survivor 0 out of `from` with a card (the first card that has one). */
+    function walkOut(st: GameState, from: string) {
+      st.survivors[0].room = from
+      const card = (['sneak', 'sprint', 'crouch', 'vault'] as const).find((c) => survivorMoves(st, 0, c).length)!
+      const m = survivorMoves(st, 0, card)[0]
+      st.phase = 'survivors'
+      st.activeSurvivor = 0
+      st.canInteract = true
+      st.step = { t: 'survivorMove', s: 0, card }
+      st.queue = [{ k: 'survivorInteract', s: 0 }, { k: 'endSurvivorTurn', s: 0 }]
+      return m
+    }
+
+    it('Thrill of the Hunt: the Unknown in the room left follows, and Unknown 1 stays', () => {
+      const { st, second, far } = twoUnknowns('thrill_of_the_hunt')
+      const m = walkOut(st, second)
+      const offered = apply(st, { t: 'move', path: m.path.id })
+      expect(offered.step).toMatchObject({ t: 'offer', perk: 'thrill_of_the_hunt' })
+      const g = settle(apply(offered, { t: 'perk', perk: 'thrill_of_the_hunt', use: true, choice: {} }))
+      expect(unknownRooms(g)).toEqual([far, m.to, null, null])
+      // Unknown 1 stands for him again
+      expect(g.killer.unknownAt).toBe(0)
+      expect(g.killer.room).toBe(far)
+    })
+
+    it('two Unknowns in the room left: the perk\'s user picks which one follows', () => {
+      const { st, second, far } = twoUnknowns('thrill_of_the_hunt')
+      st.killer.unknowns = [far, second, second, null]
+      const m = walkOut(st, second)
+      const w = { k: 'survivorLeave', s: 0, to: m.to, path: m.path.id } as PerkWindow
+      expect(perkChoices(st, 'thrill_of_the_hunt', 'killer', w).map((c) => c.index)).toEqual([1, 2])
+      const offered = apply(st, { t: 'move', path: m.path.id })
+      const g = settle(apply(offered, { t: 'perk', perk: 'thrill_of_the_hunt', use: true, choice: { index: 2 } }))
+      expect(unknownRooms(g)).toEqual([far, second, m.to, null])
+    })
+
+    it('Quick Gambit in the middle of his turn: the Unknown there follows, the one playing keeps the turn', () => {
+      const { st, second, far } = twoUnknowns('quick_gambit')
+      st.killer.perks = []
+      st.survivors[0].perks = ['quick_gambit']
+      st.survivors[0].bp = 6
+      st.survivors[0].room = second
+      const p = touchingPaths(st, second)[0]
+      const to = p.a === second ? p.b : p.a
+      st.phase = 'killer'
+      const w = { k: 'survivorLeave', s: 0, to, path: p.id } as PerkWindow
+      st.step = { t: 'offer', perk: 'quick_gambit', owner: 0, w, done: [] } as GameState['step']
+      // Unknown 1's turn 0 goes on after it: its interaction comes next
+      st.queue = [{ k: 'survivorStep', s: 0, path: p.id, to }, { k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }] as GameState['queue']
+      const g = settle(apply(st, { t: 'perk', perk: 'quick_gambit', use: true, choice: {} }))
+      expect(unknownRooms(g)[1]).toBe(to)
+      expect(g.step).toMatchObject({ t: 'killerInteract', turn: 0 })
+      expect(g.killer.unknownAt).toBe(0)
+      expect(g.killer.room).toBe(far)
+    })
+
+    it('Face the Darkness: a Guard around the Unknown whose turn begins', () => {
+      const { st, second, far } = twoUnknowns('face_the_darkness')
+      Object.assign(st.killer, { planned: ['wait', 'wait'], revealedCount: 1 })
+      st.phase = 'killer'
+      st.queue = [{ k: 'killerTurn', turn: 1 }] as GameState['queue']
+      const g = apply({ ...st, step: { t: 'turnStart', s: 0 } }, { t: 'continue' })
+      expect(g.step).toMatchObject({ t: 'offer', perk: 'face_the_darkness' })
+      const s = g.step as Extract<GameState['step'], { t: 'offer' }>
+      const rooms = new Set(perkChoices(g, 'face_the_darkness', 'killer', s.w).map((c) => c.room))
+      expect(rooms.has(second)).toBe(true)
+      expect(rooms.has(far)).toBe(false)
+    })
+
+    it('Coulrophobia: asked after a leave window, for an Unknown in the room ahead', () => {
+      const { st, second } = twoUnknowns('thrill_of_the_hunt')
+      st.killer.perks = ['thrill_of_the_hunt', 'coulrophobia']
+      const m = walkOut(st, second)
+      // Unknown 1 in the room ahead, Unknown 2 in the room left
+      st.killer.room = m.to
+      st.killer.unknowns = [m.to, second, null, null]
+      const offered = apply(st, { t: 'move', path: m.path.id })
+      expect(offered.step).toMatchObject({ t: 'offer', perk: 'thrill_of_the_hunt' })
+      const next = apply(offered, { t: 'perk', perk: 'thrill_of_the_hunt', use: false })
+      expect(next.step).toMatchObject({ t: 'offer', perk: 'coulrophobia' })
+    })
+
+    it('Agitation: any Unknown may take the move', () => {
+      const { st } = twoUnknowns('agitation')
+      const choices = perkChoices(st, 'agitation', 'killer', { k: 'afterAttack', target: 0 } as PerkWindow)
+      expect(new Set(choices.map((c) => c.index))).toEqual(new Set([0, 1]))
+    })
+
+    it('Diversion with two Unknowns in the room: each path for each, and the one picked goes', () => {
+      const { st, second, far } = nextToSecond('diversion')
+      st.killer.unknowns = [far, second, second, null]
+      const opts = survivorInteractions(st, 0).filter((x) => x.k === 'diversion') as { k: 'diversion'; path: string; unknown?: number }[]
+      expect(new Set(opts.map((x) => x.unknown))).toEqual(new Set([1, 2]))
+      const i = opts.find((x) => x.unknown === 2)!
+      const p = touchingPaths(st, second).find((x) => x.id === i.path)!
+      const g = apply(st, { t: 'interact', i })
+      expect(unknownRooms(g)).toEqual([far, second, p.a === second ? p.b : p.a, null])
+    })
+
+    it('Beast of Prey: any Unknown may take the move, along a path out of its own room', () => {
+      const { st, second } = twoUnknowns('beast_of_prey')
+      const choices = perkChoices(st, 'beast_of_prey', 'killer', { k: 'planningStart' } as PerkWindow)
+      const fromSecond = choices.find((c) => c.index === 1)
+      expect(fromSecond).toBeDefined()
+      const to = touchingPaths(st, second).find((p) => p.id === fromSecond!.path)!
+      const dest = to.a === second ? to.b : to.a
+      st.step = { t: 'offer', perk: 'beast_of_prey', owner: 'killer', w: { k: 'planningStart' } } as GameState['step']
+      st.queue = [{ k: 'plan' }] as GameState['queue']
+      const g = apply(st, { t: 'perk', perk: 'beast_of_prey', use: true, choice: fromSecond! })
+      expect(unknownRooms(g)[1]).toBe(dest)
+      expect(unknownRooms(g)[0]).toBe(st.killer.room)
+    })
+  })
 
   it('setup puts The Unknown 1 in the killer\'s start room; it plans one card for its one mini', () => {
     const st = game('unknown')

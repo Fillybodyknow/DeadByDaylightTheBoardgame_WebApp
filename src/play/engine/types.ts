@@ -236,7 +236,8 @@ export type SurvivorInteraction =
   /** Power Struggle (Élodie): interact with the killer to reveal their first card. */
   | { k: 'powerStruggle' }
   /** Diversion (Adam): interact with the killer to send them along `path`. */
-  | { k: 'diversion'; path: string }
+  /** `unknown`: which Unknown goes, picked when several stand in the room (else the one there). */
+  | { k: 'diversion'; path: string; unknown?: number }
 
 export type KillerInteraction =
   | { k: 'search'; prop: string }
@@ -568,8 +569,11 @@ export type Task =
   | { k: 'anyMove'; s: number; why?: 'antidote' | 'deadHard' | 'spineChill' | 'collective' }
   /** The killer entered the room with the Afterpiece Antidote. */
   | { k: 'killerAntidote' }
-  /** A survivor's card move, after Coulrophobia had its chance to stop it. */
-  | { k: 'survivorGo'; s: number; path: string; to: string }
+  /**
+   * A survivor's card move, after Coulrophobia had its chance to stop it. `enter`: it hasn't yet
+   * (the leave window came first): asked before the move.
+   */
+  | { k: 'survivorGo'; s: number; path: string; to: string; enter?: boolean }
   /** The killer moved by a perk (Starstruck, Diversion), once no Firecracker stopped him. */
   | { k: 'killerGo'; path: string; to: string }
   /** A hanging, after Dead Hard had its chance. */
@@ -609,8 +613,10 @@ export type Task =
   | { k: 'drawItem'; s: number; from: 'chest' | 'draw' }
   /** A survivor's move out of the killer's room, held for Deerstalker and Thrill of the Hunt. */
   | { k: 'survivorStep'; s: number; path: string; to: string }
-  /** Thrill of the Hunt: the killer follows survivor `s` along `path`, if they left. */
-  | { k: 'killerFollow'; s: number; path: string; to: string }
+  /** Thrill of the Hunt: the killer follows survivor `s` along `path`, if they left (`unknown`: which Unknown). */
+  | { k: 'killerFollow'; s: number; path: string; to: string; unknown?: number }
+  /** The Unknown playing the turn stands for him again, once another one has moved (`moveUnknown`). */
+  | { k: 'actAs'; i: number }
   /** Progress added to a generator, held while Undone was asked. */
   | { k: 'addGen'; prop: string; add: number; s: number }
   | { k: 'killerInteract'; turn: number }
@@ -864,6 +870,8 @@ export interface GameState {
   redeemer?: MoveCard | null
   /** Power Struggle: the killer can't interact after moving with their first card this round. */
   struggle?: boolean
+  /** …that card's turn: the first, or for The Unknown the card of the Unknown in the survivor's room. */
+  struggleTurn?: number
   /** Deception: the active survivor stays put this turn and can't interact. */
   deception?: boolean
   /** Guardian: this survivor is the killer's only interaction for the turn he walked in on them. */

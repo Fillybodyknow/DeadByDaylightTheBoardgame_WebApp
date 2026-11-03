@@ -12,6 +12,19 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.30.2',
+    date: '2026-11-03',
+    items: [
+      'The Unknown: Perk ของฆาตกรที่ดูว่าฆาตกรอยู่ใกล้ใคร นับ The Unknown ทุกตัวแล้ว ไม่ใช่แค่ตัวที่ 1 (Unnerving Presence, Overwhelming Presence, Nemesis, Septic Touch, Fearmonger, Dark Devotion, Discordance)',
+      'The Unknown: Beast of Prey และ Agitation เลือกได้ว่าให้ The Unknown ตัวไหนเดิน',
+      'The Unknown: Thrill of the Hunt และ Quick Gambit ให้ The Unknown ที่อยู่ห้องนั้นเดินตาม (ไม่ใช่ตัวที่ 1) ถ้ามีหลายตัวในห้อง คนใช้ Perk เลือกได้ — และไม่แย่งเทิร์นของตัวที่กำลังเล่นอยู่',
+      'The Unknown: Face the Darkness วาง Guard รอบ The Unknown ที่ถึงคิวเล่น',
+      'Coulrophobia: ถามด้วยเมื่อผู้รอดชีวิตเดินจากห้องที่มี The Unknown เข้าห้องที่มีอีกตัว',
+      'The Doctor: ผู้รอดชีวิตที่ติดบ้าคลั่งแล้วถูกค้น Locker ทอยเต๋า Danger (แดง) แทนเต๋า Skill — ล้มเหลวแล้วหายบ้าคลั่ง (ตามคำตอบของ Level 99)',
+      'The Unknown: หันเหความสนใจ และ ดิ้นรนสุดพลัง กดที่ The Unknown ตัวที่อยู่ห้องเดียวกับคุณ (ไม่ใช่ตัวที่ 1) และมีผลกับตัวนั้น — ดิ้นรนสุดพลังเปิดการ์ดของตัวนั้น หันเหความสนใจเลือกตัวได้ถ้ามีหลายตัวในห้อง',
+    ],
+  },
+  {
     version: '1.30.1',
     date: '2026-11-02',
     items: ['แก้เกมค้างตอนวางแผน เมื่อ Survivor ทุกคนเปิดการ์ดหงายไปก่อนแล้ว (Dire Crow ของ The Artist) — ตอนนี้ไปที่ฆาตกรวางแผนต่อเลย'],

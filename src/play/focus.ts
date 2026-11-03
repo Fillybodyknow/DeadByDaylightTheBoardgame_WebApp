@@ -58,9 +58,19 @@ function where(st: GameState, s: number): string {
 
 function killerFact(st: GameState, near?: number): Fact {
   const k = st.killer
-  const d = near === undefined ? null : roomDistance(st, k.room, st.survivors[near].room)
+  // The Unknown: the one nearest the survivor (every Unknown is the Killer), by number
+  let room = k.room
+  let who = k.name
+  if (k.unknowns && near !== undefined) {
+    const at = st.survivors[near].room
+    const best = unknownRooms(st)
+      .flatMap((r, i) => (r ? [{ r, i, d: roomDistance(st, r, at) ?? Infinity }] : []))
+      .sort((a, b) => a.d - b.d)[0]
+    if (best) ({ r: room } = best), (who = `The Unknown ${best.i + 1}`)
+  }
+  const d = near === undefined ? null : roomDistance(st, room, st.survivors[near].room)
   const dist = d === null ? '' : d === 0 ? ' · ห้องเดียวกัน' : ` · ห่าง ${d} ห้อง`
-  return { who: 'killer', icon: '🔪', text: `${k.name} — ${roomName(st, k.room)}${dist}` }
+  return { who: 'killer', icon: '🔪', text: `${who} — ${roomName(st, room)}${dist}` }
 }
 
 const end = (st: GameState, path: string, from: string) => {

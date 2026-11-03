@@ -141,6 +141,18 @@ function prop(st: GameState, id: string) {
   return st.props.find((p) => p.id === id)!
 }
 
+/**
+ * Who follows survivor `s` out of their room (Quick Gambit, Thrill of the Hunt): the killer, or The
+ * Unknown there by number (`index`: the one picked, with several there).
+ */
+function followerName(st: GameState, s: number, index?: number): string {
+  if (!st.killer.unknowns) return st.killer.name
+  const rooms = unknownRooms(st)
+  const here = rooms.flatMap((r, i) => (r === st.survivors[s].room ? [i] : []))
+  const i = index ?? (here.includes(st.killer.unknownAt ?? 0) ? (st.killer.unknownAt ?? 0) : here[0])
+  return i === undefined ? st.killer.name : `The Unknown ${i + 1}`
+}
+
 export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorInteraction): string {
   const room = st.survivors[s].room
   switch (i.k) {
@@ -176,10 +188,15 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
       return `วิญญาณสงบ: ย้าย Crow ไป ${roomName(st, i.room)}`
     case 'removeVictor':
       return 'ไล่ Victor ออกจากกระดาน'
-    case 'powerStruggle':
-      return `ดิ้นรนสุดพลัง: เปิดการ์ดใบแรกของ ${st.killer.name} (ฆาตกร +2 ▲)`
-    case 'diversion':
-      return `หันเหความสนใจ: ส่ง ${st.killer.name} ไปทาง ${pathLabel(st, i.path, room)} (ฆาตกร +1 ▲)`
+    // (The Unknown: the one standing in this room, by its number)
+    case 'powerStruggle': {
+      const u = st.killer.unknowns ? unknownRooms(st).indexOf(room) : -1
+      return u < 0 ? `ดิ้นรนสุดพลัง: เปิดการ์ดใบแรกของ ${st.killer.name} (ฆาตกร +2 ▲)` : `ดิ้นรนสุดพลัง: เปิดการ์ดของ The Unknown ${u + 1} (ฆาตกร +2 ▲)`
+    }
+    case 'diversion': {
+      const u = i.unknown ?? (st.killer.unknowns ? unknownRooms(st).indexOf(room) : -1)
+      return `หันเหความสนใจ: ส่ง ${u < 0 ? st.killer.name : `The Unknown ${u + 1}`} ไปทาง ${pathLabel(st, i.path, room)} (ฆาตกร +1 ▲)`
+    }
   }
 }
 
@@ -348,8 +365,11 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     case 'brutal_strength':
       return `ผลัก ${name((w as { target: number }).target)} ไปทาง ${pathLabel(st, c.path!, st.survivors[(w as { target: number }).target].room)}`
     case 'agitation':
-    case 'beast_of_prey':
-      return `เดินทาง ${pathLabel(st, c.path!, st.killer.room)}`
+    case 'beast_of_prey': {
+      // The Unknown: the mini that takes the move, from its own room
+      if (c.index === undefined) return `เดินทาง ${pathLabel(st, c.path!, st.killer.room)}`
+      return `The Unknown ${c.index + 1}: เดินทาง ${pathLabel(st, c.path!, unknownRooms(st)[c.index] ?? st.killer.room)}`
+    }
     case 'sprint_burst':
       return `วิ่งต่อทาง ${pathLabel(st, c.path!, from(o))}`
     case 'dance_with_me':
@@ -440,7 +460,7 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `ย้าย${palletOn(st, c.path!) ? ' Pallet' : 'กำแพง'} ไปทาง ${roomName(st, to.a)} ↔ ${roomName(st, to.b)}`
     }
     case 'quick_gambit':
-      return `${st.killer.name} ต้องเดินตามไปด้วย`
+      return `${followerName(st, (w as { s: number }).s, c.index)} ต้องเดินตามไปด้วย`
     case 'circle_of_healing':
       return `${name(c.target!)} หายบาดเจ็บ (แทน ▲ ที่ได้)`
     case 'shadow_step':
@@ -720,8 +740,11 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return 'จั่ว Perk 4 ใบ เลือก 1 ใบมาแทนการ์ดนี้'
     case 'deerstalker':
       return `ให้ ${name((w as { s: number }).s)} ทอย Danger Die — ล้มเหลว = อยู่ที่เดิม`
-    case 'thrill_of_the_hunt':
-      return `เดินตาม ${name((w as { s: number }).s)} ไป ${roomName(st, (w as { to: string }).to)}`
+    case 'thrill_of_the_hunt': {
+      const s = (w as { s: number }).s
+      const who = st.killer.unknowns ? `${followerName(st, s, c.index)} ` : ''
+      return `${who}เดินตาม ${name(s)} ไป ${roomName(st, (w as { to: string }).to)}`
+    }
     case 'no_one_left_behind':
       return `ย้าย ${name(c.target!)} ไปทาง ${pathLabel(st, c.path!, st.survivors[c.target!].room)}`
     default:

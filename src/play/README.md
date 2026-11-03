@@ -703,9 +703,11 @@ Perks:
 
 The Doctor, The Hag, The Wraith:
 
-- Madness changes single-die skill checks (as above) to the danger die, not the carry roll, a
-  Phantasm Trap roll or the roll of a survivor searched in a locker (Level 99's answer on their
-  Discord: Madness "only affects skill checks, not all rolls"); that roll doesn't end Madness either. A survivor in a locker isn't in the room for Carter's Spark.
+- Madness changes single-die skill checks (as above) to the danger die, the roll of a survivor
+  searched in a locker included (a skill check, p.14: Level 99 on their Discord, "Locker searches
+  do result in a skill check … would roll the danger die" — "Correct"); a failure there (picked up)
+  ends Madness as any failed skill check does. Not the carry roll nor a Phantasm Trap roll
+  ("only affects skill checks, not all rolls"). A survivor in a locker isn't in the room for Carter's Spark.
 - A Phantasm Trap roll is a skill check die: keys can re-roll it, Iron Will doesn't apply, and a
   0 still gives The Hag 1 ▲. Teleporting reveals a prop like any move; attacking or picking up
   someone there is optional.
@@ -828,7 +830,28 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Every Unknown is "the Killer" (the user's call: always): whatever a survivor asks of the
   killer's room (Overzealous, Quick Gambit, Hubris, Distortion, Power Struggle, Diversion, the
   terror radius and the chase music) counts any of them. A survivor's perk that sends the killer
-  somewhere (Diversion, Quick Gambit) sends the Unknown in that room.
+  somewhere (Diversion, Quick Gambit) sends the Unknown in that room; on the map such a perk is on
+  that Unknown's mini (`u<n>`, clickable then), its paths from the survivor's room. Power Struggle
+  shows the card of the Unknown in the survivor's room (card n for Unknown n, before it is played)
+  and that Unknown can't interact on its turn (`struggleTurn`). So do his own perks that
+  ask where he is outside his own move (`killerRooms`, `nearKiller`): Unnerving Presence,
+  Overwhelming Presence, Nemesis and Septic Touch next to any Unknown, Fearmonger and Dark
+  Devotion's targets next to any, Discordance counting each Unknown in the room as a killer
+  (`killersIn`), and Beast of Prey and Agitation (the user's call: its "you move" is any Unknown,
+  not only the one that attacked) moving the Unknown of his choice (`index`, as Unforeseen). In
+  his own turn his perks ask the Unknown playing (it stands in `room`; from the turn's start, so
+  Face the Darkness places a Guard around the Unknown whose turn it is). Bitter Murmur ("move
+  again… before interacting") stays with the Unknown that just moved.
+- The Unknown, more rulings (the user's): a perk that makes "the killer" in a room follow or go
+  (Thrill of the Hunt, Quick Gambit, Diversion) takes the Unknown standing there, and with several
+  there **its user picks which** (`index` on the choice, `unknown` on Diversion's interaction;
+  each Unknown's mini on the map). An Unknown moved by a perk in the middle of his turn (any of
+  these, Unforeseen, Agitation) moves as the killer, its windows and reveals with it, and then the
+  Unknown playing the turn takes it back (`asUnknown`, the `actAs` task). Hallucination's Unknown
+  appearing is **not** "the killer enters a room": no Spine Chill, Quick & Quiet, Head On,
+  Premonition or Firecracker. **Shadowborn** isn't his (he plans a card per Unknown and never
+  takes a bonus turn). A survivor leaving one Unknown's room for another's is asked the leave
+  perks, then Coulrophobia (`survivorGo`'s `enter`).
 - Hallucination (his power): the lowest-numbered Unknown not on the board into a room connected
   to the one playing; it has a card of its own from the next round. With all four out, the power
   can't be used.

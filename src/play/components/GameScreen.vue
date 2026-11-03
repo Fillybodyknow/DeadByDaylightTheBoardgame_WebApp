@@ -270,7 +270,7 @@ const itemPick = ref<number | null>(null)
 /** Breakout: the wounded survivor picked, waiting for where to move them. */
 const breakoutTarget = ref<number | null>(null)
 /** Diversion: the killer was clicked, his paths are the targets. */
-const diversion = ref(false)
+const diversion = ref<number | null>(null)
 /** Pain Resonance: the empty hook interacted with, waiting for the survivor next door. */
 const painHook = ref<string | null>(null)
 /** A fork's icon was clicked: its moves, waiting for the room to go to. */
@@ -319,7 +319,7 @@ watch(
     aceFirst.value = null
     fogwiseFrom.value = null
     breakoutTarget.value = null
-    diversion.value = false
+    diversion.value = null
     painHook.value = null
     perkPicked.value = null
     itemPick.value = null
@@ -343,13 +343,16 @@ const boardFocus = computed(() => {
     return { survivors: [s], killer: false, rooms: [st.survivors[s].room], paths: moves.map((m) => m.path.id), dests: moves.map((m) => m.to) }
   }
   // Diversion: the killer, and the paths he can be sent along
-  if (diversion.value) {
+  if (diversion.value !== null) {
     const st = view.value
     const s = st.step
-    const paths = s.t === 'survivorInteract' ? survivorInteractions(st, s.s).flatMap((i) => (i.k === 'diversion' ? [i.path] : [])) : []
+    const pick = diversion.value
+    const paths = s.t === 'survivorInteract' ? survivorInteractions(st, s.s).flatMap((i) => (i.k === 'diversion' && (i.unknown ?? -1) === pick ? [i.path] : [])) : []
+    // from the survivor's room (The Unknown sent may not be the one standing for him)
+    const from = s.t === 'survivorInteract' ? st.survivors[s.s].room : st.killer.room
     const dests = paths.map((id) => {
       const p = boardOf(st).paths.find((x) => x.id === id)!
-      return p.a === st.killer.room ? p.b : p.a
+      return p.a === from ? p.b : p.a
     })
     return { survivors: [], killer: true, rooms: [st.killer.room], paths, dests }
   }
@@ -488,7 +491,8 @@ function onRoom(id: string) {
   if (pp?.rooms[id] && !actions.value.some((a) => a.key === `room:${id}`)) return pp.pick(pp.rooms[id])
   onSpot(`room:${id}`)
 }
-const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'killer' || key === 'victor' ? key : `prop:${key}`)
+// (`u<n>`: one of The Unknown's minis)
+const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'killer' || key === 'victor' || /^u\d$/.test(key) ? key : `prop:${key}`)
 
 /** The mode the board is in, for the bar above it (with a way out). */
 const modeBar = computed(() => {
@@ -519,7 +523,10 @@ const modeBar = computed(() => {
       cancel: () => (forkMoves.value = null),
     }
   // after the fork: picking its room comes first, and its way out goes back to the paths
-  if (diversion.value) return { text: `หันเหความสนใจ: คลิกเส้นทางที่จะส่ง ${view.value.killer.name} ไป (ทางแยกจะให้เลือกห้องต่อ)`, cancel: () => (diversion.value = false) }
+  if (diversion.value !== null) {
+    const who = diversion.value >= 0 ? `The Unknown ${diversion.value + 1}` : view.value.killer.unknowns && view.value.step.t === 'survivorInteract' ? `The Unknown ${unknownRooms(view.value).indexOf(view.value.survivors[view.value.step.s].room) + 1}` : view.value.killer.name
+    return { text: `หันเหความสนใจ: คลิกเส้นทางที่จะส่ง ${who} ไป (ทางแยกจะให้เลือกห้องต่อ)`, cancel: () => (diversion.value = null) }
+  }
   // Undying: card → path → (room, at a fork) → prop; each step says what to do and goes back one
   const kind = stepKind(view.value, modes)
   if (kind) {

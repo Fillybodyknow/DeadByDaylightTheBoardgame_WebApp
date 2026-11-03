@@ -785,10 +785,21 @@ function guard(e: MouseEvent) {
         <img :src="asset(VICTOR_MINI)" alt="Victor" draggable="false" />
       </component>
       <!-- The Unknown's other minis, numbered (each plays the card set for its number) -->
-      <div v-for="u in r.unknowns" :key="`u${u}`" :data-mini="`u${u}`" class="mini guard unknown" :style="rectStyle(rects.minis.get(`u${u}`)!)" :title="`The Unknown ${u + 1}`">
+      <!-- (clickable when a survivor in its room does something to it: Diversion, Power Struggle) -->
+      <component
+        :is="canAct(`u${u}`) ? 'button' : 'div'"
+        v-for="u in r.unknowns"
+        :key="`u${u}`"
+        :data-mini="`u${u}`"
+        class="mini guard unknown"
+        :class="{ act: canAct(`u${u}`) }"
+        :style="rectStyle(rects.minis.get(`u${u}`)!)"
+        :title="interactTargets[`u${u}`] ?? `The Unknown ${u + 1}`"
+        @click="clickPiece(`u${u}`, r.id)"
+      >
         <img :src="asset(unknownMini(u))" :alt="`The Unknown ${u + 1}`" draggable="false" />
         <b class="unknown-no">{{ u + 1 }}</b>
-      </div>
+      </component>
       <!-- The Knight's Guards: minis of their own, beside the killer's corner -->
       <div
         v-for="g in r.guards"
