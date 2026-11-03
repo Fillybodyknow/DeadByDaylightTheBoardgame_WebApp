@@ -53,6 +53,16 @@ export const tutorial = shallowRef<{ allow(st: GameState, action: Action): boole
 /** Online moves made on this device that the room hasn't confirmed yet. */
 export const pendingWrites = shallowRef(0)
 
+/**
+ * Online: the game as it was before each move this device's player made (not its bots'), latest
+ * last, this round only: what an undo the room votes for goes back to (online/undo.ts).
+ */
+export const myMoves = shallowRef<GameState[]>([])
+const MY_MOVES_KEPT = 10
+
+/** Online: no move goes to the room while it votes on an undo (online/undo.ts). */
+export const onlineHold = shallowRef(false)
+
 export const canUndo = computed(() => !online.value && !tutorial.value && history.value.length > 0)
 
 /** Whether this device may act now (always, on one shared device). */
@@ -85,20 +95,30 @@ function save() {
 
 type Online = NonNullable<typeof online.value>
 
-/** Online: make `seat`'s move here at once, then send it to the room. */
-function send(o: Online, seat: number, action: Action): boolean {
+/** Online: make `seat`'s move here at once, then send it to the room. `own`: this device's player's (not a bot's). */
+function send(o: Online, seat: number, action: Action, own = false): boolean {
   const cur = game.value
-  if (!cur || !mayAct(cur, seat, action)) return false
+  if (!cur || onlineHold.value || !mayAct(cur, seat, action)) return false
   const next = tryApply(cur, action)
   if (!next) return false
   // Show it at once, then send the move. If someone else moved first, it is checked again
   // against their state; every device replays the same moves, so all of them agree.
   game.value = next
   pendingWrites.value++
+  // the room's game the move landed on: what an undo of it goes back to
+  const landed: { st?: GameState } = {}
   void o.room
-    .sendMove((latest) => (latest && mayAct(latest, seat, action) && tryApply(latest, action) ? action : null))
+    .sendMove((latest) => {
+      if (!latest || !mayAct(latest, seat, action) || !tryApply(latest, action)) return null
+      landed.st = latest
+      return action
+    })
     .then(
-      (ok) => !ok && resync(o),
+      (ok) => {
+        if (!ok) return resync(o)
+        const before = landed.st
+        if (own && before) myMoves.value = [...myMoves.value.filter((s) => s.round === before.round).slice(1 - MY_MOVES_KEPT), before]
+      },
       () => resync(o),
     )
     .finally(() => pendingWrites.value--)
@@ -122,7 +142,7 @@ export function dispatch(action: Action, byBot = false): boolean {
   const cur = game.value
   if (!cur) return false
   const o = online.value
-  if (o) return send(o, o.seat, action)
+  if (o) return send(o, o.seat, action, true)
   if (tutorial.value && !tutorial.value.allow(cur, action)) return false
   if (!byBot && !peopleMay(cur, action)) return false
   const next = tryApply(cur, action)
@@ -189,6 +209,8 @@ export function leaveTutorial() {
 /** Back to the hot-seat save after leaving an online room. */
 export function restoreLocal() {
   online.value = null
+  onlineHold.value = false
+  myMoves.value = []
   history.value = []
   game.value = load()
 }

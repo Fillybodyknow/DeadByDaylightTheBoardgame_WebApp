@@ -33,7 +33,7 @@ import { tryApply } from '../engine/engine'
 import type { Action, GameState, LogEntry } from '../engine/types'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from './logArchive'
 import type { Backend, ChatMessage, LfgHere, LfgMessage, Ping, Report, Room, RoomData, RoomListing, VoiceEntry, VoiceSignal } from './transport'
-import { CHAT_KEEP, CHECKPOINT_EVERY, LFG_KEEP, emptyRoom, moveKey, normalizeRoom } from './transport'
+import { CHAT_KEEP, CHECKPOINT_EVERY, LFG_KEEP, UNDO_MARK, emptyRoom, isUndoMark, moveKey, normalizeRoom } from './transport'
 
 const env = import.meta.env
 
@@ -85,6 +85,7 @@ function lobbyOf(r: RoomData): Lobby {
     ...(r.perkSeed ? { perkSeed: r.perkSeed } : {}),
     ...(r.offeringPicks && Object.keys(r.offeringPicks).length ? { offeringPicks: r.offeringPicks } : {}),
     ...(r.offeringsDone && Object.keys(r.offeringsDone).length ? { offeringsDone: r.offeringsDone } : {}),
+    ...(r.undoVote ? { undoVote: r.undoVote } : {}),
   }
 }
 interface GameNode {
@@ -194,6 +195,8 @@ class FirebaseRoom implements Room {
     let st = this.base
     let n = this.baseRev
     while (st && this.moves.has(n + 1)) {
+      // an undo: the state it goes back to comes as the next checkpoint
+      if (isUndoMark(this.moves.get(n + 1))) break
       const next = tryApply(st, this.moves.get(n + 1)!)
       // A move the engine won't take means this device is out of step: keep what we have and
       // wait for the next checkpoint, which replaces everything.
@@ -269,6 +272,38 @@ class FirebaseRoom implements Room {
       )
       if (res.committed && !taken) {
         await this.afterMove(n)
+        return true
+      }
+      await this.catchUp(n)
+    }
+    return false
+  }
+
+  async restore(fn: (cur: GameState | null) => GameState | null): Promise<boolean> {
+    for (let tries = 0; tries < 10; tries++) {
+      const target = fn(this.state ? withFullLog(this.state, this.archives, parseArchive) : null)
+      if (!target) return false
+      const n = this.applied + 1
+      const from = this.baseRev + 1
+      let taken = false
+      // the next slot first, as a move takes it: nobody's move lands between the vote and the undo
+      const res = await runTransaction(
+        this.path(`/moves/${moveKey(n)}`),
+        (cur: string | null) => {
+          if (cur !== null) {
+            taken = true
+            return undefined
+          }
+          return JSON.stringify(UNDO_MARK)
+        },
+        { applyLocally: false },
+      )
+      if (res.committed && !taken) {
+        // the earlier state, as the checkpoint after the mark; the moves it replaces go
+        await set(this.path('/game'), { rev: n, json: JSON.stringify(trimLog(target, this.archived)) })
+        const done: Record<string, null> = {}
+        for (let i = from; i <= n; i++) done[moveKey(i)] = null
+        await update(this.path('/moves'), done).catch((e) => console.warn('online: old moves not cleared', e))
         return true
       }
       await this.catchUp(n)

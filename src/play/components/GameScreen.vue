@@ -11,7 +11,7 @@ import { fxSound } from '../fx/audio'
 import { pathPick, pathPickLabel } from '../pathPick'
 import { handZone, openHands } from '../hands'
 import CardHand, { type HandCard } from './CardHand.vue'
-import { canUndo, controls, dispatch, dispatchBot, myTurn, online, quitGame, replaying, tutorial, undo } from '../game'
+import { canUndo, controls, dispatch, dispatchBot, myTurn, online, onlineHold, quitGame, replaying, tutorial, undo } from '../game'
 import { PERKS } from '../engine/perks'
 import { asset } from '../../i18n'
 import { KILLER_PLAYER, actorsOf } from '../engine/seats'
@@ -49,6 +49,8 @@ import StatusPanel from './StatusPanel.vue'
 import SyncBadge from './SyncBadge.vue'
 import BpText from '../../components/BpText.vue'
 import ChatDock from './ChatDock.vue'
+import UndoVote from './UndoVote.vue'
+import { myUndo, requestUndo, undoVote } from '../online/undo'
 
 const props = defineProps<{ st: GameState }>()
 /** `settled`: whether everything has been shown (for a replay to step on). */
@@ -440,6 +442,12 @@ function undoPlan() {
     if (hand >= 0) dispatch({ t: 'unplanHand', hand })
   }
   sfx.click()
+}
+
+/** Online: ask the other side to let this player take back their last move (online/undo.ts). */
+function askUndo() {
+  sfx.click()
+  void requestUndo()
 }
 
 /** Online: who the game is waiting on, for the side panel. */
@@ -917,7 +925,7 @@ onBeforeUnmount(() => clockTimer !== null && clearInterval(clockTimer))
 const BOT_PAUSE_MS = 700
 let botTimer: number | null = null
 watch(
-  [() => props.st, view, fxBusy, opening, botDriver, standIns, summaryRound],
+  [() => props.st, view, fxBusy, opening, botDriver, standIns, summaryRound, onlineHold],
   () => {
     if (botTimer !== null) clearTimeout(botTimer)
     botTimer = null
@@ -927,6 +935,8 @@ watch(
     const o = online.value
     if (tutorial.value || st.phase === 'over' || (!o && !st.bots?.length)) return
     if (o && session.me !== botDriver.value) return
+    // the room is voting on an undo: nobody moves until it is settled
+    if (o && onlineHold.value) return
     // on one device the round's summary is read first (it closes by itself when only bots play)
     if (!o && summaryRound.value !== null) return
     if (view.value !== st || fxBusy.value || opening.value) return
@@ -1351,6 +1361,16 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <SyncBadge v-else-if="online" />
         <span v-if="online && !replaying" class="room-tag">ห้อง {{ session.room?.code }} · {{ online.seat ? `ผู้เล่น ${online.seat}` : 'ผู้ชม' }}</span>
         <button v-else-if="!online" :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶<span class="btn-text"> ย้อน</span></button>
+        <!-- online: take back this player's last move of the round, if the other side votes yes -->
+        <button
+          v-if="online && !replaying && online.seat && view.phase !== 'over'"
+          type="button"
+          :disabled="!myUndo || !!undoVote"
+          :title="undoVote ? 'กำลังโหวตขอย้อนอยู่' : myUndo ? 'ขอย้อนการกระทำล่าสุดของคุณในรอบนี้ — อีกฝั่งโหวตว่าให้หรือไม่' : 'ยังไม่มีการกระทำของคุณในรอบนี้ให้ย้อน'"
+          @click="askUndo"
+        >
+          ↶<span class="btn-text"> ขอย้อน</span>
+        </button>
         <!-- online: ping a spot on the map for everyone (or Alt+click on it) -->
         <button
           v-if="canPing"
@@ -1477,6 +1497,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
     </button>
     <!-- online: the room's chat — a 💬 tab above the side panel's, bubbles beside the tiles -->
     <ChatDock v-if="online && !replaying" mode="game" />
+    <UndoVote v-if="online && !replaying" />
     <!-- online: your own hand, to look at, while no hand to pick from is out -->
     <CardHand v-if="ownHand.length && openHands === 0" :cards="ownHand" label="มือของคุณ" passive />
     <!-- online: the others are waiting on this device — a gold edge (the notice is in the bar) -->

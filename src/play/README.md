@@ -637,6 +637,16 @@ bots online.
   killer, a spectator and the other survivors' players see the back of the item card. An item
   shows to everyone when it is used, and a friend's key shows when it is offered for a re-roll.
   On one shared device everything is in sight anyway.
+- Online, a player may ask to take back their last move of the round (↶ ขอย้อน, `online/undo.ts`),
+  and the other side votes (asked by a player of the group, Moser): the killer's request needs more
+  than half of the survivors' players to say yes (half or less is a no); a survivor player's needs
+  the killer's yes. Bots don't vote, nor do players whose connection is gone; with nobody to ask it
+  passes. 30 s to vote, no answer is a no, and while the vote is open nobody moves (bots neither).
+  It goes back to just before that player's move, undoing everyone's moves since; the moves before
+  it in the round can be taken back the same way, one request each. The room holds no state but the
+  checkpoint (`transport.ts`), so the asking device writes the earlier state as a new checkpoint
+  after a mark in the next move slot (`Room.restore`); the replay recorder cuts its record back
+  to it (`gap` in `replay.ts`).
 
 ## Rulings
 
@@ -920,7 +930,9 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   moves along any path (not over a pallet), or stays, before interacting.
 - Dissolution: at the start of planning, on a path's icon with nothing else on it (no wall, pallet,
   trap or Entity); the Bloodpoint token shows there. Any survivor moving along it is wounded (any
-  move: a card, a perk, the rescue move, Reign of Darkness). It goes at the end of cleanup.
+  move: a card, a perk, the rescue move, Reign of Darkness). It goes at the end of cleanup. The ▲ is
+  a component on the path: no pallet can be dropped (or moved) there while it lies there (the Pallet
+  card: "a path with ... any other component").
 - Septic Touch: after a survivor reveals a prop that isn't yellow (not a generator or exit gate) in
   his room or a connected one; not an occupied hook or locker. The prop leaves the board.
 - Afterpiece (The Clown): one Tonic and one Antidote; the power puts either into his room or a
@@ -933,7 +945,7 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   left where he is and loses the turn's interaction).
 - Coulrophobia: asked when a survivor's card move would take them into his room (perk moves and the
   rescue move aren't asked); used, they stay and can't interact this turn.
-- Bamboozle: the Entity on a path's icon (a fork is one; not on a wall or under a pallet) until
+- Bamboozle: the Entity on a path's icon (a fork is one; not on a wall; over a pallet it may go) until
   cleanup. Survivors can't pass it, as a wall; he passes freely, carrying too, and it stays.
 - Pop Goes the Weasel: after an attack (wounding) or a hanging; a revealed crow, chest or empty
   locker in a room connected to his.
@@ -1172,7 +1184,7 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   played as a move of its own. Only the move: no interaction, and it is not the round's bonus turn.
 - Bitter Murmur: after he moves along a vault path (the one-way ones) or through a wall that broke
   as he passed, one more move along any path without a pallet, before he interacts.
-- Claustrophobia: after a repair roll succeeds, the Entity goes onto any path's icon and survivors
+- Claustrophobia: after a repair roll succeeds, the Entity goes onto any path's icon (a pallet's too) and survivors
   can't pass it, exactly as Bamboozle's does (he passes freely, and it goes at cleanup). There is
   one Entity token, so it moves if it was somewhere else.
 - Distressing: after a survivor moves into a room with a revealed empty locker, they hide in it —

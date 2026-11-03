@@ -1956,6 +1956,14 @@ describe('The Clown', () => {
     expect(anyMoves(used, 0).map((x) => x.path.id)).not.toContain(m.path.id)
   })
 
+  it('Bamboozle: the Entity may go over a dropped pallet', () => {
+    const st = clown('bamboozle')
+    const m = walk(st)
+    const token = m.path.token ?? m.path.id
+    Object.assign(placeProp(st, 'pallet', m.to), { revealed: true, path: token })
+    expect(perkChoices(st, 'bamboozle', 'killer', { k: 'planningStart' })).toContainEqual({ path: token })
+  })
+
   it('Pop Goes the Weasel: after an attack, a crow, chest or empty locker next door is removed', () => {
     const st = clown('pop_goes_the_weasel')
     st.killer.room = 'shack'
@@ -3570,6 +3578,19 @@ describe('The Dredge', () => {
     g.queue = [{ k: 'survivorInteract', s: 0 }, { k: 'endSurvivorTurn', s: 0 }]
     g = apply(g, { t: 'move', path: m.path.id })
     expect(g.survivors[0].wounded).toBe(true)
+  })
+
+  it('Dissolution: no pallet is dropped on its path (another component is there)', () => {
+    const st = dredge('dissolution')
+    const sv = st.survivors[0]
+    const pallet = placeProp(st, 'pallet', sv.room)
+    pallet.revealed = true
+    const drops = () => survivorInteractions(st, 0).flatMap((i) => (i.k === 'dropPallet' ? [i.path] : []))
+    const before = drops()
+    expect(before.length).toBeGreaterThan(0)
+    st.dissolution = before[0]
+    expect(drops()).not.toContain(before[0])
+    expect(drops().length).toBe(before.length - 1)
   })
 
   it('Septic Touch: a survivor reveals a prop that is not yellow next to him: it goes', () => {

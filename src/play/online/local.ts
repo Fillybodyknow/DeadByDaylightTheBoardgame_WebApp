@@ -144,6 +144,15 @@ class LocalRoom implements Room {
     return ok
   }
 
+  restore(fn: (cur: GameState | null) => GameState | null) {
+    // the earlier state as a checkpoint, counted as one more move (the mark online takes a slot)
+    return this.write((cur) => {
+      const room = roomOf(cur)
+      const target = room.game && fn(room.game)
+      return target ? { ...cur, checkpoint: target, moves: [], base: room.rev + 1 } : null
+    })
+  }
+
   async resetGame() {
     await this.write((cur) => ({ ...cur, checkpoint: null, moves: [], base: 0 }))
   }

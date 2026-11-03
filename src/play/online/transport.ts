@@ -166,6 +166,8 @@ export interface RoomData {
   /** Offerings (settings `offerings`): each side's picks ("a,b", by side) and whether they are confirmed. */
   offeringPicks?: Record<string, string>
   offeringsDone?: Record<string, boolean>
+  /** A player's request to take back their last move, and the other side's votes (undo.ts). */
+  undoVote?: UndoVote
   game: GameState | null
   /** Moves played so far (the checkpoint's own count plus the ones replayed on top). */
   rev: number
@@ -176,6 +178,34 @@ export interface RoomData {
    */
   trail?: { base: number; start: GameState | null; moves: Action[] }
 }
+
+/**
+ * A request to take back a move (undo.ts): the other side votes on it. The killer's needs more than
+ * half of the survivors' players; a survivor player's needs the killer's yes.
+ */
+export interface UndoVote {
+  /** Who asks (player number). */
+  by: number
+  /** When they asked (this device's clock). */
+  at: number
+  /** The round the move was made in: only a move of the round being played is taken back. */
+  round: number
+  /** What is taken back, in a few words (the move's first log line). */
+  what: string
+  /** Player number → their vote. */
+  votes?: Record<string, boolean>
+  /** How it ended (unset while it is open): taken back, refused, or no longer possible. */
+  result?: 'yes' | 'no' | 'failed'
+  /** When it ended. */
+  doneAt?: number
+}
+
+/**
+ * The move slot an undo takes (Room.restore): no action, only a mark that the game went back. Every
+ * device stops replaying there and waits for the checkpoint written with it.
+ */
+export const UNDO_MARK = { t: 'undo' } as const
+export const isUndoMark = (a: unknown) => !!a && (a as { t?: string }).t === UNDO_MARK.t
 
 /** A move's slot name: zero-padded so the database sorts them in the order they were played. */
 export function moveKey(n: number): string {
@@ -196,6 +226,12 @@ export interface Room {
    * drop it (someone else got there first and it is no longer this player's to make).
    */
   sendMove(fn: (cur: GameState | null) => Action | null): Promise<boolean>
+  /**
+   * Take the game back to an earlier state (an undo the room voted for): `fn` sees the room's latest
+   * state and returns the one to go back to, or null to give up. It takes the next move slot (with
+   * UNDO_MARK), so no move races it, then writes the state as a new checkpoint.
+   */
+  restore(fn: (cur: GameState | null) => GameState | null): Promise<boolean>
   /** Remove the game (the host ends it; the room stays). */
   resetGame(): Promise<void>
   /** Atomically update the rest of the room (lobby, seats, picks). */

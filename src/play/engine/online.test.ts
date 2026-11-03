@@ -5,6 +5,8 @@ import { actorsOf, handsToPlan, mayAct, playerOfSurvivor } from './seats'
 import type { Action, GameState, MoveCard } from './types'
 import { isQuestion, timeoutActions } from '../online/timeout'
 import { DEFAULT_SETTINGS, timeFor } from '../online/settings'
+import { tally, undoVoters } from '../online/undoRules'
+import type { RoomData, UndoVote } from '../online/transport'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from '../online/logArchive'
 
 const config = (seed = 1, players: GameConfig['players'] = 5): GameConfig => ({
@@ -470,5 +472,41 @@ describe('turn timer (room settings): what runs out of time answers', () => {
     st = apply(st, { t: 'perk', perk: 'crowd_control', use: false })
     expect(isQuestion(st)).toBe(false)
     expect(timeFor(s, isQuestion(st))).toBe(90)
+  })
+})
+
+describe('undo by vote (online house rule)', () => {
+  /** A room of 5 players: the killer and four survivor players; `bots`: seats the computer plays. */
+  const room = (bots: number[] = [], gone: number[] = []): RoomData =>
+    ({
+      players: 5,
+      seats: Object.fromEntries([1, 2, 3, 4, 5].map((p) => [String(p), { id: `id${p}`, name: `P${p}`, ...(bots.includes(p) ? { bot: true } : {}) }])),
+      dropped: Object.fromEntries(gone.map((p) => [`id${p}`, 1])),
+    }) as unknown as RoomData
+  const vote = (by: number, votes: Record<number, boolean>): UndoVote => ({ by, at: 0, round: 1, what: '', votes: Object.fromEntries(Object.entries(votes)) })
+
+  it('the killer asks: more than half of the survivor players must say yes', () => {
+    const d = room()
+    expect(undoVoters(d, 1)).toEqual([2, 3, 4, 5])
+    expect(tally(d, vote(1, { 2: true, 3: true })).decided).toBe(null)
+    expect(tally(d, vote(1, { 2: true, 3: true, 4: true })).decided).toBe('yes')
+    // half or less is a no: two against settles it
+    expect(tally(d, vote(1, { 2: true, 3: true, 4: false, 5: false })).decided).toBe('no')
+    expect(tally(d, vote(1, { 2: false, 3: false })).decided).toBe('no')
+  })
+
+  it('a survivor player asks: the killer decides', () => {
+    const d = room()
+    expect(undoVoters(d, 3)).toEqual([1])
+    expect(tally(d, vote(3, {})).decided).toBe(null)
+    expect(tally(d, vote(3, { 1: true })).decided).toBe('yes')
+    expect(tally(d, vote(3, { 1: false })).decided).toBe('no')
+  })
+
+  it('bots and players whose connection is gone do not vote; nobody to ask is a yes', () => {
+    const d = room([4, 5], [3])
+    expect(undoVoters(d, 1)).toEqual([2])
+    expect(tally(d, vote(1, { 2: true })).decided).toBe('yes')
+    expect(tally(room([1]), vote(2, {})).decided).toBe('yes')
   })
 })

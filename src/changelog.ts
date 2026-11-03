@@ -12,6 +12,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.31.0',
+    date: '2026-11-04',
+    items: [
+      'ออนไลน์: ปุ่ม "↶ ขอย้อน" ขอย้อนการกระทำล่าสุดของตัวเองในรอบนี้ — อีกฝั่งโหวต (Killer ขอ: Survivor ต้องเห็นด้วยเกินครึ่ง, Survivor ขอ: Killer ตัดสิน) ระหว่างโหวตเกมหยุดไว้ 30 วิ',
+      'พับ Pallet ลงบนเส้นทางที่มี ▲ ของ การสลายตัว (Dissolution) ไม่ได้แล้ว',
+      'วาง Entity ทับเส้นทางที่มี Pallet ได้แล้ว (Bamboozle, Claustrophobia)',
+    ],
+  },
+  {
     version: '1.30.3',
     date: '2026-11-03',
     items: [

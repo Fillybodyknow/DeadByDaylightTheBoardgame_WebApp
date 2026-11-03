@@ -94,6 +94,43 @@ describe('replay: recording an online game', () => {
   }, 120_000)
 })
 
+describe('replay: an undo the room voted for', () => {
+  it('cuts the record back to the state the game went back to, and records on from there', () => {
+    const g = game(6)
+    // moves 1–40 as usual (a checkpoint after 25), then an undo back to the state after 36: the
+    // room's next slot (41) is the undo's, and its checkpoint is that state
+    const states = [g.start]
+    for (const a of g.moves) states.push(tryApply(states[states.length - 1], a)!)
+    emit('UNDO', g.start, 0, g.start, [])
+    for (let n = 1; n <= 25; n++) emit('UNDO', states[n], 0, g.start, g.moves.slice(0, n))
+    emit('UNDO', states[25], 25, states[25], [])
+    for (let n = 26; n <= 40; n++) emit('UNDO', states[n], 25, states[25], g.moves.slice(25, n))
+    emit('UNDO', states[36], 41, states[36], [])
+    // the game goes on from there with the same moves (one more checkpoint on the way)
+    const rest = g.moves.slice(36)
+    let base = 41
+    let cp = states[36]
+    let pending: Action[] = []
+    for (let i = 0; i < rest.length; i++) {
+      pending = [...pending, rest[i]]
+      emit('UNDO', states[37 + i], base, cp, pending)
+      if (pending.length >= CHECKPOINT_EVERY) {
+        base += pending.length
+        cp = states[37 + i]
+        pending = []
+        emit('UNDO', cp, base, cp, [])
+      }
+    }
+    // the room counted the undone moves and the undo's slot: 5 more than the game's moves
+    expect(replayFor('UNDO', g.final, g.moves.length)).toBeNull()
+    const r = replayFor('UNDO', g.final, g.moves.length + 5)
+    expect(r?.from).toBe(0)
+    expect(r!.moves).toHaveLength(g.moves.length)
+    expect(endsAt(new Playback(r!).end, g.final)).toBe(true)
+    dropTrail('UNDO')
+  }, 120_000)
+})
+
 describe('replay: watching', () => {
   it('gives every state, stepping on, back and jumping, as playing it all through does', () => {
     const g = game(5)

@@ -30,6 +30,30 @@ interface Trail extends Replay {
   rng: number
   /** Last written (ms), for dropping records of games that never ended. */
   at: number
+  /**
+   * Move numbers the room used that the record doesn't hold: moves taken back by an undo, and the
+   * undo's own slot (online/undo.ts). The record's moves after the last undo are numbered past them.
+   */
+  gap?: number
+}
+
+/** The room's number of the record's last move (its moves, and the ones an undo took back). */
+const endOf = (t: Trail) => t.from + (t.gap ?? 0) + t.moves.length
+
+/**
+ * An undo: a checkpoint that is a state the record went through (the earliest of the latest, as
+ * undos only go back within a round). The record is cut back to it, and the move numbers it skips
+ * are counted; false when the checkpoint is no state of the record.
+ */
+function undone(t: Trail, base: number, checkpoint: GameState): boolean {
+  const states = replayStates(t)
+  for (let i = states.length - 1; i >= 0; i--) {
+    if (!sameState(states[i], checkpoint)) continue
+    t.moves.length = i
+    t.gap = base - t.from - i
+    return true
+  }
+  return false
 }
 
 /**
@@ -234,9 +258,13 @@ function save() {
 /** A record of this game stored before (a reload in the middle of it): the moves before `t`'s first state. */
 async function resume(t: Trail) {
   const old = await readTrail(t.room).catch(() => undefined)
-  if (cur !== t || !old || old.game !== t.game || old.from > t.from || old.from + old.moves.length < t.from) return
-  t.moves = [...old.moves.slice(0, t.from - old.from), ...t.moves]
+  if (cur !== t || !old || old.game !== t.game || old.from > t.from || endOf(old) < t.from) return
+  // the old record's moves before t's first state (an undo since its last move: none of it fits)
+  const keep = t.from - old.from - (old.gap ?? 0)
+  if (keep < 0) return
+  t.moves = [...old.moves.slice(0, keep), ...t.moves]
   t.from = old.from
+  t.gap = old.gap
   t.start = old.start
   t.rng = old.rng
   save()
@@ -260,17 +288,17 @@ export function recordTrail(room: string, data: RoomData | null) {
     if (cur && cur.room !== room) write(cur)
     cur = fresh(room, trail.base, start)
     if (trail.base > 0) void resume(cur)
-  } else if (trail.base > cur!.from + cur!.moves.length) {
-    // moves missed: the one that made the checkpoint is found again; more (away past a
-    // checkpoint), and the record starts again from the checkpoint there is
-    const end = cur!.from + cur!.moves.length
+  } else if (trail.base > endOf(cur!)) {
+    // moves missed: the one that made the checkpoint is found again; an undo goes back to a state
+    // the record holds; more (away past a checkpoint), and the record starts again from there
+    const end = endOf(cur!)
     const before = seen?.room === room && seen.at === end ? seen.st : null
-    if (trail.base > end + 1 || !bridge(cur!, start, before)) cur = fresh(room, trail.base, start)
+    if (!(trail.base === end + 1 && bridge(cur!, start, before)) && !undone(cur!, trail.base, start)) cur = fresh(room, trail.base, start)
   }
   const t = cur!
   trail.moves.forEach((a, i) => {
     // move number trail.base + i + 1, at this place in the record (a slot replaced after a race is taken again)
-    const at = trail.base + i - t.from
+    const at = trail.base + i - t.from - (t.gap ?? 0)
     if (at >= 0 && at <= t.moves.length) t.moves[at] = toRaw(a)
   })
   seen = { room, at: trail.base + trail.moves.length, st: toRaw(data.game) }
@@ -284,7 +312,7 @@ export function recordTrail(room: string, data: RoomData | null) {
  */
 export function replayFor(room: string, final: GameState, rev: number): Replay | null {
   const t = cur
-  if (!t || t.room !== room || t.game !== gameId(final) || t.from + t.moves.length !== rev) return null
+  if (!t || t.room !== room || t.game !== gameId(final) || endOf(t) !== rev) return null
   return { from: t.from, start: t.start, moves: [...t.moves] }
 }
 

@@ -677,10 +677,18 @@ function blocked(st: GameState, path: string): boolean {
   return pathState(st, path).wall || entityOn(st, { path })
 }
 
-/** A path with nothing on it: no wall, pallet, bear trap or entity token. */
-function pathFree(st: GameState, path: string): boolean {
+/** Nothing on the path in the way: no wall, pallet, bear trap or entity token. */
+function pathClear(st: GameState, path: string): boolean {
   const ps = pathState(st, path)
   return !ps.wall && !ps.trap && !palletOn(st, path) && !entityOn(st, { path }) && st.evadedWall !== path
+}
+
+/**
+ * A path with nothing on it, to put something there (a pallet dropped: "no other component", the
+ * Pallet card): clear, and no Dissolution ▲ on its icon either.
+ */
+function pathFree(st: GameState, path: string): boolean {
+  return pathClear(st, path) && tokenOf(boardOf(st), path) !== st.dissolution
 }
 
 export function gatesPowered(st: GameState): boolean {
@@ -3446,7 +3454,7 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // a repair succeeded: the Entity onto any path's icon, as Bamboozle's (but for survivors only)
       if (w.k !== 'repaired') return []
       const tokens = new Set(boardOf(st).paths.map((p) => tokenOf(boardOf(st), p.id)))
-      return [...tokens].filter((t) => !pathState(st, t).wall && !palletOn(st, t)).map((path) => ({ path }))
+      return [...tokens].filter((t) => !pathState(st, t).wall).map((path) => ({ path }))
     }
     case 'distressing':
       // a survivor walked into a room with a locker: into the locker they go
@@ -3853,10 +3861,10 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     case 'coulrophobia':
       return w.k === 'preEnter' ? NONE : []
     case 'bamboozle': {
-      // the Entity on a path's icon (a fork is one), not on a wall already or under a pallet
+      // the Entity on a path's icon (a fork is one), not on a wall already (over a pallet it may go)
       if (w.k !== 'planningStart') return []
       const tokens = new Set(boardOf(st).paths.map((p) => tokenOf(boardOf(st), p.id)))
-      return [...tokens].filter((t) => !pathState(st, t).wall && !palletOn(st, t)).map((path) => ({ path }))
+      return [...tokens].filter((t) => !pathState(st, t).wall).map((path) => ({ path }))
     }
     case 'pop_goes_the_weasel': {
       // after a wound (an attack) or a hanging: a crow, a chest or an empty locker next door
@@ -5446,7 +5454,7 @@ export function powerOptions(st: GameState): KillerInteraction[] {
       const out: KillerInteraction[] = []
       for (const card of new Set(k.hand)) {
         if (!isPathCard(card)) continue
-        for (const e of exits(st, k.room, card)) if (pathFree(st, e.path.id)) out.push({ k: 'chainsaw', card, path: e.path.id })
+        for (const e of exits(st, k.room, card)) if (pathClear(st, e.path.id)) out.push({ k: 'chainsaw', card, path: e.path.id })
       }
       return out
     }
