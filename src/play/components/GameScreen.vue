@@ -95,6 +95,23 @@ watch(view, () => {
 /** The dice of a roll that waited for a decision, already shown on screen. */
 let pendingShown: string | null = null
 
+/**
+ * A roll waiting on a decision before it counts: a re-roll's (Iron Will, a key, Bond: the `roll`
+ * step), or one a perk is offered on as rolled (Jolt: an offer in the `rolled` window).
+ */
+function pendingRoll(st: GameState): { dice: Die[]; s: number; ctx: RollContext['k']; prop?: string; target?: number; keep?: boolean } | null {
+  const step = st.step
+  if (step.t === 'roll')
+    return { dice: step.dice, s: step.ctx.s, ctx: step.ctx.k, prop: 'prop' in step.ctx ? step.ctx.prop : undefined, target: 'target' in step.ctx ? step.ctx.target : undefined, keep: !!step.keep }
+  if (step.t === 'offer' && step.w.k === 'rolled') {
+    // the roll's own context (its prop or target) waits in the queue, to count when settled
+    const task = st.queue.find((t) => t.k === 'settleRoll')
+    const ctx = task?.k === 'settleRoll' ? task.ctx : null
+    return { dice: step.w.dice, s: step.w.s, ctx: step.w.ctx, prop: ctx && 'prop' in ctx ? ctx.prop : undefined, target: ctx && 'target' in ctx ? ctx.target : undefined }
+  }
+  return null
+}
+
 watch(
   () => props.st,
   (st, prev) => {
@@ -173,23 +190,23 @@ watch(
     const leftover = casts.leftover()
     if (leftover) showAction(leftover)
     for (const r of rushes) showRush(r)
-    // A roll waiting on a decision (Iron Will, a key, Bond): roll it on screen first, then ask.
-    const step = st.step
-    if (step.t === 'roll') {
-      const sig = JSON.stringify(step.dice)
+    // A roll waiting on a decision (Iron Will, a key, Bond, Jolt): roll it on screen first, then ask.
+    const pending = pendingRoll(st)
+    if (pending) {
+      const sig = JSON.stringify(pending.dice)
       if (sig !== pendingShown) {
         pendingShown = sig
-        const res = step.keep ? { outcome: 'พันธะ — เลือกเก็บ 1 ลูก', tone: 'good' as const } : diceResult(step.ctx.k, step.dice)
+        const res = pending.keep ? { outcome: 'พันธะ — เลือกเก็บ 1 ลูก', tone: 'good' as const } : diceResult(pending.ctx, pending.dice)
         showDice({
-          dice: step.dice,
-          title: st.survivors[step.ctx.s].name,
+          dice: pending.dice,
+          title: st.survivors[pending.s].name,
           outcome: `${res.outcome} — รอการตัดสินใจ`,
           tone: res.tone,
-          ...skillCheck(step.ctx.k, step.dice, rollProgress(st, step.ctx.k, 'prop' in step.ctx ? step.ctx.prop : undefined, [])),
-          icon: rollIcon(st, step.ctx.k, step.ctx.s, 'target' in step.ctx ? step.ctx.target : undefined),
+          ...skillCheck(pending.ctx, pending.dice, rollProgress(st, pending.ctx, pending.prop, [])),
+          icon: rollIcon(st, pending.ctx, pending.s, pending.target),
         })
       }
-    } else if (prev.step.t !== 'roll') pendingShown = null
+    } else if (!pendingRoll(prev)) pendingShown = null
     if (!fx.perks.length && !fx.dice.length && !fx.finale) view.value = st
   },
 )

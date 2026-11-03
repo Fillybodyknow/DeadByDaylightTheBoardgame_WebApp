@@ -12,6 +12,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.31.1',
+    date: '2026-11-04',
+    items: ['ไฟกระชาก (Jolt): ลูกเต๋าทอยให้เห็นก่อน แล้วฆาตกรค่อยถูกถามว่าจะใช้ไหม'],
+  },
+  {
     version: '1.31.0',
     date: '2026-11-04',
     items: [
