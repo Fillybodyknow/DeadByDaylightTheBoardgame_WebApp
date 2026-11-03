@@ -499,7 +499,11 @@ export type Step =
   /** `free`: Slipstream's bonus turn — no ▲, and taken. */
   | { t: 'killerBonusOffer'; free?: boolean }
   | { t: 'carryDice'; s: number }
-  | { t: 'carryMove'; s: number; steps: number }
+  /**
+   * `hang`: out of steps on a free hook, hanging them is all that is left — a step of its own, so
+   * the screen shows the walk there before the hanging (games with `hangPause`).
+   */
+  | { t: 'carryMove'; s: number; steps: number; hang?: boolean }
   /** A survivor may discard an item to stop what the killer is doing. */
   /** `carry`: the killer is carrying survivor `s` with `steps` left (a Firecracker costs him the step). */
   /**
@@ -868,6 +872,12 @@ export interface GameState {
    * Secret: the screens hide it from the survivors.
    */
   redeemer?: MoveCard | null
+  /**
+   * Games from 1.30.3 on: carried onto a free hook out of steps, the hanging waits as a step of its
+   * own (`carryMove`'s `hang`). Without it (games, rooms and replays from before) it follows the
+   * move at once, as their recorded moves have it.
+   */
+  hangPause?: boolean
   /** Power Struggle: the killer can't interact after moving with their first card this round. */
   struggle?: boolean
   /** …that card's turn: the first, or for The Unknown the card of the Unknown in the survivor's room. */

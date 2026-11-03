@@ -211,6 +211,11 @@ export function legalActions(st: GameState): Action[] {
       if (hookHere(st)) out.push({ t: 'hang' })
       break
     case 'carryMove':
+      // out of steps on a free hook: only the hanging
+      if (step.hang) {
+        out.push({ t: 'hang' })
+        break
+      }
       for (const m of carryMoves(st)) out.push({ t: 'move', path: m.path.id })
       out.push({ t: 'stop' })
       if (hookHere(st)) out.push({ t: 'hang' })

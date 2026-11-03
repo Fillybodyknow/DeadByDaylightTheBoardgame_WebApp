@@ -389,7 +389,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       add(`room:${st.killer.room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
       break
     case 'carryMove':
-      moves(carryMoves(st), st.killer.room)
+      // (out of steps on a free hook: only the hook, below)
+      if (!s.hang) moves(carryMoves(st), st.killer.room)
       hookSpot(st, add)
       break
     case 'carryDice':

@@ -164,7 +164,7 @@ const moves = computed(() => {
   if (s.t === 'killerMove') return killerMoves(st, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   if (s.t === 'reignPath') return survivorMoves(st, s.s, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.survivors[s.s].room) }))
   if (s.t === 'killerAnyMove') return antidoteKillerMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
-  if (s.t === 'carryMove') return carryMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
+  if (s.t === 'carryMove' && !s.hang) return carryMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   return []
 })
 
@@ -864,6 +864,11 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </div>
     </template>
 
+    <!-- out of steps on a free hook: the hanging, pressed by itself once the walk there has shown -->
+    <template v-else-if="step.t === 'carryMove' && step.hang">
+      <p>แบก {{ st.survivors[step.s].name }} มาถึง Hook ว่าง — แขวน</p>
+      <button class="primary" @click="act({ t: 'hang' })">แขวนที่ Hook ในห้องนี้</button>
+    </template>
     <template v-else-if="step.t === 'carryMove'">
       <p>
         แบก {{ st.survivors[step.s].name }} — เดินได้อีก {{ step.steps }} ช่อง (ห้ามผ่าน Pallet / กำแพง) ถ้าเดินครบแล้วจบที่ห้องมี Hook ว่างจะแขวนทันที

@@ -1285,6 +1285,19 @@ function toggleFullscreen() {
 const settled = computed(() => view.value === props.st && !fxBusy.value && summaryRound.value === null && !fx.starts && !fx.offerings)
 watch(settled, (on) => emit('settled', on), { immediate: true })
 
+// Carried onto a free hook out of steps: the hanging is all that is left (the rulebook's "hang at
+// once", p.18). It waits as a step of its own so the walk there shows first; this device answers
+// it by itself once that has shown (if it plays the killer: `dispatch` refuses anyone else).
+let hangTimer: number | null = null
+watch(
+  () => settled.value && props.st.step.t === 'carryMove' && props.st.step.hang === true && !replaying.value,
+  (due) => {
+    if (hangTimer !== null) clearTimeout(hangTimer)
+    hangTimer = due ? window.setTimeout(() => ((hangTimer = null), dispatch({ t: 'hang' })), anim(250)) : null
+  },
+)
+onBeforeUnmount(() => hangTimer !== null && clearTimeout(hangTimer))
+
 function leave() {
   if (replaying.value) return replaying.value.exit()
   if (online.value) {

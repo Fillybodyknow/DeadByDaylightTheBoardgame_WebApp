@@ -396,6 +396,9 @@ Entity speaking (`src/play/tutorial/`). The list has a tab per side (remembered 
   4 ▲ bonus turn, crow bonus turns, cleanup.
 - Every survivor and killer interaction, carrying to a hook (1–4 dice), rescues, lockers,
   pallets, walls, exit gates, both win conditions.
+  Carried onto a free hook with no steps left, the game waits a beat (`carryMove` with
+  `hang`, games with `hangPause`) so the walk shows before the hanging; the screen hangs
+  by itself once the board is still.
 - All 10 items, including key re-rolls and the Flashlight / Firecracker reactions.
 
 ### How perks are used
@@ -473,6 +476,10 @@ host seats them in the lobby, and the host's device plays them.
     looked free, and wasn't (61 uses in 32 games). With it among the choices, every choice is
     played on to the end of his round, Slipstream's bonus card picked by the best room it reaches
     (each card played out took a decision up to 1.5 s; this way 0.8 s). 32 games: 252 uses, won 5 (4).
+  - The Nurse's blink with a card still set this round is played on to the end of the round: to the
+    end of the turn, a blink onto a survivor looked best, and the next card then took her away again
+    (or nowhere). 24 games (MacMillan and Autohaven): of 74 blinks on the first turn, 35 left her with
+    nobody to attack on the second; now 6 of 88. Hooks 51 → 74, won 8 → 13.
   - A locker is safe but gets nothing done: the work still waits, scored from the locker's room.
   - A prop to reveal is picked by its colour in the rulebook's order: survivors objective,
     survival, altruism, boldness (the generators first); the killer boldness first. With the

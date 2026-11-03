@@ -563,7 +563,11 @@ function tried(st: GameState, acts: Action[], killer: boolean): { a: Action; v: 
   const turn = killer && !playingOn && 'turn' in step ? step.turn : null
   // Slipstream trades the turns still set for a bonus turn with any card: only the rest of his
   // round, both ways, shows which is better (to the end of this turn it looked free)
-  const round = turn !== null && acts.some((a) => a.t === 'interact' && a.i.k === 'slipstream')
+  // The Nurse's blink with a card still set this round: that card is played from where the blink
+  // takes him, so only the rest of the round shows what the blink is worth (to the end of this turn
+  // a blink onto a survivor looked best, and the next card then took him away again, or nowhere)
+  const cardLeft = st.killer.revealedCount < st.killer.planned.length
+  const round = turn !== null && acts.some((a) => a.t === 'interact' && (a.i.k === 'slipstream' || (a.i.k === 'blink' && cardLeft)))
   return acts.map((a, i) => {
     const samples: { v: number; step: string }[] = []
     // an interaction mostly rolls dice (a move may lead to one): enough tries that a run of bad

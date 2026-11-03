@@ -238,6 +238,7 @@ export function createGame(config: GameConfig): GameState {
 
   const st: GameState = {
     version: 3,
+    hangPause: true,
     board: board.id,
     round: 1,
     phase: 'setup',
@@ -1462,6 +1463,7 @@ function handle(st: GameState, a: Action) {
       return
     }
     case 'carryMove': {
+      if (step.hang && a.t !== 'hang') fail('out of steps on a free hook: he hangs them')
       if (a.t === 'stop') return carryEscape(st, step.s)
       if (a.t === 'hang') return hang(st, step.s, usableHook(st, st.killer.room) ?? fail('no free hook here'))
       if (a.t !== 'move') break
@@ -2675,8 +2677,10 @@ function carryStep(st: GameState, s: number, steps: number, path: string, to: st
 
 function carryArrive(st: GameState, s: number, steps: number) {
   const hook = usableHook(st, st.killer.room)
-  // Out of steps (or nowhere to go) on a free hook: hang. With steps left the killer chooses.
-  if (hook && (steps <= 0 || carryMoves(st).length === 0)) return hang(st, s, hook)
+  // Out of steps (or nowhere to go) on a free hook: hang. With steps left the killer chooses. The
+  // hanging is a step of its own (`hangPause`), answered at once by the screen once the walk there
+  // has shown, so the hanging's card doesn't come before the walk.
+  if (hook && (steps <= 0 || carryMoves(st).length === 0)) return st.hangPause ? wait(st, { t: 'carryMove', s, steps: 0, hang: true }) : hang(st, s, hook)
   if (!hook && (steps <= 0 || carryMoves(st).length === 0)) return carryEscape(st, s)
   wait(st, { t: 'carryMove', s, steps })
 }

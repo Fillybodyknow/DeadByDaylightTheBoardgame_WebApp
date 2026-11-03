@@ -358,8 +358,19 @@ describe('attack and sacrifice', () => {
     const carried = findOutcome(make, (s) => s.step.t === 'carryMove')
     let after = apply(carried, { t: 'move', path: 'p1' })
     while (after.step.t === 'revealProp') after = apply(after, legalActions(after)[0])
+    // out of steps on a free hook: the hanging is a step of its own (the screen shows the walk
+    // first, then answers it), and nothing else may be done there
+    expect(after.step).toEqual({ t: 'carryMove', s: 2, steps: 0, hang: true })
+    expect(legalActions(after)).toEqual([{ t: 'hang' }])
+    expect(() => apply(after, { t: 'stop' })).toThrow()
+    expect(after.survivors[2].status).toBe('carried')
+    after = apply(after, { t: 'hang' })
     expect(after.survivors[2].status).toBe('hooked')
     expect(after.sacrifice).toBe(1)
+    // a game from before (no hangPause: its recorded moves, a replay, a room) hangs them at once
+    let old = apply({ ...carried, hangPause: undefined }, { t: 'move', path: 'p1' })
+    while (old.step.t === 'revealProp') old = apply(old, legalActions(old)[0])
+    expect(old.survivors[2].status).toBe('hooked')
     // Finish the killer's turns: cleanup adds 1 for the hooked survivor.
     while (after.phase === 'killer') {
       const a = legalActions(after).find((x) => x.t === 'endTurn' || x.t === 'declineBonus' || x.t === 'move') ?? legalActions(after)[0]
