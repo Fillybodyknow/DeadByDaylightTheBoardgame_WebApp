@@ -3116,9 +3116,9 @@ describe('The Unknown', () => {
       return r
     }
 
-    it('Diversion: sends the Unknown in the survivor\'s room, not Unknown 1', () => {
+    it('Diversion: may send the Unknown in the survivor\'s room, and only that one goes', () => {
       const { st, second, far } = nextToSecond('diversion')
-      const i = survivorInteractions(st, 0).find((x) => x.k === 'diversion')!
+      const i = survivorInteractions(st, 0).find((x) => x.k === 'diversion' && x.unknown === 1)!
       expect(i).toBeDefined()
       const p = touchingPaths(st, second).find((x) => x.id === (i as { path: string }).path)!
       const dest = p.a === second ? p.b : p.a
@@ -3236,11 +3236,26 @@ describe('The Unknown', () => {
       const { st, second, far } = nextToSecond('diversion')
       st.killer.unknowns = [far, second, second, null]
       const opts = survivorInteractions(st, 0).filter((x) => x.k === 'diversion') as { k: 'diversion'; path: string; unknown?: number }[]
-      expect(new Set(opts.map((x) => x.unknown))).toEqual(new Set([1, 2]))
+      // Unknown 1 too, from its own room far away (the designers' ruling)
+      expect(new Set(opts.map((x) => x.unknown))).toEqual(new Set([0, 1, 2]))
       const i = opts.find((x) => x.unknown === 2)!
       const p = touchingPaths(st, second).find((x) => x.id === i.path)!
       const g = apply(st, { t: 'interact', i })
       expect(unknownRooms(g)).toEqual([far, second, p.a === second ? p.b : p.a, null])
+    })
+
+    it('Diversion: interacting with Unknown 2, Adam may send an Unknown in another room, along its own paths', () => {
+      const { st, second, far } = nextToSecond('diversion')
+      const opts = survivorInteractions(st, 0).filter((x) => x.k === 'diversion') as { k: 'diversion'; path: string; unknown?: number }[]
+      const away = opts.filter((x) => x.unknown === 0)
+      expect(away.length).toBeGreaterThan(0)
+      const own = touchingPaths(st, far).map((p) => p.id)
+      expect(away.every((x) => own.includes(x.path))).toBe(true)
+      const i = away[0]
+      const p = touchingPaths(st, far).find((x) => x.id === i.path)!
+      const g = settle(apply(st, { t: 'interact', i }))
+      expect(unknownRooms(g)).toEqual([p.a === far ? p.b : p.a, second, null, null])
+      expect(g.killer.unknownAt ?? 0).toBe(0)
     })
 
     it('Beast of Prey: any Unknown may take the move, along a path out of its own room', () => {
@@ -3308,6 +3323,43 @@ describe('The Unknown', () => {
       expect(g.props.find((p) => p.id === pallet.id)!.removed).toBe(true)
       expect(unknownRooms(g)).toEqual([vault.b, second, null, null])
       expect(g.step).toMatchObject({ t: 'killerInteract', turn: 0, canInteract: true })
+    })
+
+    it('Unrelenting: another Unknown takes the second survivor, in its own room', () => {
+      const { st, second, far } = twoUnknowns('unrelenting')
+      Object.assign(st.survivors[2], { room: far, wounded: true })
+      st.phase = 'killer'
+      const w = { k: 'afterKillerInteract', turn: 0, target: 2 } as const
+      // Unknown 1 hit survivor 2 in its room; survivor 0 stands with Unknown 2
+      const c = perkChoices(st, 'unrelenting', 'killer', w).find((x) => x.target === 0)!
+      expect(c).toEqual({ target: 0, index: 1 })
+      st.step = { t: 'offer', perk: 'unrelenting', owner: 'killer', w }
+      // (a stop before the turn ends: the next turn is Unknown 2's own)
+      st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+      const g = apply(st, { t: 'perk', perk: 'unrelenting', use: true, choice: c })
+      expect(g.survivors[0].wounded).toBe(true)
+      expect(g.step).toMatchObject({ t: 'killerInteract', turn: 0 })
+      // the Unknown playing the turn takes it back
+      expect(g.killer.unknownAt ?? 0).toBe(0)
+      expect(unknownRooms(g)).toEqual([far, second, null, null])
+    })
+
+    it('Unrelenting: another Unknown picking up carries from its room, then hands the turn back', () => {
+      const { st, second, far } = twoUnknowns('unrelenting')
+      Object.assign(st.survivors[0], { wounded: true, woundedThisRound: false })
+      st.props.forEach((p) => p.kind === 'hook' && p.room === second && (p.removed = true))
+      st.phase = 'killer'
+      const w = { k: 'afterKillerInteract', turn: 0, target: 1 } as const
+      st.step = { t: 'offer', perk: 'unrelenting', owner: 'killer', w }
+      st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+      let g = apply(st, { t: 'perk', perk: 'unrelenting', use: true, choice: { target: 0, index: 1 } })
+      expect(g.survivors[0]).toMatchObject({ status: 'carried', room: second })
+      // Unknown 2 carries until the carry is over; only then is the turn Unknown 1's again
+      expect(g.killer).toMatchObject({ unknownAt: 1, room: second })
+      for (let n = 0; n < 20 && g.step.t !== 'killerInteract'; n++) g = apply(g, legalActions(g)[0])
+      expect(g.step).toMatchObject({ t: 'killerInteract', turn: 0 })
+      expect(g.killer.unknownAt ?? 0).toBe(0)
+      expect(g.killer.room).toBe(far)
     })
   })
 

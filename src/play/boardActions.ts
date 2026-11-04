@@ -406,10 +406,11 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       // Diversion, after clicking the killer: only his paths, each with the room it sends him to
       // (a fork asks which room next, as any move does)
       if (modes.diversion.value !== null) {
-        // (the killer in the survivor's room goes: for The Unknown, maybe not the one in `room`)
-        const from = st.survivors[s.s].room
+        // (the killer in the survivor's room goes; for The Unknown, the one picked, from its own room)
+        const u = modes.diversion.value
+        const from = u >= 0 ? (unknownRooms(st)[u] ?? st.survivors[s.s].room) : st.survivors[s.s].room
         for (const i of survivorInteractions(st, s.s)) {
-          if (i.k !== 'diversion' || (i.unknown ?? -1) !== modes.diversion.value) continue
+          if (i.k !== 'diversion' || (i.unknown ?? -1) !== u) continue
           add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select))
           const p = pathDef(st, i.path)
           out[out.length - 1].dest = p.a === from ? p.b : p.a
@@ -432,8 +433,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             add(spotOf(i), 'วิญญาณสงบ: ย้าย Crow (แล้วเลือกห้อง)', () => ((modes.calmCrow.value = i.prop), sfx.click()))
           } else if (i.k === 'diversion') {
             // Diversion: the killer first, then his paths (in its own mode, above). Once, however
-            // many paths; with Power Struggle on him too, a click asks which. The Unknown, with
-            // several in the room: each mini sends itself.
+            // many paths; with Power Struggle on him too, a click asks which. The Unknown: every
+            // mini on the board sends itself (any of them may be the one sent).
             const name = `${PERKS.diversion.name}: ส่ง`
             const spot = i.unknown === undefined ? killerSpot : unknownSpot(st, i.unknown)
             const who = i.unknown === undefined ? killerNameIn(st, st.survivors[s.s].room) : `The Unknown ${i.unknown + 1}`

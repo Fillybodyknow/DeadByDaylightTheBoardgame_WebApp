@@ -12,6 +12,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.32.1',
+    date: '2026-11-04',
+    items: [
+      'The Unknown: Unrelenting ให้ The Unknown ตัวไหนก็ได้โจมตีหรืออุ้มผู้รอดชีวิตอีกคนในห้องของตัวนั้นต่อ ไม่ใช่แค่ตัวที่เพิ่ง Interact',
+      'The Unknown: Diversion (Adam) ส่ง The Unknown ตัวไหนก็ได้บนกระดาน ไปตามเส้นทางออกจากห้องของตัวนั้น (ตามคำตอบของผู้ทำเกม)',
+    ],
+  },
+  {
     version: '1.32.0',
     date: '2026-11-04',
     items: [

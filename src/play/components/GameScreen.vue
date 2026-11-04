@@ -367,13 +367,14 @@ const boardFocus = computed(() => {
     const s = st.step
     const pick = diversion.value
     const paths = s.t === 'survivorInteract' ? survivorInteractions(st, s.s).flatMap((i) => (i.k === 'diversion' && (i.unknown ?? -1) === pick ? [i.path] : [])) : []
-    // from the survivor's room (The Unknown sent may not be the one standing for him)
-    const from = s.t === 'survivorInteract' ? st.survivors[s.s].room : st.killer.room
+    // from the survivor's room; for The Unknown, from the room of the one sent (any of them)
+    const own = s.t === 'survivorInteract' ? st.survivors[s.s].room : st.killer.room
+    const from = pick >= 0 ? (unknownRooms(st)[pick] ?? own) : own
     const dests = paths.map((id) => {
       const p = boardOf(st).paths.find((x) => x.id === id)!
       return p.a === from ? p.b : p.a
     })
-    return { survivors: [], killer: true, rooms: [st.killer.room], paths, dests }
+    return { survivors: [], killer: true, rooms: [from], paths, dests }
   }
   // A fork's icon was clicked: dim everything but the rooms it can lead to, so the two or three
   // choices stand out (the icon itself is one spot for all of them).

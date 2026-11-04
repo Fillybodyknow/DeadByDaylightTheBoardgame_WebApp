@@ -851,9 +851,12 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   He takes **no killer bonus turn** (the round starts with it spent, so no perk gives him one).
 - Every Unknown is "the Killer" (the user's call: always): whatever a survivor asks of the
   killer's room (Overzealous, Quick Gambit, Hubris, Distortion, Power Struggle, Diversion, the
-  terror radius and the chase music) counts any of them. A survivor's perk that sends the killer
-  somewhere (Diversion, Quick Gambit) sends the Unknown in that room; on the map such a perk is on
-  that Unknown's mini (`u<n>`, clickable then), its paths from the survivor's room. Power Struggle
+  terror radius and the chase music) counts any of them. Quick Gambit (the killer "moves with
+  you") sends the Unknown in that room; on the map such a perk is on that Unknown's mini (`u<n>`,
+  clickable then), its paths from the survivor's room. Diversion, with an Unknown in the room to
+  interact with, may send **any** Unknown, along a path out of its own room (the designers'
+  ruling, Discord, Nov 2026); every mini is clickable for it. Only an Unknown in the room can
+  "move with you" (Quick Gambit, Thrill of the Hunt): the same ruling. Power Struggle
   shows the card of the Unknown in the survivor's room (card n for Unknown n, before it is played)
   and that Unknown can't interact on its turn (`struggleTurn`). So do his own perks that
   ask where he is outside his own move (`killerRooms`, `nearKiller`): Unnerving Presence,
@@ -865,14 +868,15 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   Face the Darkness places a Guard around the Unknown whose turn it is). Bitter Murmur ("move
   again… before interacting") moves any Unknown, as Agitation (`index`), and the one playing the
   turn interacts after it: the designers' ruling (Discord, Nov 2026), the Unknown that triggers a
-  perk needn't be the one that uses it.
+  perk needn't be the one that uses it. So Unrelenting's second interaction is any Unknown's, on a
+  survivor in its own room (the user's call, from that ruling).
 - The Unknown and Flashlights (the designers' ruling: every Unknown being the Killer goes both
   ways): a survivor with a Flashlight in any Unknown's room may stop the one interacting, wherever
   it is. The Twins aren't so: Victor and Charlotte take turns being the Killer.
-- The Unknown, more rulings (the user's): a perk that makes "the killer" in a room follow or go
-  (Thrill of the Hunt, Quick Gambit, Diversion) takes the Unknown standing there, and with several
-  there **its user picks which** (`index` on the choice, `unknown` on Diversion's interaction;
-  each Unknown's mini on the map). An Unknown moved by a perk in the middle of his turn (any of
+- The Unknown, more rulings (the user's): a perk that makes "the killer" in a room follow
+  (Thrill of the Hunt, Quick Gambit) takes the Unknown standing there, and with several
+  there **its user picks which** (`index` on the choice, as `unknown` picks Diversion's; each
+  Unknown's mini on the map). An Unknown moved by a perk in the middle of his turn (any of
   these, Unforeseen, Agitation) moves as the killer, its windows and reveals with it, and then the
   Unknown playing the turn takes it back (`asUnknown`, the `actAs` task). Hallucination's Unknown
   appearing is **not** "the killer enters a room": no Spine Chill, Quick & Quiet, Head On,
@@ -1202,7 +1206,8 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   (p.12), so this takes them out of their own turn.
 - Unrelenting: after he attacks or picks up a survivor, the same again on another survivor on the
   board in his room: an attack if they are healthy, a pick-up if they are wounded (not one wounded
-  this round, p.15).
+  this round, p.15). The Unknown: any Unknown, on a survivor in its own room (`index`); it
+  interacts as the killer (a carry included) and then the Unknown playing the turn takes it back.
 - Iron Grasp: his button on the struggle roll, before it settles: every skill-check die of that
   roll is rolled again (once a round, so once per struggle).
 - Insidious: when he would attack a healthy survivor and has not changed room this turn

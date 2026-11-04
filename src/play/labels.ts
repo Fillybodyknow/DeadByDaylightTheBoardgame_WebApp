@@ -194,8 +194,10 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
       return u < 0 ? `ดิ้นรนสุดพลัง: เปิดการ์ดใบแรกของ ${st.killer.name} (ฆาตกร +2 ▲)` : `ดิ้นรนสุดพลัง: เปิดการ์ดของ The Unknown ${u + 1} (ฆาตกร +2 ▲)`
     }
     case 'diversion': {
+      // (The Unknown: any of them, along a path out of its own room)
       const u = i.unknown ?? (st.killer.unknowns ? unknownRooms(st).indexOf(room) : -1)
-      return `หันเหความสนใจ: ส่ง ${u < 0 ? st.killer.name : `The Unknown ${u + 1}`} ไปทาง ${pathLabel(st, i.path, room)} (ฆาตกร +1 ▲)`
+      const from = u < 0 ? room : (unknownRooms(st)[u] ?? room)
+      return `หันเหความสนใจ: ส่ง ${u < 0 ? st.killer.name : `The Unknown ${u + 1}`} ไปทาง ${pathLabel(st, i.path, from)} (ฆาตกร +1 ▲)`
     }
   }
 }
@@ -700,7 +702,7 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     case 'distressing':
       return `${name(c.target!)} ต้องซ่อนใน Locker`
     case 'unrelenting':
-      return `${st.survivors[c.target!].wounded ? 'อุ้ม' : 'โจมตี'} ${name(c.target!)} ต่อ`
+      return `${c.index !== undefined && st.killer.unknowns ? `The Unknown ${c.index + 1}: ` : ''}${st.survivors[c.target!].wounded ? 'อุ้ม' : 'โจมตี'} ${name(c.target!)} ต่อ`
     case 'iron_grasp':
       return 'ทอยเต๋า Skill Check ใหม่ทั้งหมด'
     case 'unbound':

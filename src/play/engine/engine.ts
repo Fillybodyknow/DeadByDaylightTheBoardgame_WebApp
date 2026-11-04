@@ -811,14 +811,13 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
   // Diversion (Adam): send the killer in this room along any path but one with a pallet (a wall
   // he breaks on the way, as on any move of his).
   // By the normal movement rules (the designer's ruling): not against a one-way (vault) path.
-  // The Unknown: with several of them in the room, each path once for each (which one goes).
+  // The Unknown: interacting with one in the room, any Unknown may be the one sent, along a path
+  // out of its own room (the designers' ruling, Discord, Nov 2026: every Unknown is the Killer).
   if (killerIn(st, sv.room) && victorRoom(st) !== sv.room && perkReady(st, s, 'diversion')) {
-    const here = st.killer.unknowns ? unknownsIn(st, sv.room) : []
-    for (const e of exits(st, sv.room, 'any')) {
-      if (palletOn(st, e.path.id)) continue
-      if (here.length > 1) for (const unknown of here) out.push({ k: 'diversion', path: e.path.id, unknown })
-      else out.push({ k: 'diversion', path: e.path.id })
-    }
+    const free = (room: string) => exits(st, room, 'any').filter((e) => !palletOn(st, e.path.id))
+    if (st.killer.unknowns)
+      unknownRooms(st).forEach((r, unknown) => r && free(r).forEach((e) => out.push({ k: 'diversion', path: e.path.id, unknown })))
+    else for (const e of free(sv.room)) out.push({ k: 'diversion', path: e.path.id })
   }
   return out
 }
@@ -2201,10 +2200,11 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       log(st, `${sv.name} ไล่ Victor ออกจากกระดาน`, s)
       return
     case 'diversion': {
-      // the killer in this room is sent off (The Unknown: the one there, or the one picked)
+      // the killer in this room is sent off (The Unknown: the one picked, from its own room)
       const unknown = i.unknown ?? followerIn(st, sv.room)
+      const from = unknown !== undefined ? (unknownRooms(st)[unknown] ?? sv.room) : sv.room
       const p = pathDef(st, i.path)
-      const to = p.a === sv.room ? p.b : p.a
+      const to = p.a === from ? p.b : p.a
       payPerk(st, s, 'diversion', `ส่ง ${unknownName(st, unknown)} ไป ${roomName(st, to)} (ฆาตกร +1 ▲)`)
       gainKiller(st, 1)
       return asUnknown(st, unknown, () => killerMovedBy(st, p, to))
@@ -3478,12 +3478,17 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // a survivor walked into a room with a locker: into the locker they go
       if (w.k !== 'entered' || st.survivors[w.s].status !== 'board') return []
       return propsIn(st, st.survivors[w.s].room).flatMap((p) => (p.kind === 'locker' && p.revealed && p.occupant === null ? [{ target: w.s, prop: p.id }] : []))
-    case 'unrelenting':
+    case 'unrelenting': {
       // after attacking or picking someone up: the same again on another survivor in his room
+      // (The Unknown: any Unknown, on a survivor in its own room, `index`; the designers' ruling
+      // that the Unknown triggering a perk needn't be the one using it)
       if (w.k !== 'afterKillerInteract' || w.target === undefined) return []
-      return onBoardIn(st, k.room)
-        .filter((t) => t !== w.target)
-        .flatMap((t) => (st.survivors[t].wounded ? (st.survivors[t].woundedThisRound ? [] : [{ target: t }]) : [{ target: t }]))
+      const target = w.target
+      const others = (room: string) =>
+        onBoardIn(st, room).filter((t) => t !== target && !(st.survivors[t].wounded && st.survivors[t].woundedThisRound))
+      if (k.unknowns) return unknownRooms(st).flatMap((r, index) => (r ? others(r).map((t) => ({ target: t, index })) : []))
+      return others(k.room).map((t) => ({ target: t }))
+    }
     case 'iron_grasp': {
       // a button on the struggle roll: every skill-check die is rolled again
       const step = st.step
@@ -4401,8 +4406,9 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     case 'unrelenting': {
       const { turn } = w as Extract<PerkWindow, { k: 'afterKillerInteract' }>
       const i: KillerInteraction = st.survivors[c.target!].wounded ? { k: 'pickUp', target: c.target! } : { k: 'attack', target: c.target! }
-      payPerk(st, o, perk, `${i.k === 'attack' ? 'โจมตี' : 'อุ้ม'} ${name(c.target!)} ต่ออีกคน`)
-      return killerActs(st, i, turn)
+      const who = k.unknowns && c.index !== undefined ? `The Unknown ${c.index + 1} ` : ''
+      payPerk(st, o, perk, `${who}${i.k === 'attack' ? 'โจมตี' : 'อุ้ม'} ${name(c.target!)} ต่ออีกคน`)
+      return asUnknown(st, c.index, () => killerActs(st, i, turn))
     }
     case 'iron_grasp': {
       payPerk(st, o, perk, 'ทอยเต๋า Skill Check ใหม่ทั้งหมด')
