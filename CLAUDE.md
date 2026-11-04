@@ -90,7 +90,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   tell the user. House rules (the user's own changes to the rules) go under House rules there.
 - **Bots** (`bot.ts`, `botMove(st, player)`): a seat the computer plays. It sees only what its
   player would: never face-down cards, hidden props or the dice to come (a choice is tried on a
-  copy with a fresh dice seed). No perks yet. Offline the players step marks bots
+  copy with a fresh dice seed). Perks are taught a killer at a time (`TAUGHT`, so far The
+  Trapper's), each checked in bot games (`src/play/README.md` → Bots); the rest are declined. Offline the players step marks bots
   (`GameState.bots`) and `play/bots.ts` drives them from `GameScreen`. Online the host seats them
   in the lobby (members with `bot: true`; places that mean people skip them; a bot killer's
   character is the host's pick on its seat, `pick`, or drawn) and the host's device

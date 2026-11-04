@@ -12,6 +12,11 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.34.0',
+    date: '2026-11-05',
+    items: ['บอท The Trapper ใช้ Perk ของตัวเองเป็นแล้ว: สัมผัสสยอง, กระสับกระส่าย และพละกำลังอำมหิต (ผลักคนบาดเจ็บลง Bear Trap ในเทิร์นสุดท้าย)'],
+  },
+  {
     version: '1.33.0',
     date: '2026-11-04',
     items: [

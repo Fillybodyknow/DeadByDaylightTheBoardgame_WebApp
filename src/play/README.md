@@ -559,7 +559,30 @@ host seats them in the lobby, and the host's device plays them.
     bot's own), and trying the power plays that guess out. Before, the guess was each card tried on
     the real game, which read the face-down card: right 5 times in 5, and he hardly used it (5 of
     101). 18 games: used 54 times of 73, guessed right 13 (1 in 4), hooks 51 → 60.
-- **Not yet:** perks (each offer is declined for the round), a key's re-roll.
+- **Perks** are taught a killer at a time (`TAUGHT` in `bot.ts`); every other perk is declined for
+  the round, and the survivors' all are. An offer of a taught perk is weighed like any choice: each
+  use and passing it up (to be asked again later in the round), played on the same dice 6 times to
+  the end of his round, and scored (`perkPick`). Inside a try he uses them plainly (`plainPerk`).
+  A use worth weighing at all is `worthTrying`. The Trapper's, measured in 128 games each
+  (MacMillan, every seat a bot):
+
+  | Perks used | Killer won | Hooks | Sacrifice from traps |
+  |---|---|---|---|
+  | none | 59% | 272 | 143 |
+  | Brutal Strength, any push | 53% | 204 | 272 |
+  | Brutal Strength, onto a trap only | 56% | 211 | 272 |
+  | Brutal Strength, onto a trap, last card only | 59% | 223 | 244 |
+  | Agitation | 63% | 290 | 113 |
+  | Unnerving Presence | 70% | 304 | 142 |
+  | Agitation and Unnerving Presence | 67% | 304 | 118 |
+  | all three (Brutal Strength as it is now) | **72%** | 273 | 236 |
+
+  Brutal Strength pushed anywhere took the survivor just wounded out of his reach: the
+  survivors don't move between his turns, so with a card still to play he picks them up with it.
+  Now it pushes only onto a bear trap (a wounded survivor who fails its roll is a sacrifice
+  progress), and only on his last card. Unnerving Presence does the most: a skill check near him
+  on the danger die (used about 5 times a game). Spending ▲ on perks costs bonus turns (500 → 334).
+- **Not yet:** the other killers' perks, the survivors' perks, a key's re-roll.
 - **On one device** (`play/bots.ts`, driven from `GameScreen`): a bot moves once the screen has
   caught up with the move before it, after a short pause, so the people see each one. The side
   panel says which bot is thinking.

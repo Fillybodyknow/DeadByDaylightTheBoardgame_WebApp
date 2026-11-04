@@ -6,12 +6,16 @@
 // in a row can take him). Every other decision: each legal choice is tried on a copy of the game
 // with a fresh dice seed, so the real dice stay unknown, played on through what follows by itself
 // (rolls, reveals, perk offers) to the next real decision, and the position scored. That serves
-// every killer's power without code of its own. Perks are left alone for now; items are used when
-// trying one shows it helps.
+// every killer's power without code of its own. Items are used when trying one shows it helps.
+//
+// Perks are taught one killer at a time (`TAUGHT`): an offer of one is tried as every other choice
+// is (each use and passing it up, on the same dice), played on to the end of his round. The rest are
+// declined for the round.
 
 import { SACRIFICE_TO_WIN, apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, pathState, survivorMoves, twoPlayer, unknownRooms } from './engine'
 import { legalActions } from './legal'
 import { KILLER_PLAYER, actorsOf, handsToPlan, mayAct } from './seats'
+import type { PerkId } from './perks'
 import type { Action, GameState, MoveCard, PathState } from './types'
 
 // ---------- distances ----------
@@ -409,7 +413,7 @@ function forced(st: GameState): Action | null {
     case 'roll':
       return acts.find((a) => a.t === 'acceptRoll') ?? acts.find((a) => a.t === 'passRoll') ?? null
     case 'offer':
-      return acts.find((a) => a.t === 'perk' && !a.use && a.quiet) ?? null
+      return (s.owner === 'killer' && plainPerk(st, acts)) || (acts.find((a) => a.t === 'perk' && !a.use && a.quiet) ?? null)
     case 'reaction':
       return { t: 'react', s: null }
     case 'carryDice':
@@ -843,10 +847,15 @@ export function botMove(st: GameState, player: number): Action | null {
   }
   if (step.t === 'planStridor') return { t: 'planStridor', card: survivorPick(st, step.s, st.survivorHands[st.survivors[step.s].hand]) }
 
-  // Perks are left alone, and a key's re-roll. A perk offered is declined for the round. An item
+  // A perk the killer has been taught (`TAUGHT`) is weighed as any choice; the rest are declined for
+  // the round, and a survivor's too. A key's re-roll is left alone. An item
   // is used when trying it shows it helps (a toolbox's repair, a medkit's heal). With the gates
   // powered, a generator isn't repaired: it does nothing.
   const powered = gatesPowered(st)
+  if (step.t === 'offer' && killer && step.owner === 'killer') {
+    const pick = perkPick(st, legalActions(st).filter((a) => mayAct(st, player, a)))
+    if (pick) return pick
+  }
   const acts = legalActions(st).filter(
     (a) => mayAct(st, player, a) && a.t !== 'reroll' && !(a.t === 'perk' && a.use) && !(powered && a.t === 'interact' && a.i.k === 'repair'),
   )
@@ -867,6 +876,71 @@ export function botMove(st: GameState, player: number): Action | null {
   // Vigo's Blueprint and White Ward: bots let them be, as they do perks
   if (step.t === 'vigo' || step.t === 'whiteWard') return acts[0]
   return bestTried(st, acts, killer)
+}
+
+// ---------- perks ----------
+
+/**
+ * The killer's perks the bot uses, as they are taught (and checked in bot games): The Trapper's.
+ * Brutal Strength pushes someone just wounded, Agitation moves him on after an attack, Unnerving
+ * Presence turns a skill check near him to the danger die.
+ */
+const TAUGHT = new Set<PerkId>(['brutal_strength', 'agitation', 'unnerving_presence'])
+
+/** How many times each choice of a perk offer is played out (a trap, a roll: it rides on dice). */
+const PERK_TRIES = 6
+
+/**
+ * The killer's answer to an offer of a perk he has been taught: each use, and passing it up (asked
+ * again later in the round), played on the same dice to the end of his round and scored. Null when
+ * no taught perk is offered.
+ */
+function perkPick(st: GameState, acts: Action[]): Action | null {
+  const uses = acts.filter((a) => a.t === 'perk' && a.use && TAUGHT.has(a.perk) && worthTrying(st, a))
+  // none worth it now: passed up, to be asked again later in the round
+  if (!uses.length) return acts.find((a) => a.t === 'perk' && !a.use && !a.quiet) ?? null
+  const pass = acts.find((a) => a.t === 'perk' && !a.use && !a.quiet)
+  const known = knownProps(st)
+  let best: Action | null = null
+  let bestV = -Infinity
+  for (const [i, a] of [...(pass ? [pass] : []), ...uses].entries()) {
+    let total = 0
+    let n = 0
+    for (let k = 0; k < PERK_TRIES; k++) {
+      let s = tryOut(st, a, 60 + k, null, known)
+      // in his own turn: the rest of his round shows what the push or the move was worth
+      if (s && s.phase === 'killer') s = killerTurnOn(s)
+      if (s) (total += score(s, true, known)), n++
+    }
+    const v = n ? total / n + ((st.rng >>> (i % 24)) & 7) * 0.01 : -Infinity
+    if (v > bestV) (bestV = v), (best = a)
+  }
+  return best
+}
+
+/**
+ * A use of a taught perk worth weighing at all. Brutal Strength only onto a bear trap, and only on
+ * his last turn of the round: the survivors don't move between his turns, so someone wounded with a
+ * card still to play is there to be picked up with it.
+ */
+function worthTrying(st: GameState, a: Extract<Action, { t: 'perk' }>): boolean {
+  if (a.perk === 'brutal_strength') return !!a.choice?.path && !!pathState(st, a.choice.path)?.trap && lastTurn(st)
+  return true
+}
+
+/** The killer is playing his last card of the round (a bonus turn may still come). */
+const lastTurn = (st: GameState) => st.phase === 'killer' && st.killer.revealedCount >= st.killer.planned.length
+
+/**
+ * The killer's taught perks while another choice is played out (no trying within a try): Brutal
+ * Strength pushes the survivor onto a path with a bear trap when there is one. Null: declined.
+ */
+function plainPerk(st: GameState, acts: Action[]): Action | null {
+  for (const a of acts) {
+    if (a.t !== 'perk' || !a.use || !TAUGHT.has(a.perk)) continue
+    if (a.perk === 'brutal_strength' && worthTrying(st, a)) return a
+  }
+  return null
 }
 
 /**

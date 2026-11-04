@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { botMove, nextActor } from './bot'
-import { apply, createGame, type GameConfig } from './engine'
+import { apply, createGame, pathState, perkChoices, type GameConfig } from './engine'
 import { legalActions } from './legal'
 import { mayAct } from './seats'
 import type { GameState } from './types'
@@ -67,5 +67,50 @@ describe('bots', () => {
     // a player not being waited on has no move
     st = apply(st, hand!)
     expect(botMove(st, 2)).toBeNull()
+  })
+})
+
+describe('bot perks: The Trapper', () => {
+  /**
+   * The Trapper has just wounded survivor 0 in his room, on his first card or his last, and is
+   * offered Brutal Strength; `trapped`: a bear trap on one of the paths out.
+   */
+  function attacked(last: boolean, trapped: boolean): GameState {
+    let st = createGame({ board: 'macmillan', survivors: ['dwight', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 9, bots: [1, 2, 3, 4, 5] })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    Object.assign(st.killer, { perks: ['brutal_strength'], bp: 6, planned: ['wait', 'wait'], revealedCount: last ? 2 : 1 })
+    st.survivors.forEach((sv, i) => Object.assign(sv, { room: i ? 'backlot' : st.killer.room, status: 'board', wounded: i === 0, planned: 'sneak', acted: true }))
+    const w = { k: 'afterAttack', target: 0 } as const
+    const paths = perkChoices(st, 'brutal_strength', 'killer', w).map((c) => c.path!)
+    expect(paths.length).toBeGreaterThan(0)
+    if (trapped) pathState(st, paths[0]).trap = true
+    Object.assign(st, { phase: 'killer', canInteract: false })
+    st.step = { t: 'offer', perk: 'brutal_strength', owner: 'killer', w, done: [] }
+    st.queue = [{ k: 'endKillerTurn', turn: last ? 1 : 0 }]
+    return st
+  }
+
+  it('Brutal Strength: on his last card, the one just wounded is pushed onto a bear trap', () => {
+    const st = attacked(true, true)
+    const a = botMove(st, 1)
+    expect(a).toMatchObject({ t: 'perk', perk: 'brutal_strength', use: true })
+    expect(a?.t === 'perk' && pathState(st, a.choice!.path!).trap).toBe(true)
+  }, 60_000)
+
+  it('Brutal Strength: not with a card still to play (they are there to be picked up), nor with no trap', () => {
+    for (const st of [attacked(false, true), attacked(true, false)]) {
+      const a = botMove(st, 1)
+      // passed up, to be asked again later in the round
+      expect(a).toMatchObject({ t: 'perk', perk: 'brutal_strength', use: false })
+      expect(a?.t === 'perk' && a.quiet).toBeFalsy()
+    }
+  })
+
+  it('a survivor bot still declines its perks for the round', () => {
+    let st = createGame({ board: 'macmillan', survivors: ['dwight', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 9, bots: [1, 2, 3, 4, 5] })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    const perk = st.survivors[0].perks[0]
+    st.step = { t: 'offer', perk, owner: 0, w: { k: 'planningStart' }, done: [] }
+    expect(botMove(st, 2)).toMatchObject({ t: 'perk', use: false, quiet: true })
   })
 })
