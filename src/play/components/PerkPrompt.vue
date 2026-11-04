@@ -8,7 +8,7 @@ import { asset } from '../../i18n'
 import { reignCards, CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, weavePledges, weavers, WEAVING_COST, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName, unknownRooms } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner } from '../engine/types'
-import { actionKey, perkPicked, perksToPick } from '../boardActions'
+import { actionKey, perkMinis, perkPicked, perksToPick, unknownPicked } from '../boardActions'
 import { choicePreview, preview } from '../focus'
 import { fxSound } from '../fx/audio'
 import { fx } from '../fx/bus'
@@ -221,6 +221,8 @@ function confirmPurge() {
 /** Killer perks moving a survivor along a path: the survivor first, then the path. */
 /** Unforeseen for The Unknown: a choice of which one goes, shown with its mini, room and card. */
 const unforeseenUnknown = computed(() => step.value.t === 'offer' && step.value.perk === 'unforeseen' && !!props.st.killer.unknowns)
+/** The Unknown: a perk whose mini is picked on the map first, so its choices aren't listed here. */
+const unknownStep = computed(() => step.value.t === 'offer' && perkMinis(offerChoices.value).length > 1)
 const movesSomeone = computed(() => step.value.t === 'offer' && !!activePerk.value && ['dark_devotion', 'infectious_fright', 'exponential'].includes(step.value.perk))
 const moveTargets = computed(() => (movesSomeone.value ? [...new Set(offerChoices.value.map((c) => c.target!))] : []))
 const moveWho = ref<number | null>(null)
@@ -481,7 +483,15 @@ const boardCount = computed(() => {
   // nothing armed yet: nothing on the map
   if (pickPerk.value && !perkPicked.value) return 0
   if (isOppression.value) return offerChoices.value.filter((c) => !c.prop2).length
-  if (s.t === 'offer') return offerList.value.reduce((n, o) => n + (pickPerk.value && perkPicked.value !== o.perk ? 0 : o.choices.filter((c) => !here(perkAct(o.perk, c))).length), 0)
+  if (s.t === 'offer')
+    return offerList.value.reduce((n, o) => {
+      if (pickPerk.value && perkPicked.value !== o.perk) return n
+      // The Unknown: the mini is picked on the map first, so those are the spots for now
+      const minis = perkMinis(o.choices)
+      if (minis.length < 2) return n + o.choices.filter((c) => !here(perkAct(o.perk, c))).length
+      if (unknownPicked.value === null) return n + minis.length
+      return n + o.choices.filter((c) => c.index === unknownPicked.value && !here(perkAct(o.perk, c))).length
+    }, 0)
   // Breakout's own hint says to use the board, so it isn't counted here
   if (s.t === 'turnStart') return buttons.value.reduce((n, b) => n + (b.perk === 'breakout' || !perkOpen(b.perk) ? 0 : b.choices.filter((c) => !here(perkAct(b.perk, c))).length), 0)
   if (s.t === 'phantasmChoice') return [...hagMoves.value.map((i) => ({ t: 'phantasm', teleport: true, i }) as Action), { t: 'phantasm', teleport: true } as Action].filter((a) => !here(a)).length
@@ -649,7 +659,7 @@ const boardCount = computed(() => {
             <BpText :text="cardPick ? `ยืนยัน: ${perkChoiceLabel(st, step.perk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน'" />
           </button>
           <button
-            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression && !isLightborn && !movesSomeone && !unforeseenUnknown)"
+            v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression && !isLightborn && !movesSomeone && !unforeseenUnknown && (!unknownStep || c.index === unknownPicked))"
             :key="i"
             class="primary"
             @mouseenter="hover(step.owner, c)"

@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.32.3',
+    date: '2026-11-04',
+    items: [
+      'The Unknown: Perk ที่ให้ตัวไหนก็ได้ทำ (Bitter Murmur, Agitation, Beast of Prey, Starstruck) เลือกเป็นสองจังหวะแล้ว — คลิกมินิตัวที่ต้องการบนแผนที่ก่อน แล้วค่อยเลือกเส้นทางของตัวนั้น',
+    ],
+  },
+  {
     version: '1.32.2',
     date: '2026-11-04',
     items: [

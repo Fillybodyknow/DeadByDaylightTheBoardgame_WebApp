@@ -876,7 +876,11 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - The Unknown, more rulings (the user's): a perk that makes "the killer" in a room follow
   (Thrill of the Hunt, Quick Gambit) takes the Unknown standing there, and with several
   there **its user picks which** (`index` on the choice, as `unknown` picks Diversion's; each
-  Unknown's mini on the map). An Unknown moved by a perk in the middle of his turn (any of
+  Unknown's mini on the map). A perk of his own that any mini may take (Bitter Murmur, Agitation,
+  Beast of Prey, Starstruck) is picked in two clicks, as Diversion is: the mini first, then its own
+  paths (Starstruck: the survivors it could pick up); with one mini they show straight away
+  (`unknownPicked` and `perkMinis` in `boardActions.ts`). Every mini's targets at once said
+  nothing about whose each one was. An Unknown moved by a perk in the middle of his turn (any of
   these, Unforeseen, Agitation) moves as the killer, its windows and reveals with it, and then the
   Unknown playing the turn takes it back (`asUnknown`, the `actAs` task). Hallucination's Unknown
   appearing is **not** "the killer enters a room": no Spine Chill, Quick & Quiet, Head On,

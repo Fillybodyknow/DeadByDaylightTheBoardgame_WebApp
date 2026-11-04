@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anim, settings } from '../../settings'
 import { botAction, botTurn, botsOnly, botsWaitedOn, onlineBotMove, peopleOnBothSides } from '../bots'
-import { anyMoves, boardOf, survivorInteractions, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, palletOn, survivorInteractions, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showOfferings, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
@@ -22,7 +22,7 @@ import { canPing, pingArmed, pingWait } from '../pings'
 import { isQuestion, timeoutActions } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { STEP_NAME, boardActionKeys, offerPerk, perkPicked, perksToPick, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
+import { STEP_NAME, boardActionKeys, offerPerk, perkPicked, perksToPick, unknownPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, cardImage, killerMini, playerOf, survivorMini } from '../labels'
 import SettingsDialog from '../../components/SettingsDialog.vue'
 import VoiceButton from './VoiceButton.vue'
@@ -341,6 +341,7 @@ watch(
     diversion.value = null
     painHook.value = null
     perkPicked.value = null
+    unknownPicked.value = null
     itemPick.value = null
     forkMoves.value = null
     multiPick.value = []
@@ -360,6 +361,29 @@ const boardFocus = computed(() => {
     const s = breakoutTarget.value
     const moves = anyMoves(st, s)
     return { survivors: [s], killer: false, rooms: [st.survivors[s].room], paths: moves.map((m) => m.path.id), dests: moves.map((m) => m.to) }
+  }
+  // The Unknown: the mini a perk will move, and its own paths (Bitter Murmur, Agitation, Beast of
+  // Prey, Starstruck — the survivors it could pick up instead)
+  if (unknownPicked.value !== null) {
+    const st = view.value
+    const s = st.step
+    const i = unknownPicked.value
+    const from = unknownRooms(st)[i] ?? st.killer.room
+    const perk = s.t === 'offer' ? offerPerk(st) : null
+    const picked = perk && s.t === 'offer' ? perkChoices(st, perk, s.owner, s.w).filter((c) => c.index === i) : []
+    const paths = picked.flatMap((c) => (c.path ? [c.path] : []))
+    return {
+      survivors: picked.flatMap((c) => (c.target !== undefined ? [c.target] : [])),
+      killer: true,
+      rooms: [from],
+      paths,
+      // a pallet stops him: he breaks it and stays, so no room beyond is pointed at
+      dests: paths.flatMap((id) => {
+        if (palletOn(st, id)) return []
+        const p = boardOf(st).paths.find((x) => x.id === id)!
+        return [p.a === from ? p.b : p.a]
+      }),
+    }
   }
   // Diversion: the killer, and the paths he can be sent along
   if (diversion.value !== null) {
@@ -550,6 +574,13 @@ const modeBar = computed(() => {
       text: `ทางแยก: คลิกห้องที่จะไปบนแผนที่ — ${forkMoves.value.map((a) => roomName(view.value, a.dest!)).join(' · ')}`,
       cancel: () => (forkMoves.value = null),
     }
+  if (unknownPicked.value !== null) {
+    const s = view.value.step
+    const perk = s.t === 'offer' ? offerPerk(view.value) : null
+    const name = perk ? PERKS[perk].name : ''
+    const what = perk === 'starstruck' ? 'คลิกผู้รอดชีวิตที่จะอุ้มแทน' : 'คลิกเส้นทางบนแผนที่'
+    return { text: `${name}: The Unknown ${unknownPicked.value + 1} — ${what}`, cancel: () => (unknownPicked.value = null) }
+  }
   // after the fork: picking its room comes first, and its way out goes back to the paths
   if (diversion.value !== null) {
     const who = diversion.value >= 0 ? `The Unknown ${diversion.value + 1}` : view.value.killer.unknowns && view.value.step.t === 'survivorInteract' ? `The Unknown ${unknownRooms(view.value).indexOf(view.value.survivors[view.value.step.s].room) + 1}` : view.value.killer.name

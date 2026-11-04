@@ -506,7 +506,19 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         }
         break
       }
-      for (const c of perkChoices(st, perk, s.owner, s.w)) {
+      // The Unknown: with several minis to choose between, the mini comes first and only its own
+      // targets follow (as Diversion does); with one, its targets show straight away.
+      let choices = perkChoices(st, perk, s.owner, s.w)
+      const minis = perkMinis(choices)
+      if (minis.length > 1) {
+        if (unknownPicked.value === null) {
+          const then = perk === 'starstruck' ? 'แล้วเลือกคนที่จะอุ้ม' : 'แล้วเลือกเส้นทาง'
+          for (const i of minis) add(unknownSpot(st, i), `${PERKS[perk].name}: The Unknown ${i + 1} (${then})`, () => ((unknownPicked.value = i), sfx.click()))
+          break
+        }
+        choices = choices.filter((c) => c.index === unknownPicked.value)
+      }
+      for (const c of choices) {
         const label = `${PERKS[perk].name}: ${perkChoiceLabel(st, perk, s.owner, s.w, c)}`
         const run = go({ t: 'perk', perk, use: true, choice: c }, sfx.select)
         // Starstruck: the survivor to pick up instead (the path there is part of the label)
@@ -702,6 +714,21 @@ function hookSpot(st: GameState, add: (key: SpotKey, label: string, run: () => v
  * and only its targets are on the board. Null: none picked yet.
  */
 export const perkPicked = ref<PerkId | null>(null)
+
+/**
+ * The Unknown: which of his minis a perk's targets are being picked for. A perk any of them may
+ * take (Bitter Murmur, Agitation, Beast of Prey, Starstruck) asks for the mini first, as Diversion
+ * does: every mini's paths glowing at once told nobody whose each one was. Null: none picked yet.
+ */
+export const unknownPicked = ref<number | null>(null)
+
+/**
+ * The minis a perk offers targets on the map for, lowest number first ([] for any other killer,
+ * and for one whose choices are the minis themselves: Unforeseen picks its mini and is done).
+ */
+export function perkMinis(choices: PerkChoice[]): number[] {
+  return [...new Set(choices.filter(onMap).flatMap((c) => (c.index === undefined ? [] : [c.index])))].sort((a, b) => a - b)
+}
 
 /** A perk choice made by clicking the map (a path, a prop, a survivor, a room), not a card or a button. */
 const onMap = (c: PerkChoice) => !c.card && (!!c.path || !!c.prop || c.target !== undefined || !!c.room)
