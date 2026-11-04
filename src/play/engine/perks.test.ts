@@ -3344,6 +3344,46 @@ describe('The Unknown', () => {
       expect(unknownRooms(g)).toEqual([far, second, null, null])
     })
 
+    it('Starstruck: another Unknown moves from its own room and picks up there, then hands the turn back', () => {
+      const { st, second, far } = twoUnknowns('starstruck')
+      killerInteracting(st)
+      st.killer.bp = 6
+      st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+      st.props.forEach((p) => p.kind === 'pallet' && (p.removed = true))
+      const p = touchingPaths(st, second).find((x) => x.a !== far && x.b !== far && !(x.kind === 'vault' && x.b === second))!
+      const to = p.a === second ? p.b : p.a
+      Object.assign(st.survivors[1], { room: far, wounded: true, woundedThisRound: false })
+      Object.assign(st.survivors[3], { room: to })
+      st.props.forEach((x) => x.room === to && (x.kind === 'hook' ? (x.removed = true) : (x.revealed = true)))
+      const offered = apply(st, { t: 'interact', i: { k: 'pickUp', target: 1 } })
+      expect(offered.step).toMatchObject({ t: 'offer', perk: 'starstruck' })
+      const w = (offered.step as Extract<GameState['step'], { t: 'offer' }>).w
+      const c = perkChoices(offered, 'starstruck', 'killer', w).find((x) => x.index === 1 && x.path === p.id && x.target === 3)!
+      expect(c).toBeDefined()
+      let g = apply(offered, { t: 'perk', perk: 'starstruck', use: true, choice: c })
+      for (let n = 0; n < 5 && g.step.t !== 'carryDice'; n++) g = apply(g, legalActions(g)[0])
+      // Unknown 2 went and carries; Unknown 1 and its survivor stay
+      expect(g.survivors[3].status).toBe('carried')
+      expect(g.survivors[1].status).toBe('board')
+      expect(g.killer).toMatchObject({ unknownAt: 1, room: to })
+      for (let n = 0; n < 20 && g.step.t !== 'killerInteract'; n++) g = apply(g, legalActions(g)[0])
+      expect(g.killer.unknownAt ?? 0).toBe(0)
+      expect(g.killer.room).toBe(far)
+    })
+
+    it('Undying: a prop in a room joined to any Unknown\'s room, by a path of the card', () => {
+      const { st, second, far } = twoUnknowns('undying')
+      killerInteracting(st)
+      st.killer.bp = 6
+      const near = (a: string, b: string) => a === b || connectedRoomsOf(st, a).includes(b)
+      const p = touchingPaths(st, second).find((x) => !near(x.a === second ? x.b : x.a, far))!
+      const to = p.a === second ? p.b : p.a
+      const gen = placeProp(st, 'generator', to)
+      gen.progress = 1
+      st.killer.hand = [p.kind as MoveCard]
+      expect(killerInteractions(st)).toContainEqual({ k: 'undying', card: p.kind, i: { k: 'damage', prop: gen.id } })
+    })
+
     it('Unrelenting: another Unknown picking up carries from its room, then hands the turn back', () => {
       const { st, second, far } = twoUnknowns('unrelenting')
       Object.assign(st.survivors[0], { wounded: true, woundedThisRound: false })

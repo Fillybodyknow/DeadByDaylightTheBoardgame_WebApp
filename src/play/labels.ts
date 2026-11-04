@@ -627,8 +627,13 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `ห้าม ${name((w as { s: number }).s)} Interact`
     case 'crowd_control':
       return `เลือก ${name(c.target!)} (ผู้รอดชีวิตจ่าย 2 ▲ หรือคุณเลือกการ์ดให้)`
-    case 'starstruck':
-      return `ไป ${roomName(st, (() => { const p = pathDef(st, c.path!); return p.a === st.killer.room ? p.b : p.a })())} แล้วอุ้ม ${name(c.target!)} แทน`
+    case 'starstruck': {
+      // (The Unknown: the one that moves, from its own room)
+      const other = st.killer.unknowns && c.index !== undefined
+      const from = other ? (unknownRooms(st)[c.index!] ?? st.killer.room) : st.killer.room
+      const p = pathDef(st, c.path!)
+      return `${other ? `The Unknown ${c.index! + 1}: ` : ''}ไป ${roomName(st, p.a === from ? p.b : p.a)} แล้วอุ้ม ${name(c.target!)} แทน`
+    }
     case 'solidarity':
       return `รักษา ${name(c.target!)} ที่ ${roomName(st, st.survivors[c.target!].room)}`
     case 'poised':

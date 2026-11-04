@@ -198,10 +198,13 @@ export function undyingRoomOf(st: GameState, i: Undying): string {
 export function undyingPaths(st: GameState, card: MoveCard, kind: StepKind = 'undying'): { to: string; paths: string[] }[] {
   const rooms = new Set(undyingOptions(st, card, kind).map((i) => undyingRoomOf(st, i)))
   const out = new Map<string, string[]>()
-  for (const p of touchingPaths(st, st.killer.room)) {
-    const to = p.a === st.killer.room ? p.b : p.a
-    if (p.kind === card && rooms.has(to)) out.set(to, [...(out.get(to) ?? []), p.id])
-  }
+  // (Undying for The Unknown: from every Unknown's room)
+  const froms = kind === 'undying' && st.killer.unknowns ? unknownRooms(st).filter((r): r is string => r !== null) : [st.killer.room]
+  for (const from of froms)
+    for (const p of touchingPaths(st, from)) {
+      const to = p.a === from ? p.b : p.a
+      if (p.kind === card && rooms.has(to) && !out.get(to)?.includes(p.id)) out.set(to, [...(out.get(to) ?? []), p.id])
+    }
   return [...out].map(([to, paths]) => ({ to, paths }))
 }
 

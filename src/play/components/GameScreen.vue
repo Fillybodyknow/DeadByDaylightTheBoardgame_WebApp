@@ -390,8 +390,10 @@ const boardFocus = computed(() => {
   const kind = stepKind(view.value, modes)
   if (kind) {
     const st = view.value
-    const base = { survivors: [], killer: true, rooms: [st.killer.room] }
-    if (undyingRoom.value) return { ...base, rooms: [st.killer.room, undyingRoom.value], paths: [], dests: [undyingRoom.value] }
+    // (Undying for The Unknown reaches from every Unknown's room)
+    const own = kind === 'undying' && st.killer.unknowns ? unknownRooms(st).filter((r): r is string => r !== null) : [st.killer.room]
+    const base = { survivors: [], killer: true, rooms: own }
+    if (undyingRoom.value) return { ...base, rooms: [...own, undyingRoom.value], paths: [], dests: [undyingRoom.value] }
     const cards = undyingCard.value ? [undyingCard.value] : undyingCards(st, kind)
     const reach = cards.flatMap((c) => undyingPaths(st, c, kind))
     return { ...base, paths: reach.flatMap((r) => r.paths), dests: reach.map((r) => r.to) }

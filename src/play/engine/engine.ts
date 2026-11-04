@@ -852,12 +852,20 @@ export function killerInteractions(st: GameState, step: Step = st.step): KillerI
   if (perkReady(st, 'killer', 'pain_resonance') && k.bp >= PERKS.pain_resonance.cost && usableHook(st, k.room))
     for (const r of connectedRooms(st, k.room)) for (const t of onBoardIn(st, r)) if (!st.survivors[t].wounded) out.push({ k: 'painResonance', target: t })
   // Undying (The Blight): discard a card (not Wait) to interact with a prop in a room joined to
-  // this one by a path of that card's colour.
+  // this one by a path of that card's colour. The Unknown: joined to any Unknown's room (every
+  // Unknown is the Killer); each room reached once.
   if (perkReady(st, 'killer', 'undying'))
     for (const card of new Set(k.hand))
-      if (card !== 'wait')
-        for (const p of touchingPaths(st, k.room))
-          if (p.kind === card) for (const i of propInteractions(st, p.a === k.room ? p.b : p.a)) out.push({ k: 'undying', card, i })
+      if (card !== 'wait') {
+        const reached = new Set<string>()
+        for (const room of killerRooms(st))
+          for (const p of touchingPaths(st, room)) {
+            const to = p.a === room ? p.b : p.a
+            if (p.kind !== card || reached.has(to)) continue
+            reached.add(to)
+            for (const i of propInteractions(st, to)) out.push({ k: 'undying', card, i })
+          }
+      }
   out.push(...powerOptions(st))
   // Blighted Corruption: after entering a room with it, the power can go again.
   if (step.t === 'killerInteract' && step.rush && k.hand.length) out.push({ k: 'rush' })
@@ -3921,13 +3929,18 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // another survivor there is picked up instead, wounded or not
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
       // (Red Herring, asked first, may have turned it into damaging a generator)
+      // (The Unknown: any Unknown moves, from its own room, and picks up there: `index`)
       if (w.k !== 'preKillerInteract' || !w.pickUp || !task || task.i.k !== 'pickUp' || k.asVictor) return []
       const out: PerkChoice[] = []
-      for (const p of touchingPaths(st, k.room)) {
-        if (palletOn(st, p.id)) continue
-        const to = p.a === k.room ? p.b : p.a
-        for (const t of onBoardIn(st, to)) if (t !== w.target) out.push({ path: p.id, target: t })
+      const from = (room: string, index?: number) => {
+        for (const p of touchingPaths(st, room)) {
+          if (palletOn(st, p.id)) continue
+          const to = p.a === room ? p.b : p.a
+          for (const t of onBoardIn(st, to)) if (t !== w.target) out.push(index === undefined ? { path: p.id, target: t } : { path: p.id, target: t, index })
+        }
       }
+      if (k.unknowns) unknownRooms(st).forEach((r, index) => r && from(r, index))
+      else from(k.room)
       return out
     }
     // ----- Yun-Jin -----
@@ -5224,10 +5237,19 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     }
     case 'starstruck': {
       const p = pathDef(st, c.path!)
-      const to = p.a === k.room ? p.b : p.a
+      const from = k.unknowns && c.index !== undefined ? (unknownRooms(st)[c.index] ?? k.room) : k.room
+      const to = p.a === from ? p.b : p.a
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')!
-      payPerk(st, o, perk, `ไป ${roomName(st, to)} แล้วอุ้ม ${name(c.target!)} แทน`)
+      const who = k.unknowns && c.index !== undefined ? `The Unknown ${c.index + 1} ` : ''
+      payPerk(st, o, perk, `${who}ไป ${roomName(st, to)} แล้วอุ้ม ${name(c.target!)} แทน`)
       task.i = { k: 'pickUp', target: c.target! }
+      // The Unknown: another one moves and picks up (a carry included), then the one playing the
+      // turn takes it back, after the pick-up rather than before it (asUnknown's place)
+      const now = k.unknownAt ?? 0
+      if (k.unknowns && c.index !== undefined && c.index !== now) {
+        st.queue.splice(st.queue.indexOf(task) + 1, 0, { k: 'actAs', i: now })
+        actAs(st, c.index)
+      }
       return killerMovedBy(st, p, to)
     }
     case 'poised': {

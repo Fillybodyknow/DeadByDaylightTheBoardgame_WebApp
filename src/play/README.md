@@ -996,7 +996,9 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   pallet; a wall breaks, as on his other moves) and picks up another survivor on the board there,
   wounded or not, wounded this round or not. The move reveals the room and sets off what an
   entry does, but not Head On (it isn't his turn's move). Someone who hides as he comes in
-  (Quick & Quiet) is not picked up.
+  (Quick & Quiet) is not picked up. The Unknown: any Unknown moves, from its own room, and picks
+  up there (`index`; a carry included); the one playing the turn takes it back after the pick-up
+  (the designers' ruling, Discord, Nov 2026).
 - Fast Track / Self-Preservation (Yun-Jin): "the turn" is any turn, a survivor's or one of the
   killer's; at its end, if another survivor was wounded (by anything, a perk of their own too) or
   hung on a hook during it, she may repair a generator / hide in a locker in her room — an
@@ -1120,7 +1122,8 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Smash Hit: any pallet the killer breaks (Enduring's too), any wall he moves through (Diversion's
   too), any generator he damages (with progress or not).
 - Undying: the killer's interaction for the turn, with a prop in a room joined to his by a path
-  of the discarded card's colour (either direction). It is an ordinary interaction over there, so
+  of the discarded card's colour (either direction); for The Unknown, joined to any Unknown's
+  room (the designers' ruling, Discord, Nov 2026). It is an ordinary interaction over there, so
   damaging a generator with it still sets off Overcharge, Gearhead, Oppression, Dragon's Grip and
   Alert.
 - Blood Favour works by itself at the start of cleanup ("sacrificed" = on a hook).

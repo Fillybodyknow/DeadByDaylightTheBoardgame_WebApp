@@ -12,6 +12,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.32.2',
+    date: '2026-11-04',
+    items: [
+      'The Unknown: Starstruck ให้ The Unknown ตัวไหนก็ได้เดินออกจากห้องของตัวนั้น แล้วอุ้มผู้รอดชีวิตที่นั่นแทน (ตามคำตอบของผู้ทำเกม)',
+      'The Unknown: Undying ใช้ได้กับ prop ในห้องที่เชื่อมกับห้องของ The Unknown ตัวไหนก็ได้ (ตามคำตอบของผู้ทำเกม)',
+    ],
+  },
+  {
     version: '1.32.1',
     date: '2026-11-04',
     items: [
