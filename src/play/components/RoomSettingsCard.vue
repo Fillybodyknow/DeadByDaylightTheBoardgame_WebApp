@@ -76,6 +76,8 @@ function describe(key: keyof RoomSettings, v: RoomSettings): string {
     case 'offeringCount':
     case 'offeringRandom':
       return v.offerings === 'none' ? 'Offering → ไม่ใช้' : (settingsChips(v).find((c) => c.startsWith('🔥')) ?? '')
+    case 'undoVote':
+      return v.undoVote ? 'ขอย้อนการกระทำล่าสุด (โหวต) → เปิด' : 'ขอย้อนการกระทำล่าสุด (โหวต) → ปิด'
   }
 }
 
@@ -139,6 +141,14 @@ onBeforeUnmount(() => noticeTimer !== null && clearTimeout(noticeTimer))
             @update:count="set({ offeringCount: $event })"
             @update:random="set({ offeringRandom: $event })"
           />
+        </div>
+        <div class="row">
+          <span class="label">↶ ขอย้อน<i v-if="differs('undoVote')" class="dot" /></span>
+          <label class="toggle">
+            <input type="checkbox" :checked="s.undoVote" :disabled="busy" @change="set({ undoVote: !s.undoVote })" />
+            ขอย้อนการกระทำล่าสุดได้ (อีกฝั่งโหวต)
+          </label>
+          <small v-if="s.undoVote" class="muted hint">ย้อนได้เฉพาะการกระทำของตัวเองในรอบนี้ — Killer ขอ: ผู้เล่น Survivor ต้องเห็นด้วยเกินครึ่ง · Survivor ขอ: Killer ต้องเห็นด้วย · โหวตภายใน 30 วิ</small>
         </div>
       </div>
 

@@ -44,6 +44,11 @@ export interface RoomSettings {
   offerings: OfferingPlan
   offeringCount: number
   offeringRandom: boolean
+  /**
+   * Online undo by vote (a house rule, `online/undo.ts`): a player may ask to take back their last
+   * move of the round. Off by default, and in rooms made before it.
+   */
+  undoVote: boolean
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -61,6 +66,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   offerings: 'none',
   offeringCount: 1,
   offeringRandom: false,
+  undoVote: false,
 }
 
 /** Settings as they play: a choice that does nothing as things are (the ban count with no Banlist) at its default. */
@@ -122,6 +128,7 @@ export function settingsChips(s: RoomSettings): string[] {
     const who = s.offerings === 'both' ? 'ฝั่งละ 1' : `${s.offerings === 'killer' ? 'Killer' : 'Survivor'} ${s.offeringCount} ใบ`
     out.push(`🔥 Offering ${who}${s.offeringRandom ? ' (สุ่ม)' : ''}`)
   }
+  if (s.undoVote) out.push('↶ ขอย้อนได้ (โหวต)')
   if (s.survivorBp !== DEFAULT_SETTINGS.survivorBp || s.killerBp !== DEFAULT_SETTINGS.killerBp) out.push(`▲ เริ่ม ${s.survivorBp} / ${s.killerBp}`)
   return out
 }

@@ -8,7 +8,8 @@
 import { computed, ref, toRaw, watch } from 'vue'
 import type { GameState } from '../engine/types'
 import { game, myMoves, online, onlineHold } from '../game'
-import { mySeat, session } from './session'
+import { mySeat, roomSettings, session } from './session'
+import { settingsOf } from './settings'
 import type { UndoVote } from './transport'
 import { tally, undoVoters } from './undoRules'
 
@@ -23,10 +24,13 @@ let ticker: number | null = null
 
 const open = (v: UndoVote | undefined, at: number): v is UndoVote => !!v && !v.result && at - v.at < UNDO_VOTE_MS
 
-/** The vote going on now, or null. */
+/** The room lets players ask (a room setting, off by default). */
+export const undoAllowed = computed(() => roomSettings.value.undoVote)
+
+/** The vote going on now, or null (none at all with the setting off: nothing is held for one). */
 export const undoVote = computed(() => {
   const v = session.data?.undoVote
-  return session.data?.game && open(v, now.value) ? v : null
+  return undoAllowed.value && session.data?.game && open(v, now.value) ? v : null
 })
 
 /** A vote's outcome, for its few seconds on screen. */
@@ -67,11 +71,11 @@ export async function requestUndo(): Promise<boolean> {
   const target = myUndo.value
   const seat = mySeat.value
   const asked = online.value?.latest()
-  if (!target || !seat || !asked || !session.room || undoVote.value) return false
+  if (!undoAllowed.value || !target || !seat || !asked || !session.room || undoVote.value) return false
   // what goes: the first thing the log says after it
   const what = asked.log.slice(target.log.length).find((e) => e.text)?.text ?? ''
   const ok = await session.room.updateRoom((cur) => {
-    if (!cur.game || open(cur.undoVote, Date.now())) return null
+    if (!cur.game || !settingsOf(cur.settings).undoVote || open(cur.undoVote, Date.now())) return null
     return { ...cur, undoVote: { by: seat, at: Date.now(), round: target.round, what: what.slice(0, 160) } }
   })
   if (ok) pending = { target: toRaw(target), asked: toRaw(asked) }

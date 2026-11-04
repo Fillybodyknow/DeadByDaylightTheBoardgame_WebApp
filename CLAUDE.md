@@ -181,7 +181,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   from the picks on the players talk and spectators only listen (`mayTalk`). The killer hears
   everyone (p.8). Speaking turns the tile's row (or the lobby seat) green, over a wound's red. The mic is open (M toggles it) or push
   to talk (a key, V by default, or holding the 🎙️ button). Never saved or replayed.
-- **Undo by vote (online):** ↶ ขอย้อน in the top bar takes back the player's last move of the round
+- **Undo by vote (online):** a room setting (`undoVote`, off by default). On, ↶ ขอย้อน in the top bar takes back the player's last move of the round
   if the other side votes yes (`online/undo.ts`, `undoRules.ts`, `UndoVote`): the killer's needs
   more than half of the survivors' players, a survivor player's the killer's; 30 s, the game held
   meanwhile. The room gets the earlier state as a checkpoint (`Room.restore`). Details in

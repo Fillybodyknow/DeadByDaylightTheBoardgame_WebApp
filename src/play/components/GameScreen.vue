@@ -50,7 +50,7 @@ import SyncBadge from './SyncBadge.vue'
 import BpText from '../../components/BpText.vue'
 import ChatDock from './ChatDock.vue'
 import UndoVote from './UndoVote.vue'
-import { myUndo, requestUndo, undoVote } from '../online/undo'
+import { myUndo, requestUndo, undoAllowed, undoVote } from '../online/undo'
 
 const props = defineProps<{ st: GameState }>()
 /** `settled`: whether everything has been shown (for a replay to step on). */
@@ -1380,7 +1380,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <button v-else-if="!online" :disabled="!canUndo" title="ย้อนการกระทำล่าสุด" @click="undo">↶<span class="btn-text"> ย้อน</span></button>
         <!-- online: take back this player's last move of the round, if the other side votes yes -->
         <button
-          v-if="online && !replaying && online.seat && view.phase !== 'over'"
+          v-if="online && !replaying && online.seat && undoAllowed && view.phase !== 'over'"
           type="button"
           :disabled="!myUndo || !!undoVote"
           :title="undoVote ? 'กำลังโหวตขอย้อนอยู่' : myUndo ? 'ขอย้อนการกระทำล่าสุดของคุณในรอบนี้ — อีกฝั่งโหวตว่าให้หรือไม่' : 'ยังไม่มีการกระทำของคุณในรอบนี้ให้ย้อน'"

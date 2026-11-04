@@ -676,6 +676,8 @@ function perkDest(st: GameState, owner: PerkOwner, c: PerkChoice): string | unde
   const mover = c.target ?? owner
   // (The Unknown: the mini the choice moves, `index`)
   const from = mover !== 'killer' ? st.survivors[mover].room : c.index !== undefined && st.killer.unknowns ? (unknownRooms(st)[c.index] ?? st.killer.room) : st.killer.room
+  // a pallet stops the killer: it breaks and he stays (Agitation, Beast of Prey, Bitter Murmur)
+  if (mover === 'killer' && palletOn(st, c.path!)) return undefined
   const p = pathDef(st, c.path!)
   return p.a === from ? p.b : p.b === from ? p.a : undefined
 }

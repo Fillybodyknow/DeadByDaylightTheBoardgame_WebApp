@@ -3256,6 +3256,59 @@ describe('The Unknown', () => {
       expect(unknownRooms(g)[1]).toBe(dest)
       expect(unknownRooms(g)[0]).toBe(st.killer.room)
     })
+
+    it('Bitter Murmur: after one Unknown vaults, another may move on, and the one playing still interacts', () => {
+      const { st, second } = twoUnknowns('bitter_murmur')
+      const vault = boardOf(st).paths.find((p) => p.kind === 'vault' && p.a !== second && p.b !== second)!
+      st.killer.room = vault.b
+      st.killer.unknowns = [vault.b, second, null, null]
+      st.phase = 'killer'
+      st.canInteract = true
+      const w = { k: 'killerEntered', room: vault.b, from: vault.a, path: vault.id } as PerkWindow
+      const choices = perkChoices(st, 'bitter_murmur', 'killer', w)
+      expect(new Set(choices.map((c) => c.index))).toEqual(new Set([0, 1]))
+      const c = choices.find((x) => x.index === 1)!
+      const p = touchingPaths(st, second).find((x) => x.id === c.path)!
+      st.step = { t: 'offer', perk: 'bitter_murmur', owner: 'killer', w } as GameState['step']
+      st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }] as GameState['queue']
+      const g = settle(apply(st, { t: 'perk', perk: 'bitter_murmur', use: true, choice: c }))
+      expect(unknownRooms(g)).toEqual([vault.b, p.a === second ? p.b : p.a, null, null])
+      expect(g.killer.unknownAt).toBe(0)
+      expect(g.step).toMatchObject({ t: 'killerInteract', turn: 0 })
+    })
+
+    it("a Flashlight on another Unknown stops the one interacting (it goes both ways)", () => {
+      const { st, far } = twoUnknowns('agitation')
+      st.killer.perks = []
+      st.survivors[1].room = far
+      st.survivors[0].item = 'flashlight'
+      const asked = apply(st, { t: 'interact', i: { k: 'attack', target: 1 } })
+      expect(asked.step).toMatchObject({ t: 'reaction', item: 'flashlight', holders: [0] })
+      const g = settle(apply(asked, { t: 'react', s: 0 }))
+      expect(g.survivors[1].wounded).toBe(false)
+      expect(g.survivors[0].item).toBe(null)
+    })
+
+    it('Bitter Murmur: another Unknown breaking a pallet stays put, and the one playing still interacts', () => {
+      const { st, second } = twoUnknowns('bitter_murmur')
+      const vault = boardOf(st).paths.find((p) => p.kind === 'vault' && p.a !== second && p.b !== second)!
+      st.killer.room = vault.b
+      st.killer.unknowns = [vault.b, second, null, null]
+      st.phase = 'killer'
+      st.canInteract = true
+      const out = touchingPaths(st, second)[0]
+      const pallet = st.props.find((p) => p.kind === 'pallet')!
+      Object.assign(pallet, { room: null, path: out.id, revealed: true, removed: false })
+      const w = { k: 'killerEntered', room: vault.b, from: vault.a, path: vault.id } as PerkWindow
+      const c = perkChoices(st, 'bitter_murmur', 'killer', w).find((x) => x.index === 1 && x.path === out.id)!
+      expect(c).toBeDefined()
+      st.step = { t: 'offer', perk: 'bitter_murmur', owner: 'killer', w } as GameState['step']
+      st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }] as GameState['queue']
+      const g = settle(apply(st, { t: 'perk', perk: 'bitter_murmur', use: true, choice: c }))
+      expect(g.props.find((p) => p.id === pallet.id)!.removed).toBe(true)
+      expect(unknownRooms(g)).toEqual([vault.b, second, null, null])
+      expect(g.step).toMatchObject({ t: 'killerInteract', turn: 0, canInteract: true })
+    })
   })
 
   it('setup puts The Unknown 1 in the killer\'s start room; it plans one card for its one mini', () => {
@@ -4317,6 +4370,28 @@ describe('perk cards: the rest of the deck (the edit-perks mode)', () => {
     const c = perkChoices(st, 'bitter_murmur', 'killer', w)[0]
     const after = apply(st, { t: 'perk', perk: 'bitter_murmur', use: true, choice: c })
     expect(after.killer.room).not.toBe(vault.b)
+  })
+
+  it("Agitation and Bitter Murmur along a pallet's path: it breaks and he stays (Bitter Murmur: no interaction)", () => {
+    const st = game()
+    deal(st, 'killer', 'bitter_murmur')
+    st.killer.perks = ['bitter_murmur', 'agitation']
+    const vault = boards.macmillan.paths.find((p) => p.kind === 'vault')!
+    st.killer.room = vault.b
+    st.phase = 'killer'
+    st.canInteract = true
+    const out = touchingPaths(st, vault.b).find((p) => p.id !== vault.id)!
+    const pallet = st.props.find((p) => p.kind === 'pallet')!
+    Object.assign(pallet, { room: null, path: out.id, revealed: true, removed: false })
+    const w = { k: 'killerEntered', room: vault.b, from: vault.a, path: vault.id } as const
+    expect(perkChoices(st, 'agitation', 'killer', { k: 'afterAttack', target: 0 }).some((c) => c.path === out.id)).toBe(true)
+    const c = perkChoices(st, 'bitter_murmur', 'killer', w).find((x) => x.path === out.id)!
+    st.step = { t: 'offer', perk: 'bitter_murmur', owner: 'killer', w }
+    st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+    const after = apply(st, { t: 'perk', perk: 'bitter_murmur', use: true, choice: c })
+    expect(after.killer.room).toBe(vault.b)
+    expect(after.props.find((p) => p.id === pallet.id)!.removed).toBe(true)
+    expect(after.canInteract).toBe(false)
   })
 
   it('Claustrophobia: the Entity on a path after a repair, and survivors cannot pass', () => {

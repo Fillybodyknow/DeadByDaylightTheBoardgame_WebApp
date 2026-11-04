@@ -4,7 +4,7 @@ import { legalActions } from './legal'
 import { actorsOf, handsToPlan, mayAct, playerOfSurvivor } from './seats'
 import type { Action, GameState, MoveCard } from './types'
 import { isQuestion, timeoutActions } from '../online/timeout'
-import { DEFAULT_SETTINGS, timeFor } from '../online/settings'
+import { DEFAULT_SETTINGS, settingsChips, settingsOf, timeFor } from '../online/settings'
 import { tally, undoVoters } from '../online/undoRules'
 import type { RoomData, UndoVote } from '../online/transport'
 import { archivedRounds, roundKey, roundsToArchive, trimLog, withFullLog } from '../online/logArchive'
@@ -476,6 +476,13 @@ describe('turn timer (room settings): what runs out of time answers', () => {
 })
 
 describe('undo by vote (online house rule)', () => {
+  it('is a room setting, off by default and in rooms made before it', () => {
+    expect(DEFAULT_SETTINGS.undoVote).toBe(false)
+    expect(settingsOf({ timer: 90 }).undoVote).toBe(false)
+    expect(settingsOf({ undoVote: true }).undoVote).toBe(true)
+    expect(settingsChips(settingsOf({ undoVote: true }))).toContain('↶ ขอย้อนได้ (โหวต)')
+  })
+
   /** A room of 5 players: the killer and four survivor players; `bots`: seats the computer plays. */
   const room = (bots: number[] = [], gone: number[] = []): RoomData =>
     ({

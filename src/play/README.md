@@ -637,7 +637,9 @@ bots online.
   killer, a spectator and the other survivors' players see the back of the item card. An item
   shows to everyone when it is used, and a friend's key shows when it is offered for a re-roll.
   On one shared device everything is in sight anyway.
-- Online, a player may ask to take back their last move of the round (↶ ขอย้อน, `online/undo.ts`),
+- Online, in a room whose host turned it on in the lobby (`undoVote`, off by default and in rooms
+  made before it; off, there is no button and no request is taken), a player may ask to take back
+  their last move of the round (↶ ขอย้อน, `online/undo.ts`),
   and the other side votes (asked by a player of the group, Moser): the killer's request needs more
   than half of the survivors' players to say yes (half or less is a no); a survivor player's needs
   the killer's yes. Bots don't vote, nor do players whose connection is gone; with nobody to ask it
@@ -708,7 +710,10 @@ Perks:
   other path" is any path but the one just taken.
 - Brutal Strength can push a survivor through a pallet or wall, breaking it; the survivor
   reveals a prop and bear traps trigger as usual.
-- Agitation and Beast of Prey: any path without a pallet; walls break.
+- Agitation, Beast of Prey and Bitter Murmur: any path; walls break. A pallet on it breaks and he
+  stays, without interacting, as a card move (p.14; the community's answer, Nov 2026). Only Bitter
+  Murmur loses anything by it (it comes before his interaction); The Unknown keeps the interaction
+  of the one playing the turn when another breaks the pallet.
 - Prove Thyself: the other survivor (same or connected room) interacts in their own room.
 - Adrenaline is offered at the start of cleanup, before sacrifice progression.
 - Empathy works with any survivor not on a hook ("willing" is left to the players).
@@ -858,7 +863,12 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   not only the one that attacked) moving the Unknown of his choice (`index`, as Unforeseen). In
   his own turn his perks ask the Unknown playing (it stands in `room`; from the turn's start, so
   Face the Darkness places a Guard around the Unknown whose turn it is). Bitter Murmur ("move
-  again… before interacting") stays with the Unknown that just moved.
+  again… before interacting") moves any Unknown, as Agitation (`index`), and the one playing the
+  turn interacts after it: the designers' ruling (Discord, Nov 2026), the Unknown that triggers a
+  perk needn't be the one that uses it.
+- The Unknown and Flashlights (the designers' ruling: every Unknown being the Killer goes both
+  ways): a survivor with a Flashlight in any Unknown's room may stop the one interacting, wherever
+  it is. The Twins aren't so: Victor and Charlotte take turns being the Killer.
 - The Unknown, more rulings (the user's): a perk that makes "the killer" in a room follow or go
   (Thrill of the Hunt, Quick Gambit, Diversion) takes the Unknown standing there, and with several
   there **its user picks which** (`index` on the choice, `unknown` on Diversion's interaction;

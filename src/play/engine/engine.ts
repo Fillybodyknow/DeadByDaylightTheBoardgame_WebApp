@@ -507,12 +507,13 @@ function followChoices(st: GameState, s: number): PerkChoice[] {
 }
 
 /**
- * Agitation, Beast of Prey: the killer moves along any path but one with a pallet; The Unknown,
- * any of his minis (`index`; the user's call: every Unknown is the Killer).
+ * Agitation, Beast of Prey, Bitter Murmur: the killer moves along any path, a pallet's too (it
+ * breaks and he stays: `perkPalletStop`); The Unknown, any of his minis (`index`; the user's call:
+ * every Unknown is the Killer).
  */
 function moveChoices(st: GameState): PerkChoice[] {
   const k = st.killer
-  const paths = (room: string) => exits(st, room, 'any').filter((e) => !palletOn(st, e.path.id))
+  const paths = (room: string) => exits(st, room, 'any')
   if (k.unknowns) return unknownRooms(st).flatMap((r, index) => (r ? paths(r).map((e) => ({ path: e.path.id, index })) : []))
   return paths(k.room).map((e) => ({ path: e.path.id }))
 }
@@ -2446,6 +2447,19 @@ function palletStop(st: GameState, path: string) {
   log(st, `${st.killer.name} ทำลาย Pallet — อยู่ที่เดิม และไม่ได้ Interact`, 'killer', { ev: { k: 'palletBreak', path } })
 }
 
+/**
+ * A perk's move along a path with a pallet (Agitation, Beast of Prey, Bitter Murmur): it breaks and
+ * the killer stays without interacting, as a card move (p.14; the community's answer). The Unknown:
+ * only the one that broke it loses the interaction, so another playing the turn keeps its own.
+ */
+function perkPalletStop(st: GameState, index: number | undefined, path: string) {
+  const k = st.killer
+  const other = !!k.unknowns && index !== undefined && index !== (k.unknownAt ?? 0)
+  const could = st.canInteract
+  palletStop(st, path)
+  if (other) st.canInteract = could
+}
+
 function finishKillerMove(st: GameState, path: PathDef, to: string) {
   const wall = pathState(st, path.id).wall
   if (wall) {
@@ -2493,7 +2507,11 @@ function killerInteract(st: GameState, i: KillerInteraction, reacted: boolean, t
   if (!reacted && !emped && (i.k === 'attack' || i.k === 'pickUp') && empIn(st, k.room))
     return wait(st, { t: 'reaction', item: 'emp', holders: [i.target], pending: { t: 'interact', i, emp: true } })
   {
-    const holders = onBoardIn(st, k.room).filter((s) => st.survivors[s].item === 'flashlight' && st.itemLock !== s)
+    // The Unknown: a Flashlight in any Unknown's room stops him, each being the Killer (the
+    // designers' ruling: it goes both ways)
+    const holders = killerRooms(st)
+      .flatMap((r) => onBoardIn(st, r))
+      .filter((s) => st.survivors[s].item === 'flashlight' && st.itemLock !== s)
     if (holders.length > 0 && !reacted) {
       wait(st, { t: 'reaction', item: 'flashlight', holders, pending: { t: 'interact', i } })
       return
@@ -3447,9 +3465,9 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       if (w.k !== 'killerEntered' || w.carrying || !w.path) return []
       if (!w.broke && pathDef(st, w.path).kind !== 'vault') return []
       if (!st.canInteract || st.queue.some((t) => t.k === 'killerDo')) return []
-      return exits(st, k.room, 'any')
-        .filter((e) => !palletOn(st, e.path.id))
-        .map((e) => ({ path: e.path.id }))
+      // The Unknown: any of his minis moves on, not only the one that went through (the designers'
+      // ruling, as Agitation's)
+      return moveChoices(st)
     case 'claustrophobia': {
       // a repair succeeded: the Entity onto any path's icon, as Bamboozle's (but for survivors only)
       if (w.k !== 'repaired') return []
@@ -4280,10 +4298,16 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       return moveSurvivor(st, t, e.path, e.to)
     }
     case 'agitation':
-    case 'beast_of_prey': {
+    case 'beast_of_prey':
+    case 'bitter_murmur': {
       const from = k.unknowns && c.index !== undefined ? (unknownRooms(st)[c.index] ?? k.room) : k.room
       const e = exits(st, from, 'any').find((x) => x.path.id === c.path)!
-      payPerk(st, o, perk, k.unknowns && c.index !== undefined ? `The Unknown ${c.index + 1} → ${roomName(st, e.to)}` : undefined)
+      const who = k.unknowns && c.index !== undefined ? `The Unknown ${c.index + 1} ` : ''
+      if (palletOn(st, e.path.id)) {
+        payPerk(st, o, perk, `${who}ทุบ Pallet ทางไป ${roomName(st, e.to)} — อยู่ที่เดิม`)
+        return perkPalletStop(st, c.index, e.path.id)
+      }
+      payPerk(st, o, perk, perk === 'bitter_murmur' ? `${who}เดินต่อไป ${roomName(st, e.to)}` : who ? `${who}→ ${roomName(st, e.to)}` : undefined)
       return asUnknown(st, c.index, () => killerMovedBy(st, e.path, e.to))
     }
     case 'unnerving_presence':
@@ -4367,11 +4391,6 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       st.queue.unshift({ k: 'cardMove', s, card: c.card as PathKind }, { k: 'activeBack', s: st.activeSurvivor })
       st.activeSurvivor = s
       return
-    }
-    case 'bitter_murmur': {
-      const e = exits(st, k.room, 'any').find((x) => x.path.id === c.path)!
-      payPerk(st, o, perk, `เดินต่อไป ${roomName(st, e.to)}`)
-      return killerMovedBy(st, e.path, e.to)
     }
     case 'claustrophobia':
       payPerk(st, o, perk, `วาง Entity บนเส้นทาง ${roomName(st, pathDef(st, c.path!).a)} ↔ ${roomName(st, pathDef(st, c.path!).b)} — ผู้รอดชีวิตผ่านไม่ได้`)

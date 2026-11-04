@@ -891,6 +891,10 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p v-else-if="step.item === 'emp'">
         {{ st.killer.name }} กำลังจะ Interact กับ <b>{{ st.survivors[step.holders[0]].name }}</b> — ในห้องมี <b>EMP</b> หงายอยู่: ทิ้ง EMP เพื่อให้ {{ st.killer.name }} Interact ไม่ได้เทิร์นนี้ไหม?
       </p>
+      <!-- The Unknown: a Flashlight on any Unknown stops the one interacting, wherever it is -->
+      <p v-else-if="st.killer.unknowns">
+        The Unknown {{ (st.killer.unknownAt ?? 0) + 1 }} กำลังจะ Interact ที่ {{ roomName(st, st.killer.room) }} — ใช้ <b>Flashlight</b> ใส่ The Unknown ในห้องของคุณเพื่อกันไว้ไหม?
+      </p>
       <p v-else>{{ st.killer.name }} กำลังจะ Interact ในห้องของคุณ — ใช้ <b>Flashlight</b> กันไว้ไหม?</p>
       <!-- an item kept by Built to Last on an earlier turn: the card forbids only that turn -->
       <p v-for="s in step.holders.filter(keptBefore)" :key="`kept-${s}`" class="board-hint">

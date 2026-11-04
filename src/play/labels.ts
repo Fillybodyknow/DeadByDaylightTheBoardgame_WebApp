@@ -365,10 +365,13 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     case 'brutal_strength':
       return `ผลัก ${name((w as { target: number }).target)} ไปทาง ${pathLabel(st, c.path!, st.survivors[(w as { target: number }).target].room)}`
     case 'agitation':
-    case 'beast_of_prey': {
-      // The Unknown: the mini that takes the move, from its own room
-      if (c.index === undefined) return `เดินทาง ${pathLabel(st, c.path!, st.killer.room)}`
-      return `The Unknown ${c.index + 1}: เดินทาง ${pathLabel(st, c.path!, unknownRooms(st)[c.index] ?? st.killer.room)}`
+    case 'beast_of_prey':
+    case 'bitter_murmur': {
+      // The Unknown: the mini that takes the move, from its own room; a pallet on the path breaks
+      const go = perk === 'bitter_murmur' ? 'เดินต่อทาง' : 'เดินทาง'
+      const pallet = palletOn(st, c.path!) ? ' (ทุบ Pallet อยู่ที่เดิม)' : ''
+      if (c.index === undefined) return `${go} ${pathLabel(st, c.path!, st.killer.room)}${pallet}`
+      return `The Unknown ${c.index + 1}: ${go} ${pathLabel(st, c.path!, unknownRooms(st)[c.index] ?? st.killer.room)}${pallet}`
     }
     case 'sprint_burst':
       return `วิ่งต่อทาง ${pathLabel(st, c.path!, from(o))}`
@@ -683,7 +686,6 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     case 'inner_healing':
       return 'หายบาดเจ็บ (ทิ้งการ์ดนี้)'
     case 'dark_sense':
-    case 'bitter_murmur':
       return `เดินต่อทาง ${pathLabel(st, c.path!, o === 'killer' ? st.killer.room : st.survivors[o].room)}`
     case 'deja_vu':
       return `ซ่อม Generator ที่ ${roomName(st, prop(st, c.prop!).room!)}`

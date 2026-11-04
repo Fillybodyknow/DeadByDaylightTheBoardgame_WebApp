@@ -12,6 +12,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.32.0',
+    date: '2026-11-04',
+    items: [
+      'The Unknown: Bitter Murmur ให้ The Unknown ตัวไหนก็ได้เดินต่อ ไม่ใช่แค่ตัวที่เพิ่งเดินผ่าน (ตามคำตอบของผู้ทำเกม)',
+      'The Unknown: ผู้รอดชีวิตที่อยู่ห้องเดียวกับ The Unknown ตัวไหนก็ได้ ใช้ Flashlight กันตัวที่กำลังจะ Interact ได้ แม้จะอยู่คนละห้อง',
+      'Agitation, Beast of Prey และ Bitter Murmur เลือกเส้นทางที่มี Pallet ได้แล้ว: ทุบ Pallet แล้วอยู่ที่เดิม (Bitter Murmur เสียการ Interact เทิร์นนั้น)',
+      'ขอย้อนการกระทำล่าสุด (โหวต) เป็นตัวเลือกในการตั้งค่าห้องแล้ว: หัวห้องเปิด/ปิดได้ที่ Lobby ค่าเริ่มต้นคือปิด',
+    ],
+  },
+  {
     version: '1.31.1',
     date: '2026-11-04',
     items: ['ไฟกระชาก (Jolt): ลูกเต๋าทอยให้เห็นก่อน แล้วฆาตกรค่อยถูกถามว่าจะใช้ไหม'],
