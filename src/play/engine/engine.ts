@@ -808,16 +808,15 @@ function allSurvivorInteractions(st: GameState, s: number): SurvivorInteraction[
   if (victorRoom(st) === sv.room) out.push({ k: 'removeVictor' })
   // Power Struggle (Élodie): with the killer (Charlotte for The Twins), before their first card.
   if (struggleCard(st, sv.room) >= 0 && perkReady(st, s, 'power_struggle')) out.push({ k: 'powerStruggle' })
-  // Diversion (Adam): send the killer in this room along any path but one with a pallet (a wall
-  // he breaks on the way, as on any move of his).
+  // Diversion (Adam): send the killer in this room along any path (a wall he breaks on the way, as
+  // on any move of his; a pallet breaks too and he stays, as Agitation's move — p.14).
   // By the normal movement rules (the designer's ruling): not against a one-way (vault) path.
   // The Unknown: interacting with one in the room, any Unknown may be the one sent, along a path
   // out of its own room (the designers' ruling, Discord, Nov 2026: every Unknown is the Killer).
   if (killerIn(st, sv.room) && victorRoom(st) !== sv.room && perkReady(st, s, 'diversion')) {
-    const free = (room: string) => exits(st, room, 'any').filter((e) => !palletOn(st, e.path.id))
     if (st.killer.unknowns)
-      unknownRooms(st).forEach((r, unknown) => r && free(r).forEach((e) => out.push({ k: 'diversion', path: e.path.id, unknown })))
-    else for (const e of free(sv.room)) out.push({ k: 'diversion', path: e.path.id })
+      unknownRooms(st).forEach((r, unknown) => r && exits(st, r, 'any').forEach((e) => out.push({ k: 'diversion', path: e.path.id, unknown })))
+    else for (const e of exits(st, sv.room, 'any')) out.push({ k: 'diversion', path: e.path.id })
   }
   return out
 }
@@ -2213,6 +2212,11 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       const from = unknown !== undefined ? (unknownRooms(st)[unknown] ?? sv.room) : sv.room
       const p = pathDef(st, i.path)
       const to = p.a === from ? p.b : p.a
+      if (palletOn(st, i.path)) {
+        payPerk(st, s, 'diversion', `${unknownName(st, unknown)} ทุบ Pallet ทางไป ${roomName(st, to)} — อยู่ที่เดิม (ฆาตกร +1 ▲)`)
+        gainKiller(st, 1)
+        return perkPalletStop(st, unknown, i.path)
+      }
       payPerk(st, s, 'diversion', `ส่ง ${unknownName(st, unknown)} ไป ${roomName(st, to)} (ฆาตกร +1 ▲)`)
       gainKiller(st, 1)
       return asUnknown(st, unknown, () => killerMovedBy(st, p, to))
@@ -2465,7 +2469,8 @@ function perkPalletStop(st: GameState, index: number | undefined, path: string) 
   const other = !!k.unknowns && index !== undefined && index !== (k.unknownAt ?? 0)
   const could = st.canInteract
   palletStop(st, path)
-  if (other) st.canInteract = could
+  // Diversion is played on a survivor's turn: the killer has no interaction of his own to lose
+  if (other || st.phase !== 'killer') st.canInteract = could
 }
 
 function finishKillerMove(st: GameState, path: PathDef, to: string) {
@@ -3925,17 +3930,18 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       if (w.k !== 'planningStart') return []
       return st.survivors.flatMap((sv, i) => (sv.status === 'board' && sv.planned === null && st.survivorHands[sv.hand].length ? [{ target: i }] : []))
     case 'starstruck': {
-      // about to pick someone up: along any path (not through a pallet; a wall he breaks), and
-      // another survivor there is picked up instead, wounded or not
+      // about to pick someone up: along any path (a wall he breaks; a pallet breaks and stops
+      // him), and another survivor there is picked up instead, wounded or not
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')
       // (Red Herring, asked first, may have turned it into damaging a generator)
       // (The Unknown: any Unknown moves, from its own room, and picks up there: `index`)
       if (w.k !== 'preKillerInteract' || !w.pickUp || !task || task.i.k !== 'pickUp' || k.asVictor) return []
       const out: PerkChoice[] = []
+      // a pallet on the way breaks and he stays, as Agitation's move (p.14): the path is offered,
+      // on the survivor beyond it, and nobody is picked up.
+      // `exits`, as every other perk move: not back up a one-way (vault) path, not over Shadow Step.
       const from = (room: string, index?: number) => {
-        for (const p of touchingPaths(st, room)) {
-          if (palletOn(st, p.id)) continue
-          const to = p.a === room ? p.b : p.a
+        for (const { path: p, to } of exits(st, room, 'any')) {
           for (const t of onBoardIn(st, to)) if (t !== w.target) out.push(index === undefined ? { path: p.id, target: t } : { path: p.id, target: t, index })
         }
       }
@@ -5241,6 +5247,13 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       const to = p.a === from ? p.b : p.a
       const task = st.queue.find((t): t is Extract<Task, { k: 'killerDo' }> => t.k === 'killerDo')!
       const who = k.unknowns && c.index !== undefined ? `The Unknown ${c.index + 1} ` : ''
+      // A pallet on the way breaks and he stays (p.14), so he reaches nobody: the pick-up this
+      // perk replaces doesn't happen either, as Bitter Murmur loses its interaction.
+      if (palletOn(st, c.path!)) {
+        payPerk(st, o, perk, `${who}ทุบ Pallet ทางไป ${roomName(st, to)} — อยู่ที่เดิม ไม่ได้อุ้มใคร`)
+        st.queue.splice(st.queue.indexOf(task), 1)
+        return perkPalletStop(st, c.index, c.path!)
+      }
       payPerk(st, o, perk, `${who}ไป ${roomName(st, to)} แล้วอุ้ม ${name(c.target!)} แทน`)
       task.i = { k: 'pickUp', target: c.target! }
       // The Unknown: another one moves and picks up (a carry included), then the one playing the

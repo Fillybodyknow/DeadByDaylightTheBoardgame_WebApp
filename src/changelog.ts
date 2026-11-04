@@ -12,6 +12,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.33.0',
+    date: '2026-11-04',
+    items: [
+      'Starstruck และ Diversion เลือกเส้นทางที่มี Pallet ได้แล้ว เหมือน Agitation: ทุบ Pallet แล้วอยู่ที่เดิม',
+      'Starstruck ที่โดน Pallet ขวาง จะไม่ได้อุ้มใครเลย แม้แต่คนที่กำลังจะอุ้ม และเสียการ Interact เทิร์นนั้น',
+      'Diversion ที่โดน Pallet ขวาง ผู้รอดชีวิตยังเสีย ▲ และฆาตกรยังได้ ▲ ตามเดิม',
+      'แก้บั๊ก Starstruck: เดินย้อนขึ้นทาง Vault หรือข้าม Entity ของ Shadow Step ไม่ได้แล้ว ใช้กฎการเคลื่อนที่ชุดเดียวกับ Perk อื่น',
+    ],
+  },
+  {
     version: '1.32.3',
     date: '2026-11-04',
     items: [

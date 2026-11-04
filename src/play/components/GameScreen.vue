@@ -394,9 +394,11 @@ const boardFocus = computed(() => {
     // from the survivor's room; for The Unknown, from the room of the one sent (any of them)
     const own = s.t === 'survivorInteract' ? st.survivors[s.s].room : st.killer.room
     const from = pick >= 0 ? (unknownRooms(st)[pick] ?? own) : own
-    const dests = paths.map((id) => {
+    // a pallet stops him: he breaks it and stays, so no room beyond is pointed at
+    const dests = paths.flatMap((id) => {
+      if (palletOn(st, id)) return []
       const p = boardOf(st).paths.find((x) => x.id === id)!
-      return p.a === from ? p.b : p.a
+      return [p.a === from ? p.b : p.a]
     })
     return { survivors: [], killer: true, rooms: [from], paths, dests }
   }

@@ -801,8 +801,10 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
 - Spirit Fury: any pallet the killer breaks, also one broken with Enduring.
 - Diversion (Adam): an interaction with the killer in his room. "Any path" means any colour, but
   by the normal movement rules: not against a one-way (vault) path (the designer's ruling, through
-  Level 99). A wall on it the killer breaks on the way (as on any move of his), but a path with a
-  pallet isn't offered. The killer reveals a prop where he arrives, as on any move.
+  Level 99). A wall on it the killer breaks on the way (as on any move of his); a **pallet** on it
+  he breaks too and stays where he is, as a perk's move does (p.14) — the survivor still pays and
+  he still gains his ▲, and nothing of his own turn is touched (it is theirs). The killer reveals
+  a prop where he arrives, as on any move.
 - Autodidact: one die of a success (not a great one already, nor a failure Iron Will counts as
   a success) becomes a great success, on any roll of a survivor in Adam's room or a connected
   one — struggling free from a carry too (one great success frees them). Not on a Phantasm roll.
@@ -996,11 +998,16 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   player confirms, paying at 2 ▲ or refusing once everyone has said and it is short; until then
   anyone may change what they put in. Refused (or not 2 ▲ among them), the killer picks from that
   survivor's hand and the card is set face up, as Stridor's is.
-- Starstruck: when he would pick someone up, he moves along a path from his room (not through a
-  pallet; a wall breaks, as on his other moves) and picks up another survivor on the board there,
+- Starstruck: when he would pick someone up, he moves along a path from his room (a wall breaks, as
+  on his other moves; by the normal movement rules, so not back up a one-way (vault) path and not
+  over Shadow Step's Entity) and picks up another survivor on the board there,
   wounded or not, wounded this round or not. The move reveals the room and sets off what an
   entry does, but not Head On (it isn't his turn's move). Someone who hides as he comes in
-  (Quick & Quiet) is not picked up. The Unknown: any Unknown moves, from its own room, and picks
+  (Quick & Quiet) is not picked up. A **pallet** on the path he breaks, and stays where he is, as
+  a perk's move does (p.14): he reaches nobody, so the pick-up this perk replaces doesn't happen
+  either — not even on the survivor he was about to take — and his interaction for the turn is
+  gone, as Bitter Murmur's is. The path is offered on the survivor beyond it.
+  The Unknown: any Unknown moves, from its own room, and picks
   up there (`index`; a carry included); the one playing the turn takes it back after the pick-up
   (the designers' ruling, Discord, Nov 2026).
 - Fast Track / Self-Preservation (Yun-Jin): "the turn" is any turn, a survivor's or one of the

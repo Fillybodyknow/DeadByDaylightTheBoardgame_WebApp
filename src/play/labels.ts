@@ -197,7 +197,10 @@ export function survivorInteractionLabel(st: GameState, s: number, i: SurvivorIn
       // (The Unknown: any of them, along a path out of its own room)
       const u = i.unknown ?? (st.killer.unknowns ? unknownRooms(st).indexOf(room) : -1)
       const from = u < 0 ? room : (unknownRooms(st)[u] ?? room)
-      return `หันเหความสนใจ: ส่ง ${u < 0 ? st.killer.name : `The Unknown ${u + 1}`} ไปทาง ${pathLabel(st, i.path, from)} (ฆาตกร +1 ▲)`
+      const who = u < 0 ? st.killer.name : `The Unknown ${u + 1}`
+      // a pallet on it breaks and he stays, as a perk's move does (p.14)
+      if (palletOn(st, i.path)) return `หันเหความสนใจ: ${who} ทุบ Pallet ทาง ${pathLabel(st, i.path, from)} — อยู่ที่เดิม (ฆาตกร +1 ▲)`
+      return `หันเหความสนใจ: ส่ง ${who} ไปทาง ${pathLabel(st, i.path, from)} (ฆาตกร +1 ▲)`
     }
   }
 }
@@ -632,7 +635,10 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       const other = st.killer.unknowns && c.index !== undefined
       const from = other ? (unknownRooms(st)[c.index!] ?? st.killer.room) : st.killer.room
       const p = pathDef(st, c.path!)
-      return `${other ? `The Unknown ${c.index! + 1}: ` : ''}ไป ${roomName(st, p.a === from ? p.b : p.a)} แล้วอุ้ม ${name(c.target!)} แทน`
+      const to = roomName(st, p.a === from ? p.b : p.a)
+      const head = other ? `The Unknown ${c.index! + 1}: ` : ''
+      if (palletOn(st, c.path!)) return `${head}ทุบ Pallet ทางไป ${to} — อยู่ที่เดิม ไม่ได้อุ้มใคร`
+      return `${head}ไป ${to} แล้วอุ้ม ${name(c.target!)} แทน`
     }
     case 'solidarity':
       return `รักษา ${name(c.target!)} ที่ ${roomName(st, st.survivors[c.target!].room)}`

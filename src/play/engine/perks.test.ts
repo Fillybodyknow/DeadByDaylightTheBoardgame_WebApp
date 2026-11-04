@@ -1204,6 +1204,31 @@ describe('Adam Francis', () => {
     expect(send('mine-entrance')).toBe(false)
   })
 
+  it("Diversion along a pallet's path: the killer breaks it and stays, and still gains his ▲", () => {
+    const st = adam('diversion')
+    const room = st.killer.room
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', planned: 'sneak', plannedRevealed: true }))
+    st.survivors[0].room = room
+    st.survivors[0].bp = 6
+    const p = touchingPaths(st, room)[0]
+    const pallet = st.props.find((x) => x.kind === 'pallet')!
+    Object.assign(pallet, { room: null, path: p.token ?? p.id, revealed: true, removed: false })
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.canInteract = true
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const i = survivorInteractions(st, 0).find((x) => x.k === 'diversion' && x.path === p.id)!
+    expect(i).toBeDefined()
+    const bp = st.killer.bp
+    const after = apply(st, { t: 'interact', i })
+    expect(after.killer.room).toBe(room)
+    expect(after.props.find((x) => x.id === pallet.id)!.removed).toBe(true)
+    expect(after.killer.bp).toBe(bp + 1)
+    // it is the survivors' phase, so nothing of the killer's own turn is touched
+    expect(after.phase).toBe('survivors')
+  })
+
   it('Diversion through a wall: the killer breaks it on the way', () => {
     const st = adam('diversion')
     const room = st.killer.room
@@ -1624,6 +1649,52 @@ describe('The Trickster', () => {
     expect(g.killer.room).toBe(to)
     expect(g.survivors[2].status).toBe('carried')
     expect(g.survivors[0].status).toBe('board')
+  })
+
+  it('Starstruck keeps to the normal movement rules: not back up a vault, not over Shadow Step', () => {
+    // MacMillan's p2 is a vault path from Foundry Upper Floor into Mine Entrance
+    const offers = (room: string, shadow = false) => {
+      const st = trickster('starstruck')
+      st.props.forEach((x) => x.kind === 'pallet' && (x.removed = true))
+      const other = room === 'foundry-upper' ? 'mine-entrance' : 'foundry-upper'
+      st.killer.room = room
+      Object.assign(st.survivors[0], { room, wounded: true })
+      Object.assign(st.survivors[2], { room: other })
+      st.survivors[1].room = 'backlot'
+      st.survivors[3].room = 'backlot'
+      if (shadow) st.entity = { path: 'p2', shadow: true }
+      const offered = apply(st, { t: 'interact', i: { k: 'pickUp', target: 0 } })
+      if (offered.step.t !== 'offer') return false
+      return perkChoices(offered, 'starstruck', 'killer', offered.step.w).some((c) => c.path === 'p2')
+    }
+    expect(offers('foundry-upper')).toBe(true)
+    // the far end: going back up the one-way path is not a move he may make
+    expect(offers('mine-entrance')).toBe(false)
+    // Shadow Step shuts the path for everyone, the killer too
+    expect(offers('foundry-upper', true)).toBe(false)
+  })
+
+  it("Starstruck along a pallet's path: it breaks, he stays, and nobody is picked up at all", () => {
+    const st = trickster('starstruck')
+    st.killer.room = 'shack'
+    const to = next(st, 'shack')
+    Object.assign(st.survivors[0], { wounded: true })
+    st.survivors[2].room = to
+    const p = touchingPaths(st, 'shack').find((x) => (x.a === to || x.b === to))!
+    const pallet = st.props.find((x) => x.kind === 'pallet')!
+    Object.assign(pallet, { room: null, path: p.token ?? p.id, revealed: true, removed: false })
+    // (a stop before the turn ends, where the lost interaction still shows)
+    st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+    const offered = apply(st, { t: 'interact', i: { k: 'pickUp', target: 0 } })
+    const w = (offered.step as Extract<GameState['step'], { t: 'offer' }>).w
+    const c = perkChoices(offered, 'starstruck', 'killer', w).find((x) => x.path === p.id && x.target === 2)!
+    expect(c).toBeDefined()
+    const g = apply(offered, { t: 'perk', perk: 'starstruck', use: true, choice: c })
+    expect(g.killer.room).toBe('shack')
+    expect(g.props.find((x) => x.id === pallet.id)!.removed).toBe(true)
+    // the pick-up this perk replaces doesn't happen either
+    expect(g.survivors.every((sv) => sv.status === 'board')).toBe(true)
+    expect(g.step).toMatchObject({ t: 'killerInteract', canInteract: false })
   })
 
   it('Starstruck: landing on a free hook, the one he picks up is hung there at once', () => {

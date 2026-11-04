@@ -415,6 +415,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         for (const i of survivorInteractions(st, s.s)) {
           if (i.k !== 'diversion' || (i.unknown ?? -1) !== u) continue
           add(spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select))
+          // a pallet stops him: he breaks it and stays, so no room beyond is pointed at
+          if (palletOn(st, i.path)) continue
           const p = pathDef(st, i.path)
           out[out.length - 1].dest = p.a === from ? p.b : p.a
         }
