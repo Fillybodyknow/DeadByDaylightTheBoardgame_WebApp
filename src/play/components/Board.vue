@@ -15,7 +15,7 @@ import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini, unknownMini, roundEffects } from '../labels'
+import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, GUARD_SYMBOL, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini, unknownMini, roundEffects } from '../labels'
 import Mini from './Mini.vue'
 import PingLayer from './PingLayer.vue'
 import { canPing, pingArmed, sendPing, shownPings } from '../pings'
@@ -334,15 +334,38 @@ function roomCentre(room: string): [number, number] {
 
 const pathAt = (path: string) => pathDef(props.st, path).at as [number, number]
 
-/** Mini positions at the last render, to animate from. */
+/** Mini positions at the last render, to animate from, and which Unknown was the killer's mini. */
 let prevMinis = new Map<string, Rect>()
-onMounted(() => (prevMinis = new Map(rects.value.minis)))
+let prevUnknownAt = 0
+onMounted(() => {
+  prevMinis = new Map(rects.value.minis)
+  prevUnknownAt = props.st.killer.unknownAt ?? 0
+})
+
+/**
+ * The Unknown's minis as they were, keyed as they are now. The killer's mini ('k') is whichever
+ * Unknown plays now, so when the turn passes to another, 'k' starts from where that one stood
+ * (not from the last one's place), and the last one, now 'u<n>', from where 'k' was.
+ */
+function unknownSwap(from: Map<string, Rect>, was: number): Map<string, Rect> {
+  const now = props.st.killer.unknownAt ?? 0
+  if (!props.st.killer.unknowns || now === was) return from
+  const out = new Map(from)
+  const k = from.get('k')
+  const next = from.get(`u${now}`)
+  if (next) out.set('k', next)
+  else out.delete('k')
+  if (k) out.set(`u${was}`, k)
+  out.delete(`u${now}`)
+  return out
+}
 
 watch(
   () => props.st.log.length,
   async (len, old) => {
-    const from = prevMinis
+    const from = unknownSwap(prevMinis, prevUnknownAt)
     prevMinis = new Map(rects.value.minis)
+    prevUnknownAt = props.st.killer.unknownAt ?? 0
     if (old === undefined || len <= old) return
     const fresh = props.st.log.slice(old).flatMap((e) => (e.ev ? [e.ev] : []))
     await nextTick()
@@ -820,6 +843,7 @@ function guard(e: MouseEvent) {
         @pointerleave="pressEnd"
       >
         <img :src="asset(GUARD_IMAGE[g])" :alt="GUARD_NAMES[g]" draggable="false" />
+        <img class="guard-symbol" :src="asset(GUARD_SYMBOL[g])" alt="" draggable="false" />
         <b v-if="r.guards.length === 1" class="guard-name">{{ GUARD_NAMES[g] }}</b>
       </button>
       <!-- Two or three Guards in one room: their names on one line under them, not one each,
@@ -1287,6 +1311,31 @@ button.tile.picked::after {
     0 0 0 3.5px #7d241e,
     0 0 0 5px rgb(0 0 0 / 0.7),
     0 0 10px 3px rgb(200 40 30 / 0.45);
+}
+/* The Guard's face and its symbol take turns: the symbol fades in over the face and out again. */
+.mini > img.guard-symbol {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: guard-symbol 8s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes guard-symbol {
+  0%,
+  40% {
+    opacity: 0;
+  }
+  50%,
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* with motion reduced, the face stays */
+:global(html.reduce-motion) .mini > img.guard-symbol {
+  animation: none;
 }
 /* the name under the mini, for anyone who doesn't know the colours yet */
 .guard-name {

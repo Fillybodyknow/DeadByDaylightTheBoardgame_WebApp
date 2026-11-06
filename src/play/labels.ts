@@ -61,6 +61,12 @@ export const GUARD_IMAGE = {
   assassin: 'assets/killers/tokens/knight-assassin.webp',
   jailer: 'assets/killers/tokens/knight-jailer.webp',
 } as const
+/** Each Guard's symbol, which their mini on the map fades to and back. */
+export const GUARD_SYMBOL = {
+  carnifex: 'assets/killers/mini/knight_carnifex_symbol.webp',
+  assassin: 'assets/killers/mini/knight_assassin_symbol.webp',
+  jailer: 'assets/killers/mini/knight_jailer_symbol.webp',
+} as const
 export const TONIC_IMAGE = 'assets/killers/tokens/clown-afterpiece-tonic.webp'
 export const ANTIDOTE_IMAGE = 'assets/killers/tokens/clown-afterpiece-antidote.webp'
 /** The Plague's Vile Purge token (resized to 256 px, as Madness). */

@@ -158,7 +158,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 - **The Knight's Guards say which they are on the map** (`Board`): their three pictures are alike
   at a mini's size, so each has its own colour on the inside of its ring (the killer's red stays
   outside) and its name under it (two or three in one room share a single line of names, so the
-  props under them stay clear). Clicking one opens the killer's details on it (`InspectTarget` `{ k: 'guard' }`),
+  props under them stay clear). Each mini fades back and forth between the Guard's face and its
+  symbol (`GUARD_SYMBOL`, an 8 s CSS loop; with motion reduced, the face stays). Clicking one opens the killer's details on it (`InspectTarget` `{ k: 'guard' }`),
   where all three are listed with what they do and where they stand — reachable by both sides.
   The tooltip was the only name before, which a tablet never shows and which the survivors, who
   don't see the killer's power panel, had no way to reach.
