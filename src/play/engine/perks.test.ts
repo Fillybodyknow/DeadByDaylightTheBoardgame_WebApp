@@ -412,6 +412,43 @@ describe('perks', () => {
     expect(done.step.t).not.toBe('roll')
   })
 
+  /** Survivor 1 about to repair in the Scrapyard with survivor 0 (who has Bond) beside them. */
+  function bondRepair(killer: string, ...perks: PerkId[]) {
+    const st = game(killer)
+    only(st, 'bond', ...perks)
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'backlot', planned: 'sneak', acted: true }))
+    st.survivors[0].room = 'scrapyard'
+    st.survivors[1].room = 'scrapyard'
+    st.killer.room = 'scrapyard'
+    const gen = placeProp(st, 'generator', 'scrapyard')
+    Object.assign(st, { phase: 'survivors', activeSurvivor: 1 })
+    st.step = { t: 'survivorInteract', s: 1, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 1 }]
+    st.killer.planned = ['wait', 'wait']
+    return { st, gen }
+  }
+
+  it('Bond, then a danger die perk of the killer: the later perk wins, one danger die (Bond still paid)', () => {
+    const { st, gen } = bondRepair('trapper', 'unnerving_presence')
+    let g = apply(st, { t: 'interact', i: { k: 'repair', prop: gen.id } })
+    g = apply(g, { t: 'perk', perk: 'bond', use: true, choice: {} })
+    expect(g.step).toMatchObject({ t: 'offer', perk: 'unnerving_presence', owner: 'killer' })
+    g = apply(g, { t: 'perk', perk: 'unnerving_presence', use: true, choice: {} })
+    for (let n = 0; n < 4 && g.step.t === 'roll'; n++) g = apply(g, legalActions(g)[0])
+    const roll = g.log.filter((e) => e.ev?.k === 'roll').at(-1)!
+    expect(roll.dice!.map((d) => d.kind)).toEqual(['danger'])
+    expect(g.survivors[0].bp).toBe(5)
+  })
+
+  it("Bond replaces Madness's danger die: two skill dice (the passive comes first)", () => {
+    const { st, gen } = bondRepair('doctor')
+    st.survivors[1].madness = true
+    let g = apply(st, { t: 'interact', i: { k: 'repair', prop: gen.id } })
+    g = apply(g, { t: 'perk', perk: 'bond', use: true, choice: {} })
+    expect(g.step).toMatchObject({ t: 'roll', keep: true })
+    expect((g.step as Extract<GameState['step'], { t: 'roll' }>).dice.map((d) => d.kind)).toEqual(['skill', 'skill'])
+  })
+
   it('Tinkerer swaps an unplayed planned card for one in hand when a generator is done', () => {
     const offered = findOutcome(
       (rng) => {

@@ -741,8 +741,15 @@ Perks:
   the roll of the locker being searched: Unnerving Presence, Thanatophobia, Bond, Off the Record
   and Lucky Break all skip them, whether or not the card names a space. Searching the locker is
   the killer's way to them.
-- Bond with a danger die: two danger dice, keep one. When two dice are rolled and one kept, the
-  killer gains 1 ▲ if either failed (p.18).
+- A perk that changes the dice changes all of them, never adds one, and the last one used wins
+  (a community ruling, from the designers' answer on Discord). The passives come first (Madness,
+  the Jailer), then the perks in the order they are asked (the survivors', then the killer's,
+  p.16). So Bond on someone with Madness rolls two skill dice, keep one; a danger-die perk of the
+  killer's (Unnerving Presence, Thanatophobia, Sloppy Butcher...) after Bond rolls one danger
+  die, and Bond's ▲ stays paid. (Before 1.36.1 the two stacked: two danger dice, keep one.) When
+  two dice are rolled and one kept, the killer gains 1 ▲ if either failed (p.18).
+- A key re-rolls one die of the player's choice ("any die"), Bond's two included, before one is
+  kept. On screen only that die's needle sweeps again.
 - Iron Will works on any survivor roll in range, danger dice included (a bear trap, a hatchet),
   but not on the carry roll. Every failed die counts as a success.
 - Huntress Lullaby also stops bonus-turn moves (they are made with a movement card).

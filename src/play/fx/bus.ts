@@ -23,6 +23,11 @@ export interface DiceShow {
   icon?: { src: string; round: boolean }
   /** Progress of the generator or gate, before and after this roll. */
   progress?: { before: number; after: number; max: number }
+  /**
+   * Dice already shown as they are (a key re-rolled another one, or the die Bond kept): their
+   * needles stand where they stopped instead of sweeping again.
+   */
+  still?: boolean[]
 }
 
 /** One mini's start-room roll (setup step 11), read back from the room the engine put it in. */

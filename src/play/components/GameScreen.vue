@@ -95,6 +95,14 @@ watch(view, () => {
 /** The dice of a roll that waited for a decision, already shown on screen. */
 let pendingShown: string | null = null
 
+/** Which of `dice` are on screen already, from the roll that waited (a key's re-roll changes one). */
+function stillDice(dice: Die[]): { still?: boolean[] } {
+  if (!pendingShown) return {}
+  const shown = (JSON.parse(pendingShown) as Die[]).map((d) => JSON.stringify(d))
+  const still = dice.map((d) => shown.includes(JSON.stringify(d)))
+  return still.some(Boolean) ? { still } : {}
+}
+
 /**
  * A roll waiting on a decision before it counts: a re-roll's (Iron Will, a key, Bond: the `roll`
  * step), or one a perk is offered on as rolled (Jolt: an offer in the `rolled` window).
@@ -172,10 +180,12 @@ watch(
         if (ev.id === 'chalk-pouch') afterRoll = card
         else showPerk(card)
       }
-      // A roll already shown while it waited for a decision, and kept as it was, isn't shown twice.
+      // A roll already shown while it waited for a decision, and kept as it was, isn't shown twice;
+      // a die of it kept (Bond's) stands still while the result shows
       if (e.dice && ev?.k === 'roll' && JSON.stringify(e.dice) !== pendingShown)
         showDice({
           dice: e.dice,
+          ...stillDice(e.dice),
           title: st.survivors[ev.s].name,
           ...diceResult(ev.ctx, e.dice),
           ...skillCheck(ev.ctx, e.dice, rollProgress(prev, ev.ctx, ev.prop, fresh.slice(n + 1))),
@@ -195,10 +205,13 @@ watch(
     if (pending) {
       const sig = JSON.stringify(pending.dice)
       if (sig !== pendingShown) {
-        pendingShown = sig
         const res = pending.keep ? { outcome: 'พันธะ — เลือกเก็บ 1 ลูก', tone: 'good' as const } : diceResult(pending.ctx, pending.dice)
+        // a key re-rolled one die: the others stand still (they were shown already)
+        const still = stillDice(pending.dice)
+        pendingShown = sig
         showDice({
           dice: pending.dice,
+          ...still,
           title: st.survivors[pending.s].name,
           outcome: `${res.outcome} — รอการตัดสินใจ`,
           tone: res.tone,

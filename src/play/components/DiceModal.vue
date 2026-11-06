@@ -73,7 +73,7 @@ function check(verdict: SkillVerdict, greatOnly: boolean, face?: number): Check 
 const checks = ref<Check[]>([])
 const angle = ref<number[]>([])
 // the needle's CSS transition is written at full length and played at the player's speed (settings.ts)
-const sweepMs = computed(() => (reducedMotion.value ? 0 : anim(Math.max(...checks.value.map((c) => (c.stop / SPEED) * 1000), 0))))
+const sweepMs = computed(() => (reducedMotion.value ? 0 : anim(Math.max(...checks.value.map((c, i) => (current.value?.still?.[i] ? 0 : (c.stop / SPEED) * 1000)), 0))))
 
 let timers: number[] = []
 function clear() {
@@ -90,7 +90,8 @@ watch(
     const greatOnly = c.greatOnly ?? c.dice.every((d) => d.kind === 'danger')
     const verdicts = c.verdicts ?? c.dice.map((d) => verdictOf(d, greatOnly))
     checks.value = verdicts.map((v, i) => check(v, greatOnly, c.dice[i]?.kind === 'skill' ? c.dice[i].face : undefined))
-    angle.value = checks.value.map(() => 0)
+    // a die already shown stands where it stopped: only the new ones sweep
+    angle.value = checks.value.map((k, i) => (c.still?.[i] ? k.stop : 0))
     phase.value = 'warn'
     fxSound.skillWarn()
     timers.push(

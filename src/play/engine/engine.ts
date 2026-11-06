@@ -1772,7 +1772,10 @@ function runTask(st: GameState, task: Task) {
       return
     }
     case 'roll': {
-      // Perks may have changed this skill check (danger die instead, two dice keep one).
+      // Perks may have changed this skill check (danger die instead, two dice keep one). A perk
+      // that changes the dice changes all of them, never adds one, and the last one used wins:
+      // Bond's two skill dice, or a danger die asked for after it (the killer's perks come after
+      // the survivors', p.16). The passives come before any perk: Bond replaces their danger die.
       const mods = st.rollMods
       st.rollMods = { danger: false, keep: false }
       // The Doctor's passive: survivors with Madness roll the danger die for skill checks.
@@ -1780,10 +1783,11 @@ function runTask(st: GameState, task: Task) {
       // The Knight's Jailer: a skill check in its room is a danger-die roll — not for someone in a
       // locker, who is off the board (p.12): being searched stays a skill check
       const jailed = st.survivors[task.ctx.s]
-      const jail = SKILL_CHECKS.includes(task.ctx.k) && !!st.guards?.jailer && jailed.status === 'board' && jailed.room === st.guards.jailer
+      const jail = !mods.keep && SKILL_CHECKS.includes(task.ctx.k) && !!st.guards?.jailer && jailed.status === 'board' && jailed.room === st.guards.jailer
       st.jailerRoll = jail ? task.ctx.s : null
       const ctx: RollContext = mods.retribution && task.ctx.k === 'cleanse' ? { ...task.ctx, retribution: true } : task.ctx
-      startRoll(st, ctx, mods.keep ? 2 : task.n, mods.danger || mad || jail ? 'danger' : task.kind, mods.keep)
+      const kind = mods.keep ? 'skill' : mods.danger || mad || jail ? 'danger' : task.kind
+      startRoll(st, ctx, mods.keep ? 2 : task.n, kind, mods.keep)
       return
     }
     case 'resume':
@@ -2329,6 +2333,15 @@ function sweetWilliam(st: GameState, s: number) {
   const before = st.survivors[s].bp
   gainSurvivor(st, s, 1)
   log(st, `${offeringName(o)}: ${st.survivors[s].name} +${st.survivors[s].bp - before} ▲`, s, { ev: { k: 'offering', who: s, id: o } })
+}
+
+/**
+ * A perk turns the roll to the danger die (Unnerving Presence, Thanatophobia, Sloppy Butcher...):
+ * one danger die, whatever was to be rolled, Bond's two skill dice too (the later perk wins).
+ */
+function dangerInstead(st: GameState) {
+  st.rollMods.danger = true
+  st.rollMods.keep = false
 }
 
 function placeEntity(st: GameState, place: EntityPlace) {
@@ -4339,14 +4352,14 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     case 'unnerving_presence':
     case 'thanatophobia':
       payPerk(st, o, perk, 'ทอย Danger Die แทน')
-      st.rollMods.danger = true
+      dangerInstead(st)
       return
 
     // ----- cards only, on no character's board (the edit-perks mode) -----
     case 'this_is_not_happening':
     case 'sloppy_butcher':
       payPerk(st, o, perk, 'ทอย Danger Die แทน')
-      st.rollMods.danger = true
+      dangerInstead(st)
       return
     case 'small_game':
       payPerk(st, o, perk, `${k.name} −2 ▲`)
@@ -4581,7 +4594,10 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
     }
     case 'bond':
       payPerk(st, o, perk, 'ทอย 2 ลูก เลือกเก็บ 1')
+      // two skill dice instead of whatever was to be rolled: a danger die a perk asked for before
+      // goes (the later perk wins); so does Madness's or the Jailer's, below
       st.rollMods.keep = true
+      st.rollMods.danger = false
       return
     case 'sprint_burst': {
       const m = anyMoves(st, o as number).find((x) => x.path.id === c.path)!
@@ -4925,7 +4941,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       return
     case 'retribution':
       payPerk(st, o, perk, 'ทอย Danger Die แทน — ถ้าสำเร็จ ฆาตกร +2 ▲')
-      st.rollMods.danger = true
+      dangerInstead(st)
       st.rollMods.retribution = true
       return
     case 'dead_mans_switch': {
@@ -5119,7 +5135,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       return placeGuard(st, c.guard!, c.room!)
     case 'nowhere_to_hide':
       payPerk(st, o, perk, 'ผู้รอดชีวิตใน Locker ทอย Danger Die แทน')
-      st.rollMods.danger = true
+      dangerInstead(st)
       return
     case 'hubris': {
       const s = (w as Extract<PerkWindow, { k: 'entered' }>).s
