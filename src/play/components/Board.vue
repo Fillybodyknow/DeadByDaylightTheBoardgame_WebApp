@@ -332,6 +332,17 @@ function roomCentre(room: string): [number, number] {
   return [x + w / 2, y + h / 2]
 }
 
+/**
+ * Keeps a looping CSS animation on the page's clock: started at the timeline's zero, every
+ * element with it is at the same point in the loop, whenever it was put on the board (the
+ * Guards' faces and symbols change all at once, a Guard placed or moved later too).
+ */
+const vInStep = {
+  mounted(el: HTMLElement) {
+    for (const a of el.getAnimations()) a.startTime = 0
+  },
+}
+
 const pathAt = (path: string) => pathDef(props.st, path).at as [number, number]
 
 /** Mini positions at the last render, to animate from, and which Unknown was the killer's mini. */
@@ -843,7 +854,7 @@ function guard(e: MouseEvent) {
         @pointerleave="pressEnd"
       >
         <img :src="asset(GUARD_IMAGE[g])" :alt="GUARD_NAMES[g]" draggable="false" />
-        <img class="guard-symbol" :src="asset(GUARD_SYMBOL[g])" alt="" draggable="false" />
+        <img v-in-step class="guard-symbol" :src="asset(GUARD_SYMBOL[g])" alt="" draggable="false" />
         <b v-if="r.guards.length === 1" class="guard-name">{{ GUARD_NAMES[g] }}</b>
       </button>
       <!-- Two or three Guards in one room: their names on one line under them, not one each,

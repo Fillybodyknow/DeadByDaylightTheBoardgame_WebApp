@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.37.1',
+    date: '2026-11-07',
+    items: [
+      'มินิ Guard ของ The Knight สลับเป็นสัญลักษณ์พร้อมกันทุกตัว รวมถึงตัวที่เพิ่งลงกระดานหรือเพิ่งย้ายห้อง',
+    ],
+  },
+  {
     version: '1.37.0',
     date: '2026-11-07',
     items: [
