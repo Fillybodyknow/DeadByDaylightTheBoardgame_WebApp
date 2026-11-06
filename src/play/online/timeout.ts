@@ -4,8 +4,17 @@
 // the planning is the player's own: running out of time on those only tells the room.
 
 import { pledgedPay, crowdPledges, rollHelpers, tryApply, weavePledges, WEAVING_COST } from '../engine/engine'
-import { mayAct, playerOfOwner, playerOfSurvivor } from '../engine/seats'
+import { actorsOf, mayAct, playerOfOwner, playerOfSurvivor } from '../engine/seats'
 import type { Action, GameState } from '../engine/types'
+
+/**
+ * One decision, for the clock: it changes with every new question (or new set of players being
+ * waited on), and not when the same state comes back from the room. The log's length is part of
+ * it because the same question comes up again word for word — the same perk offered at the start
+ * of every round — and two of those must not look like one, or the clock would never start over
+ * on the second and it would open already run out, with nothing to answer it.
+ */
+export const waitKeyOf = (st: GameState) => JSON.stringify([st.log.length, st.step, actorsOf(st)])
 
 /** The decisions a timer may answer "no" to (`answer` below): they run on the room's question time. */
 const QUESTIONS = new Set<GameState['step']['t']>(['offer', 'reaction', 'bonusOffer', 'killerBonusOffer', 'turnStart', 'vigo', 'whiteWard', 'phantasmChoice', 'twinChoice', 'roll', 'crowdPay', 'weavePay'])

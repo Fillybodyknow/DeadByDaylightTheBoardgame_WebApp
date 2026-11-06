@@ -3,7 +3,7 @@ import { apply, createGame, tryApply, type GameConfig } from './engine'
 import { legalActions } from './legal'
 import { actorsOf, handsToPlan, mayAct, playerOfSurvivor } from './seats'
 import type { Action, GameState, MoveCard } from './types'
-import { isQuestion, timeoutActions } from '../online/timeout'
+import { isQuestion, timeoutActions, waitKeyOf } from '../online/timeout'
 import { DEFAULT_SETTINGS, settingsChips, settingsOf, timeFor } from '../online/settings'
 import { tally, undoVoters } from '../online/undoRules'
 import type { RoomData, UndoVote } from '../online/transport'
@@ -473,6 +473,22 @@ describe('turn timer (room settings): what runs out of time answers', () => {
     expect(isQuestion(st)).toBe(false)
     expect(timeFor(s, isQuestion(st))).toBe(90)
   })
+
+  it('the same question in a later round is a decision of its own, so its clock starts over', () => {
+    let st = createGame({ ...config(1, 5), killer: { id: 'trickster', name: 'trickster' } })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    // Crowd Control is offered at the start of every round, word for word: step and players alike
+    const first = st
+    const offer = JSON.stringify([first.step, actorsOf(first)])
+    let again: GameState | null = null
+    for (let n = 0; n < 2000 && !again; n++) {
+      st = apply(st, legalActions(st)[0])
+      if (st.round > first.round && JSON.stringify([st.step, actorsOf(st)]) === offer) again = st
+    }
+    expect(again, 'the offer comes up again in a later round').not.toBeNull()
+    // telling them apart is what starts the clock again: without it the second opens run out
+    expect(waitKeyOf(again!)).not.toBe(waitKeyOf(first))
+  }, 60_000)
 })
 
 describe('undo by vote (online house rule)', () => {

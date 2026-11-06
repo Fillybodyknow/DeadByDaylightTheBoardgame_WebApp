@@ -19,7 +19,7 @@ import { STAND_IN_AFTER_MS, botDriver, closeOnlineGame, goneSince, isHost, leave
 import { pingHex } from '../online/pingColors'
 import { timeFor } from '../online/settings'
 import { canPing, pingArmed, pingWait } from '../pings'
-import { isQuestion, timeoutActions } from '../online/timeout'
+import { isQuestion, timeoutActions, waitKeyOf } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
 import { STEP_NAME, boardActionKeys, offerPerk, perkPicked, perksToPick, unknownPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
@@ -954,11 +954,13 @@ watch(
 
 const turnLimit = computed(() => (online.value && props.st.phase !== 'over' ? timeFor(roomSettings.value, isQuestion(props.st)) : 0))
 const fxBusy = computed(() => fx.dice.length > 0 || fx.perks.length > 0 || !!fx.finale || opening.value || fx.boardBusy)
-/** Changes with every new decision (or new set of players being waited on). */
-const waitKey = computed(() => JSON.stringify([props.st.step, actorsOf(props.st)]))
+/** Changes with every new decision (or new set of players being waited on): `waitKeyOf`. */
+const waitKey = computed(() => waitKeyOf(props.st))
 const turnStarted = ref(Date.now())
 const clock = ref(Date.now())
-watch([waitKey, fxBusy], () => (turnStarted.value = clock.value = Date.now()))
+/** Whether this decision has already been answered for them (reset with the clock). */
+let timedOut = false
+watch([waitKey, fxBusy], () => ((timedOut = false), (turnStarted.value = clock.value = Date.now())))
 let clockTimer: number | null = null
 watch(
   turnLimit,
@@ -1056,10 +1058,9 @@ const waitingNames = computed(() => {
   return actorsOf(props.st).map((p) => (seats[String(p)]?.bot ? '🤖 ' : '') + (seats[String(p)]?.name ?? `ผู้เล่น ${p}`))
 })
 
-let timedOut = ''
 watch(timeLeft, (t) => {
-  if (t !== 0 || !yourTurn.value || timedOut === waitKey.value) return
-  timedOut = waitKey.value
+  if (t !== 0 || !yourTurn.value || timedOut) return
+  timedOut = true
   const acts = timeoutActions(props.st, online.value!.seat)
   if (acts.length) {
     showBanner({ title: 'หมดเวลา', sub: 'ตอบ "ไม่ใช้" ให้อัตโนมัติ', tone: 'game' })
