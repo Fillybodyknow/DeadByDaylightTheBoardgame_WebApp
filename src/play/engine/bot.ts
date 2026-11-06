@@ -12,7 +12,7 @@
 // is (each use and passing it up, on the same dice), played on to the end of his round. The rest are
 // declined for the round.
 
-import { SACRIFICE_TO_WIN, apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, pathState, survivorMoves, twoPlayer, unknownRooms } from './engine'
+import { SACRIFICE_TO_WIN, apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, palletOn, pathState, survivorMoves, twoPlayer, unknownRooms } from './engine'
 import { legalActions } from './legal'
 import { KILLER_PLAYER, actorsOf, handsToPlan, mayAct } from './seats'
 import type { PerkId } from './perks'
@@ -919,21 +919,22 @@ function perkPick(st: GameState, acts: Action[]): Action | null {
 }
 
 /**
- * A use of a taught perk worth weighing at all. Brutal Strength only onto a bear trap, and only on
- * his last turn of the round: the survivors don't move between his turns, so someone wounded with a
- * card still to play is there to be picked up with it.
+ * A use of a taught perk worth weighing at all. Brutal Strength only onto a bear trap or through a
+ * pallet (the card breaks it): pushed anywhere else it took the survivor just wounded out of his
+ * reach. Which of the two, and whether the push beats standing still, is left to the score.
  */
 function worthTrying(st: GameState, a: Extract<Action, { t: 'perk' }>): boolean {
-  if (a.perk === 'brutal_strength') return !!a.choice?.path && !!pathState(st, a.choice.path)?.trap && lastTurn(st)
+  if (a.perk === 'brutal_strength') {
+    const path = a.choice?.path
+    if (!path) return false
+    return !!pathState(st, path)?.trap || !!palletOn(st, path)
+  }
   return true
 }
 
-/** The killer is playing his last card of the round (a bonus turn may still come). */
-const lastTurn = (st: GameState) => st.phase === 'killer' && st.killer.revealedCount >= st.killer.planned.length
-
 /**
  * The killer's taught perks while another choice is played out (no trying within a try): Brutal
- * Strength pushes the survivor onto a path with a bear trap when there is one. Null: declined.
+ * Strength pushes the survivor onto a bear trap or through a pallet when there is one. Null: declined.
  */
 function plainPerk(st: GameState, acts: Action[]): Action | null {
   for (const a of acts) {

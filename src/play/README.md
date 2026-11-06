@@ -575,13 +575,30 @@ host seats them in the lobby, and the host's device plays them.
   | Agitation | 63% | 290 | 113 |
   | Unnerving Presence | 70% | 304 | 142 |
   | Agitation and Unnerving Presence | 67% | 304 | 118 |
-  | all three (Brutal Strength as it is now) | **72%** | 273 | 236 |
+  | all three (Brutal Strength gated to a trap on his last card) | **72%** | 273 | 236 |
 
   Brutal Strength pushed anywhere took the survivor just wounded out of his reach: the
   survivors don't move between his turns, so with a card still to play he picks them up with it.
-  Now it pushes only onto a bear trap (a wounded survivor who fails its roll is a sacrifice
-  progress), and only on his last card. Unnerving Presence does the most: a skill check near him
+  Unnerving Presence does the most: a skill check near him
   on the danger die (used about 5 times a game). Spending ▲ on perks costs bonus turns (500 → 334).
+
+  **Pallets.** Both of his moving perks may take a path with a pallet on it (the killer breaks it;
+  Brutal Strength's card says so itself). Agitation always could, and does. Brutal Strength was
+  gated to a bear trap on his last card, so it never could; opening that gate was measured four
+  ways, 128 games on the seeds above and 256 more on fresh ones:
+
+  | Brutal Strength may push | Killer won (128) | Killer won (256, fresh seeds) | Pallets it broke |
+  |---|---|---|---|
+  | onto a trap, last card only (was) | 72% | 66% | — |
+  | onto a trap or a pallet, last card only | 77% | — | 0 of 42 offers |
+  | **onto a trap or a pallet, any card (now)** | **79%** | **70%** | 4 of 202 offers |
+  | onto a trap last card, a pallet any card | — | 65% | 9 of 190 offers |
+
+  The last-card rule had to go too: with it, a pallet push was offered 42 times and taken none.
+  Ahead in both samples (68% → 73% over 384 games each), though by about 1.4 times the spread, so
+  it is a small gain, not a proven one. The bot still rarely pushes through a pallet (4 games in
+  256): the score usually finds the survivor moved out of reach costs more than the pallet gains,
+  and that is its call to make, not a rule. Agitation breaks one about 30 times in 256 games.
 - **Not yet:** the other killers' perks, the survivors' perks, a key's re-roll.
 - **On one device** (`play/bots.ts`, driven from `GameScreen`): a bot moves once the screen has
   caught up with the move before it, after a short pause, so the people see each one. The side

@@ -20,6 +20,8 @@ import { boardOf,
   killerInteractions,
   killerMoves,
   merchantDrones,
+  artistCrows,
+  DIRE_CROWS,
   unknownRooms,
   mustMove,
   perkButtons,
@@ -40,6 +42,7 @@ import {
   ANTIDOTE_IMAGE,
   GUARD_IMAGE,
   PROP_IMAGE,
+  DIRE_CROW_IMAGE,
   TONIC_IMAGE,
   unknownMini,
   cardImage,
@@ -785,9 +788,16 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
               <span><b>The Unknown {{ u + 1 }}</b> — {{ room ? roomName(st, room) : 'ยังไม่อยู่บนกระดาน' }}{{ u === (st.killer.unknownAt ?? 0) && room ? ' · ตัวที่เล่นอยู่' : '' }}</span>
             </li>
           </ul>
-          <!-- The Skull Merchant: the Drones on his board -->
+          <!-- The Skull Merchant: the Drones on his board. With none there, "place" is not offered
+               at all, so it says why rather than leaving only "take back" with no reason. -->
           <ul v-if="st.killer.characterId === 'skullmerchant'" class="afterpiece">
             <li><img :src="asset(PROP_IMAGE.drone)" alt="" /><span><b>Drone</b> — Skill Check ในห้องที่มี Drone หงายหน้า: สำเร็จ คุณ +1 ▲, ล้มเหลว = บาดเจ็บ แล้ว Drone คว่ำลง · บนบอร์ดคุณ {{ merchantDrones(st).length }} ตัว</span></li>
+            <li v-if="!merchantDrones(st).length"><img :src="asset(PROP_IMAGE.drone)" alt="" /><span class="warn">ไม่มี Drone บนบอร์ด — <b>วางไม่ได้</b> ต้องเก็บ Drone หงายหน้าจากแผนที่กลับขึ้นบอร์ดก่อน</span></li>
+          </ul>
+          <!-- The Artist: what is still on her board to place -->
+          <ul v-if="st.killer.characterId === 'artist'" class="afterpiece">
+            <li><img :src="asset(PROP_IMAGE.crow)" alt="" /><span><b>Crow</b> — บนบอร์ดคุณ {{ artistCrows(st).crows }} ตัว</span></li>
+            <li><img :src="asset(DIRE_CROW_IMAGE)" alt="" /><span><b>Dire Crow</b> — ผู้รอดชีวิตในห้องนั้นวางการ์ดหงายก่อนใคร · บนบอร์ดคุณ {{ artistCrows(st).dire }}/{{ DIRE_CROWS }} ตัว</span></li>
           </ul>
           <!-- The Clown: what each token does, and where it stands now -->
           <ul v-if="st.killer.characterId === 'clown'" class="afterpiece">

@@ -61,6 +61,8 @@ export const PROGRESS_MAX = 3
 export const KILLER_BONUS_COST = 4
 export const PHANTASM_TRAPS = 7
 export const VILE_PURGES = 10
+/** The Artist's passive: her three Dire Crows, on her board at setup. */
+export const DIRE_CROWS = 3
 
 /** The killer's bonus turn costs 4 ▲; The Doctor's passive takes 1 off per survivor with Madness. */
 export function bonusCost(st: GameState): number {
@@ -321,7 +323,7 @@ export function createGame(config: GameConfig): GameState {
 
   // The Artist's passive: three Dire Crows on his board.
   if (config.killer.id === 'artist')
-    for (let d = 1; d <= 3; d++)
+    for (let d = 1; d <= DIRE_CROWS; d++)
       st.props.push({ id: `dire${d}`, kind: 'crow', category: 'altruism', room: null, path: null, revealed: true, removed: true, progress: 0, done: false, occupant: null, dire: true, artist: true })
 
   // Step 9: item deck.

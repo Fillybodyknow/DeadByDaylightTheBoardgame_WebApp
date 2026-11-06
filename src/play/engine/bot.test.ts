@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { botMove, nextActor } from './bot'
-import { apply, createGame, pathState, perkChoices, type GameConfig } from './engine'
+import { apply, createGame, palletOn, pathState, perkChoices, type GameConfig } from './engine'
 import { legalActions } from './legal'
 import { mayAct } from './seats'
 import type { GameState } from './types'
@@ -97,14 +97,26 @@ describe('bot perks: The Trapper', () => {
     expect(a?.t === 'perk' && pathState(st, a.choice!.path!).trap).toBe(true)
   }, 60_000)
 
-  it('Brutal Strength: not with a card still to play (they are there to be picked up), nor with no trap', () => {
-    for (const st of [attacked(false, true), attacked(true, false)]) {
+  it('Brutal Strength: with no bear trap and no pallet to push them through, it is passed up', () => {
+    for (const st of [attacked(false, false), attacked(true, false)]) {
       const a = botMove(st, 1)
       // passed up, to be asked again later in the round
       expect(a).toMatchObject({ t: 'perk', perk: 'brutal_strength', use: false })
       expect(a?.t === 'perk' && a.quiet).toBeFalsy()
     }
   })
+
+  it('Brutal Strength: a pallet on a path out is weighed — the push breaks it (p.14)', () => {
+    const st = attacked(true, false)
+    const w = { k: 'afterAttack', target: 0 } as const
+    const path = perkChoices(st, 'brutal_strength', 'killer', w)[0].path!
+    const pallet = st.props.find((p) => p.kind === 'pallet')!
+    Object.assign(pallet, { room: null, path, revealed: true, removed: false })
+    // with the pallet there the use is no longer gated away; whether he takes it is the score's call
+    const a = botMove(st, 1)
+    expect(a).toMatchObject({ t: 'perk', perk: 'brutal_strength' })
+    if (a?.t === 'perk' && a.use) expect(palletOn(st, a.choice!.path!)).toBeTruthy()
+  }, 60_000)
 
   it('a survivor bot still declines its perks for the round', () => {
     let st = createGame({ board: 'macmillan', survivors: ['dwight', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 9, bots: [1, 2, 3, 4, 5] })

@@ -3,11 +3,11 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { items, killerById, survivorById } from '../../data'
 import { asset, tr } from '../../i18n'
-import { ITEM_NAMES, PROP_NAMES, KILLER_BP, roomName, survivorMax } from '../engine/engine'
+import { BEAR_TRAPS, DIRE_CROWS, ITEM_NAMES, PHANTASM_TRAPS, PROP_NAMES, KILLER_BP, VILE_PURGES, artistCrows, merchantDrones, purgeSupply, roomName, survivorMax } from '../engine/engine'
 import type { GameState, PerkOwner } from '../engine/types'
 import { CATEGORY_TH, PROP_RULES, type InspectTarget } from '../inspect'
 import { PERKS } from '../engine/perks'
-import { BEAR_TRAP_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf, powerName } from '../labels'
+import { BEAR_TRAP_IMAGE, DIRE_CROW_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf, powerName } from '../labels'
 import { perkUsed } from '../engine/engine'
 import { itemHidden } from '../game'
 import Mini from './Mini.vue'
@@ -104,7 +104,12 @@ const item = computed(() => {
         </header>
         <ul class="facts">
           <li>{{ st.killer.bp }}/{{ KILLER_BP.max }} <BpIcon /></li>
-          <li v-if="st.killer.characterId === 'trapper'"><img class="inline" :src="asset(BEAR_TRAP_IMAGE)" alt="" /> เหลือ {{ st.killer.trapsInSupply }} อัน</li>
+          <!-- what he still has to place, out of the whole supply -->
+          <li v-if="st.killer.characterId === 'trapper'"><img class="inline" :src="asset(BEAR_TRAP_IMAGE)" alt="" /> เหลือ {{ st.killer.trapsInSupply }}/{{ BEAR_TRAPS }} อัน</li>
+          <li v-if="st.killer.characterId === 'hag'"><img class="inline" :src="asset('assets/killers/tokens/hag-phantasm-trap.webp')" alt="" /> เหลือ {{ PHANTASM_TRAPS - st.phantasm.length }}/{{ PHANTASM_TRAPS }} อัน</li>
+          <li v-if="st.killer.characterId === 'plague'"><img class="inline" :src="asset(VILE_PURGE_IMAGE)" alt="" /> เหลือ {{ purgeSupply(st) }}/{{ VILE_PURGES }} อัน</li>
+          <li v-if="st.killer.characterId === 'skullmerchant'"><img class="inline" :src="asset(PROP_IMAGE.drone)" alt="" /> บนบอร์ด {{ merchantDrones(st).length }} อัน{{ merchantDrones(st).length ? '' : ' — วางไม่ได้' }}</li>
+          <li v-if="st.killer.characterId === 'artist'"><img class="inline" :src="asset(PROP_IMAGE.crow)" alt="" /> บนบอร์ด {{ artistCrows(st).crows }} ตัว · <img class="inline" :src="asset(DIRE_CROW_IMAGE)" alt="" /> {{ artistCrows(st).dire }}/{{ DIRE_CROWS }} ตัว</li>
           <li :class="st.killer.powerUsed ? 'bad' : 'good'">{{ st.killer.powerUsed ? 'ใช้พลังแล้วรอบนี้' : 'ใช้พลังได้' }}</li>
         </ul>
         <div class="powers">

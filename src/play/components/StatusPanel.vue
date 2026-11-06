@@ -4,7 +4,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components, items, killerById } from '../../data'
 import { asset } from '../../i18n'
-import { CARD_NAMES, ITEM_NAMES, KILLER_BP, SURVIVOR_CARDS, isPower, killerCardCount, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, twoPlayer, victorRoom } from '../engine/engine'
+import { BEAR_TRAPS, CARD_NAMES, DIRE_CROWS, ITEM_NAMES, KILLER_BP, PHANTASM_TRAPS, SURVIVOR_CARDS, VILE_PURGES, artistCrows, isPower, killerCardCount, merchantDrones, purgeSupply, survivorMax, itemUses, killerInteractions, roomName, turnOrder, twoPlayer, victorRoom } from '../engine/engine'
 import type { GameState, ItemUse, MoveCard, PathKind } from '../engine/types'
 import { itemHidden, myTurn, online, replaying } from '../game'
 import { isBot } from '../bots'
@@ -12,7 +12,7 @@ import { KILLER_PLAYER } from '../engine/seats'
 import { seatVoice } from '../voice'
 import { session } from '../online/session'
 import type { InspectTarget } from '../inspect'
-import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini, roundEffects, perkImage } from '../labels'
+import { KILLER_CARD_BACK, SURVIVOR_CARD_BACK, BEAR_TRAP_IMAGE, DIRE_CROW_IMAGE, KNIFE_IMAGE, MADNESS_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, cardImage, cardLabel, itemImage, itemUseLabel, killerMini, playerOf, powerName, survivorMini, roundEffects, perkImage } from '../labels'
 import Mini from './Mini.vue'
 import WoundRing from './WoundRing.vue'
 import ObjectiveHud from './ObjectiveHud.vue'
@@ -222,13 +222,25 @@ function onPowerSlot() {
       <div class="line small">
         <span class="ptag" :class="{ me: mine.includes('killer') }" :title="`ผู้เล่น 1${seatName(1) ? ` · ${seatName(1)}` : ''}${mine.includes('killer') ? ' (คุณ)' : ''}`">{{ ptag(1) }}</span>
         <span class="bp">{{ st.killer.bp }}/{{ KILLER_BP.max }} <BpIcon /></span>
-        <span v-if="st.killer.characterId === 'trapper'" class="traps"><img :src="asset(BEAR_TRAP_IMAGE)" alt="" /> ×{{ st.killer.trapsInSupply }}</span>
+        <!-- what the killer still has to place: left of the whole supply, so he can plan ahead -->
+        <span v-if="st.killer.characterId === 'trapper'" class="traps" title="กับดักหมี ที่ยังวางได้"
+          ><img :src="asset(BEAR_TRAP_IMAGE)" alt="" /> {{ st.killer.trapsInSupply }}/{{ BEAR_TRAPS }}</span
+        >
         <span v-if="st.killer.characterId === 'hag'" class="traps" title="กับดักหลอก ที่ยังวางได้"
-          ><img :src="asset('assets/killers/tokens/hag-phantasm-trap.webp')" alt="" /> ×{{ 7 - st.phantasm.length }}</span
+          ><img :src="asset('assets/killers/tokens/hag-phantasm-trap.webp')" alt="" /> {{ PHANTASM_TRAPS - st.phantasm.length }}/{{ PHANTASM_TRAPS }}</span
         >
         <span v-if="st.killer.characterId === 'plague'" class="traps" title="การชำระมลทินต่ำช้า ที่ยังวางได้"
-          ><img :src="asset(VILE_PURGE_IMAGE)" alt="" /> ×{{ purgeSupply(st) }}</span
+          ><img :src="asset(VILE_PURGE_IMAGE)" alt="" /> {{ purgeSupply(st) }}/{{ VILE_PURGES }}</span
         >
+        <!-- The Skull Merchant: the Drones on his board are the ones he may place -->
+        <span v-if="st.killer.characterId === 'skullmerchant'" class="traps" :title="`Drone บนบอร์ด ที่ยังวางได้${merchantDrones(st).length ? '' : ' — ไม่มีเลย ต้องเก็บจากแผนที่กลับขึ้นบอร์ดก่อน'}`"
+          ><img :src="asset(PROP_IMAGE.drone)" alt="" /> ×{{ merchantDrones(st).length }}</span
+        >
+        <!-- The Artist: the crows on her board, the Dire Crows out of her three -->
+        <template v-if="st.killer.characterId === 'artist'">
+          <span class="traps" title="Crow บนบอร์ด ที่ยังวางได้"><img :src="asset(PROP_IMAGE.crow)" alt="" /> ×{{ artistCrows(st).crows }}</span>
+          <span class="traps" title="Dire Crow บนบอร์ด ที่ยังวางได้"><img :src="asset(DIRE_CROW_IMAGE)" alt="" /> {{ artistCrows(st).dire }}/{{ DIRE_CROWS }}</span>
+        </template>
         <span v-if="st.sealedCard" class="warn" title="สัญลักษณ์ที่สาม">ห้ามใช้ {{ st.sealedCard }}</span>
         <span v-if="st.killer.powerUsed" class="muted">ใช้พลังแล้ว</span>
         <span v-if="victorRoom(st)" class="victor-at" :title="`Victor อยู่ที่ ${roomName(st, victorRoom(st)!)}`">V · {{ roomName(st, victorRoom(st)!) }}</span>
@@ -770,6 +782,13 @@ button.slot:hover .slot-crop {
   flex-wrap: nowrap;
   overflow: hidden;
   white-space: nowrap;
+}
+/* The killer's line carries his supply (two counters for The Artist) beside the ▲ and his state:
+   it wraps rather than cutting a count off, where a survivor's stays on its one line. */
+.tile.killer .line {
+  flex-wrap: wrap;
+  overflow: visible;
+  white-space: normal;
 }
 .cards {
   grid-column: 1 / -1;
