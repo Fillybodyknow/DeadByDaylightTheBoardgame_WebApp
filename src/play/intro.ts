@@ -26,6 +26,8 @@ import type { StartMini } from './fx/bus'
 export const SEEN = 'dbdl-play-intro-seen'
 /** The offerings' burning, once per game as the start rolls. */
 export const OFFERINGS_SEEN = 'dbdl-play-offerings-seen'
+/** The epithets turned over, once per game: looking at the summary again goes straight to it. */
+export const EPITHETS_SEEN = 'dbdl-play-epithets-seen'
 
 /**
  * A game just started: 'beat' while the alarm plays over the page as it was (the page keeps its

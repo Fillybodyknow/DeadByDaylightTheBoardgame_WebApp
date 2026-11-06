@@ -1,11 +1,14 @@
 <script setup lang="ts">
 // End of the trial: who won, everyone's stats and the timeline of the game.
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { asset } from '../../i18n'
 import type { GameState } from '../engine/types'
+import { epithets, type EpithetCard } from '../epithets'
 import { replaying } from '../game'
+import { EPITHETS_SEEN, firstTime, gameKey } from '../intro'
 import { killerMini, playerOf, survivorMini } from '../labels'
 import { gameStats, timeline } from '../stats'
+import EpithetReveal from './EpithetReveal.vue'
 import Mini from './Mini.vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
@@ -19,6 +22,15 @@ const emit = defineEmits<{ close: []; again: [] }>()
 
 const stats = computed(() => gameStats(props.st))
 const events = computed(() => timeline(props.st))
+
+/** Everyone's epithet (epithets.ts): turned over one at a time, then shown under their name. */
+const epi = computed(() => epithets(props.st))
+const cards = computed<EpithetCard[]>(() => [
+  ...props.st.survivors.map((sv, s) => ({ epithet: epi.value.survivors[s], name: sv.name, mini: survivorMini(props.st, s) })),
+  { epithet: epi.value.killer, name: props.st.killer.name, mini: killerMini(props.st), killer: true },
+])
+/** Turned over once per game: coming back to the summary goes straight to it. */
+const revealing = ref(firstTime(EPITHETS_SEEN, gameKey(props.st)))
 
 const survivorCols = [
   { key: 'repair', label: 'ซ่อม' },
@@ -42,7 +54,9 @@ const mvp = computed(() => {
 
 <template>
   <div class="backdrop" :class="winner">
-    <div class="card modal" role="dialog" aria-modal="true">
+    <!-- the epithets first; the summary itself waits behind them -->
+    <EpithetReveal v-if="revealing" :cards="cards" @done="revealing = false" />
+    <div v-if="!revealing" class="card modal" role="dialog" aria-modal="true">
       <header class="hero">
         <p class="eyebrow">จบการทดสอบ · {{ st.round }} รอบ</p>
         <h1>{{ winner === 'survivors' ? 'หนีรอด' : 'ถูกสังเวย' }}</h1>
@@ -54,12 +68,16 @@ const mvp = computed(() => {
           <Mini class="face" :class="winner === 'survivors' ? 'aura-survivor' : ''" :src="asset(survivorMini(st, s))" />
           <strong>{{ sv.name }}</strong>
           <span class="muted small">ผู้เล่น {{ playerOf(st, s) }}</span>
+          <span class="epithet">{{ epi.survivors[s].name }}</span>
+          <span v-if="epi.survivors[s].note" class="muted note">{{ epi.survivors[s].note }}</span>
           <span v-if="winner === 'survivors' && s === mvp" class="badge">MVP</span>
         </div>
         <div class="fig killer" :class="{ lost: winner === 'survivors' }">
           <Mini class="face" :class="winner === 'killer' ? 'aura-killer' : ''" :src="asset(killerMini(st))" />
           <strong>{{ st.killer.name }}</strong>
           <span class="muted small">ผู้เล่น 1</span>
+          <span class="epithet blood">{{ epi.killer.name }}</span>
+          <span v-if="epi.killer.note" class="muted note">{{ epi.killer.note }}</span>
         </div>
       </section>
 
@@ -171,9 +189,22 @@ const mvp = computed(() => {
   display: grid;
   justify-items: center;
   gap: 0.2rem;
-  width: 7.5rem;
+  /* wide enough for a Thai epithet of three or four words on two lines */
+  width: 9rem;
   text-align: center;
   animation: rise 0.5s ease-out backwards;
+}
+.epithet {
+  font-family: var(--font-display);
+  color: #f5c542;
+  line-height: 1.25;
+}
+.epithet.blood {
+  color: #ff8a80;
+}
+.note {
+  font-size: 0.75rem;
+  line-height: 1.3;
 }
 .fig:nth-child(2) {
   animation-delay: 0.1s;

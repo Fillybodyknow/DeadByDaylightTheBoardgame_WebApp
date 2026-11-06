@@ -10,6 +10,7 @@ import { KILLER_PLAYER } from './engine/seats'
 import type { GameState, LogEntry } from './engine/types'
 import { online, replaying, tutorial } from './game'
 import { gameKey } from './intro'
+import { epithets, type Epithets } from './epithets'
 import { dropTrail, replayFor, type Replay } from './replay'
 import { roomSettings, session } from './online/session'
 import { gameStats, timeline, type TimelineItem } from './stats'
@@ -49,6 +50,8 @@ export interface HistoryHead {
 export interface HistoryGame {
   head: HistoryHead
   stats: ReturnType<typeof gameStats>
+  /** Everyone's epithet (epithets.ts); games saved before 1.36.0 have none. */
+  epithets?: Epithets
   timeline: TimelineItem[]
   log: LogEntry[]
   /**
@@ -205,7 +208,7 @@ function record(st: GameState, seat: number): HistoryGame {
   }
   const replay = replayFor(head.room, st, toRaw(d)?.rev ?? -1)
   if (replay) head.replay = true
-  return { head, stats: gameStats(st), timeline: timeline(st), log: maskLog(st, seat), state: JSON.stringify(st), ...(replay ? { replay } : {}) }
+  return { head, stats: gameStats(st), epithets: epithets(st), timeline: timeline(st), log: maskLog(st, seat), state: JSON.stringify(st), ...(replay ? { replay } : {}) }
 }
 
 /** Ids saved this visit: a game is saved once, when it ends. */

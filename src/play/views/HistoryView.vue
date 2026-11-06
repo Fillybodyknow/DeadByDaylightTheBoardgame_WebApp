@@ -248,12 +248,15 @@ const KILLER_COLS = [
             <Mini class="face aura-killer" :src="asset(killerMini(opened.head.killer.id))" />
             <strong>{{ opened.head.killer.name }}</strong>
             <small>{{ opened.head.killer.player }}{{ opened.head.seat === opened.head.killer.seat ? ' (คุณ)' : '' }}</small>
+            <!-- the epithet of that game (games saved before 1.36.0 have none) -->
+            <span v-if="opened.epithets" class="epithet blood">{{ opened.epithets.killer.name }}</span>
           </div>
           <span class="vs">VS</span>
           <div v-for="(sv, i) in opened.head.survivors" :key="i" class="who" :class="{ me: opened.head.seat === sv.seat, won: opened.head.winner === 'survivors' }">
             <Mini class="face aura-survivor" :src="asset(survivorMini(sv.id))" />
             <strong>{{ sv.name }}</strong>
             <small>{{ sv.player }}{{ opened.head.seat === sv.seat ? ' (คุณ)' : '' }}</small>
+            <span v-if="opened.epithets?.survivors[i]" class="epithet">{{ opened.epithets.survivors[i].name }}</span>
           </div>
         </section>
 
@@ -593,6 +596,15 @@ small {
 }
 .who.me .face {
   box-shadow: 0 0 0 3px #ffd56a;
+}
+.epithet {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1.25;
+  color: #f5c542;
+}
+.epithet.blood {
+  color: #ff8a80;
 }
 .panel {
   padding: 1rem;

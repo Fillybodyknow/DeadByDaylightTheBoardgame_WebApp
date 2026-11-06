@@ -3,11 +3,11 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { items, killerById, survivorById } from '../../data'
 import { asset, tr } from '../../i18n'
-import { BEAR_TRAPS, DIRE_CROWS, ITEM_NAMES, PHANTASM_TRAPS, PROP_NAMES, KILLER_BP, VILE_PURGES, artistCrows, merchantDrones, purgeSupply, roomName, survivorMax } from '../engine/engine'
-import type { GameState, PerkOwner } from '../engine/types'
+import { BEAR_TRAPS, DIRE_CROWS, GUARD_NAMES, ITEM_NAMES, PHANTASM_TRAPS, PROP_NAMES, KILLER_BP, VILE_PURGES, artistCrows, merchantDrones, purgeSupply, roomName, survivorMax } from '../engine/engine'
+import type { GameState, Guard, PerkOwner } from '../engine/types'
 import { CATEGORY_TH, PROP_RULES, type InspectTarget } from '../inspect'
 import { PERKS } from '../engine/perks'
-import { BEAR_TRAP_IMAGE, DIRE_CROW_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf, powerName } from '../labels'
+import { BEAR_TRAP_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf, powerName } from '../labels'
 import { perkUsed } from '../engine/engine'
 import { itemHidden } from '../game'
 import Mini from './Mini.vue'
@@ -42,7 +42,25 @@ const survivor = computed(() => {
   return { s: t.s, sv, data: survivorById.get(sv.characterId) }
 })
 
-const killer = computed(() => (props.target.k === 'killer' ? killerById.get(props.st.killer.characterId) : null))
+// A Guard tapped on the map opens the killer's details too: that is where all three are explained,
+// and it is the only place the survivors, who never see his power panel, can read them.
+const killer = computed(() => (props.target.k === 'killer' || props.target.k === 'guard' ? killerById.get(props.st.killer.characterId) : null))
+const guardPick = computed(() => (props.target.k === 'guard' ? props.target.g : null))
+
+/**
+ * The Knight's three Guards: which colour is which, and where each stands now. What they do is
+ * the Passive text below, printed on his card — it isn't said twice here.
+ */
+const guards = computed(() =>
+  props.st.killer.characterId !== 'knight'
+    ? []
+    : (Object.keys(GUARD_NAMES) as Guard[]).map((g) => ({
+        g,
+        name: GUARD_NAMES[g],
+        image: GUARD_IMAGE[g],
+        where: props.st.guards?.[g] ? roomName(props.st, props.st.guards[g]!) : 'ยังไม่ได้วางบนแผนที่',
+      })),
+)
 
 const prop = computed(() => {
   const t = props.target
@@ -117,6 +135,14 @@ const item = computed(() => {
           <img v-if="killer.passiveImage?.th" class="zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(killer.passiveImage.th)" alt="Passive" />
         </div>
         <p class="rule"><b>พลัง — {{ powerName(st) }}<small v-if="powerName(st) !== killer.power.name" class="en">{{ killer.power.name }}</small>:</b> <PerkRichText :text="tr(killer.power.text)" /></p>
+        <!-- Which Guard is which colour, and where it stands: the survivors have nowhere else to look -->
+        <ul v-if="guards.length" class="guards">
+          <li v-for="g in guards" :key="g.g" :class="[`is-${g.g}`, { picked: g.g === guardPick }]">
+            <img :src="asset(g.image)" :alt="g.name" />
+            <b>{{ g.name }}</b>
+            <span class="muted">{{ g.where }}</span>
+          </li>
+        </ul>
         <p v-if="killer.passive" class="rule"><b>Passive:</b> <PerkRichText :text="tr(killer.passive)" /></p>
       </template>
 
@@ -321,6 +347,45 @@ header p {
 }
 .inline {
   width: 18px;
+}
+/* The Knight's Guards, each in the colour its mini carries on the map */
+.guards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.guards li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.25rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+}
+.guards li.picked {
+  background: rgb(255 255 255 / 0.06);
+  border-color: var(--guard);
+}
+.guards li b {
+  color: var(--guard);
+}
+.guards img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--guard);
+}
+.guards .is-carnifex {
+  --guard: #e0a32e;
+}
+.guards .is-assassin {
+  --guard: #a855c7;
+}
+.guards .is-jailer {
+  --guard: #3f8fd8;
 }
 .perk-list {
   display: grid;

@@ -149,6 +149,19 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 - **The game's last beat shows before the summary:** Sacrifice filling up or the exit gate
   opening (`FinaleReveal`, `fx.finale`, queued on the `gameOver` event after the cards and rolls
   before it); the screen holds the old state until it is done.
+- **Everyone gets an epithet** (ฉายา) when the game ends (`epithets.ts`): a teasing name read from
+  the log as the stats are, one each and no two alike — every epithet is scored for every player
+  and the best whole set taken, with four spares at the end of the list so a set can always be
+  filled. Nothing random: online each device works it out, so they must all agree. `EpithetReveal`
+  turns them over one at a time before the summary (once per game, `EPITHETS_SEEN`; a click
+  skips), `EndSummary` then shows each under its name, and the history keeps them (`epithets?:`).
+- **The Knight's Guards say which they are on the map** (`Board`): their three pictures are alike
+  at a mini's size, so each has its own colour on the inside of its ring (the killer's red stays
+  outside) and its name under it (two or three in one room share a single line of names, so the
+  props under them stay clear). Clicking one opens the killer's details on it (`InspectTarget` `{ k: 'guard' }`),
+  where all three are listed with what they do and where they stand — reachable by both sides.
+  The tooltip was the only name before, which a tablet never shows and which the survivors, who
+  don't see the killer's power panel, had no way to reach.
 - **The offerings burn first** (`OfferingBurn`, `fx.offerings`): a game with offerings opens on
   them dealt into a row one by one, a moment to read, then all burnt together like paper, each from one of
   its corners, the edge ragged (`fx/paperBurn.ts`, a canvas), with embers; a click skips. Once per game (`OFFERINGS_SEEN`), before the start-room rolls, and

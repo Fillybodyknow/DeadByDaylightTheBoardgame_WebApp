@@ -1,12 +1,14 @@
 // What the details modal can show, and the rules text for each prop (rulebook p.12–15).
 
 import type { PerkId } from './engine/perks'
-import type { PerkOwner, PropKind } from './engine/types'
+import type { Guard, PerkOwner, PropKind } from './engine/types'
 
 export type InspectTarget =
   | { k: 'prop'; id: string }
   | { k: 'survivor'; s: number }
   | { k: 'killer' }
+  /** One of The Knight's Guards: the killer's details, opened on that Guard. */
+  | { k: 'guard'; g: Guard }
   | { k: 'item'; id: string }
   | { k: 'perk'; perk: PerkId; owner: PerkOwner }
 

@@ -9,7 +9,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components } from '../../data'
 import { asset } from '../../i18n'
-import { boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, unknownRooms, victorRoom } from '../engine/engine'
+import { GUARD_NAMES, boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, unknownRooms, victorRoom } from '../engine/engine'
 import type { GameEvent, GameState, Guard, Prop } from '../engine/types'
 import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
@@ -800,16 +800,34 @@ function guard(e: MouseEvent) {
         <img :src="asset(unknownMini(u))" :alt="`The Unknown ${u + 1}`" draggable="false" />
         <b class="unknown-no">{{ u + 1 }}</b>
       </component>
-      <!-- The Knight's Guards: minis of their own, beside the killer's corner -->
-      <div
+      <!-- The Knight's Guards: minis of their own, beside the killer's corner. Their three
+           pictures are too alike to tell apart at this size, so each carries its own colour, its
+           short name and its full one: a tooltip is no use on a tablet, and the survivors, who
+           never see the killer's power panel, had nothing else to read. -->
+      <button
         v-for="g in r.guards"
         :key="g"
+        type="button"
         :data-mini="`g-${g}`"
         class="mini guard"
+        :class="`guard-${g}`"
         :style="rectStyle(rects.minis.get(`g-${g}`)!)"
         :title="GUARD_TITLE[g]"
+        @click="emit('inspect', { k: 'guard', g })"
+        @contextmenu.prevent="emit('inspect', { k: 'guard', g })"
+        @pointerdown="pressStart($event, { k: 'guard', g })"
+        @pointerup="pressEnd"
+        @pointerleave="pressEnd"
       >
-        <img :src="asset(GUARD_IMAGE[g])" :alt="g" draggable="false" />
+        <img :src="asset(GUARD_IMAGE[g])" :alt="GUARD_NAMES[g]" draggable="false" />
+        <b v-if="r.guards.length === 1" class="guard-name">{{ GUARD_NAMES[g] }}</b>
+      </button>
+      <!-- Two or three Guards in one room: their names on one line under them, not one each,
+           which would stack down over the props. Right to left, as the minis are laid out. -->
+      <div v-if="r.guards.length > 1" class="guard-names" :style="rectStyle(rects.minis.get(`g-${r.guards[0]}`)!)">
+        <span class="names-row">
+          <b v-for="g in r.guards" :key="g" :class="`guard-${g}`">{{ GUARD_NAMES[g] }}</b>
+        </span>
       </div>
     </template>
 
@@ -1249,6 +1267,77 @@ button.tile.picked::after {
     0 0 0 2px #b8332b,
     0 0 0 4px rgb(0 0 0 / 0.7),
     0 0 10px 3px rgb(200 40 30 / 0.55);
+}
+/* Each Guard's own colour on the inside of the ring, the killer's red still on the outside, so
+   they read as his pieces. The colour tells them apart at any size; the badge says which. */
+.guard-carnifex {
+  --guard: #e0a32e;
+}
+.guard-assassin {
+  --guard: #a855c7;
+}
+.guard-jailer {
+  --guard: #3f8fd8;
+}
+.mini.guard-carnifex,
+.mini.guard-assassin,
+.mini.guard-jailer {
+  box-shadow:
+    0 0 0 2px var(--guard),
+    0 0 0 3.5px #7d241e,
+    0 0 0 5px rgb(0 0 0 / 0.7),
+    0 0 10px 3px rgb(200 40 30 / 0.45);
+}
+/* the name under the mini, for anyone who doesn't know the colours yet */
+.guard-name {
+  position: absolute;
+  left: 50%;
+  /* tucked onto the mini's lower edge, so the name reads as part of the piece */
+  top: 93%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  /* the box only as big as the word: the name is the point, not the frame round it */
+  padding: 0 0.25em;
+  border-radius: 2px;
+  background: rgb(10 10 12 / 0.92);
+  color: var(--guard);
+  font-family: var(--font-display);
+  font-size: clamp(0.52rem, 0.78vw, 0.7rem);
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.8);
+  pointer-events: none;
+}
+/* several Guards in one room: one line of names under them, laid out as the minis are (the row
+   is built right to left from the killer's corner), so it stays a single row over the props */
+.guard-names {
+  position: absolute;
+  aspect-ratio: 1;
+  z-index: 3;
+  pointer-events: none;
+}
+.names-row {
+  position: absolute;
+  right: 0;
+  top: 93%;
+  display: flex;
+  /* the minis run right to left, so the names do too: each sits under its own */
+  flex-direction: row-reverse;
+  gap: 0.45em;
+  white-space: nowrap;
+  padding: 0 0.25em;
+  border-radius: 2px;
+  background: rgb(10 10 12 / 0.92);
+  font-family: var(--font-display);
+  font-size: clamp(0.52rem, 0.78vw, 0.7rem);
+  font-weight: 500;
+  line-height: 1.15;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.8);
+}
+.names-row b {
+  color: var(--guard);
+  font-weight: 500;
 }
 /* crop the square art to its printed ring (same as Mini.vue) */
 .mini > img {
