@@ -748,8 +748,13 @@ Perks:
   killer's (Unnerving Presence, Thanatophobia, Sloppy Butcher...) after Bond rolls one danger
   die, and Bond's ▲ stays paid. (Before 1.36.1 the two stacked: two danger dice, keep one.) When
   two dice are rolled and one kept, the killer gains 1 ▲ if either failed (p.18).
-- A key re-rolls one die of the player's choice ("any die"), Bond's two included, before one is
-  kept. On screen only that die's needle sweeps again.
+- A key re-rolls one die of the player's choice ("any die"). On screen only that die's needle sweeps
+  again.
+- Bond comes in two steps (since 1.37.2, from a player's report): first the die to keep, with
+  nothing else on offer; then that die alone is open to a key and to the perks that change a roll
+  (Iron Will, Autodidact, Corrective Action, Iron Grasp), and the die let go stays let go. The
+  killer's ▲ counts the kept die as it ended up and the die let go. (Before, keys and perks came
+  with the choice, on either die, and a die re-rolled could still be passed over.)
 - Iron Will works on any survivor roll in range, danger dice included (a bear trap, a hatchet),
   but not on the carry roll. Every failed die counts as a success.
 - Huntress Lullaby also stops bonus-turn moves (they are made with a movement card).

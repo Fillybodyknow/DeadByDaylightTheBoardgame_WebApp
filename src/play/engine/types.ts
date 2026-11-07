@@ -485,7 +485,11 @@ export type Step =
    * `keep`: Bond rolled two dice and one must be kept. `passed`: survivors who said they
    * won't use their key on this roll (online, each key holder decides on their own device).
    */
-  | { t: 'roll'; ctx: RollContext; dice: Die[]; keep?: boolean; passed?: number[] }
+  /**
+   * `keep`: Bond's two dice, one to keep (nothing else changes them yet). `other`: the die Bond
+   * let go, once one is kept: the kept one is then open to keys and perks alone.
+   */
+  | { t: 'roll'; ctx: RollContext; dice: Die[]; keep?: boolean; other?: Die; passed?: number[] }
   /** `rush`: The Blight's power drew this card. */
   | { t: 'killerMove'; turn: number; card: PathKind; rush?: boolean }
   /**

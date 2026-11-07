@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { DIRECT_CARDS, crowdPledges, redeemerTargets, empIn, killerIn, killersIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { DIRECT_CARDS, crowdPledges, redeemerTargets, empIn, killerIn, killersIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, rerollers, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { boards } from './boards'
 import { actorsOf, mayAct, playerOfSurvivor } from './seats'
@@ -447,6 +447,39 @@ describe('perks', () => {
     g = apply(g, { t: 'perk', perk: 'bond', use: true, choice: {} })
     expect(g.step).toMatchObject({ t: 'roll', keep: true })
     expect((g.step as Extract<GameState['step'], { t: 'roll' }>).dice.map((d) => d.kind)).toEqual(['skill', 'skill'])
+  })
+
+  it('Bond: the die is kept first; only then may a key re-roll it or a perk change it', () => {
+    const { st, gen } = bondRepair('trapper')
+    // survivor 2 beside them, with a key and Autodidact
+    Object.assign(st.survivors[2], { room: 'scrapyard', item: 'broken_key', perks: ['autodidact'] })
+    let g = apply(st, { t: 'interact', i: { k: 'repair', prop: gen.id } })
+    g = apply(g, { t: 'perk', perk: 'bond', use: true, choice: {} })
+    const two = g.step as Extract<GameState['step'], { t: 'roll' }>
+    two.dice = [
+      { kind: 'skill', face: 3, rerolled: false },
+      { kind: 'skill', face: 0, rerolled: false },
+    ]
+    // nothing but the choice of a die while there are two
+    expect(rerollers(g)).toEqual([])
+    expect(perkButtons(g)).toEqual([])
+    expect(legalActions(g).filter((x) => ['reroll', 'perk', 'passRoll'].includes(x.t))).toEqual([])
+    g = apply(g, { t: 'acceptRoll', die: 0 })
+    const killerBp = g.killer.bp
+    // the die kept, alone, open to the key and to Autodidact; no going back to the choice
+    expect(g.step).toMatchObject({ t: 'roll', dice: [{ face: 3 }], other: { face: 0 } })
+    expect(rerollers(g)).toEqual([2])
+    expect(perkButtons(g).map((b) => b.perk)).toEqual(['autodidact'])
+    expect(legalActions(g).some((x) => x.t === 'acceptRoll' && x.die !== undefined)).toBe(false)
+    g = apply(g, { t: 'perk', perk: 'autodidact', use: true, choice: { index: 0 } })
+    g = apply(g, { t: 'passRoll', s: 2 })
+    if (g.step.t === 'roll') g = apply(g, { t: 'acceptRoll' })
+    const roll = g.log.filter((e) => e.ev?.k === 'roll').at(-1)!
+    // the kept die (now a great success) counts, the other is shown beside it
+    expect(roll.dice!.map((d) => d.face)).toEqual([5, 0])
+    expect(g.props.find((p) => p.id === gen.id)!.progress).toBe(2)
+    // the die let go failed: the killer still gains ▲ (p.18)
+    expect(g.killer.bp).toBe(killerBp + 1)
   })
 
   it('Tinkerer swaps an unplayed planned card for one in hand when a generator is done', () => {

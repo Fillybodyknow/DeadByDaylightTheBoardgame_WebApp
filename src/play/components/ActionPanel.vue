@@ -647,6 +647,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <!-- dice with a possible key re-roll -->
     <template v-else-if="step.t === 'roll'">
       <p v-if="step.keep">พันธะ: ทอย 2 ลูก — คลิกลูกที่จะเก็บ 1 ลูก</p>
+      <p v-else-if="step.other">พันธะ: เก็บลูกนี้แล้ว — ใช้กุญแจทอยลูกนี้ใหม่ หรือ perk ได้</p>
       <p v-else>ผลทอย — ใช้กุญแจทอยใหม่ หรือ perk ได้</p>
       <RollDice :st="st" :key-holders="rollers" :can-keep="rollMine && !keyWaiting.length" @act="act" />
       <div class="buttons col">

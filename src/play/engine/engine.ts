@@ -942,7 +942,8 @@ export function itemUses(st: GameState, s: number): ItemUse[] {
 /** Survivors who may re-roll a die with a key (p.16; keys are "any time"). */
 export function rerollers(st: GameState): number[] {
   const step = st.step
-  if (step.t !== 'roll' || step.dice.every((d) => d.rerolled)) return []
+  // Bond's two dice wait for one to be kept: the key comes after, on that one
+  if (step.t !== 'roll' || step.keep || step.dice.every((d) => d.rerolled)) return []
   // on the board — or the survivor being carried, on their own roll to struggle free (house rule)
   const ownCarry = (i: number) => step.ctx.k === 'carry' && step.ctx.s === i && st.survivors[i].status === 'carried'
   return st.survivors.flatMap((sv, i) =>
@@ -1411,10 +1412,16 @@ function handle(st: GameState, a: Action) {
     }
     case 'roll': {
       if (a.t !== 'acceptRoll') break
-      if (!step.keep) return resolveRoll(st, step.ctx, step.dice)
-      // Bond: keep one of the two dice; the killer gains ▲ if either failed (p.18).
+      if (!step.keep) return countRoll(st, step)
+      // Bond: keep one of the two dice first. Only then may a key re-roll it or a perk change it
+      // (Autodidact, Iron Will...): they work on the die kept, never on a die about to be let go.
       const kept = step.dice[a.die ?? -1] ?? fail('choose the die to keep')
-      resolveRoll(st, step.ctx, [kept, ...step.dice.filter((d) => d !== kept)], step.dice.some((d) => !succeeded(d)) ? 1 : 0)
+      const other = step.dice.find((_, i) => i !== a.die)!
+      wait(st, { t: 'roll', ctx: step.ctx, dice: [kept], other })
+      if (rollSettled(st)) {
+        st.step = { t: 'idle' }
+        countRoll(st, { ctx: step.ctx, dice: [kept], other })
+      }
       return
     }
     case 'killerMove': {
@@ -2841,6 +2848,15 @@ function rollSettled(st: GameState): boolean {
   return step.t === 'roll' && !step.keep && rerollers(st).length === 0 && perkButtons(st).length === 0
 }
 
+/**
+ * The roll counts as it stands. After Bond the die let go is shown with the one kept, and the
+ * killer gains ▲ if either failed (p.18), the kept one as it ended up.
+ */
+function countRoll(st: GameState, step: { ctx: RollContext; dice: Die[]; other?: Die }) {
+  if (!step.other) return resolveRoll(st, step.ctx, step.dice)
+  resolveRoll(st, step.ctx, [...step.dice, step.other], isFailure(step.dice[0]) || isFailure(step.other) ? 1 : 0)
+}
+
 function reroll(st: GameState, s: number, die: number) {
   const step = st.step
   if (step.t !== 'roll' || !rerollers(st).includes(s)) fail('cannot re-roll')
@@ -2853,7 +2869,7 @@ function reroll(st: GameState, s: number, die: number) {
   step.dice[die] = { ...rollDie(st, d.kind), rerolled: true }
   if (rollSettled(st)) {
     st.step = { t: 'idle' }
-    resolveRoll(st, step.ctx, step.dice)
+    countRoll(st, step)
   }
 }
 
@@ -2874,7 +2890,7 @@ function passRoll(st: GameState, s: number) {
   step.passed = [...(step.passed ?? []), s]
   if (rollSettled(st)) {
     st.step = { t: 'idle' }
-    resolveRoll(st, step.ctx, step.dice)
+    countRoll(st, step)
   }
 }
 
@@ -4255,9 +4271,10 @@ export function perkButtons(st: GameState): { perk: PerkId; owner: PerkOwner; w:
   if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout', 'inner_healing', 'self_aware', 'potential_energy', 'fogwise', 'strength_in_shadows', 'scavenger'])
   if (step.t === 'survivorInteract')
     add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity', 'kinship', 'no_one_left_behind', 'wicked', 'weaving_spiders'])
-  if (step.t === 'roll') st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact', 'corrective_action']))
+  // (not on Bond's two dice: the perks change the die kept, once it is)
+  if (step.t === 'roll' && !step.keep) st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact', 'corrective_action']))
   // Iron Grasp: his own button on the struggle roll, before it is settled
-  if (step.t === 'roll' && step.ctx.k === 'carry') add('killer', { k: 'roll' }, ['iron_grasp'])
+  if (step.t === 'roll' && !step.keep && step.ctx.k === 'carry') add('killer', { k: 'roll' }, ['iron_grasp'])
   if (step.t === 'killerInteract' && step.canInteract && !step.powerOnly) add('killer', { k: 'killerInteract' }, ['iron_maiden'])
   return out
 }
@@ -4303,7 +4320,7 @@ function handlePerk(st: GameState, a: Extract<Action, { t: 'perk' }>) {
     usePerk(st, a.perk, button.owner, button.w, choice)
     if (rollSettled(st)) {
       st.step = { t: 'idle' }
-      resolveRoll(st, step.ctx, step.dice)
+      countRoll(st, step)
     }
     return
   }
