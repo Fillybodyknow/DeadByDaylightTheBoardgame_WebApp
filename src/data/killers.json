@@ -783,6 +783,102 @@
     }
   },
   {
+    "id": "houndmaster",
+    "name": "The Houndmaster",
+    "realName": "Portia Maye",
+    "difficulty": "hard",
+    "bloodpoints": {
+      "start": 4,
+      "max": 12
+    },
+    "description": {
+      "en": "The Houndmaster is a force to be feared, with an equally fearsome dog at her side.\nThe Houndmaster can pick up Survivors on the same round they are wounded by The Dog. Plan ahead and use The Dog's patrol path to corner Survivors and get hooks early. Then, use Jagged Compass to compound your advantage",
+      "th": "The Houndmaster เป็นฆาตกรที่น่าเกรงขาม พร้อมหมาที่น่ากลัวไม่แพ้กันอยู่ข้างกาย\nThe Houndmaster pick up ผู้รอดชีวิตได้ในรอบเดียวกับที่ The Dog ทำให้บาดเจ็บ ควรวางแผนล่วงหน้า และ ใช้เส้นทางลาดตระเวนของ The Dog ต้อนผู้รอดชีวิตให้จนมุม เพื่อแขวน ตะขอแขวน ได้ตั้งแต่ต้นเกม จากนั้นใช้ Jagged Compass เพื่อต่อยอดความได้เปรียบ"
+    },
+    "extraAction": {
+      "cost": 4,
+      "text": {
+        "en": "After your second turn, take an additional turn by playing a card from your hand",
+        "th": "หลังเทิร์นที่สอง, ให้เล่นเทิร์นเพิ่มอีกหนึ่งเทิร์น โดยใช้การ์ดจากมือ"
+      }
+    },
+    "power": {
+      "name": "Scent of Blood",
+      "text": {
+        "en": "Place The Dog onto your space or keep it in the current space. Then, you may assign a movement card from your hand to The Dog, discarding any previously assigned movement cards.",
+        "th": "วาง The Dog ลงในห้องของคุณ หรือ ให้อยู่ในห้องเดิม, จากนั้นคุณอาจมอบการ์ดเคลื่อนที่ 1 ใบจากมือให้ The Dog, ให้ทิ้งการ์ดเคลื่อนที่ที่เคยมอบไว้ก่อนหน้า"
+      },
+      "image": {
+        "th": "assets/killers/power-th/houndmaster.webp",
+        "en": "assets/killers/power-en/houndmaster.webp"
+      }
+    },
+    "passive": {
+      "en": "The Dog can have a movement card assigned to it via The Houndmaster's Power. At the start of The Houndmaster's first turn each round, if The Dog is on the game board, The Dog moves using its assigned movement card, ignoring pallets and breakable walls, and possibly moving against one-way paths. If it moved, a Survivor in The Dog's space becomes wounded. It doesn't need to move to wound if it was assigned 'Wait'. A Survivor wounded by The Dog can still be picked up this round.",
+      "th": "The Dog รับการ์ดเคลื่อนที่ได้ผ่านพลังของ The Houndmaster, เมื่อเริ่มเทิร์นแรกของ The Houndmaster ในแต่ละรอบ ถ้า The Dog อยู่บนกระดาน, The Dog จะเคลื่อนที่ตามการ์ดเคลื่อนที่ที่ได้รับ โดยไม่สนใจ แผ่นพาเลท และ กำแพงทำลายได้ และ ย้อนเส้นทางทางเดียวได้, ถ้ามันเคลื่อนที่, ผู้รอดชีวิตในห้องของ The Dog จะบาดเจ็บ, ถ้าได้รับ 'Wait' ไม่ต้องเคลื่อนที่ก็ทำให้บาดเจ็บได้, ผู้รอดชีวิตที่บาดเจ็บจาก The Dog ยังถูก pick up ได้ในรอบนี้"
+    },
+    "perks": [
+      {
+        "name": "Jagged Compass",
+        "cost": 0,
+        "flavor": {
+          "en": "Sometimes the compass points north. Other times it points somewhere else entirely.",
+          "th": "บางครั้งเข็มทิศก็ชี้ไปทางเหนือ บางครั้งก็ชี้ไปที่อื่นโดยสิ้นเชิง"
+        },
+        "text": {
+          "en": "After you sacrifice a Survivor, move directly to the space with the generator with the most progress. (You choose if there is a tie.)",
+          "th": "หลังจากคุณสังเวยผู้รอดชีวิต, ให้เคลื่อนที่ไปยังห้องที่มี เครื่องปั่นไฟ ที่มีความคืบหน้ามากที่สุดทันที (ถ้าเท่ากัน คุณเลือก)"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/houndmaster-1.webp",
+          "en": "assets/killers/perks-en/houndmaster-1.webp"
+        }
+      },
+      {
+        "name": "No Quarter",
+        "cost": 2,
+        "flavor": {
+          "en": "Every skirmish ended with a relentless volley of cannon fire, leaving no doubt who was superior.",
+          "th": "ทุกการปะทะจบลงด้วยห่ากระสุนปืนใหญ่ไม่หยุดหย่อน ไม่เหลือข้อสงสัยว่าใครเหนือกว่า"
+        },
+        "text": {
+          "en": "At the end of your turn, if a Survivor became healthy this round, take a Killer bonus turn.",
+          "th": "เมื่อจบเทิร์นของคุณ, ถ้ามีผู้รอดชีวิตกลับมาไม่บาดเจ็บในรอบนี้, ให้เล่น Killer bonus turn"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/houndmaster-2.webp",
+          "en": "assets/killers/perks-en/houndmaster-2.webp"
+        }
+      },
+      {
+        "name": "All-Shaking Thunder",
+        "cost": 2,
+        "flavor": {
+          "en": "Enemies on land and sea learned to tremble before your might.",
+          "th": "ศัตรูทั้งบนบกและในทะเลต่างเรียนรู้ที่จะสั่นสะท้านต่อหน้าพลังของคุณ"
+        },
+        "text": {
+          "en": "After you move with \"Vault\" (Yellow), interact with a prop or Survivor in your space. You cannot interact with the prop or Survivor again this turn.",
+          "th": "หลังจากคุณเคลื่อนที่ด้วย 'Vault' (สีเหลือง), ให้ Interact กับ prop หรือ ผู้รอดชีวิตในห้องของคุณ, คุณไม่สามารถ Interact กับ prop หรือ ผู้รอดชีวิตนั้นซ้ำได้ในเทิร์นนี้"
+        },
+        "image": {
+          "th": "assets/killers/perks-th/houndmaster-3.webp",
+          "en": "assets/killers/perks-en/houndmaster-3.webp"
+        }
+      }
+    ],
+    "tokens": [],
+    "images": {
+      "boardEn": "assets/killers/board-en/houndmaster.webp",
+      "boardTh": "assets/killers/board-th/houndmaster.webp",
+      "mini": "assets/killers/mini/houndmaster.webp"
+    },
+    "passiveImage": {
+      "th": "assets/killers/passive-th/houndmaster.webp",
+      "en": "assets/killers/passive-en/houndmaster.webp"
+    }
+  },
+  {
     "id": "huntress",
     "name": "The Huntress",
     "realName": "Anna",

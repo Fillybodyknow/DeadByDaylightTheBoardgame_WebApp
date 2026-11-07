@@ -1520,6 +1520,82 @@
     }
   },
   {
+    "id": "taurie",
+    "name": "Taurie Cain",
+    "title": {
+      "en": "Young Mystic",
+      "th": ""
+    },
+    "difficulty": "easy",
+    "bloodpoints": {
+      "start": 2,
+      "max": 6
+    },
+    "description": {
+      "en": "Taurie Cain was raised as a Disciple of the Black Talon, condemned to be a sacrifice.",
+      "th": "Taurie Cain ถูกเลี้ยงดูมาในฐานะสาวกของ Black Talon และ ถูกกำหนดให้เป็นเครื่องสังเวย"
+    },
+    "quote": {
+      "en": "\"Give me a chance... I would be your most loyal servant!\" — Taurie Cain",
+      "th": "\"ให้โอกาสฉันเถอะ... ฉันจะเป็นข้ารับใช้ที่ภักดีที่สุดของคุณ!\" – Taurie Cain"
+    },
+    "perks": [
+      {
+        "name": "Clean Break",
+        "cost": 2,
+        "flavor": {
+          "en": "At the end of the day, everyone has to look out for themselves.",
+          "th": "สุดท้ายแล้ว ทุกคนก็ต้องเอาตัวรอดเอง"
+        },
+        "text": {
+          "en": "After you successfully heal another Survivor, you become healthy.",
+          "th": "หลังจากคุณ heal ผู้รอดชีวิตคนอื่นสำเร็จ, คุณจะกลับมาไม่บาดเจ็บ"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/taurie-1.webp",
+          "en": "assets/survivors/perks-en/taurie-1.webp"
+        }
+      },
+      {
+        "name": "Treacherous Crows",
+        "cost": 1,
+        "flavor": {
+          "en": "One with arcane knowledge has no reason to fear those watchful birds.",
+          "th": "ผู้มีความรู้ลึกลับไม่มีเหตุให้ต้องกลัวนกที่คอยจับตาพวกนั้น"
+        },
+        "text": {
+          "en": "As an interaction, interact with a crow to reveal one of the Killer's set movement cards, then place the crow in a connected space.",
+          "th": "Perk นี้เป็นการ Interact, ให้ Interact กับ อีกา เพื่อเปิดการ์ดเคลื่อนที่ที่วางไว้ของฆาตกรหนึ่งใบ, จากนั้นวาง อีกา ลงในห้องที่เชื่อมกัน"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/taurie-2.webp",
+          "en": "assets/survivors/perks-en/taurie-2.webp"
+        }
+      },
+      {
+        "name": "Shoulder the Burden",
+        "cost": 0,
+        "flavor": {
+          "en": "Born to be a disciple. Ready to submit to a greater cause. This is your calling.",
+          "th": "เกิดมาเพื่อเป็นสาวก พร้อมยอมศิโรราบต่อจุดหมายที่ยิ่งใหญ่กว่า นี่คือเสียงเรียกของคุณ"
+        },
+        "text": {
+          "en": "After you sabotage an occupied hook, move a sacrifice progress from your board to the other Survivor's board. If you did, both of you gain 1 {BP}.",
+          "th": "หลังจากคุณ ทำลาย ตะขอแขวน ที่มีคนอยู่, ให้ย้าย sacrifice progress 1 แต้มจากบอร์ดของคุณไปยังบอร์ดของผู้รอดชีวิตคนนั้น, หากทำเช่นนั้น, ทั้งคุณและเขาได้รับ 1 {BP}"
+        },
+        "image": {
+          "th": "assets/survivors/perks-th/taurie-3.webp",
+          "en": "assets/survivors/perks-en/taurie-3.webp"
+        }
+      }
+    ],
+    "images": {
+      "boardEn": "assets/survivors/board-en/taurie.webp",
+      "boardTh": "assets/survivors/board-th/taurie.webp",
+      "mini": "assets/survivors/mini/taurie.webp"
+    }
+  },
+  {
     "id": "thalita",
     "name": "Thalita Lyra",
     "title": {
