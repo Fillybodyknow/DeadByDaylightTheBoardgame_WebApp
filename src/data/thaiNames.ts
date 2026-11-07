@@ -36,7 +36,8 @@ export const THAI_NAMES: Record<string, string> = {
   'SCENT OF BLOOD': 'กลิ่นเลือด',
   'JAGGED COMPASS': 'เข็มทิศหยัก',
   'NO QUARTER': 'ไร้ปรานี',
-  'ALL-SHAKING THUNDER': 'ฟ้าคำรามสั่นพสุธา',
+  // (keyed as thaiKey reads it: the hyphen is a space)
+  'ALL SHAKING THUNDER': 'ฟ้าคำรามสั่นพสุธา',
   'CLEAN BREAK': 'เลิกฟ้าผ่า',
   'TREACHEROUS CROWS': 'อีกาแฝงร้าย',
   'SHOULDER THE BURDEN': 'แบกภาระ',

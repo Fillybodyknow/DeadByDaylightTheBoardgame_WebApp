@@ -76,6 +76,8 @@ export const KNIFE_IMAGE = 'assets/killers/tokens/trickster-knife.webp'
 export const BEAR_TRAP_IMAGE = 'assets/killers/tokens/trapper-bear-trap.webp'
 /** The Twins: Victor's own mini. */
 export const VICTOR_MINI = 'assets/killers/mini/twins_victor.webp'
+/** The Houndmaster's Dog. */
+export const DOG_MINI = 'assets/killers/mini/houndmaster_dog.webp'
 
 export function survivorMini(st: GameState, s: number): string {
   return survivorById.get(st.survivors[s].characterId)?.images.mini ?? ''
@@ -267,6 +269,11 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `ดวงตาบนท้องฟ้า: วาง Drone หงายหน้าที่ ${roomName(st, st.killer.room)}`
     case 'guard':
       return `${GUARD_NAMES[i.guard]} → ${roomName(st, i.room)}${st.guards?.[i.guard] ? ' (ย้าย)' : ''}`
+    case 'dog': {
+      const k = st.killer
+      if (i.stay && k.dogRoom) return `กลิ่นเลือด: The Dog อยู่ที่ ${roomName(st, k.dogRoom)} ต่อ แล้วมอบการ์ด`
+      return `กลิ่นเลือด: ${k.dogRoom ? 'ย้าย' : 'วาง'} The Dog มาที่ ${roomName(st, k.room)} แล้วมอบการ์ด`
+    }
     case 'afterpiece':
       return `${i.which === 'tonic' ? 'ยาบำรุงส่งท้าย' : 'ยาแก้พิษส่งท้าย'} → ${roomName(st, i.room)}${st.afterpiece?.[i.which] ? ' (ย้าย)' : ''}`
     case 'purge': {
@@ -595,6 +602,26 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
       return `${GUARD_NAMES[c.guard!]} → ${roomName(st, c.room!)}${st.guards?.[c.guard!] ? ' (ย้าย)' : ''}`
     case 'nowhere_to_hide':
       return 'ให้คนใน Locker ทอย Danger Die แทน'
+    case 'clean_break':
+      return `${st.survivors[o as number].name} หายบาดเจ็บ`
+    case 'treacherous_crows':
+      return `เปิดการ์ดฆาตกร 1 ใบ แล้ววาง Crow ที่ ${roomName(st, c.room!)}`
+    case 'shoulder_the_burden': {
+      const t = (w as Extract<PerkWindow, { k: 'afterSabotage' }>).rescued!
+      return `ย้าย sacrifice progress 1 แต้มไปบอร์ดของ ${name(t)} — ทั้งคู่ +1 ▲`
+    }
+    case 'jagged_compass': {
+      const top = Math.max(0, ...st.props.filter((p) => p.kind === 'generator' && p.room === c.room && p.revealed && !p.removed && p.progress < PROGRESS_MAX).map((p) => p.progress))
+      return `ตรงไปที่ ${roomName(st, c.room!)} (Generator ${top}/${PROGRESS_MAX})`
+    }
+    case 'no_quarter':
+      return `Killer bonus turn ด้วย ${CARD_NAMES[c.card!]}`
+    case 'all_shaking_thunder': {
+      if (c.target !== undefined) return `${st.survivors[c.target].wounded ? 'อุ้ม' : 'โจมตี'} ${name(c.target)} ทันที`
+      const p = prop(st, c.prop!)
+      const i: KillerInteraction = p.kind === 'locker' ? { k: 'search', prop: p.id } : p.kind === 'crow' ? { k: 'scout', prop: p.id } : p.kind === 'totem' ? { k: 'venerate', prop: p.id } : { k: 'damage', prop: p.id }
+      return `${killerInteractionLabel(st, i)} ทันที`
+    }
     case 'hubris': {
       const sv = st.survivors[(w as { s: number }).s]
       return sv.bp > 0 ? `${sv.name} ต้องจ่าย 1 ▲ (มี ${sv.bp})` : `${sv.name} ไม่มี ▲ — Interact ไม่ได้เทิร์นนี้`

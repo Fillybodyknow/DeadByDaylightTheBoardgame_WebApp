@@ -9,13 +9,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components } from '../../data'
 import { asset } from '../../i18n'
-import { GUARD_NAMES, boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, unknownRooms, victorRoom } from '../engine/engine'
+import { CARD_NAMES, GUARD_NAMES, boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, unknownRooms, victorRoom } from '../engine/engine'
 import type { GameEvent, GameState, Guard, Prop } from '../engine/types'
 import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
-import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, GUARD_SYMBOL, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, killerMini, propPicture, survivorMini, unknownMini, roundEffects } from '../labels'
+import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, GUARD_SYMBOL, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, DOG_MINI, cardImage, killerMini, propPicture, survivorMini, unknownMini, roundEffects } from '../labels'
 import Mini from './Mini.vue'
 import PingLayer from './PingLayer.vue'
 import { canPing, pingArmed, sendPing, shownPings } from '../pings'
@@ -163,6 +163,8 @@ const rooms = computed(() => {
     guards: (Object.entries(props.st.guards ?? {}) as [Guard, string | undefined][]).flatMap(([g, room]) => (room === r.id ? [g] : [])),
     // The Unknown: its other minis (the one standing for the killer is the killer's mini)
     unknowns: props.st.startPending ? [] : unknownRooms(props.st).flatMap((room, i) => (room === r.id && i !== (props.st.killer.unknownAt ?? 0) ? [i] : [])),
+    // The Houndmaster's Dog: in the row with the Guards (one of the killer's pieces)
+    dog: !props.st.startPending && props.st.killer.dogRoom === r.id,
   }))
 })
 
@@ -180,12 +182,13 @@ const rects = computed(() => {
     // the survivors standing take the slots in turn; one being carried rides on the killer
     let slot = 0
     const standing = r.survivors.filter((s) => props.st.survivors[s].status !== 'carried').length
-    const row = rowWithGuards(r.box, standing, r.guards.length + r.unknowns.length, r.killer, r.victor)
+    const row = rowWithGuards(r.box, standing, r.guards.length + r.unknowns.length + (r.dog ? 1 : 0), r.killer, r.victor)
     for (const s of r.survivors) minis.set(`s${s}`, props.st.survivors[s].status === 'carried' ? carryRect(r.box) : row.survivors[slot++])
     if (r.killer) minis.set('k', miniRect(r.box, 0, true))
     if (r.victor) minis.set('v', victorRect(r.box, r.killer))
     r.guards.forEach((g, i) => minis.set(`g-${g}`, row.guards[i]))
     r.unknowns.forEach((u, i) => minis.set(`u${u}`, row.guards[r.guards.length + i]))
+    if (r.dog) minis.set('d', row.guards[r.guards.length + r.unknowns.length])
   }
   return { minis, tiles, tokens }
 })
@@ -394,7 +397,10 @@ function walk(events: GameEvent[], from: Map<string, Rect>): number {
   let longest = 0
   const step = anim(380) // one path's stride
   const moved = new Map<string, string[]>()
-  for (const ev of events) if (ev.k === 'move') moved.set(key(ev.who), [...(moved.get(key(ev.who)) ?? []), ev.path])
+  for (const ev of events) {
+    if (ev.k === 'move') moved.set(key(ev.who), [...(moved.get(key(ev.who)) ?? []), ev.path])
+    if (ev.k === 'dog' && ev.path) moved.set('d', [...(moved.get('d') ?? []), ev.path])
+  }
   for (const [k, now] of rects.value.minis) {
     const was = from.get(k)
     if (!was || (was.x === now.x && was.y === now.y) || reducedMotion.value) continue
@@ -833,6 +839,23 @@ function guard(e: MouseEvent) {
       >
         <img :src="asset(unknownMini(u))" :alt="`The Unknown ${u + 1}`" draggable="false" />
         <b class="unknown-no">{{ u + 1 }}</b>
+      </component>
+      <!-- The Houndmaster's Dog, the card it runs with face up on it. Clicked: the killer's
+           details (or the power's choice on it, when it is one) -->
+      <component
+        :is="canAct('dog') || roomTarget(r.id) ? 'button' : 'div'"
+        v-if="r.dog"
+        type="button"
+        data-mini="d"
+        class="mini guard dog"
+        :class="{ act: canAct('dog') }"
+        :style="rectStyle(rects.minis.get('d')!)"
+        :title="interactTargets.dog ?? (st.killer.dogCard ? `The Dog — ${CARD_NAMES[st.killer.dogCard]}` : 'The Dog — ยังไม่มีการ์ด')"
+        @click="canAct('dog') || roomTarget(r.id) ? clickPiece('dog', r.id) : emit('inspect', { k: 'killer' })"
+        @contextmenu.prevent="emit('inspect', { k: 'killer' })"
+      >
+        <img :src="asset(DOG_MINI)" alt="The Dog" draggable="false" />
+        <img v-if="st.killer.dogCard" class="dog-card" :src="asset(cardImage(st.killer.dogCard))" :alt="CARD_NAMES[st.killer.dogCard]" draggable="false" />
       </component>
       <!-- The Knight's Guards: minis of their own, beside the killer's corner. Their three
            pictures are too alike to tell apart at this size, so each carries its own colour, its
@@ -1295,6 +1318,19 @@ button.tile.picked::after {
   line-height: 1.4;
   text-align: center;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.8);
+  pointer-events: none;
+}
+/* The Dog's card: a small card leaning on its ring, the colour of the path it will take */
+.mini.dog > img.dog-card {
+  position: absolute;
+  right: -30%;
+  bottom: -18%;
+  width: 68%;
+  height: auto;
+  clip-path: none;
+  transform: rotate(10deg);
+  border-radius: 6%;
+  box-shadow: 0 2px 5px rgb(0 0 0 / 0.85);
   pointer-events: none;
 }
 .mini.guard {

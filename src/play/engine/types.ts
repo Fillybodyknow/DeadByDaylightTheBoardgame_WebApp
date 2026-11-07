@@ -160,6 +160,12 @@ export interface KillerState {
    */
   victorRoom?: string | null
   asVictor?: boolean
+  /**
+   * The Houndmaster: the room The Dog stands in (null or absent: not on the board yet), and the
+   * movement card it has been given (out of his hand until another replaces it).
+   */
+  dogRoom?: string | null
+  dogCard?: MoveCard | null
 }
 
 export interface PathState {
@@ -297,6 +303,8 @@ export type KillerInteraction =
   | { k: 'painResonance'; target: number }
   /** The Knight: a Guard into his room or a connected one (moved if it is out already). */
   | { k: 'guard'; guard: Guard; room: string }
+  /** The Houndmaster's Scent of Blood: The Dog into his room, or (`stay`) left where it is; a card for it next. */
+  | { k: 'dog'; stay?: boolean }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
   | { k: 'wrath' }
   /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */
@@ -543,7 +551,7 @@ export type Step =
   /** Predator: this survivor sets a new movement card. */
   | { t: 'replaceCard'; s: number }
   /** The Hillbilly's chainsaw entered a room with several healthy survivors. */
-  | { t: 'pickSurvivor'; why: 'chainsaw'; options: number[] }
+  | { t: 'pickSurvivor'; why: 'chainsaw' | 'dog'; options: number[] }
   /** The Deathslinger's Redeemer: survivor `s` guesses the card he discarded face down. */
   | { t: 'redeemerGuess'; s: number }
   /** Crowd Control: the survivors may pay 2 ▲ between them, or the killer sets `s`'s card. */
@@ -565,6 +573,10 @@ export type Step =
   /** The Knight's Carnifex, at the start of cleanup: the prop it removes, then the room it goes to. */
   | { t: 'carnifexProp' }
   | { t: 'carnifexMove' }
+  /** The Houndmaster, after Scent of Blood: the card from his hand The Dog is given (or none). */
+  | { t: 'dogCard' }
+  /** The Dog at the start of his first turn: which path of its card's colour, when there are several. */
+  | { t: 'dogMove'; card: PathKind }
   | { t: 'gameOver'; winner: 'survivors' | 'killer' }
 
 /** Queued work that runs once the current step has its input. */
@@ -610,7 +622,7 @@ export type Task =
    * `extra`: a turn from Devour Hope at the start of cleanup (cleanup is already queued).
    * `begun`: the start-of-turn perks were asked. `chosen`: The Twins picked who takes it.
    */
-  | { k: 'killerTurn'; turn: number; extra?: boolean; begun?: boolean; chosen?: boolean }
+  | { k: 'killerTurn'; turn: number; extra?: boolean; begun?: boolean; chosen?: boolean; dogged?: boolean }
   /** The killer's interaction, after Red Herring had its chance to redirect it. */
   | { k: 'killerDo'; i: KillerInteraction; turn: number | null }
   /** A roll's result, after Off the Record had its chance at the killer's ▲. */
@@ -720,6 +732,10 @@ export type Action =
   /** The Carnifex's prop / room. */
   | { t: 'guardProp'; prop: string }
   | { t: 'guardRoom'; room: string }
+  /** The Houndmaster: the card given to The Dog (null: none, it keeps the one it has). */
+  | { t: 'dogCard'; card: MoveCard | null }
+  /** The path The Dog runs along. */
+  | { t: 'dogPath'; path: string }
   | { t: 'keepItem'; keep: 'new' | 'old' }
   | { t: 'pickItem'; item: number }
   | { t: 'selfAware'; perk: PerkId }
@@ -762,6 +778,10 @@ export type GameEvent =
   | { k: 'round'; round: number }
   /** `path` is empty for a teleport (Wailing Bell, a Phantasm Trap). `victor`: The Twins' Victor. */
   | { k: 'move'; who: number | 'killer' | 'victor'; from: string; to: string; path: string }
+  /** The Houndmaster's Dog: placed (`from` null, no path) or running along `path`. */
+  | { k: 'dog'; from: string | null; to: string; path: string }
+  /** The Houndmaster gave The Dog `card`. */
+  | { k: 'dogCard'; card: MoveCard }
   | { k: 'phantasmSet'; room: string }
   /** Blighted Corruption: `card` drawn at random from `hand` (his hand before it); `stuck`: it goes nowhere. */
   | { k: 'rushDraw'; card: MoveCard; hand: MoveCard[]; stuck?: boolean }
@@ -861,6 +881,10 @@ export interface GameState {
   jailerGone?: boolean
   /** The survivor whose skill check the Jailer turned into a danger-die roll (until it resolves). */
   jailerRoll?: number | null
+  /** All-Shaking Thunder: the survivor or prop it interacted with, not to be again this turn. */
+  thunder?: { target?: number; prop?: string } | null
+  /** A survivor became healthy this round (No Quarter). */
+  healthyThisRound?: boolean
   /** The survivor whose turn began in a locker (Dance With Me). */
   lockerTurn?: number | null
   /** Rooms with one of The Plague's Vile Purges (10 tokens, one per room, the rest on survivors). */

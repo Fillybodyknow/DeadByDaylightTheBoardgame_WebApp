@@ -7,6 +7,8 @@ import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { boardOf,
   CARD_NAMES,
+  dogPaths,
+  isPathCard,
   ITEM_NAMES,
   WARD_COST,
   antidoteKillerMoves,
@@ -52,6 +54,7 @@ import {
   killerInteractionLabel,
   killerMini,
   VICTOR_MINI,
+  DOG_MINI,
   iconLabel,
   pathLabel,
   pathName,
@@ -89,7 +92,8 @@ const props = defineProps<{
 // Perk and power choices the board already offers are made there; the panel points at it.
 const here = (a: Action) => !props.onBoard.has(actionKey(a))
 /** Windows of Opportunity's pallets are picked on the board, the pallet and then its path. */
-const boardPallet = (perk: PerkId, c: PerkChoice) => perk === 'windows_of_opportunity' && !!c.path
+/** Treacherous Crows too: the crow, then the room it goes to, both on the board. */
+const boardPallet = (perk: PerkId, c: PerkChoice) => (perk === 'windows_of_opportunity' && !!c.path) || perk === 'treacherous_crows'
 const perkAct = (perk: PerkId, c: PerkChoice): Action => ({ t: 'perk', perk, use: true, choice: c })
 const powerAct = (i: KillerInteraction): Action => ({ t: 'interact', i })
 const emit = defineEmits<{
@@ -141,6 +145,8 @@ const actor = computed<number | 'killer' | null>(() => {
     case 'shrikeWreath':
     case 'carnifexProp':
     case 'carnifexMove':
+    case 'dogCard':
+    case 'dogMove':
     case 'reignPath':
       return 'killer'
     case 'roll':
@@ -302,7 +308,9 @@ function pickedHint(b: { perk: PerkId; choices: PerkChoice[] }): string {
           ? 'คลิกผู้รอดชีวิตบนแผนที่ แล้วเลือกเส้นทางที่จะให้เดิน'
           : b.perk === 'weaving_spiders'
             ? 'คลิก Generator ที่หงายอยู่บนแผนที่ — แล้วผู้รอดชีวิตในห้องคุณร่วมกันลง 6 ▲'
-            : undefined
+            : b.perk === 'treacherous_crows'
+              ? 'คลิก Crow ในห้องคุณบนแผนที่ แล้วคลิกห้องที่เชื่อมกันที่จะส่งมันไป'
+              : undefined
   return perkPickedHint(b.choices, (c) => !here(perkAct(b.perk, c)), how)
 }
 
@@ -389,6 +397,33 @@ function confirmBonus() {
   preview.value = null
   act({ t: 'bonus', card: bonusPick.value })
 }
+
+// ---------- Scent of Blood, step 2: a card for The Dog, picked from the hand, then confirmed ----------
+
+const dogPick = ref<MoveCard | null>(null)
+watch(
+  () => JSON.stringify(step.value),
+  () => (dogPick.value = null),
+)
+const dogHand = computed<HandCard[]>(() =>
+  step.value.t === 'dogCard' ? [...new Set(props.st.killer.hand)].map((card) => ({ card, picked: dogPick.value === card, ...(dogPick.value === card ? { badge: 'The Dog' } : {}) })) : [],
+)
+function pickDog(card: MoveCard) {
+  sfx.click()
+  dogPick.value = dogPick.value === card ? null : card
+}
+function confirmDog() {
+  if (dogPick.value) act({ t: 'dogCard', card: dogPick.value })
+}
+/** What The Dog would do with a card at the start of his first turn, from where it stands now. */
+function dogWhere(card: MoveCard): string {
+  const room = props.st.killer.dogRoom
+  if (!room) return ''
+  if (card === 'wait') return `อยู่ที่ ${roomName(props.st, room)} แล้วขย้ำคนในห้องนั้น`
+  const runs = isPathCard(card) ? dogPaths(props.st, card) : []
+  return runs.length ? `วิ่งจาก ${roomName(props.st, room)} ไป ${runs.map((e) => roomName(props.st, e.to)).join(' หรือ ')} แล้วขย้ำคนที่นั่น` : `ไม่มีเส้นทางสีนี้จาก ${roomName(props.st, room)} — อยู่กับที่ ไม่ขย้ำใคร`
+}
+const dogRuns = computed(() => (step.value.t === 'dogMove' ? dogPaths(props.st, step.value.card) : []))
 
 // Online each helper (a key, Iron Will) decides on their own device; the roller waits for them.
 const rollers = computed(() => rerollers(props.st).filter((s) => controls(props.st, s)))
@@ -488,8 +523,37 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p class="board-hint">🎯 คลิกบนแผนที่ — {{ step.t === 'carnifexProp' ? 'prop ที่กระพริบ' : 'ห้องที่กระพริบ' }}</p>
     </template>
 
+    <!-- The Houndmaster's Scent of Blood, step 2: the card The Dog runs with -->
+    <template v-else-if="step.t === 'dogCard'">
+      <p><Mini class="token-inline" :src="asset(DOG_MINI)" alt="" /> <b>กลิ่นเลือด</b> — มอบการ์ดเคลื่อนที่ 1 ใบจากมือให้ The Dog</p>
+      <p class="small">
+        ทุกรอบ ตอนเริ่มเทิร์นแรกของคุณ The Dog จะวิ่งตามการ์ดนี้ (ข้าม Pallet กำแพง และย้อนเส้นทางทางเดียวได้) แล้ว<b>ขย้ำ</b>ผู้รอดชีวิตที่ไม่บาดเจ็บในห้องที่ไปถึง 1 คน — คนนั้นยังถูกอุ้มได้ในรอบเดียวกัน
+      </p>
+      <p class="small muted">การ์ดที่มอบจะอยู่กับ The Dog ไม่กลับเข้ามือ จนกว่าจะมอบใบใหม่{{ st.killer.dogCard ? ` · ตอนนี้ The Dog ถือ ${CARD_NAMES[st.killer.dogCard]} (มอบใบใหม่ = ทิ้งใบนี้)` : '' }}</p>
+      <p class="muted small">👇 เลือกการ์ดจากมือด้านล่าง แล้วกดยืนยัน</p>
+      <p v-if="dogPick" class="small">{{ CARD_NAMES[dogPick] }}: {{ dogWhere(dogPick) }}</p>
+      <div class="buttons col way-on">
+        <button class="primary" :disabled="!dogPick" @click="confirmDog">{{ dogPick ? `ยืนยัน: มอบ ${CARD_NAMES[dogPick]} ให้ The Dog` : 'เลือกการ์ดจากมือก่อน' }}</button>
+        <button @click="act({ t: 'dogCard', card: null })">{{ st.killer.dogCard ? `ไม่มอบ — The Dog ใช้ ${CARD_NAMES[st.killer.dogCard]} ต่อ` : 'ไม่มอบการ์ด (The Dog ไม่วิ่ง)' }}</button>
+      </div>
+      <CardHand :cards="dogHand" :label="`กลิ่นเลือด — มือของ ${st.killer.name}`" prompt="กลิ่นเลือด — เลือกการ์ดให้ The Dog" @pick="pickDog" />
+    </template>
+
+    <!-- The Dog's run at the start of his first turn: which path of its colour -->
+    <template v-else-if="step.t === 'dogMove'">
+      <p><Mini class="token-inline" :src="asset(DOG_MINI)" alt="" /> <b>The Dog</b> วิ่งด้วย <b>{{ CARD_NAMES[step.card] }}</b> — มีหลายเส้นทางสีนี้ เลือกทางที่มันจะไป</p>
+      <p class="small muted">ไปถึงแล้ว มันจะขย้ำผู้รอดชีวิตที่ไม่บาดเจ็บในห้องนั้น 1 คน</p>
+      <p class="board-hint">🎯 คลิกเส้นทางที่กระพริบบนแผนที่{{ dogRuns.some((e) => here({ t: 'dogPath', path: e.path.id })) ? ' หรือปุ่มด้านล่าง' : '' }}</p>
+      <div class="buttons col">
+        <template v-for="e in dogRuns" :key="e.path.id">
+          <button v-if="here({ t: 'dogPath', path: e.path.id })" @click="act({ t: 'dogPath', path: e.path.id })">→ {{ roomName(st, e.to) }}</button>
+        </template>
+      </div>
+    </template>
+
     <template v-else-if="step.t === 'pickSurvivor'">
-      <p>เลื่อยไฟฟ้า — เลือกผู้รอดชีวิตในห้องที่จะบาดเจ็บ</p>
+      <p v-if="step.why === 'dog'"><b>The Dog</b> — เลือกผู้รอดชีวิตที่จะถูกขย้ำ (บาดเจ็บ แต่ยังถูกอุ้มได้ในรอบนี้)</p>
+      <p v-else>เลื่อยไฟฟ้า — เลือกผู้รอดชีวิตในห้องที่จะบาดเจ็บ</p>
       <p v-if="step.options.some((s) => !here({ t: 'pick', s }))" class="board-hint">🎯 เลือกบนแผนที่ได้เลย — คลิกผู้รอดชีวิตที่กระพริบ</p>
       <div class="buttons">
         <button v-for="s in step.options.filter((s) => here({ t: 'pick', s }))" :key="s" class="primary" @click="act({ t: 'pick', s })"><FaceLabel :st="st" :who="s" :text="st.survivors[s].name" /></button>
@@ -577,15 +641,18 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <p v-if="hasPallet && !perkPicked" class="board-hint">🎯 ทิ้ง Pallet: คลิก Pallet บนแผนที่ แล้วเลือกเส้นทาง</p>
         <!-- Diversion is played on the board: the killer, then the path -->
         <p v-if="hasDiversion" class="board-hint">🎯 หันเหความสนใจ: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
-        <details v-for="c in calmSpirit" :key="c.prop" class="calm">
-          <summary>วิญญาณสงบ: ย้าย Crow ไปห้องอื่น (ฟรี)</summary>
-          <div class="buttons">
-            <button v-for="o in c.options" :key="o.room" @click="act({ t: 'interact', i: o })">{{ roomName(st, o.room) }}</button>
-          </div>
-        </details>
       </div>
       <!-- a perk is picked first (its targets then show on the board), again to put it back -->
-      <p v-if="buttons.length && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
+      <p v-if="(buttons.length || calmSpirit.length) && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
+      <!-- Calm Spirit is an interaction, but pressed as a perk is: then a crow, then the room -->
+      <div v-if="calmSpirit.length">
+        <PerkCard
+          perk="calm_spirit"
+          :state="perkPicked === 'calm_spirit' ? 'picked' : perkPicked ? 'dim' : 'ready'"
+          :hint="perkPicked === 'calm_spirit' ? '🎯 คลิก Crow ในห้องคุณบนแผนที่ แล้วคลิกห้องที่จะส่งมันไป — กดการ์ดอีกครั้งเพื่อยกเลิก' : undefined"
+          @pick="pickInteractPerk('calm_spirit')"
+        />
+      </div>
       <div v-for="b in buttons" :key="b.perk">
         <PerkCard
           :perk="b.perk"
@@ -1097,15 +1164,6 @@ p {
   font-size: 0.82rem;
   font-weight: 700;
   color: #ffe9b0;
-}
-.calm summary {
-  cursor: pointer;
-  padding: 0.45rem 0.85rem;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-}
-.calm .buttons {
-  margin-top: 0.35rem;
 }
 .ghost {
   background: none;

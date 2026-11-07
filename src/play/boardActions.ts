@@ -6,6 +6,7 @@ import { ref, type Ref } from 'vue'
 import { sfx } from '../sound'
 import {
   anyMoves,
+  dogPaths,
   CARD_NAMES,
   boardOf,
   pathDef,
@@ -39,7 +40,7 @@ import { PERKS, type PerkId } from './engine/perks'
 import { boards } from './engine/boards'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, DOG_MINI, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -272,6 +273,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       if (i.k === 'calmSpirit' && i.prop === modes.calmCrow.value)
         add(`room:${i.room}`, `ย้าย Crow ไป ${roomName(st, i.room)}`, () => {
           modes.calmCrow.value = null
+          perkPicked.value = null
           go({ t: 'interact', i }, sfx.select)()
         })
     return out
@@ -294,6 +296,17 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   }
 
   // Ace in the Hole / Iron Maiden: the first prop picked, the second to swap it with
+  // Treacherous Crows: the crow picked (in the same mode as Ace in the Hole's first prop), the rooms it may go to
+  const crowsPerk = s.t === 'survivorInteract' && modes.aceFirst.value ? perkButtons(st).find((x) => x.perk === 'treacherous_crows' && x.choices.some((c) => c.prop === modes.aceFirst.value)) : undefined
+  if (crowsPerk) {
+    for (const c of crowsPerk.choices)
+      if (c.prop === modes.aceFirst.value)
+        add(`room:${c.room}`, `${PERKS.treacherous_crows.name}: ${perkChoiceLabel(st, 'treacherous_crows', crowsPerk.owner, crowsPerk.w, c)}`, () => {
+          modes.aceFirst.value = null
+          go({ t: 'perk', perk: 'treacherous_crows', use: true, choice: c }, sfx.drop)()
+        })
+    return out
+  }
   if (modes.aceFirst.value && (s.t === 'survivorInteract' || s.t === 'killerInteract')) {
     const b = perkButtons(st).find((x) => x.perk === 'ace_in_the_hole' || x.perk === 'iron_maiden')
     for (const c of b?.choices ?? [])
@@ -401,6 +414,13 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       break
 
     case 'survivorInteract': {
+      // Calm Spirit pressed in the panel (it is an interaction, armed as a perk is): the crows in
+      // the room, then the room it goes to
+      if (perkPicked.value === 'calm_spirit') {
+        for (const crow of new Set(survivorInteractions(st, s.s).flatMap((i) => (i.k === 'calmSpirit' ? [i.prop] : []))))
+          add(`prop:${crow}`, `${PERKS.calm_spirit.name}: Crow ตัวนี้ (แล้วเลือกห้องที่จะส่งไป)`, () => ((modes.calmCrow.value = crow), sfx.click()))
+        break
+      }
       // a perk picked in the panel: only its targets
       if (perkPicked.value && perksToPick(st)) {
         perkSpots(st, out, modes)
@@ -424,7 +444,6 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       }
       if (s.canInteract) {
         const pallets = new Set<string>()
-        const crows = new Set<string>()
         // what the survivor does to the killer is on the killer's mini in their room
         const killerSpot = killerSpotIn(st, st.survivors[s.s].room)
         for (const i of survivorInteractions(st, s.s)) {
@@ -433,9 +452,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             pallets.add(i.prop)
             add(spotOf(i), 'ทิ้ง Pallet (แล้วเลือกเส้นทาง)', () => ((modes.palletMode.value = i.prop), sfx.click()))
           } else if (i.k === 'calmSpirit') {
-            if (crows.has(i.prop)) continue
-            crows.add(i.prop)
-            add(spotOf(i), 'วิญญาณสงบ: ย้าย Crow (แล้วเลือกห้อง)', () => ((modes.calmCrow.value = i.prop), sfx.click()))
+            // armed in the panel first (above): an ordinary click on a crow chases it
+            continue
           } else if (i.k === 'diversion') {
             // Diversion: the killer first, then his paths (in its own mode, above). Once, however
             // many paths; with Power Struggle on him too, a click asks which. The Unknown: every
@@ -609,6 +627,15 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           case 'purge':
             add(`room:${i.room}`, label, run)
             break
+          case 'dog':
+            // Scent of Blood: The Dog into his room (his room or his mini), or left where it is (The Dog)
+            if (i.stay) add('dog', label, run)
+            else {
+              add(`room:${st.killer.room}`, label, run)
+              add('killer', label, run)
+            }
+            out[out.length - 1].icon = DOG_MINI
+            break
           case 'guard':
             // a room offers every Guard: the chooser shows each one's picture
             add(`room:${i.room}`, label, run)
@@ -679,8 +706,15 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     case 'carnifexMove':
       for (const room of connectedRoomsOf(st, st.guards!.carnifex!)) add(`room:${room}`, `Carnifex → ${roomName(st, room)}`, go({ t: 'guardRoom', room }, sfx.drop))
       break
+    case 'dogMove':
+      // The Dog's run: a path of its card's colour (its room's other end shows where it goes)
+      for (const e of dogPaths(st, s.card)) {
+        add(`path:${e.path.id}`, `The Dog → ${roomName(st, e.to)}`, go({ t: 'dogPath', path: e.path.id }, sfx.drop))
+        out[out.length - 1].dest = e.to
+      }
+      break
     case 'pickSurvivor':
-      for (const t of s.options) add(`s:${t}`, `${st.survivors[t].name} โดน เลื่อยไฟฟ้า`, go({ t: 'pick', s: t }, sfx.select), 'act', t)
+      for (const t of s.options) add(`s:${t}`, s.why === 'dog' ? `The Dog ขย้ำ ${st.survivors[t].name}` : `${st.survivors[t].name} โดน เลื่อยไฟฟ้า`, go({ t: 'pick', s: t }, sfx.select), 'act', t)
       break
   }
   return out
@@ -750,12 +784,16 @@ export function offerPerk(st: GameState): PerkId | null {
   return perksToPick(st) ? perkPicked.value : st.step.perk
 }
 
+/** Killer perks armed in the panel first, as survivors' are: their targets look like his own interactions. */
+const ARMED_KILLER_PERKS: PerkId[] = ['all_shaking_thunder']
+
 export function perksToPick(st: GameState): boolean {
   const s = st.step
   if (s.t === 'offer') {
     // several perks of one owner offered at the same moment (p.16)
     if (offeredPerks(s).length > 1) return true
-    return s.owner !== 'killer' && perkChoices(st, s.perk, s.owner, s.w).some(onMap)
+    // (a killer's too when its targets are the ones he interacts with anyway: All-Shaking Thunder)
+    return (s.owner !== 'killer' || ARMED_KILLER_PERKS.includes(s.perk)) && perkChoices(st, s.perk, s.owner, s.w).some(onMap)
   }
   const n = new Set(perkButtons(st).map((b) => b.perk)).size
   return (s.t === 'turnStart' || s.t === 'survivorInteract' || s.t === 'killerInteract') && n > 0
@@ -816,6 +854,12 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
         const what = palletOn(st, from) ? 'Pallet' : 'กำแพง'
         out.push({ key: spotKey(st, `path:${from}`), label: `${name}: ย้าย${what}นี้ (แล้วคลิกเส้นทางที่จะวาง)`, style: 'act', run: () => ((modes.fogwiseFrom.value = from), sfx.click()) })
       }
+      continue
+    }
+    // Treacherous Crows: a crow in her room first, then the room it goes to (a mode, above)
+    if (b.perk === 'treacherous_crows') {
+      for (const crow of new Set(b.choices.map((c) => c.prop!)))
+        out.push({ key: `prop:${crow}`, label: `${name}: Crow ตัวนี้ (แล้วเลือกห้องที่จะส่งไป)`, style: 'act', run: () => ((modes.aceFirst.value = crow), sfx.click()) })
       continue
     }
     // Windows of Opportunity: a pallet is one spot (then its path, as a pallet in her own room is)

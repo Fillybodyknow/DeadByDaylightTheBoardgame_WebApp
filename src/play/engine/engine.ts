@@ -874,8 +874,15 @@ export function killerInteractions(st: GameState, step: Step = st.step): KillerI
   // no power, no prop, no walking on. With neither open to him, he does nothing this turn.
   if (step.t === 'killerInteract' && step.only !== undefined) return out.filter((i) => (i.k === 'attack' || i.k === 'pickUp') && i.target === step.only)
   const guarded = st.guardian
-  if (guarded !== null && guarded !== undefined) return out.filter((i) => (i.k === 'attack' || i.k === 'pickUp') && i.target === guarded)
-  return out
+  if (guarded !== null && guarded !== undefined) return thunderFree(st, out.filter((i) => (i.k === 'attack' || i.k === 'pickUp') && i.target === guarded))
+  return thunderFree(st, out)
+}
+
+/** All-Shaking Thunder: the survivor or prop it interacted with is not interacted with again this turn. */
+function thunderFree(st: GameState, out: KillerInteraction[]): KillerInteraction[] {
+  const t = st.thunder
+  if (!t) return out
+  return out.filter((i) => !(t.target !== undefined && 'target' in i && i.target === t.target) && !(t.prop !== undefined && 'prop' in i && i.prop === t.prop))
 }
 
 /** The Trapper's Bear Trap: a connected path without pallet, wall or other component. */
@@ -1297,6 +1304,26 @@ function handle(st: GameState, a: Action) {
       if (!carnifexProps(st).some((p) => p.id === a.prop)) fail('not a prop the Carnifex removes')
       return carnifexTake(st, a.prop)
     }
+    case 'dogCard': {
+      if (a.t !== 'dogCard') break
+      const k = st.killer
+      if (a.card === null) {
+        log(st, k.dogCard ? `The Dog ใช้การ์ด ${CARD_NAMES[k.dogCard]} ต่อ` : `${k.name} ไม่มอบการ์ดให้ The Dog`, 'killer')
+        return
+      }
+      if (!k.hand.includes(a.card)) fail('card not in hand')
+      k.hand.splice(k.hand.indexOf(a.card), 1)
+      const was = k.dogCard
+      // the card given before is discarded: back in his hand at cleanup, as his other cards
+      k.dogCard = a.card
+      log(st, `${k.name} มอบ ${CARD_NAMES[a.card]} ให้ The Dog${was ? ` (ทิ้ง ${CARD_NAMES[was]} ที่มอบไว้เดิม)` : ''}`, 'killer', { ev: { k: 'dogCard', card: a.card } })
+      return
+    }
+    case 'dogMove': {
+      if (a.t !== 'dogPath') break
+      const e = dogPaths(st, step.card).find((x) => x.path.id === a.path) ?? fail('not a path The Dog can take')
+      return dogGo(st, e.path, e.to)
+    }
     case 'carnifexMove': {
       if (a.t !== 'guardRoom') break
       if (!st.guards?.carnifex || !connectedRooms(st, st.guards.carnifex).has(a.room)) fail('not a room next to the Carnifex')
@@ -1595,6 +1622,7 @@ function handle(st: GameState, a: Action) {
     }
     case 'pickSurvivor': {
       if (a.t !== 'pick' || !step.options.includes(a.s)) break
+      if (step.why === 'dog') return dogBite(st, a.s)
       wound(st, a.s, 'power', `${st.survivors[a.s].name} โดน เลื่อยไฟฟ้า — บาดเจ็บ`)
       return
     }
@@ -1944,6 +1972,11 @@ function runTask(st: GameState, task: Task) {
         st.queue.unshift({ k: 'trigger', w: { k: 'killerTurnBegin', turn: task.turn }, done: [] }, { ...task, begun: true })
         return
       }
+      // The Houndmaster's passive: at the start of his first turn The Dog runs with its card
+      if (task.turn === 0 && !task.dogged && k.characterId === 'houndmaster' && k.dogRoom && k.dogCard) {
+        st.queue.unshift({ ...task, dogged: true })
+        return dogRun(st)
+      }
       // The Twins' passive: with Victor on the board, the turn may be taken with him.
       if (!task.chosen && k.characterId === 'twins' && k.victorRoom) {
         st.queue.unshift({ ...task, chosen: true })
@@ -1985,6 +2018,8 @@ function runTask(st: GameState, task: Task) {
       // Power Struggle: no interaction after moving with the first card.
       const struggled = st.struggle === true && task.turn === (st.struggleTurn ?? 0)
       if (struggled && st.canInteract) log(st, `${actorName(st)} Interact ไม่ได้เทิร์นนี้ (ดิ้นรนสุดพลัง)`, 'killer')
+      // All-Shaking Thunder picked someone up and he carries them: that was this turn's interaction
+      if (st.thunder && st.survivors.some((sv) => sv.status === 'carried')) st.canInteract = false
       wait(st, { t: 'killerInteract', turn: task.turn, canInteract: st.canInteract && !struggled })
       return
     }
@@ -1998,8 +2033,9 @@ function runTask(st: GameState, task: Task) {
       // A turn taken with Victor ends: Charlotte is "the Killer" again.
       if (k.asVictor) twinSwap(st)
       st.itemLock = null
-      // Guardian held him to one survivor for this turn only.
+      // Guardian held him to one survivor for this turn only; All-Shaking Thunder's one is free again.
       st.guardian = null
+      st.thunder = null
       // Coup de Grâce comes at the end of the turn, before the next one.
       if (!task.ended) {
         st.queue.unshift({ k: 'trigger', w: { k: 'killerTurnEnd', turn: task.turn }, done: [] }, { ...task, ended: true })
@@ -2807,7 +2843,7 @@ function cleanup(st: GameState) {
   }
   // (The Unknown can't take killer bonus turns: its round starts with the bonus spent)
   Object.assign(st.killer, {
-    hand: [...killerDeck(st.killer.characterId), ...(st.killer.extraCards ?? [])],
+    hand: freshHand(st),
     planned: [],
     revealedCount: 0,
     plannedShown: false,
@@ -2816,7 +2852,7 @@ function cleanup(st: GameState) {
     bonusAt: null,
     shown: [],
   })
-  Object.assign(st, { perksUsed: [], offeringsUsed: [], perksMuted: [], healedWith: [], genBy: {}, empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, geneticLimits: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null })
+  Object.assign(st, { perksUsed: [], offeringsUsed: [], perksMuted: [], healedWith: [], genBy: {}, empathyNo: [], leverage: null, guardian: null, dissolution: null, fearmonger: null, geneticLimits: null, plunder: null, moveBlocked: false, stridor: null, rollMods: { danger: false, keep: false }, sealedCard: null, itemBlocked: false, redeemer: null, struggle: false, deception: false, itemLock: null, kept: [], rushCard: null, thunder: null, healthyThisRound: false })
   st.round++
   log(st, `— รอบ ${st.round} —`, 'game', { ev: { k: 'round', round: st.round } })
   startPlanning(st)
@@ -3918,6 +3954,22 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return w.k === 'killerTurnBegin' ? guardOptions(st) : []
     case 'nowhere_to_hide':
       return w.k === 'preRoll' && w.ctx.k === 'search' && !st.rollMods.danger ? NONE : []
+    // ----- The Houndmaster -----
+    case 'jagged_compass':
+      // a survivor hung: straight to the room of the face-up generator with the most progress (his pick on a tie)
+      if (w.k !== 'afterHang') return []
+      return compassRooms(st)
+        .filter((room) => room !== k.room)
+        .map((room) => ({ room }))
+    case 'no_quarter':
+      // the end of a turn of his, someone healthy again this round, no bonus turn yet (one a round, p.10)
+      if (w.k !== 'killerTurnEnd' || !st.healthyThisRound || k.bonusUsed) return []
+      return [...new Set(k.hand)].map((card) => ({ card }))
+    case 'all_shaking_thunder':
+      // he walked in with his Vault card, along the vault path: an interaction here at once
+      if (w.k !== 'killerEntered' || !w.path || st.phase !== 'killer' || k.asVictor) return []
+      if (pathDef(st, w.path).kind !== 'vault' || k.planned[k.revealedCount - 1] !== 'vault') return []
+      return thunderOptions(st).map(thunderChoice)
     case 'hubris': {
       // a survivor walking into his room, by any move
       if (w.k !== 'entered') return []
@@ -4051,6 +4103,22 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // progress left on their board
       if (w.k !== 'turnStart' || w.s !== o) return []
       return st.survivors.flatMap((sv, i) => (sv.status === 'board' && !tokensOn(sv) && healable(st, i) ? [{ target: i }] : []))
+    // ----- Taurie -----
+    case 'clean_break':
+      // she healed someone else: she is healthy herself
+      return w.k === 'healed' && w.by === o && w.s !== o && me!.wounded && healable(st, o as number) ? NONE : []
+    case 'treacherous_crows': {
+      // her interaction: a crow in her room, with a card of his still to see; the crow then goes
+      // into a connected room of her choice
+      if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract || crowsCard(st) < 0) return []
+      const rooms = [...connectedRooms(st, me!.room)]
+      return propsIn(st, me!.room)
+        .filter((p) => p.kind === 'crow' && p.revealed && !entityOn(st, { prop: p.id }))
+        .flatMap((p) => rooms.map((room) => ({ prop: p.id, room })))
+    }
+    case 'shoulder_the_burden':
+      // she took someone off a hook, with a sacrifice progress on her board to give them
+      return w.k === 'afterSabotage' && w.s === o && w.rescued !== undefined && w.rescued !== o && tokensOn(me!) > 0 ? NONE : []
     case 'weaving_spiders': {
       // her interaction for the turn: 6 ▲ from the survivors in her room, for a face-up generator
       if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract) return []
@@ -4270,7 +4338,7 @@ export function perkButtons(st: GameState): { perk: PerkId; owner: PerkOwner; w:
   }
   if (step.t === 'turnStart') add(step.s, { k: 'turnStart', s: step.s }, ['self_care', 'empathy', 'botany_knowledge', 'breakout', 'inner_healing', 'self_aware', 'potential_energy', 'fogwise', 'strength_in_shadows', 'scavenger'])
   if (step.t === 'survivorInteract')
-    add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity', 'kinship', 'no_one_left_behind', 'wicked', 'weaving_spiders'])
+    add(step.s, { k: 'interact', s: step.s }, ['prove_thyself', 'botany_knowledge', 'ace_in_the_hole', 'balanced_landing', 'solidarity', 'windows_of_opportunity', 'kinship', 'no_one_left_behind', 'wicked', 'weaving_spiders', 'treacherous_crows'])
   // (not on Bond's two dice: the perks change the die kept, once it is)
   if (step.t === 'roll' && !step.keep) st.survivors.forEach((_, i) => !step.passed?.includes(i) && add(i, { k: 'roll' }, ['iron_will', 'autodidact', 'corrective_action']))
   // Iron Grasp: his own button on the struggle roll, before it is settled
@@ -4682,6 +4750,32 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       const at = st.queue.findIndex((t) => t.k === 'killerDo' && t.i.k === 'pickUp' && t.i.target === o)
       if (at >= 0) st.queue.splice(at, 1)
       return addSacrifice(st, 1)
+    }
+    case 'clean_break':
+      payPerk(st, o, perk)
+      return makeHealthy(st, o as number, `${name(o as number)} หายบาดเจ็บ (เลิกฟ้าผ่า)`, o as number)
+    case 'treacherous_crows': {
+      const index = crowsCard(st)
+      const crow = st.props.find((p) => p.id === c.prop)!
+      payPerk(st, o, perk, `เปิดการ์ดฆาตกรใบที่ ${index + 1}: ${CARD_NAMES[k.planned[index]]} แล้ววาง Crow ที่ ${roomName(st, c.room!)}`)
+      k.shown.push(index)
+      crow.room = c.room!
+      // her interaction for the turn: Desperate Measures may follow it
+      trigger(st, { k: 'afterSurvivorInteract', s: o as number })
+      return
+    }
+    case 'shoulder_the_burden': {
+      const t = (w as Extract<PerkWindow, { k: 'afterSabotage' }>).rescued!
+      const her = st.survivors[o as number]
+      const them = st.survivors[t]
+      payPerk(st, o, perk, `ย้าย sacrifice progress ให้ ${them.name} — ทั้งคู่ +1 ▲`)
+      if (her.sacrificeToken) her.sacrificeToken = false
+      else her.extraSacrifice = (her.extraSacrifice ?? 1) - 1
+      if (!them.sacrificeToken) them.sacrificeToken = true
+      else them.extraSacrifice = (them.extraSacrifice ?? 0) + 1
+      gainSurvivor(st, o as number, 1)
+      gainSurvivor(st, t, 1)
+      return
     }
     case 'wicked': {
       payPerk(st, o, perk, 'ผู้รอดชีวิตทุกคน +1 ▲ — ฆาตกรได้ Sacrifice Progress +1')
@@ -5154,6 +5248,26 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk, 'ผู้รอดชีวิตใน Locker ทอย Danger Die แทน')
       dangerInstead(st)
       return
+    case 'jagged_compass':
+      payPerk(st, o, perk, `ตรงไปที่ ${roomName(st, c.room!)}`)
+      return killerEnter(st, '', c.room!)
+    case 'no_quarter': {
+      // a bonus turn right after this one, with a card from his hand (as No One Escapes Death's)
+      const turn = (w as Extract<PerkWindow, { k: 'killerTurnEnd' }>).turn
+      payPerk(st, o, perk, `Killer bonus turn ด้วย ${CARD_NAMES[c.card!]}`)
+      k.hand.splice(k.hand.indexOf(c.card!), 1)
+      k.planned.splice(turn + 1, 0, c.card!)
+      k.shown = k.shown.map((i) => (i > turn ? i + 1 : i))
+      k.bonusUsed = true
+      k.bonusAt = turn + 1
+      return
+    }
+    case 'all_shaking_thunder': {
+      const i = thunderOptions(st).find((x) => same(thunderChoice(x), c)) ?? fail('nothing to interact with')
+      payPerk(st, o, perk, 'Interact ทันที')
+      st.thunder = c.target !== undefined ? { target: c.target } : { prop: c.prop }
+      return killerActs(st, i, k.revealedCount - 1)
+    }
     case 'hubris': {
       const s = (w as Extract<PerkWindow, { k: 'entered' }>).s
       const sv = st.survivors[s]
@@ -5356,6 +5470,7 @@ function makeHealthy(st: GameState, s: number, text: string, by: number) {
     return
   }
   sv.wounded = false
+  st.healthyThisRound = true
   log(st, text, by, { ev: { k: 'heal', s, by } })
   if (perkReady(st, 'killer', 'nurses_calling')) {
     payPerk(st, 'killer', 'nurses_calling', '+2 ▲')
@@ -5379,8 +5494,111 @@ function startBonusMove(st: GameState, s: number, card: PathKind) {
 
 // ---------- killer powers ----------
 
+// ---------- The Houndmaster ----------
+
+/** His hand for a new round: the card with The Dog stays with it. */
+function freshHand(st: GameState): MoveCard[] {
+  const hand = [...killerDeck(st.killer.characterId), ...(st.killer.extraCards ?? [])]
+  const dog = st.killer.dogCard
+  if (dog && hand.includes(dog)) hand.splice(hand.indexOf(dog), 1)
+  return hand
+}
+
+/**
+ * Where The Dog may run with `card`: every path of that colour touching its room, either way. It
+ * ignores pallets and breakable walls and may go against a one-way path (his passive).
+ */
+export function dogPaths(st: GameState, card: PathKind): { path: PathDef; to: string }[] {
+  const room = st.killer.dogRoom
+  if (!room) return []
+  return touchingPaths(st, room)
+    .filter((p) => p.kind === card)
+    .map((p) => ({ path: p, to: p.a === room ? p.b : p.a }))
+}
+
+/** The Houndmaster's passive, at the start of his first turn: The Dog runs with its card, then bites. */
+function dogRun(st: GameState) {
+  const k = st.killer
+  const card = k.dogCard
+  if (!k.dogRoom || !card) return
+  // Wait: it stays, and still bites where it stands
+  if (card === 'wait') {
+    log(st, `The Dog (Wait) อยู่ที่ ${roomName(st, k.dogRoom)}`, 'killer', { ev: { k: 'dog', from: k.dogRoom, to: k.dogRoom, path: '' } })
+    return dogBiteHere(st)
+  }
+  const runs = isPathCard(card) ? dogPaths(st, card) : []
+  // no path of its colour: it doesn't move, so it bites nobody
+  if (!runs.length) {
+    log(st, `The Dog ไม่มีเส้นทาง ${CARD_NAMES[card]} — อยู่กับที่`, 'killer')
+    return
+  }
+  if (runs.length === 1) return dogGo(st, runs[0].path, runs[0].to)
+  wait(st, { t: 'dogMove', card: card as PathKind })
+}
+
+function dogGo(st: GameState, path: PathDef, to: string) {
+  const k = st.killer
+  const from = k.dogRoom!
+  k.dogRoom = to
+  log(st, `The Dog → ${roomName(st, to)}`, 'killer', { ev: { k: 'dog', from, to, path: path.id } })
+  dogBiteHere(st)
+}
+
+/** Healthy survivors on the board in The Dog's room: one of them is bitten. */
+export function dogPrey(st: GameState): number[] {
+  const room = st.killer.dogRoom
+  return room ? onBoardIn(st, room).filter((s) => !st.survivors[s].wounded) : []
+}
+
+/** The Dog bites someone healthy where it stopped (his pick when there are several). */
+function dogBiteHere(st: GameState) {
+  const prey = dogPrey(st)
+  if (prey.length === 1) return dogBite(st, prey[0])
+  if (prey.length > 1) wait(st, { t: 'pickSurvivor', why: 'dog', options: prey })
+}
+
+/** Wounded by The Dog: not an attack, and they may still be picked up this round (his passive). */
+function dogBite(st: GameState, s: number) {
+  wound(st, s, 'power', `The Dog ขย้ำ ${st.survivors[s].name} — บาดเจ็บ`, true)
+}
+
+/**
+ * Treacherous Crows: the killer's set card it reveals — the next he will play that nobody has seen
+ * yet (a ruling: the card reads "one of", the one that matters is his next); -1 when there is none.
+ */
+export function crowsCard(st: GameState): number {
+  const k = st.killer
+  if (k.plannedShown) return -1
+  return k.planned.findIndex((_, i) => i >= k.revealedCount && !k.shown.includes(i))
+}
+
+/** Jagged Compass: the rooms of the face-up generators not yet repaired with the most progress. */
+export function compassRooms(st: GameState): string[] {
+  const gens = st.props.filter((p) => p.kind === 'generator' && p.revealed && !p.removed && p.room && p.progress < PROGRESS_MAX)
+  if (!gens.length) return []
+  const top = Math.max(...gens.map((g) => g.progress))
+  return [...new Set(gens.filter((g) => g.progress === top).map((g) => g.room!))]
+}
+
+/** All-Shaking Thunder's interactions: a prop or a survivor in his room (no power). */
+function thunderOptions(st: GameState): KillerInteraction[] {
+  const k = st.killer
+  const out = propInteractions(st, k.room)
+  for (const t of onBoardIn(st, k.room)) {
+    const sv = st.survivors[t]
+    if (!sv.wounded) out.push({ k: 'attack', target: t })
+    else if (!sv.woundedThisRound) out.push({ k: 'pickUp', target: t })
+  }
+  return thunderFree(st, out)
+}
+
+/** The perk choice for one of them: the survivor, or the prop (each prop has one interaction). */
+function thunderChoice(i: KillerInteraction): PerkChoice {
+  return 'target' in i ? { target: i.target } : 'prop' in i ? { prop: i.prop } : {}
+}
+
 export function isPower(i: KillerInteraction): boolean {
-  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'reign', 'birds', 'droneTake', 'droneDrop', 'hallucinate', 'slipstream'].includes(i.k)
+  return ['power', 'blink', 'hatchet', 'chainsaw', 'spark', 'phantasm', 'bell', 'wrath', 'redeemer', 'victor', 'rush', 'haunt', 'frenzy', 'showstopper', 'purge', 'afterpiece', 'guard', 'reign', 'birds', 'droneTake', 'droneDrop', 'hallucinate', 'slipstream', 'dog'].includes(i.k)
 }
 
 // ---------- The Twins ----------
@@ -5508,6 +5726,10 @@ export function powerOptions(st: GameState): KillerInteraction[] {
       )
     case 'knight':
       return guardOptions(st).map(({ guard, room }) => ({ k: 'guard' as const, guard, room }))
+    case 'houndmaster':
+      // Scent of Blood: The Dog into his room, or left where it stands; a card for it next
+      if (!k.dogRoom) return [{ k: 'dog' }]
+      return k.dogRoom === k.room ? [{ k: 'dog', stay: true }] : [{ k: 'dog' }, { k: 'dog', stay: true }]
     case 'clown': {
       // either token, into his room or a connected one (moved from where it stands)
       const rooms = [k.room, ...connectedRooms(st, k.room)]
@@ -5580,6 +5802,17 @@ function usePower(st: GameState, i: KillerInteraction) {
   const k = st.killer
   k.powerUsed = true
   switch (i.k) {
+    case 'dog': {
+      if (i.stay && k.dogRoom) log(st, `${k.name} ใช้ กลิ่นเลือด — The Dog อยู่ที่ ${roomName(st, k.dogRoom)} ต่อ`, 'killer')
+      else {
+        const from = k.dogRoom ?? null
+        k.dogRoom = k.room
+        log(st, `${k.name} ใช้ กลิ่นเลือด — วาง The Dog ที่ ${roomName(st, k.room)}`, 'killer', { ev: { k: 'dog', from, to: k.room, path: '' } })
+      }
+      // then a card for it from what is left in his hand, or none (it keeps the one it has)
+      if (k.hand.length) wait(st, { t: 'dogCard' })
+      return
+    }
     case 'haunt': {
       k.hand.splice(k.hand.indexOf(i.card), 1)
       log(st, `${k.name} ใช้ ความหลอกหลอนของยามาโอกะ — ทิ้ง ${CARD_NAMES[i.card]} แล้ว Interact ที่ ${roomName(st, i.room)}`, 'killer')
@@ -5989,11 +6222,12 @@ export function crowdPayments(st: GameState): number[][] {
   return out
 }
 
-function wound(st: GameState, s: number, by: 'attack' | 'trap' | 'power' | 'perk', text: string) {
+/** `pickable`: they may still be picked up this round (The Houndmaster's Dog). */
+function wound(st: GameState, s: number, by: 'attack' | 'trap' | 'power' | 'perk', text: string, pickable = false) {
   const sv = st.survivors[s]
   if (sv.wounded) return
   sv.wounded = true
-  sv.woundedThisRound = true
+  if (!pickable) sv.woundedThisRound = true
   hurt(st, s)
   log(st, text, 'killer', { ev: { k: 'wound', s, by } })
 }

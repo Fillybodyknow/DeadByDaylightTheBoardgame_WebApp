@@ -59,6 +59,9 @@ export type PerkId =
   | 'face_the_darkness'
   | 'nowhere_to_hide'
   | 'hubris'
+  | 'jagged_compass'
+  | 'no_quarter'
+  | 'all_shaking_thunder'
   | 'unbound'
   | 'undone'
   | 'unforeseen'
@@ -129,6 +132,9 @@ export type PerkId =
   | 'wicked'
   | 'strength_in_shadows'
   | 'weaving_spiders'
+  | 'clean_break'
+  | 'treacherous_crows'
+  | 'shoulder_the_burden'
   | 'machine_learning'
   | 'scavenger'
   | 'troubleshooter'
@@ -319,6 +325,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   dissolution: def('dissolution', 'Dissolution', 1, 'killer', 'dredge', 1, 'ถามตอนเริ่มเฟสวางแผน: วาง ▲ บนเส้นทางที่ว่าง'),
   septic_touch: def('septic_touch', 'Septic Touch', 1, 'killer', 'dredge', 2, 'ถามหลังผู้รอดชีวิตเปิด prop ที่ไม่ใช่สีเหลือง ในห้องคุณหรือห้องที่เชื่อมกัน'),
   hubris: def('hubris', 'Hubris', 1, 'killer', 'knight', 2, 'ถามเมื่อผู้รอดชีวิตเข้าห้องของคุณ'),
+  jagged_compass: def('jagged_compass', 'Jagged Compass', 0, 'killer', 'houndmaster', 0, 'ถามหลังคุณแขวนผู้รอดชีวิต: ตรงไปห้องที่ Generator คืบหน้ามากที่สุด'),
+  no_quarter: def('no_quarter', 'No Quarter', 2, 'killer', 'houndmaster', 1, 'ถามตอนจบเทิร์นของคุณ ถ้ามีผู้รอดชีวิตหายบาดเจ็บในรอบนี้: Killer bonus turn'),
+  all_shaking_thunder: def('all_shaking_thunder', 'All-Shaking Thunder', 2, 'killer', 'houndmaster', 2, "ถามหลังคุณเดินด้วยการ์ด 'Vault': Interact ทันทีอีกครั้ง"),
   rancor: def('rancor', 'Rancor', 2, 'killer', 'spirit', 0, 'ถามเมื่อคุณเดินออกจากห้องที่มีผู้รอดชีวิตบาดเจ็บ'),
   haunted_ground: def('haunted_ground', 'Haunted Ground', 1, 'killer', 'spirit', 1, 'ถามหลังผู้รอดชีวิตเปิด prop'),
   spirit_fury: def('spirit_fury', 'Spirit Fury', 0, 'killer', 'spirit', 2, 'ถามหลังคุณทำลาย Pallet'),
@@ -355,6 +364,9 @@ export const PERKS: Record<PerkId, PerkDef> = {
   machine_learning: def('machine_learning', 'Machine Learning', 1, 'killer', 'singularity', 0, 'ถามเมื่อ Generator ซ่อมเสร็จ: จั่ว Perk ฆาตกร 2 ใบ เก็บไว้ใช้ 1 ใบ'),
   genetic_limits: def('genetic_limits', 'Genetic Limits', 1, 'killer', 'singularity', 1, 'ถามตอนจบเฟสวางแผน: ผู้รอดชีวิตที่บอร์ดยังมี Sacrifice Progress ใช้ Perk ไม่ได้จนจบรอบ'),
   forced_hesitation: def('forced_hesitation', 'Forced Hesitation', 2, 'killer', 'singularity', 2, 'ถามตอนจบเฟสวางแผน ถ้า Wait ยังอยู่ในมือ: ทิ้ง Wait แล้วทิ้งการ์ดที่วางไว้ของผู้รอดชีวิต 1 คน — เขา Interact ในห้องได้ทันที แต่ไม่ได้เล่นเทิร์นรอบนี้'),
+  clean_break: def('clean_break', 'Clean Break', 2, 'survivor', 'taurie', 0, 'ถามหลังคุณ heal ผู้รอดชีวิตคนอื่นสำเร็จ: คุณหายบาดเจ็บ'),
+  treacherous_crows: def('treacherous_crows', 'Treacherous Crows', 1, 'survivor', 'taurie', 1, 'ปุ่มแทนการ Interact: Interact กับ Crow ในห้อง — เปิดการ์ดฆาตกร 1 ใบ แล้ววาง Crow ในห้องที่เชื่อมกัน'),
+  shoulder_the_burden: def('shoulder_the_burden', 'Shoulder the Burden', 0, 'survivor', 'taurie', 2, 'ถามหลังคุณทำลาย Hook ที่มีคนแขวน: ย้าย sacrifice progress จากบอร์ดคุณให้เขา ทั้งคู่ +1 ▲'),
   weaving_spiders: def('weaving_spiders', 'Weaving Spiders', 0, 'survivor', 'sable', 2, 'ปุ่มแทนการ Interact: ผู้รอดชีวิตในห้องคุณร่วมกันจ่าย 6 ▲ — Generator ที่หงายอยู่ +3 แล้วฆาตกรได้ Sacrifice Progress +1'),
   cut_loose: def('cut_loose', 'Cut Loose', 1, 'survivor', 'thalita', 2, 'ถามเมื่อการ์ดที่คุณวางไว้คือ Vault: ใช้เป็น Sneak / Crouch / Sprint แทน'),
   overzealous: def('overzealous', 'Overzealous', 0, 'survivor', 'haddie', 0, 'ทำงานเองเมื่อคุณเข้าห้องของฆาตกร'),
@@ -429,4 +441,4 @@ export const DECK_PERKS: PerkId[] = Object.values(PERKS)
   .map((p) => p.id)
 
 /** Killers the full game can play (their power is implemented). */
-export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown', 'singularity']
+export const PLAYABLE_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown', 'singularity', 'houndmaster']

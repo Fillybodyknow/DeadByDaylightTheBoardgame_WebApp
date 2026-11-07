@@ -2,6 +2,7 @@
 
 import {
   anyMoves,
+  dogPaths,
   carryMoves,
   crowdPayments,
   carnifexProps,
@@ -126,6 +127,14 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'carnifexMove':
       for (const room of connectedRoomsOf(st, st.guards!.carnifex!)) out.push({ t: 'guardRoom', room })
+      break
+    case 'dogCard':
+      // none first: it keeps the card it has (what a bot or a timeout picks without thinking)
+      out.push({ t: 'dogCard', card: null })
+      for (const card of new Set(st.killer.hand)) out.push({ t: 'dogCard', card })
+      break
+    case 'dogMove':
+      for (const e of dogPaths(st, step.card)) out.push({ t: 'dogPath', path: e.path.id })
       break
     case 'pickSurvivor':
       for (const s of step.options) out.push({ t: 'pick', s })

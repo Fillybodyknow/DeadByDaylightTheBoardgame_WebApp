@@ -564,8 +564,10 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 /** The mode the board is in, for the bar above it (with a way out). */
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
-  if (calmCrow.value) return { text: 'วิญญาณสงบ: คลิกห้องที่จะส่ง Crow ไป', cancel: () => (calmCrow.value = null) }
+  if (calmCrow.value) return { text: `${PERKS.calm_spirit.name}: คลิกห้องที่จะส่ง Crow ไป`, cancel: () => (calmCrow.value = null) }
   if (painHook.value) return { text: `${PERKS.pain_resonance.name}: คลิกผู้รอดชีวิตในห้องที่เชื่อมกันที่เรืองแสง — คนนั้นบาดเจ็บ`, cancel: () => (painHook.value = null) }
+  if (aceFirst.value && perkPicked.value === 'treacherous_crows')
+    return { text: `${PERKS.treacherous_crows.name}: คลิกห้องที่เชื่อมกันที่จะส่ง Crow ไป (เปิดการ์ดฆาตกร 1 ใบ)`, cancel: () => (aceFirst.value = null) }
   if (aceFirst.value)
     return view.value.step.t === 'killerInteract'
       ? { text: 'เครื่องทรมานสตรีเหล็ก: คลิก Hook ที่จะสลับกับ Locker นี้', cancel: () => (aceFirst.value = null) }
@@ -573,7 +575,7 @@ const modeBar = computed(() => {
   if (fogwiseFrom.value) return { text: 'ภูมิปัญญาแห่งสายหมอก: คลิกเส้นทางว่างที่เรืองแสงเพื่อวางกำแพง/Pallet', cancel: () => (fogwiseFrom.value = null) }
   if (perkPicked.value && (view.value.step.t === 'survivorInteract' || view.value.step.t === 'killerInteract'))
     return {
-      text: perkPicked.value === 'iron_maiden' ? 'เครื่องทรมานสตรีเหล็ก: คลิก Locker ว่างที่กระพริบบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`,
+      text: perkPicked.value === 'iron_maiden' ? 'เครื่องทรมานสตรีเหล็ก: คลิก Locker ว่างที่กระพริบบนแผนที่ แล้วคลิก Hook ว่างที่จะสลับด้วย' : perkPicked.value === 'treacherous_crows' || perkPicked.value === 'calm_spirit' ? `${PERKS[perkPicked.value].name}: คลิก Crow ที่กระพริบในห้องคุณ แล้วคลิกห้องที่จะส่งมันไป` : `${PERKS[perkPicked.value].name}: คลิกเป้าหมายที่กระพริบบนแผนที่`,
       cancel: () => (perkPicked.value = null),
     }
   if (breakoutTarget.value !== null) {

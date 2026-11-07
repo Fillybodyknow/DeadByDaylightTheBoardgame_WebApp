@@ -354,9 +354,9 @@ Entity speaking (`src/play/tutorial/`). The list has a tab per side (remembered 
   above their character picker (which is long enough to hide anything under it).
 - Killers: **The Trapper, The Nurse, The Huntress, The Hillbilly** (the rulebook's
   automated-mode cast, p.20–23), **The Doctor, The Hag, The Wraith, The Oni, The Deathslinger,
-  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist, The Skull Merchant, The Unknown, The Singularity** — with powers and passives.
+  The Twins, The Blight, The Spirit, The Legion, The Trickster, The Plague, The Clown, The Knight, The Dredge, The Artist, The Skull Merchant, The Unknown, The Singularity, The Houndmaster** — with powers and passives.
 - Survivors: **Dwight, Meg, Jake, Claudette, Feng Min, Ace, Nea, Yui Kimura, Zarina Kassir,
-  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano, Renato Lyra, Thalita Lyra, Sable Ward, Gabriel Soma**.
+  Élodie Rakoto, Felix Richter, Adam Francis, Yun-Jin Lee, Jane Romero, Kate Denson, David King, Jeff Johansen, Jonah Vasquez, Haddie Kaur, Mikaela Reid, Vittorio Toscano, Renato Lyra, Thalita Lyra, Sable Ward, Gabriel Soma, Taurie Cain**.
   Others are locked in the setup screen until their perks are written (`engine/perks.ts`).
 - Mode **Adept**: each character plays the 3 perks printed on their board (141 perks).
 - The **perk cards** of the edit-perks mode (`src/data/editPerks.json`): 94 of the 129 cards are
@@ -881,6 +881,43 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   heal) by a survivor on the board in its room is on the danger die; a failure wounds them and the
   Jailer leaves the board (back to his, see House rules). Not being searched: in a locker they are off the board (p.12). The killer still gains ▲ for the failures.
 - Nowhere to Hide: asked before the search roll; it is on the danger die.
+- The Houndmaster's Dog (its board is a fan-made one, the rulings are ours):
+  - Not on the board at the start. Scent of Blood (his power, instead of interacting) puts it into
+    his room, or leaves it where it stands; then he may give it one movement card from what is
+    left in his hand, or none (it keeps its own). On the map: his room or his mini places it, The
+    Dog's mini leaves it; the card is picked from his hand, the panel saying where it would run.
+  - The card given stays with The Dog, face up for everyone, and out of his hand: at cleanup his
+    hand comes back without it. A card given in its place discards the old one, which is back in
+    his hand at the next cleanup as his other cards.
+  - At the start of his first turn each round (after the turn-start perks, before his card is
+    revealed), The Dog on the board with a card runs along a path of its colour from its room. It
+    ignores pallets and breakable walls (neither breaks) and may go against a one-way path. With
+    several paths, he picks one on the map; with none, it stays and bites nobody. With Wait it
+    stays and still bites.
+  - It bites one healthy survivor on the board in its room (his pick among several, on the map):
+    wounded, not attacked (Dead Hard and the like don't answer it), and they may still be picked
+    up this round. Someone in a locker is off the board (p.12). The Dog is not the killer: it
+    reveals nothing and nothing that asks for "the killer's space" counts it.
+- Taurie Cain (a fan-made board too):
+  - Clean Break: asked after she heals another survivor (any heal of hers: the interaction, an
+    item, a perk); she becomes healthy, as any heal (Leverage or three Knives still stop it).
+  - Treacherous Crows: her interaction (a button in her interact step, pressed first; then the room
+    on the map): a face-up crow in her room. It reveals the killer's next set card nobody has seen
+    yet (the card says "one of"; his next is the one that matters, and it keeps the choice to one
+    click), then the crow goes into a connected room of her choice. With every card of his seen
+    (Rainbow Map, Open-Handed), it isn't offered.
+  - Shoulder the Burden: after she takes someone off a hook, with a sacrifice progress on her board:
+    it goes onto theirs (a Shrike Wreath extra one when hers is gone), and both gain 1 ▲.
+- Jagged Compass: after he hangs someone ("sacrificed", as Blood Echo reads it), straight to the room
+  of the face-up generator not yet repaired with the most progress (his pick on a tie; not when he
+  is there already). He arrives as by any teleport: a reveal, then what answers his entering.
+- No Quarter: at the end of a turn of his, if anyone became healthy this round and he has had no
+  bonus turn (one a round, p.10): a bonus turn right after it with a card from his hand, as No One
+  Escapes Death's, for the perk's 2 ▲ only.
+- All-Shaking Thunder: after he walks into a room along a vault path on his turn with his Vault card
+  (not a teleport, not a turn taken with Victor), an interaction there at once, before his own:
+  attacking or picking up a survivor, or a prop's. His own interaction this turn can't be with the
+  same survivor or prop. If it was a pick-up and he is carrying them, that was his interaction.
 - Hubris: a survivor entering his room by any move pays 1 ▲; with none, they can't interact this
   turn if it is their turn (on someone else's turn there is no interaction to lose).
 - The Artist's passive: three Dire Crows start on his board (props of their own, a crow in every

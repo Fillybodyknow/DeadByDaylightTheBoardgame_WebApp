@@ -68,6 +68,8 @@ export function stepOwner(st: GameState): PerkOwner | null {
     case 'reignPath':
     case 'carnifexProp':
     case 'carnifexMove':
+    case 'dogCard':
+    case 'dogMove':
       return 'killer'
     default:
       return null

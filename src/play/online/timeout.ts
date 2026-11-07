@@ -17,7 +17,7 @@ import type { Action, GameState } from '../engine/types'
 export const waitKeyOf = (st: GameState) => JSON.stringify([st.log.length, st.step, actorsOf(st)])
 
 /** The decisions a timer may answer "no" to (`answer` below): they run on the room's question time. */
-const QUESTIONS = new Set<GameState['step']['t']>(['offer', 'reaction', 'bonusOffer', 'killerBonusOffer', 'turnStart', 'vigo', 'whiteWard', 'phantasmChoice', 'twinChoice', 'roll', 'crowdPay', 'weavePay'])
+const QUESTIONS = new Set<GameState['step']['t']>(['offer', 'reaction', 'bonusOffer', 'killerBonusOffer', 'turnStart', 'vigo', 'whiteWard', 'phantasmChoice', 'twinChoice', 'roll', 'crowdPay', 'weavePay', 'dogCard'])
 
 /** Whether the game waits on a question that can be passed over (a perk, an item, a bonus turn, a roll), not a move or a plan. */
 export const isQuestion = (st: GameState) => QUESTIONS.has(st.step.t)
@@ -37,6 +37,9 @@ function answer(st: GameState, seat: number): Action | null {
       return { t: 'declineBonus' }
     case 'turnStart':
       return { t: 'continue' }
+    // Scent of Blood: no card given, The Dog keeps the one it has
+    case 'dogCard':
+      return { t: 'dogCard', card: null }
     // the offerings asked in the game: no swap, nothing paid
     case 'vigo':
       return mine(s.s) ? { t: 'vigo', gen: null } : null

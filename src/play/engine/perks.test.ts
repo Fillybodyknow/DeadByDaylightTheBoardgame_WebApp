@@ -1,16 +1,16 @@
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { DIRECT_CARDS, crowdPledges, redeemerTargets, empIn, killerIn, killersIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, rerollers, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { DIRECT_CARDS, dogPaths, pathDef, crowdPledges, redeemerTargets, empIn, killerIn, killersIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, rerollers, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { boards } from './boards'
 import { actorsOf, mayAct, playerOfSurvivor } from './seats'
 import { DECK_PERKS, PERKS, PRINTED_PERKS, type PerkId } from './perks'
 import { perkCard, perkImage, perkText } from '../labels'
-import type { Action, GameState, MoveCard, PerkWindow, PropKind } from './types'
+import type { Action, GameState, MoveCard, PathKind, PerkWindow, PropKind } from './types'
 
 const SURVIVORS = ['dwight', 'meg', 'claudette', 'jake']
-const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah', 'haddie', 'mikaela', 'vittorio', 'renato', 'thalita', 'sable', 'gabriel']
-const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown', 'singularity']
+const ALL_SURVIVORS = ['dwight', 'meg', 'claudette', 'jake', 'feng', 'ace', 'nea', 'yui', 'zarina', 'elodie', 'felix', 'adam', 'yunjin', 'jane', 'kate', 'david', 'jeff', 'jonah', 'haddie', 'mikaela', 'vittorio', 'renato', 'thalita', 'sable', 'gabriel', 'taurie']
+const ALL_KILLERS = ['trapper', 'nurse', 'huntress', 'hillbilly', 'doctor', 'hag', 'wraith', 'oni', 'deathslinger', 'twins', 'blight', 'spirit', 'legion', 'trickster', 'plague', 'clown', 'knight', 'dredge', 'artist', 'skullmerchant', 'unknown', 'singularity', 'houndmaster']
 
 function game(killer = 'trapper', seed = 1): GameState {
   let st = createGame({ board: 'macmillan', survivors: SURVIVORS.map((id) => ({ id, name: id })), killer: { id: killer, name: killer }, players: 5, seed })
@@ -52,7 +52,7 @@ function findOutcome(make: (rng: number) => GameState, pick: (st: GameState) => 
 describe('perk data', () => {
   it('gives each automate character its 3 printed perks', () => {
     for (const c of [...ALL_SURVIVORS, ...ALL_KILLERS]) expect(PRINTED_PERKS[c]).toHaveLength(3)
-    expect(Object.keys(PERKS)).toHaveLength(176)
+    expect(Object.keys(PERKS)).toHaveLength(182)
     // the cards that are on no board: their name, cost and text come from the deck data instead
     for (const p of DECK_PERKS) {
       expect(PERKS[p].character, p).toBe('')
@@ -3891,6 +3891,227 @@ describe('The Dredge', () => {
     // a generator stays
     const gen = st.props.find((x) => x.room === st.killer.room && x.category === 'objective')
     if (gen) expect(perkChoices(st, 'septic_touch', 'killer', { k: 'afterReveal', s: 0, prop: gen.id })).toEqual([])
+  })
+})
+
+describe('Taurie Cain', () => {
+  /** Taurie (survivor 0) and survivor 1 in the shack, her perks only; the killer in the backlot. */
+  function taurie(...perks: PerkId[]) {
+    const st = game('trapper')
+    st.survivors[0] = { ...st.survivors[0], characterId: 'taurie', perks: [...perks] }
+    only(st, ...perks)
+    st.killer.room = 'backlot'
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'shack', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true, acted: true }))
+    // in the middle of her turn
+    Object.assign(st, { phase: 'survivors', activeSurvivor: 0 })
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    return st
+  }
+
+  it('Clean Break: after she heals someone else, she is healthy too', () => {
+    const st = taurie('clean_break')
+    st.survivors[0].wounded = true
+    const w = { k: 'healed', s: 1, by: 0 } as const
+    expect(perkChoices(st, 'clean_break', 0, w)).toEqual([{}])
+    // not on healing herself, nor on someone else's heal
+    expect(perkChoices(st, 'clean_break', 0, { k: 'healed', s: 0, by: 0 })).toEqual([])
+    expect(perkChoices(st, 'clean_break', 0, { k: 'healed', s: 1, by: 2 })).toEqual([])
+    const g = apply({ ...st, step: { t: 'offer', perk: 'clean_break', owner: 0, w, done: [] } }, { t: 'perk', perk: 'clean_break', use: true, choice: {} })
+    expect(g.survivors[0].wounded).toBe(false)
+    expect(g.survivors[0].bp).toBe(4)
+  })
+
+  it('Treacherous Crows: her interaction with a crow shows his next card, and the crow goes next door', () => {
+    const st = taurie('treacherous_crows')
+    const crow = placeProp(st, 'crow', 'shack')
+    st.killer.planned = ['vault', 'sneak']
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.canInteract = true
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+    st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+    const room = [...connectedRoomsOf(st, 'shack')][0]
+    expect(perkButtons(st).find((b) => b.perk === 'treacherous_crows')?.choices).toContainEqual({ prop: crow.id, room })
+    const g = apply(st, { t: 'perk', perk: 'treacherous_crows', use: true, choice: { prop: crow.id, room } })
+    expect(g.killer.shown).toEqual([0])
+    expect(g.props.find((p) => p.id === crow.id)!.room).toBe(room)
+    // that was her interaction
+    expect(g.step.t).not.toBe('survivorInteract')
+    // with both of his cards seen, there is nothing to reveal
+    const seen = structuredClone(st)
+    seen.killer.shown = [0, 1]
+    expect(perkButtons(seen).some((b) => b.perk === 'treacherous_crows')).toBe(false)
+  })
+
+  it('Shoulder the Burden: after taking someone off a hook, her sacrifice progress goes to their board; both gain 1 ▲', () => {
+    const st = taurie('shoulder_the_burden')
+    st.survivors[1].sacrificeToken = false
+    st.survivors.forEach((sv) => (sv.bp = 3))
+    const w = { k: 'afterSabotage', s: 0, rescued: 1 } as const
+    expect(perkChoices(st, 'shoulder_the_burden', 0, w)).toEqual([{}])
+    const g = apply({ ...st, step: { t: 'offer', perk: 'shoulder_the_burden', owner: 0, w, done: [] } }, { t: 'perk', perk: 'shoulder_the_burden', use: true, choice: {} })
+    expect(g.survivors[0].sacrificeToken).toBe(false)
+    expect(g.survivors[1].sacrificeToken).toBe(true)
+    expect([g.survivors[0].bp, g.survivors[1].bp]).toEqual([4, 4])
+    // with none left on her board, nothing to move
+    expect(perkChoices(g, 'shoulder_the_burden', 0, w)).toEqual([])
+  })
+})
+
+describe('The Houndmaster', () => {
+  /** The Houndmaster with only these perks, about to interact in the shack; the survivors in the backlot. */
+  function hm(...perks: PerkId[]) {
+    const st = game('houndmaster')
+    only(st, ...perks)
+    killerInteracting(st)
+    st.killer.room = 'shack'
+    st.survivors.forEach((sv) => Object.assign(sv, { room: 'backlot', status: 'board', wounded: false, planned: 'sneak', plannedRevealed: true, acted: true }))
+    return st
+  }
+  /** His first turn begins (The Dog runs first): ending this interaction step plays the queued turn. */
+  function firstTurn(st: GameState) {
+    st.queue = [{ k: 'killerTurn', turn: 0 }]
+    return apply(st, { t: 'endTurn' })
+  }
+  /** A room and a card The Dog has exactly `n` paths for (n = 0: none at all). */
+  function dogSpot(st: GameState, n: number): { room: string; card: PathKind } {
+    for (const r of boardOf(st).rooms)
+      for (const card of ['sneak', 'sprint', 'crouch', 'vault'] as const) {
+        st.killer.dogRoom = r.id
+        if (dogPaths(st, card).length === n) return { room: r.id, card }
+      }
+    throw new Error('no such room')
+  }
+
+  it('Scent of Blood: The Dog into his room, then a card from his hand; that card stays with The Dog', () => {
+    const st = hm()
+    expect(killerInteractions(st)).toContainEqual({ k: 'dog' })
+    let g = apply(st, { t: 'interact', i: { k: 'dog' } })
+    expect(g.killer.dogRoom).toBe('shack')
+    expect(g.step).toEqual({ t: 'dogCard' })
+    g = apply(g, { t: 'dogCard', card: 'sprint' })
+    expect(g.killer.dogCard).toBe('sprint')
+    expect(g.killer.hand).not.toContain('sprint')
+    // a new round: his hand is whole again but for the card with The Dog
+    g.queue = [{ k: 'cleanup' }]
+    g.step = { t: 'killerInteract', turn: 0, canInteract: true }
+    g = apply(g, { t: 'endTurn' })
+    expect(g.round).toBe(st.round + 1)
+    expect(g.killer.hand.slice().sort()).toEqual(['crouch', 'sneak', 'vault', 'wait'])
+  })
+
+  it('Scent of Blood: left where it stands, or brought over; giving no card keeps its own', () => {
+    const st = hm()
+    Object.assign(st.killer, { dogRoom: 'backlot', dogCard: 'crouch', hand: ['sneak', 'wait', 'vault'] })
+    expect(killerInteractions(st).filter((i) => i.k === 'dog')).toEqual([{ k: 'dog' }, { k: 'dog', stay: true }])
+    let g = apply(st, { t: 'interact', i: { k: 'dog', stay: true } })
+    expect(g.killer.dogRoom).toBe('backlot')
+    g = apply(g, { t: 'dogCard', card: null })
+    expect(g.killer.dogCard).toBe('crouch')
+    // replaced: the old card is discarded (back at cleanup), the new one leaves his hand
+    g = apply(apply(st, { t: 'interact', i: { k: 'dog' } }), { t: 'dogCard', card: 'vault' })
+    expect(g.killer.dogRoom).toBe('shack')
+    expect(g.killer.dogCard).toBe('vault')
+    expect(g.killer.hand.slice().sort()).toEqual(['sneak', 'wait'])
+  })
+
+  it('The Dog runs at the start of his first turn and wounds someone healthy where it stops, who may still be picked up', () => {
+    const st = hm()
+    const { room, card } = dogSpot(st, 1)
+    st.killer.dogCard = card
+    const to = dogPaths(st, card)[0].to
+    st.survivors[1].room = to
+    const g = firstTurn(st)
+    expect(g.killer.dogRoom).toBe(to)
+    expect(g.survivors[1].wounded).toBe(true)
+    expect(g.survivors[1].woundedThisRound).toBe(false)
+    expect(g.log.some((e) => e.ev?.k === 'dog' && e.ev.from === room && e.ev.to === to)).toBe(true)
+    // he can pick them up this round, wherever they are
+    const k = structuredClone(g)
+    killerInteracting(k)
+    k.killer.room = to
+    expect(killerInteractions(k)).toContainEqual({ k: 'pickUp', target: 1 })
+  })
+
+  it('The Dog: several paths of its colour, he picks one; against a one-way path too, over pallets and walls', () => {
+    const st = hm()
+    const { card } = dogSpot(st, 2)
+    st.killer.dogCard = card
+    const g = firstTurn(st)
+    expect(g.step).toEqual({ t: 'dogMove', card })
+    const path = (legalActions(g)[0] as { path: string }).path
+    const end = apply(g, { t: 'dogPath', path })
+    const p = pathDef(st, path)
+    expect(end.killer.dogRoom).toBe(p.a === st.killer.dogRoom ? p.b : p.a)
+    // a vault path, from its far end: The Dog goes against the arrow
+    const v = boardOf(st).paths.find((x) => x.kind === 'vault')!
+    st.killer.dogRoom = v.b
+    expect(dogPaths(st, 'vault').map((e) => e.path.id)).toContain(v.id)
+  })
+
+  it('The Dog with Wait stays and still wounds; with several healthy there, he picks; no path, nobody', () => {
+    const st = hm()
+    Object.assign(st.killer, { dogRoom: 'backlot', dogCard: 'wait' })
+    let g = firstTurn(st)
+    expect(g.step).toEqual({ t: 'pickSurvivor', why: 'dog', options: [0, 1, 2, 3] })
+    g = apply(g, { t: 'pick', s: 2 })
+    expect(g.survivors.map((sv) => sv.wounded)).toEqual([false, false, true, false])
+    // a card with no path of its colour from its room: it doesn't move, so it bites nobody
+    const none = hm()
+    const spot = dogSpot(none, 0)
+    none.killer.dogCard = spot.card
+    none.survivors.forEach((sv) => (sv.room = spot.room))
+    const still = firstTurn(none)
+    expect(still.killer.dogRoom).toBe(spot.room)
+    expect(still.survivors.some((sv) => sv.wounded)).toBe(false)
+  })
+
+  it('Jagged Compass: after a hanging, straight to the face-up generator with the most progress', () => {
+    const st = hm('jagged_compass')
+    const a = placeProp(st, 'generator', 'backlot')
+    const b = st.props.find((x) => x.kind === 'generator' && x !== a && !x.removed)!
+    Object.assign(b, { room: 'scrapyard', path: null, revealed: true })
+    st.props.forEach((p) => p.kind === 'generator' && p !== a && p !== b && (p.revealed = false))
+    a.progress = 2
+    b.progress = 1
+    const w = { k: 'afterHang', s: 0 } as const
+    expect(perkChoices(st, 'jagged_compass', 'killer', w)).toEqual([{ room: 'backlot' }])
+    const g = apply({ ...st, step: { t: 'offer', perk: 'jagged_compass', owner: 'killer', w, done: [] } }, { t: 'perk', perk: 'jagged_compass', use: true, choice: { room: 'backlot' } })
+    expect(g.killer.room).toBe('backlot')
+    // a tie: both rooms to choose from
+    b.progress = 2
+    expect(perkChoices(st, 'jagged_compass', 'killer', w)).toHaveLength(2)
+  })
+
+  it('No Quarter: at the end of his turn, with someone healthy again this round, a bonus turn', () => {
+    const st = hm('no_quarter')
+    const w = { k: 'killerTurnEnd', turn: 0 } as const
+    expect(perkChoices(st, 'no_quarter', 'killer', w)).toEqual([])
+    st.healthyThisRound = true
+    st.killer.hand = ['sprint', 'vault']
+    expect(perkChoices(st, 'no_quarter', 'killer', w)).toEqual([{ card: 'sprint' }, { card: 'vault' }])
+    const g = apply({ ...st, step: { t: 'offer', perk: 'no_quarter', owner: 'killer', w, done: [] } }, { t: 'perk', perk: 'no_quarter', use: true, choice: { card: 'sprint' } })
+    expect(g.killer.planned).toEqual(['wait', 'sprint', 'wait'])
+    expect(g.killer.bonusUsed).toBe(true)
+    // one bonus turn a round
+    expect(perkChoices(g, 'no_quarter', 'killer', w)).toEqual([])
+  })
+
+  it('All-Shaking Thunder: walking in with his Vault card, an interaction at once; not with the same one again', () => {
+    const st = hm('all_shaking_thunder')
+    const v = boardOf(st).paths.find((x) => x.kind === 'vault')!
+    Object.assign(st.killer, { room: v.b, planned: ['vault', 'wait'], revealedCount: 1 })
+    st.survivors[1].room = v.b
+    // the turn's interaction is still to come
+    st.queue = [{ k: 'killerInteract', turn: 0 }, { k: 'endKillerTurn', turn: 0 }]
+    const w = { k: 'killerEntered', room: v.b, from: v.a, path: v.id } as const
+    expect(perkChoices(st, 'all_shaking_thunder', 'killer', w)).toContainEqual({ target: 1 })
+    // not with another card
+    expect(perkChoices({ ...st, killer: { ...st.killer, planned: ['sprint', 'wait'] } }, 'all_shaking_thunder', 'killer', w)).toEqual([])
+    const g = apply({ ...st, step: { t: 'offer', perk: 'all_shaking_thunder', owner: 'killer', w, done: [] } }, { t: 'perk', perk: 'all_shaking_thunder', use: true, choice: { target: 1 } })
+    expect(g.survivors[1].wounded).toBe(true)
+    expect(g.thunder).toEqual({ target: 1 })
+    expect(killerInteractions(g).some((i) => 'target' in i && i.target === 1)).toBe(false)
   })
 })
 

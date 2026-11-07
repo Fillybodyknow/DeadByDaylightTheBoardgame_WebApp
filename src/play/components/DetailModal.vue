@@ -3,11 +3,11 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { items, killerById, survivorById } from '../../data'
 import { asset, tr } from '../../i18n'
-import { BEAR_TRAPS, DIRE_CROWS, GUARD_NAMES, ITEM_NAMES, PHANTASM_TRAPS, PROP_NAMES, KILLER_BP, VILE_PURGES, artistCrows, merchantDrones, purgeSupply, roomName, survivorMax } from '../engine/engine'
+import { BEAR_TRAPS, CARD_NAMES, DIRE_CROWS, GUARD_NAMES, ITEM_NAMES, PHANTASM_TRAPS, PROP_NAMES, KILLER_BP, VILE_PURGES, artistCrows, merchantDrones, purgeSupply, roomName, survivorMax } from '../engine/engine'
 import type { GameState, Guard, PerkOwner } from '../engine/types'
 import { CATEGORY_TH, PROP_RULES, type InspectTarget } from '../inspect'
 import { PERKS } from '../engine/perks'
-import { BEAR_TRAP_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf, powerName } from '../labels'
+import { BEAR_TRAP_IMAGE, DIRE_CROW_IMAGE, DOG_MINI, GUARD_IMAGE, PROP_IMAGE, VILE_PURGE_IMAGE, itemImage, propPicture, ownerLabel, perkImage, perkText, playerOf, powerName } from '../labels'
 import { perkUsed } from '../engine/engine'
 import { itemHidden } from '../game'
 import Mini from './Mini.vue'
@@ -141,6 +141,15 @@ const item = computed(() => {
             <img :src="asset(g.image)" :alt="g.name" />
             <b>{{ g.name }}</b>
             <span class="muted">{{ g.where }}</span>
+          </li>
+        </ul>
+        <!-- The Houndmaster's Dog: where it stands and the card it runs with (face up for everyone) -->
+        <ul v-if="st.killer.characterId === 'houndmaster'" class="guards dog">
+          <li>
+            <img :src="asset(DOG_MINI)" alt="The Dog" />
+            <b>The Dog</b>
+            <span class="muted">{{ st.killer.dogRoom ? roomName(st, st.killer.dogRoom) : 'ยังไม่ได้วางบนแผนที่' }}</span>
+            <span>· {{ st.killer.dogCard ? `การ์ด ${CARD_NAMES[st.killer.dogCard]}` : 'ยังไม่มีการ์ด' }}</span>
           </li>
         </ul>
         <p v-if="killer.passive" class="rule"><b>Passive:</b> <PerkRichText :text="tr(killer.passive)" /></p>
@@ -364,6 +373,9 @@ header p {
   padding: 0.2rem 0.6rem 0.2rem 0.25rem;
   border: 1px solid var(--line-strong);
   border-radius: 99px;
+}
+.guards.dog {
+  --guard: #e8473b;
 }
 .guards li.picked {
   background: rgb(255 255 255 / 0.06);
