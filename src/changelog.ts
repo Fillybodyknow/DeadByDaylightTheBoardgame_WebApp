@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.38.5',
+    date: '2026-11-09',
+    items: [
+      'กลิ่นเลือด (The Houndmaster): คลิกตัว The Dog เพื่อให้อยู่ที่เดิมได้แล้ว และถ้า The Dog อยู่ห้องเดียวกับคุณ คลิกห้องหรือตัว The Dog ก็ได้',
+    ],
+  },
+  {
     version: '1.38.4',
     date: '2026-11-09',
     items: [

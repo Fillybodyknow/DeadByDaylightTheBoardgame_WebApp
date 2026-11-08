@@ -40,7 +40,7 @@ import { PERKS, type PerkId } from './engine/perks'
 import { boards } from './engine/boards'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, DOG_MINI, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -644,13 +644,19 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             add(`room:${i.room}`, label, run)
             break
           case 'dog':
-            // Scent of Blood: The Dog into his room (his room or his mini), or left where it is (The Dog)
-            if (i.stay) add('dog', label, run)
-            else {
+            // Scent of Blood: The Dog into his room (his room or his mini), or left where it is (The
+            // Dog). Already in his room, staying is the only way: his room and his mini do it too.
+            // One click does it (no chooser: there is only one thing to do there).
+            if (i.stay) {
+              add('dog', label, run)
+              if (st.killer.dogRoom === st.killer.room) {
+                add(`room:${st.killer.room}`, label, run)
+                add('killer', label, run)
+              }
+            } else {
               add(`room:${st.killer.room}`, label, run)
               add('killer', label, run)
             }
-            out[out.length - 1].icon = DOG_MINI
             break
           case 'guard':
             // a room offers every Guard: the chooser shows each one's picture

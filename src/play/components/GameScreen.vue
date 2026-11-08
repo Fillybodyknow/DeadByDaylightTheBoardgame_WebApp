@@ -609,7 +609,7 @@ function onRoom(id: string) {
   onSpot(`room:${id}`)
 }
 // (`u<n>`: one of The Unknown's minis)
-const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'killer' || key === 'victor' || /^u\d$/.test(key) ? key : `prop:${key}`)
+const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'killer' || key === 'victor' || key === 'dog' || /^u\d$/.test(key) ? key : `prop:${key}`)
 
 /** The mode the board is in, for the bar above it (with a way out). */
 const modeBar = computed(() => {

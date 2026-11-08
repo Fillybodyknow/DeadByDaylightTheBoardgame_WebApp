@@ -915,7 +915,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
               <img :src="asset(DOG_MINI)" alt="" /><span><b>{{ st.killer.dogRoom ? 'ย้าย' : 'วาง' }} The Dog มาที่ {{ roomName(st, st.killer.room) }}</b> — คลิกห้องของคุณ (หรือตัวคุณ) บนแผนที่</span>
             </li>
             <li v-if="st.killer.dogRoom && kInteractions.powers.some((i) => i.k === 'dog' && i.stay)">
-              <img :src="asset(DOG_MINI)" alt="" /><span><b>ให้ The Dog อยู่ที่ {{ roomName(st, st.killer.dogRoom) }}</b> — คลิกตัว The Dog บนแผนที่ (มอบการ์ดใหม่ได้)</span>
+              <img :src="asset(DOG_MINI)" alt="" /><span><b>ให้ The Dog อยู่ที่ {{ roomName(st, st.killer.dogRoom) }}</b> — คลิกตัว The Dog{{ st.killer.dogRoom === st.killer.room ? ' หรือห้องของคุณ' : '' }} บนแผนที่ (มอบการ์ดใหม่ได้)</span>
             </li>
           </ul>
           <!-- The Unknown: where each one stands, and which is playing now -->
