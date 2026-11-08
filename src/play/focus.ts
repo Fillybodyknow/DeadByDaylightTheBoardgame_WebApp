@@ -123,6 +123,8 @@ export function decisionFocus(st: GameState, powerMode = false): { focus: Focus;
         f.dests.push(end(st, c.path, from))
       }
     for (const c of choices) if (c.target !== undefined) f.survivors.push(c.target)
+    // a room picked on the map (Jagged Compass): lit as a place to go
+    for (const c of choices) if (c.room && !c.path && !c.card) f.dests.push(c.room)
   }
 
   if (step.t === 'offer') {

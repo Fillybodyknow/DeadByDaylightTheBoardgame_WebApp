@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anim, settings } from '../../settings'
 import { botAction, botTurn, botsOnly, botsWaitedOn, onlineBotMove, peopleOnBothSides } from '../bots'
-import { anyMoves, boardOf, palletOn, survivorInteractions, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, palletOn, survivorInteractions, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, crowsCards, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showOfferings, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
@@ -295,6 +295,9 @@ const revealing = ref<{ s: number; props: string[] } | null>(null)
 const calmCrow = ref<string | null>(null)
 /** Treacherous Crows: the crow to send to a connected room. */
 const crowsCrow = ref<string | null>(null)
+/** Treacherous Crows: the killer's card to reveal, picked in the side panel. */
+const crowsCard = ref<number | null>(null)
+watch(crowsCrow, () => (crowsCard.value = null))
 /** Ace in the Hole: the prop in Ace's room, waiting for the one to swap with. */
 const aceFirst = ref<string | null>(null)
 /** Fogwise: the path whose wall or pallet moves, waiting for where it goes. */
@@ -339,7 +342,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, crowsCrow, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, crowsCrow, crowsCard, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
 
 watch(
   () => view.value.step,
@@ -351,6 +354,7 @@ watch(
     palletMode.value = null
     calmCrow.value = null
     crowsCrow.value = null
+    targetAsk.value = null
     aceFirst.value = null
     fogwiseFrom.value = null
     breakoutTarget.value = null
@@ -371,6 +375,30 @@ const powerMode = computed(() => isPowerMode(view.value, modes))
 
 /** While a perk or power is being decided, the board points at who and where. */
 const boardFocus = computed(() => {
+  // A target clicked that a perk may use, asked in the side panel (as every perk question): the
+  // asker's room and the target stay lit. Treacherous Crows' crow on its way: the rooms it may go to.
+  if (targetAsk.value || crowsCrow.value) {
+    const st = view.value
+    const s = st.step
+    const own = s.t === 'survivorInteract' ? st.survivors[s.s].room : st.killer.room
+    const f = { survivors: s.t === 'survivorInteract' ? [s.s] : [], killer: s.t !== 'survivorInteract', rooms: [own], paths: [] as string[], dests: [] as string[] }
+    const key = targetAsk.value ?? ''
+    if (key.startsWith('prop:')) {
+      const p = st.props.find((x) => x.id === key.slice(5))
+      if (p?.room) f.rooms.push(p.room)
+    } else if (key.startsWith('s:')) {
+      const t = Number(key.slice(2))
+      f.survivors.push(t)
+      f.rooms.push(st.survivors[t].room)
+    } else if (key.startsWith('room:')) f.rooms.push(key.slice(5))
+    else if (key.startsWith('path:')) {
+      const p = boardOf(st).paths.find((x) => x.id === key.slice(5))
+      if (p) f.paths.push(p.id), f.dests.push(p.a === own ? p.b : p.a)
+    }
+    if (crowsCrow.value && s.t === 'survivorInteract')
+      f.dests.push(...new Set(perkChoices(st, 'treacherous_crows', s.s, { k: 'interact', s: s.s }).flatMap((c) => (c.prop === crowsCrow.value && c.room ? [c.room] : []))))
+    return f
+  }
   // Breakout: the friend being moved, and every path they could take
   if (breakoutTarget.value !== null) {
     const st = view.value
@@ -533,9 +561,28 @@ const waitingOn = computed(() => {
 /** Several actions on one spot: a small menu at the click. */
 const menu = ref<{ actions: BoardAction[]; x: number; y: number } | null>(null)
 let pointer = { x: 0, y: 0 }
+/**
+ * A target clicked that a perk may use (a crow: Treacherous Crows, Calm Spirit): the side panel
+ * asks whether to use it, its card next to the plain action. Kept as the spot's key, so the
+ * actions are always the current ones.
+ */
+const targetAsk = ref<string | null>(null)
+const askActions = computed(() => (targetAsk.value ? actions.value.filter((a) => a.key === targetAsk.value) : []))
+watch(askActions, (a) => {
+  if (targetAsk.value && !a.some((x) => x.perk)) targetAsk.value = null
+})
 
 function onSpot(key: string) {
   const found = actions.value.filter((a) => a.key === key)
+  targetAsk.value = null
+  // a perk may be used on it: asked in the side panel (opened if it was folded)
+  if (found.some((a) => a.perk)) {
+    targetAsk.value = key
+    sideFolded.value = false
+    // the same alert as every other perk question (the killer's when it is his, Iron Maiden)
+    fxSound.perk(view.value.step.t === 'killerInteract')
+    return
+  }
   // A fork's icon with moves to different rooms: pick the room on the board next.
   const dests = new Set(found.map((a) => a.dest))
   if (found.length > 1 && found.every((a) => a.dest) && dests.size === found.length) {
@@ -546,7 +593,7 @@ function onSpot(key: string) {
   if (forkMoves.value && key.startsWith('room:')) forkMoves.value = null
   // a token to place (a Guard, an Afterpiece, a crow) is always picked from the chooser, even when
   // only one can go there: a click on the room shouldn't place one the player never chose
-  if (found.length === 1 && !found[0].icon && !found[0].perk) found[0].run()
+  if (found.length === 1 && !found[0].icon) found[0].run()
   else if (found.length) menu.value = { actions: found, x: pointer.x + 8, y: pointer.y + 8 }
 }
 
@@ -568,7 +615,13 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: `${PERKS.calm_spirit.name}: คลิกห้องที่จะส่ง Crow ไป`, cancel: () => (calmCrow.value = null) }
-  if (crowsCrow.value) return { text: `${PERKS.treacherous_crows.name}: คลิกห้องที่เชื่อมกันที่จะส่ง Crow ไป`, cancel: () => (crowsCrow.value = null) }
+  if (targetAsk.value) return { text: 'เลือกในแผงด้านข้าง: ใช้ Perk หรือทำตามปกติ', cancel: () => (targetAsk.value = null) }
+  if (crowsCrow.value) {
+    const name = PERKS.treacherous_crows.name
+    const cancel = () => (crowsCrow.value = null)
+    if (crowsCard.value === null && crowsCards(view.value).length > 1) return { text: `${name}: เลือกการ์ดฆาตกรที่จะเปิดในแผงด้านข้าง`, cancel }
+    return { text: `${name}: คลิกห้องที่เชื่อมกันที่จะส่ง Crow ไป`, cancel }
+  }
   if (painHook.value) return { text: `${PERKS.pain_resonance.name}: คลิกผู้รอดชีวิตในห้องที่เชื่อมกันที่เรืองแสง — คนนั้นบาดเจ็บ`, cancel: () => (painHook.value = null) }
   if (aceFirst.value)
     return view.value.step.t === 'killerInteract'
@@ -1551,6 +1604,12 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           :trap-path="trapPath"
           :power-card="powerCard"
           :on-board="onBoard"
+          :ask="askActions"
+          @ask="targetAsk = null"
+          :crows-crow="crowsCrow"
+          :crows-card="crowsCard"
+          @crows-crow="crowsCrow = $event"
+          @crows-card="crowsCard = $event"
           @power-on="powerOn = $event"
           @trap-path="trapPath = $event"
           @power-card="powerCard = $event"

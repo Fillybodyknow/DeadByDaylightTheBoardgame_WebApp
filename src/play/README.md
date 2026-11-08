@@ -902,10 +902,10 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   - Clean Break: asked after she heals another survivor (any heal of hers: the interaction, an
     item, a perk); she becomes healthy, as any heal (Leverage or three Knives still stop it).
   - Treacherous Crows: her interaction with a face-up crow in her room. Asked on the crow (since
-    1.38.1, a player's report): a click on it opens a window with the crow perks she may use (their
-    cards; Calm Spirit too, and both at once in the edit-perks mode) and chasing it plainly. Then a
-    connected room on the map, then which of the killer's set cards nobody has seen yet to reveal
-    (her pick; with one, no question). With every card of his seen (Rainbow Map, Open-Handed), it
+    1.38.1, a player's report): a click on it asks in the side panel, with the crow perks she may use (their
+    cards; Calm Spirit too, and both at once in the edit-perks mode) and chasing it plainly. Then
+    which of the killer's set cards nobody has seen yet to reveal, picked in the side panel (her
+    pick; with one, no question), then a connected room on the map. With every card of his seen (Rainbow Map, Open-Handed), it
     isn't offered.
   - Shoulder the Burden: after she takes someone off a hook, with a sacrifice progress on her board:
     it goes onto theirs (a Shrike Wreath extra one when hers is gone), and both gain 1 ▲.

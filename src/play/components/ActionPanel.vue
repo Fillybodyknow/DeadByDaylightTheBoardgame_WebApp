@@ -1,12 +1,15 @@
 <script setup lang="ts">
 // What the current player can do now. Every button dispatches one engine action; moves can
 // also be made by clicking the highlighted paths on the board.
+import { isBot } from '../bots'
+import { playerOfSurvivor } from '../engine/seats'
 import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { offeringName } from '../engine/offerings'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { boardOf,
   CARD_NAMES,
+  crowsCards,
   dogPaths,
   isPathCard,
   ITEM_NAMES,
@@ -37,12 +40,13 @@ import { boardOf,
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
-import { onTargetPerk, STEP_NAME, actionKey, perkPicked, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
+import { onTargetPerk, STEP_NAME, type BoardAction, actionKey, perkPicked, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import {
   ANTIDOTE_IMAGE,
   GUARD_IMAGE,
+  KILLER_CARD_BACK,
   PROP_IMAGE,
   DIRE_CROW_IMAGE,
   TONIC_IMAGE,
@@ -87,6 +91,11 @@ const props = defineProps<{
   onBoard: Set<string>
   /** Pain Resonance's hook interacted with, its survivor being picked on the board. */
   painArmed?: boolean
+  /** Treacherous Crows: the crow picked on the map, and the killer's card picked here. */
+  crowsCrow?: string | null
+  crowsCard?: number | null
+  /** A target clicked on the map that a perk may use: its actions, the perks' and the plain one. */
+  ask?: BoardAction[]
 }>()
 
 // Perk and power choices the board already offers are made there; the panel points at it.
@@ -105,7 +114,24 @@ const emit = defineEmits<{
   powerCard: [card: MoveCard | null]
   /** Pain Resonance: interact with this hook, then pick the survivor (on the board); null: put back. */
   painHook: [hook: string | null]
+  crowsCrow: [crow: string | null]
+  crowsCard: [index: number | null]
+  /** The target's question answered or put back. */
+  ask: []
 }>()
+
+const askPerks = computed(() => (props.ask ?? []).filter((a) => a.perk))
+const askPlain = computed(() => (props.ask ?? []).filter((a) => !a.perk))
+/** A perk choice's words without the perk's name in front (its card says it). */
+const askWhat = (a: BoardAction) => a.label.replace(/^[^:]+:\s*/, '')
+function answer(a: BoardAction) {
+  emit('ask')
+  a.run()
+}
+
+/** Treacherous Crows, its crow picked: the killer's cards still unseen, to pick which to reveal. */
+const crowsPick = computed(() => (props.crowsCrow && step.value.t === 'survivorInteract' ? crowsCards(props.st) : []))
+const CARD_PLACE = ['ซ้าย', 'ขวา', 'โบนัส']
 
 const step = computed(() => props.st.step)
 
@@ -433,9 +459,13 @@ const dogRuns = computed(() => (step.value.t === 'dogMove' ? dogPaths(props.st, 
 // Online each helper (a key, Iron Will) decides on their own device; the roller waits for them.
 const rollers = computed(() => rerollers(props.st).filter((s) => controls(props.st, s)))
 const rollOthers = computed(() => (props.st.step.t === 'roll' ? rollHelpers(props.st).filter((s) => s !== (props.st.step as { ctx: { s: number } }).ctx.s) : []))
-const passers = computed(() => (online.value ? rollOthers.value.filter((s) => controls(props.st, s)) : []))
+// On one device, a bot's roll: the people who could help pass on it here (the roll is the bot's to accept)
+const botRoll = computed(() => props.st.step.t === 'roll' && isBot(props.st, playerOfSurvivor(props.st, props.st.step.ctx.s)))
+const passers = computed(() =>
+  online.value || botRoll.value ? rollOthers.value.filter((s) => controls(props.st, s) && !isBot(props.st, playerOfSurvivor(props.st, s))) : [],
+)
 const keyWaiting = computed(() => rollOthers.value.filter((s) => !controls(props.st, s)))
-const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, step.value.ctx.s))
+const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, step.value.ctx.s) && !botRoll.value)
 </script>
 
 <template>
@@ -631,6 +661,37 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <button v-for="m in moves.filter((m) => here({ t: 'move', path: m.path }))" :key="m.path" @click="act({ t: 'move', path: m.path })">{{ m.label }}</button>
       </div>
       <button v-if="!(step.t === 'anyMove' && mustMove(step.why))" class="primary" @click="act({ t: 'stop' })">อยู่ห้องเดิม</button>
+    </template>
+
+    <!-- a target clicked that a perk may use: which perk, or the plain action -->
+    <template v-else-if="askPerks.length">
+      <p class="ask-title">{{ askPerks.length > 1 ? 'ใช้ Perk ไหน?' : 'ใช้ Perk นี้ไหม?' }}</p>
+      <PerkCard v-for="(a, i) in askPerks" :key="i" :perk="a.perk!" state="ready" :hint="`👆 กดการ์ดเพื่อใช้: ${askWhat(a)}`" @pick="answer(a)" />
+      <button v-for="(a, i) in askPlain" :key="`p${i}`" @click="answer(a)">
+        <FaceLabel :st="st" :who="a.who" :text="`ไม่ใช้ Perk — ${a.label}`" :icon="a.icon" />
+      </button>
+      <button class="ghost" @click="emit('ask')">ยกเลิก</button>
+    </template>
+
+    <!-- Treacherous Crows, the crow picked: which of the killer's cards to reveal, then the room on the map -->
+    <template v-else-if="step.t === 'survivorInteract' && crowsPick.length > 1">
+      <PerkCard perk="treacherous_crows" state="picked" @pick="emit('crowsCrow', null)" />
+      <p class="crow-step">1. เลือกการ์ดฆาตกรที่จะเปิด</p>
+      <div class="card-row crow-cards">
+        <button
+          v-for="i in crowsPick"
+          :key="i"
+          class="cardbtn cap"
+          :class="{ on: crowsCard === i }"
+          :title="`การ์ดฆาตกรใบที่ ${i + 1}`"
+          @click="(emit('crowsCard', crowsCard === i ? null : i), sfx.click())"
+        >
+          <img :src="asset(KILLER_CARD_BACK)" alt="คว่ำ" />
+          <span>ใบที่ {{ i + 1 }} ({{ CARD_PLACE[i] ?? 'โบนัส' }})</span>
+        </button>
+      </div>
+      <p v-if="crowsCard !== null && crowsCard !== undefined" class="board-hint">🎯 2. คลิกห้องที่เชื่อมกันบนแผนที่ ที่จะส่ง Crow ไป</p>
+      <button @click="emit('crowsCrow', null)">ยกเลิก</button>
     </template>
 
     <!-- survivor interact -->
@@ -1178,6 +1239,30 @@ p {
   gap: 0.15rem;
   justify-items: center;
   font-size: 0.7rem;
+}
+.ask-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: #ffe9b0;
+}
+/* Treacherous Crows: the killer's cards at a size to pick from, not the hand's thumbnails */
+.crow-step {
+  margin: 0.2rem 0 0;
+  font-weight: 600;
+  color: #ffe9b0;
+}
+.crow-cards {
+  gap: 0.6rem;
+}
+.crow-cards .cardbtn {
+  width: 120px;
+  padding: 4px;
+  font-size: 0.82rem;
+}
+.cardbtn.on {
+  border-color: #f5c542;
+  box-shadow: 0 0 0 2px #f5c542, 0 0 12px rgb(245 197 66 / 0.55);
 }
 .itembtn {
   display: grid;

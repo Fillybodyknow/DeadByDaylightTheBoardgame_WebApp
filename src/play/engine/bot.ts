@@ -12,9 +12,9 @@
 // is (each use and passing it up, on the same dice), played on to the end of his round. The rest are
 // declined for the round.
 
-import { SACRIFICE_TO_WIN, apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, palletOn, pathState, survivorMoves, twoPlayer, unknownRooms } from './engine'
+import { SACRIFICE_TO_WIN, apply, boardOf, directRoom, generatorsDone, gatesPowered, isDirect, killerMoves, nextToPlan, palletOn, pathState, rollHelpers, survivorMoves, twoPlayer, unknownRooms } from './engine'
 import { legalActions } from './legal'
-import { KILLER_PLAYER, actorsOf, handsToPlan, mayAct } from './seats'
+import { KILLER_PLAYER, actorsOf, handsToPlan, mayAct, playerOfSurvivor } from './seats'
 import type { PerkId } from './perks'
 import type { Action, GameState, MoveCard, PathState } from './types'
 
@@ -847,6 +847,11 @@ export function botMove(st: GameState, player: number): Action | null {
   }
   if (step.t === 'planStridor') return { t: 'planStridor', card: survivorPick(st, step.s, st.survivorHands[st.survivors[step.s].hand]) }
 
+  // Its own roll waits for everyone else who could still change it (a key, Iron Will, Autodidact):
+  // accepting settles it, and a person's perk would be skipped before they could press it.
+  if (step.t === 'roll' && !step.keep && playerOfSurvivor(st, step.ctx.s) === player)
+    if (rollHelpers(st).some((h) => h !== step.ctx.s && playerOfSurvivor(st, h) !== player)) return null
+
   // A perk the killer has been taught (`TAUGHT`) is weighed as any choice; the rest are declined for
   // the round, and a survivor's too. A key's re-roll is left alone. An item
   // is used when trying it shows it helps (a toolbox's repair, a medkit's heal). With the gates
@@ -1073,7 +1078,11 @@ function revealPick(st: GameState, acts: Action[], killer: boolean): Action {
   return acts.reduce((best, a) => (rank(a) < rank(best) ? a : best))
 }
 
-/** The player the game waits on first (for a game the bots play through on their own). */
+/**
+ * The player the game waits on first who has a move now (for a game the bots play through on
+ * their own): a roller waiting for the others' keys and perks comes after them.
+ */
 export function nextActor(st: GameState): number | null {
-  return actorsOf(st)[0] ?? null
+  const all = actorsOf(st)
+  return all.find((p) => botMove(st, p) !== null) ?? all[0] ?? null
 }

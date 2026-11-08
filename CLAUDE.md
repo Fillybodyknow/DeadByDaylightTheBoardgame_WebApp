@@ -240,8 +240,9 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
   already offers and show "เลือกบนแผนที่" instead. A perk of the interact step (a survivor's, or
   Iron Maiden) with targets on the map is asked **on its target** (`onTargetPerk`): a click there
-  opens a window with the perks' cards (several at once to pick from, as in the edit-perks mode)
-  and the plain action under them, "ไม่ใช้ Perk — …" (`ChoiceMenu`, BoardAction `perk`). So do the
+  asks in the side panel, with the perks' cards (several at once to pick from, as in the edit-perks
+  mode) and the plain action under them, "ไม่ใช้ Perk — …" (`targetAsk` in GameScreen, ActionPanel's
+  `ask`, BoardAction `perk`); no window over the map. Treacherous Crows' card is picked there too. So do the
   crow perks (Calm Spirit, Treacherous Crows). Other perks aimed on the map (the start of a turn,
   All-Shaking Thunder) are armed in the side panel first ("ใช้ [perk]", glowing until pressed;
   `perksToPick`), and only then are their targets on the map, so a path or generator clicked by

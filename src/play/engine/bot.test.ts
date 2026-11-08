@@ -125,4 +125,25 @@ describe('bot perks: The Trapper', () => {
     st.step = { t: 'offer', perk, owner: 0, w: { k: 'planningStart' }, done: [] }
     expect(botMove(st, 2)).toMatchObject({ t: 'perk', use: false, quiet: true })
   })
+
+  it("a bot's own roll waits for another player's Iron Will before it is accepted", () => {
+    // Jake (player 5) is a person; Meg (player 3) a bot, failing a repair in Jake's room
+    let st = createGame({ board: 'macmillan', survivors: ['dwight', 'meg', 'claudette', 'jake'].map((id) => ({ id, name: id })), killer: { id: 'trapper', name: 'trapper' }, players: 5, seed: 9, bots: [1, 2, 3, 4] })
+    while (st.step.t === 'setupReveal') st = apply(st, legalActions(st)[0])
+    const gen = st.props.find((p) => p.kind === 'generator')!
+    Object.assign(gen, { room: st.survivors[3].room, revealed: true, path: null })
+    st.survivors[1].room = st.survivors[3].room
+    st.survivors[3].bp = 2
+    st.phase = 'survivors'
+    st.activeSurvivor = 1
+    st.step = { t: 'roll', ctx: { k: 'repair', s: 1, prop: gen.id }, dice: [{ kind: 'skill', face: 0, rerolled: false }] }
+    st.queue = [{ k: 'endSurvivorTurn', s: 1 }]
+    expect(perkChoices(st, 'iron_will', 3, { k: 'roll' }).length).toBeGreaterThan(0)
+    expect(botMove(st, 3)).toBeNull()
+    // Jake passes: now Meg's roll is hers to accept
+    const passed = apply(st, { t: 'passRoll', s: 3 })
+    expect(passed.step.t).not.toBe('roll')
+    // a bot Jake passes on it by itself, so the roll never stalls
+    expect(botMove({ ...st, bots: [1, 2, 3, 4, 5] }, 5)).toMatchObject({ t: 'passRoll', s: 3 })
+  })
 })

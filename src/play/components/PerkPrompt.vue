@@ -3,6 +3,8 @@
 // roll still waiting on Iron Will, a key or Bond's choice. Docked beside the board (not over
 // it) so the map stays readable: the board lights up who is involved and where they could go,
 // and hovering a choice previews it on the map.
+import { isBot } from '../bots'
+import { playerOfSurvivor } from '../engine/seats'
 import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { asset } from '../../i18n'
 import { reignCards, CARD_NAMES, KILLER_CARDS, purgeOptions, crowdPayments, crowdPledges, pledgedPay, weavePledges, weavers, WEAVING_COST, gripTargets, offeredPerks, perkButtons, perkChoices, phantasmInteractions, rerollers, rollHelpers, roomName, unknownRooms } from '../engine/engine'
@@ -39,9 +41,13 @@ const buttons = computed(() => perkButtons(props.st).filter((b) => b.owner === '
 // Online each helper (a key, Iron Will) decides on their own device; the roller waits for them.
 const keyHolders = computed(() => rerollers(props.st).filter((s) => controls(props.st, s)))
 const rollOthers = computed(() => (props.st.step.t === 'roll' ? rollHelpers(props.st).filter((s) => s !== (props.st.step as { ctx: { s: number } }).ctx.s) : []))
-const passers = computed(() => (online.value ? rollOthers.value.filter((s) => controls(props.st, s)) : []))
+// On one device, a bot's roll: the people who could help pass on it here (the roll is the bot's to accept)
+const botRoll = computed(() => props.st.step.t === 'roll' && isBot(props.st, playerOfSurvivor(props.st, props.st.step.ctx.s)))
+const passers = computed(() =>
+  online.value || botRoll.value ? rollOthers.value.filter((s) => controls(props.st, s) && !isBot(props.st, playerOfSurvivor(props.st, s))) : [],
+)
 const keyWaiting = computed(() => rollOthers.value.filter((s) => !controls(props.st, s)))
-const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, step.value.ctx.s))
+const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, step.value.ctx.s) && !botRoll.value)
 
 // ---------- several perks at the start of a turn: the perk first, then what to do with it ----------
 

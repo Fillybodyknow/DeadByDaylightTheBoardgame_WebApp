@@ -40,7 +40,7 @@ import { PERKS, type PerkId } from './engine/perks'
 import { boards } from './engine/boards'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, DOG_MINI, GUARD_IMAGE, KILLER_CARD_BACK, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, DOG_MINI, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -76,6 +76,8 @@ export interface BoardModes {
   calmCrow: Ref<string | null>
   /** Treacherous Crows: the crow being sent to a connected room. */
   crowsCrow: Ref<string | null>
+  /** Treacherous Crows: which of the killer's cards to reveal (picked in the side panel). */
+  crowsCard: Ref<number | null>
   /** Ace in the Hole: the prop in Ace's room picked first. */
   aceFirst: Ref<string | null>
   /** Fogwise: the path whose wall or pallet was picked, waiting for the path it goes to. */
@@ -300,18 +302,19 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   }
 
   // Ace in the Hole / Iron Maiden: the first prop picked, the second to swap it with
-  // Treacherous Crows: the crow picked, the connected rooms; a room with several of his cards still
-  // unseen asks which to reveal (each its own line in the chooser, his card's back as the picture)
+  // Treacherous Crows: the crow picked, then which of his cards to reveal (in the side panel, when
+  // more than one is still unseen), then the connected room on the map
   const crowsPerk = s.t === 'survivorInteract' && modes.crowsCrow.value ? perkButtons(st).find((x) => x.perk === 'treacherous_crows') : undefined
   if (crowsPerk) {
+    const cards = [...new Set(crowsPerk.choices.map((x) => x.index))]
+    const card = cards.length > 1 ? modes.crowsCard.value : cards[0]
+    if (card === null) return out
     for (const c of crowsPerk.choices)
-      if (c.prop === modes.crowsCrow.value) {
+      if (c.prop === modes.crowsCrow.value && c.index === card)
         add(`room:${c.room}`, `${PERKS.treacherous_crows.name}: ${perkChoiceLabel(st, 'treacherous_crows', crowsPerk.owner, crowsPerk.w, c)}`, () => {
           modes.crowsCrow.value = null
           go({ t: 'perk', perk: 'treacherous_crows', use: true, choice: c }, sfx.drop)()
         })
-        if (new Set(crowsPerk.choices.map((x) => x.index)).size > 1) out[out.length - 1].icon = KILLER_CARD_BACK
-      }
     return out
   }
   if (modes.aceFirst.value && (s.t === 'survivorInteract' || s.t === 'killerInteract')) {
@@ -562,6 +565,9 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           add(`room:${c.room}`, label, run)
           out[out.length - 1].icon = GUARD_IMAGE[c.guard]
         }
+        // a room to go to or act on (Jagged Compass: one of the rooms tied for the most progress):
+        // the room itself lights up and a click picks it, not a list in the panel
+        else if (c.room && !c.card) add(`room:${c.room}`, label, run)
       }
       break
     }
