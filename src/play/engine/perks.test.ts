@@ -2097,12 +2097,13 @@ describe('The Clown', () => {
     expect(anyMoves(used, 0).map((x) => x.path.id)).not.toContain(m.path.id)
   })
 
-  it('Bamboozle: the Entity may go over a dropped pallet', () => {
+  it('Bamboozle: the Entity never goes over a dropped pallet (nothing on a path that has something)', () => {
     const st = clown('bamboozle')
     const m = walk(st)
     const token = m.path.token ?? m.path.id
-    Object.assign(placeProp(st, 'pallet', m.to), { revealed: true, path: token })
     expect(perkChoices(st, 'bamboozle', 'killer', { k: 'planningStart' })).toContainEqual({ path: token })
+    Object.assign(placeProp(st, 'pallet', m.to), { revealed: true, path: token })
+    expect(perkChoices(st, 'bamboozle', 'killer', { k: 'planningStart' })).not.toContainEqual({ path: token })
   })
 
   it('Pop Goes the Weasel: after an attack, a crow, chest or empty locker next door is removed', () => {
@@ -2771,6 +2772,20 @@ describe('Mikaela Reid', () => {
     expect(anyMoves(g, 0).some((x) => x.path.id === m.path.id)).toBe(false)
     g.killer.room = from
     expect(killerMoves(g, m.path.kind).some((x) => x.path.id === m.path.id)).toBe(false)
+  })
+
+  it('Shadow Step: not on a path with something on it — a pallet she crossed, a wall Urban Evasion lifted', () => {
+    const st = mikaela('shadow_step')
+    const m = (['sneak', 'sprint', 'crouch', 'vault'] as const).flatMap((card) => survivorMoves(st, 0, card).map((x) => ({ ...x, card })))[0]
+    const token = m.path.token ?? m.path.id
+    const w = { k: 'entered', s: 0, path: m.path.id } as const
+    const pallet = structuredClone(st)
+    Object.assign(placeProp(pallet, 'pallet', m.to), { revealed: true, path: token })
+    expect(perkChoices(pallet, 'shadow_step', 0, w)).toEqual([])
+    // the wall is only lifted for the turn: it comes back, so nothing else may go there
+    const evaded = structuredClone(st)
+    evaded.evadedWall = token
+    expect(perkChoices(evaded, 'shadow_step', 0, w)).toEqual([])
   })
 
   it('Clairvoyance: at the start of planning, a face-down prop anywhere is revealed', () => {
@@ -4862,6 +4877,10 @@ describe('perk cards: the rest of the deck (the edit-perks mode)', () => {
     const after = apply(st, { t: 'perk', perk: 'claustrophobia', use: true, choice: { path } })
     expect(after.entity).toMatchObject({ path })
     expect(anyMoves(after, 0).map((m) => m.path.id)).not.toContain(path)
+    // not over a pallet
+    const p = structuredClone(st)
+    Object.assign(placeProp(p, 'pallet', st.survivors[0].room), { revealed: true, path })
+    expect(perkChoices(p, 'claustrophobia', 'killer', w).map((c) => c.path)).not.toContain(path)
   })
 
   it('Distressing: a survivor who walks into a room with a locker hides in it', () => {

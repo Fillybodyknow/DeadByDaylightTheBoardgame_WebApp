@@ -799,8 +799,8 @@ Feng Min, Ace, Nea:
 - Technician: the second interaction can't target the same generator.
 - Ace in the Hole swaps props of one category between your room and a connected one (different
   kinds, at least one face up), before interacting; it doesn't use the interaction.
-- Urban Evasion's wall comes back when that survivor's turn ends; no pallet can be dropped on
-  that path in the meantime.
+- Urban Evasion's wall comes back when that survivor's turn ends; nothing can be put on that
+  path in the meantime (no pallet, no Entity: Shadow Step).
 
 The Oni, The Deathslinger, Yui Kimura, Zarina Kassir:
 
@@ -1055,8 +1055,11 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   left where he is and loses the turn's interaction).
 - Coulrophobia: asked when a survivor's card move would take them into his room (perk moves and the
   rescue move aren't asked); used, they stay and can't interact this turn.
-- Bamboozle: the Entity on a path's icon (a fork is one; not on a wall; over a pallet it may go) until
-  cleanup. Survivors can't pass it, as a wall; he passes freely, carrying too, and it stays.
+- Bamboozle: the Entity on a path's icon (a fork is one) with nothing else on it — no wall, pallet
+  (a dropped one too), bear trap or Dissolution ▲ — until cleanup. "Nothing goes on a path that
+  already has something" is the designers' answer (Level 99), and it holds for every Entity put on
+  a path (Claustrophobia, Shadow Step). Survivors can't pass it, as a wall; he passes freely,
+  carrying too, and it stays.
 - Pop Goes the Weasel: after an attack (wounding) or a hanging; a revealed crow, chest or empty
   locker in a room connected to his.
 - Vile Purge (The Plague): his room and a connected one, each only if it has none (10 tokens:
@@ -1168,7 +1171,9 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   in a locker, hung or carried: off the board, p.12) becomes healthy, picked on the map; the cleanse's ▲ are
   taken back from her.
 - Shadow Step: after a move of hers along a path (any move with a path; Inner Focus has none), the
-  Entity goes onto that path's icon (taken from wherever it was: there is one). "Players cannot move
+  Entity goes onto that path's icon (taken from wherever it was: there is one), only if nothing is
+  on it: not over a pallet she crossed, nor a wall Urban Evasion lifted (it comes back at the end
+  of the turn, so the path still has it; the killer then breaks it as any wall). "Players cannot move
   along that path": the killer neither, unlike Bamboozle's. It goes at cleanup, as the Entity does.
 - Clairvoyance: at the start of planning, any face-down prop on the board, clicked on the map; it
   is her reveal (Haunted Ground, Septic Touch may answer it).
@@ -1302,7 +1307,7 @@ Perk cards on no character's board (the edit-perks mode, `DECK_PERKS`):
   played as a move of its own. Only the move: no interaction, and it is not the round's bonus turn.
 - Bitter Murmur: after he moves along a vault path (the one-way ones) or through a wall that broke
   as he passed, one more move along any path without a pallet, before he interacts.
-- Claustrophobia: after a repair roll succeeds, the Entity goes onto any path's icon (a pallet's too) and survivors
+- Claustrophobia: after a repair roll succeeds, the Entity goes onto any path's icon with nothing on it (as Bamboozle's) and survivors
   can't pass it, exactly as Bamboozle's does (he passes freely, and it goes at cleanup). There is
   one Entity token, so it moves if it was somewhere else.
 - Distressing: after a survivor moves into a room with a revealed empty locker, they hide in it —

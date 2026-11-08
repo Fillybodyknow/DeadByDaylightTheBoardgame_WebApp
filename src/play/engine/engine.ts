@@ -688,7 +688,8 @@ function pathClear(st: GameState, path: string): boolean {
 
 /**
  * A path with nothing on it, to put something there (a pallet dropped: "no other component", the
- * Pallet card): clear, and no Dissolution ▲ on its icon either.
+ * Pallet card; the Entity too, the designers' ruling): clear, and no Dissolution ▲ on its icon
+ * either. A wall lifted by Urban Evasion still counts: it comes back.
  */
 function pathFree(st: GameState, path: string): boolean {
   return pathClear(st, path) && tokenOf(boardOf(st), path) !== st.dissolution
@@ -3549,10 +3550,10 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       // ruling, as Agitation's)
       return moveChoices(st)
     case 'claustrophobia': {
-      // a repair succeeded: the Entity onto any path's icon, as Bamboozle's (but for survivors only)
+      // a repair succeeded: the Entity onto any free path's icon, as Bamboozle's (but for survivors only)
       if (w.k !== 'repaired') return []
       const tokens = new Set(boardOf(st).paths.map((p) => tokenOf(boardOf(st), p.id)))
-      return [...tokens].filter((t) => !pathState(st, t).wall).map((path) => ({ path }))
+      return [...tokens].filter((t) => pathFree(st, t)).map((path) => ({ path }))
     }
     case 'distressing':
       // a survivor walked into a room with a locker: into the locker they go
@@ -3980,10 +3981,11 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     case 'coulrophobia':
       return w.k === 'preEnter' ? NONE : []
     case 'bamboozle': {
-      // the Entity on a path's icon (a fork is one), not on a wall already (over a pallet it may go)
+      // the Entity on a path's icon (a fork is one) with nothing else on it: no wall, pallet, trap
+      // (the designers: nothing goes on a path that already has something)
       if (w.k !== 'planningStart') return []
       const tokens = new Set(boardOf(st).paths.map((p) => tokenOf(boardOf(st), p.id)))
-      return [...tokens].filter((t) => !pathState(st, t).wall).map((path) => ({ path }))
+      return [...tokens].filter((t) => pathFree(st, t)).map((path) => ({ path }))
     }
     case 'pop_goes_the_weasel': {
       // after a wound (an attack) or a hanging: a crow, a chest or an empty locker next door
@@ -4152,9 +4154,10 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       if (w.k !== 'cleansed' || w.s !== o) return []
       return st.survivors.flatMap((sv, i) => (sv.status === 'board' && healable(st, i) ? [{ target: i }] : []))
     case 'shadow_step':
-      // after a move of hers along a path: the Entity onto it (its icon), not where it is already
+      // after a move of hers along a path: the Entity onto it (its icon), only with nothing on it
+      // (not over a pallet she crossed, nor a wall Urban Evasion lifted: it comes back)
       if (w.k !== 'entered' || w.s !== o || !w.path) return []
-      return entityOn(st, { path: w.path }) ? [] : NONE
+      return pathFree(st, tokenOf(boardOf(st), w.path)) ? NONE : []
     case 'clairvoyance':
       // a face-down prop anywhere
       if (w.k !== 'planningStart') return []
