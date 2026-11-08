@@ -258,6 +258,7 @@ const powerMode = computed(() => {
 
 /** The situation while choosing where the power goes (same facts as the perk panel). */
 const POWER_HINT: Record<string, string> = {
+  houndmaster: 'เลือกว่า The Dog จะอยู่ที่ไหน แล้วเลือกการ์ดที่จะมอบให้ (หรือไม่มอบ)',
   nurse: 'เลือกห้องที่เชื่อมกัน (ผ่าน Pallet / กำแพง / ทวน Vault ได้)',
   huntress: 'เลือกผู้รอดชีวิตในห้องที่เชื่อมกัน (คลิกบนแผนที่หรือปุ่ม)',
   doctor: 'เลือกห้องนี้หรือห้องที่เชื่อมกัน — ทุกคนในห้องนั้นจ่าย 1 ▲ หรือติด บ้าคลั่ง (มีแล้ว = บาดเจ็บ)',
@@ -907,6 +908,15 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             <li><img :src="asset(GUARD_IMAGE.carnifex)" alt="" /><span><b>เพชฌฆาต</b> — เริ่มเก็บกวาด: นำ prop เขียว/น้ำเงินในห้องออก แล้วย้ายไปห้องข้าง ๆ · {{ guardWhere('carnifex') }}</span></li>
             <li><img :src="asset(GUARD_IMAGE.assassin)" alt="" /><span><b>มือลอบสังหาร</b> — ใครเดินเข้าห้องทอย Danger Die พลาด = บาดเจ็บ · {{ guardWhere('assassin') }}</span></li>
             <li><img :src="asset(GUARD_IMAGE.jailer)" alt="" /><span><b>ผู้คุม</b> — Skill Check ในห้อง (ไม่รวมคนใน Locker) ใช้ Danger Die พลาด = บาดเจ็บ (ผู้คุม กลับมาบนบอร์ด วางใหม่ได้) · {{ guardWhere('jailer') }}</span></li>
+          </ul>
+          <!-- The Houndmaster: the two ways Scent of Blood goes, and where each is clicked -->
+          <ul v-if="st.killer.characterId === 'houndmaster'" class="afterpiece">
+            <li v-if="kInteractions.powers.some((i) => i.k === 'dog' && !i.stay)">
+              <img :src="asset(DOG_MINI)" alt="" /><span><b>{{ st.killer.dogRoom ? 'ย้าย' : 'วาง' }} The Dog มาที่ {{ roomName(st, st.killer.room) }}</b> — คลิกห้องของคุณ (หรือตัวคุณ) บนแผนที่</span>
+            </li>
+            <li v-if="st.killer.dogRoom && kInteractions.powers.some((i) => i.k === 'dog' && i.stay)">
+              <img :src="asset(DOG_MINI)" alt="" /><span><b>ให้ The Dog อยู่ที่ {{ roomName(st, st.killer.dogRoom) }}</b> — คลิกตัว The Dog บนแผนที่ (มอบการ์ดใหม่ได้)</span>
+            </li>
           </ul>
           <!-- The Unknown: where each one stands, and which is playing now -->
           <ul v-if="st.killer.unknowns" class="afterpiece">

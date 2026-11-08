@@ -44,7 +44,8 @@ const emit = defineEmits<{ path: [id: string]; prop: [id: string]; interact: [ke
 
 const roomTarget = (room: string) => !!props.roomTargets && room in props.roomTargets
 /** The word after a room's name when clicking it means staying there. */
-const stayTag = (label?: string) => (label?.includes('Wait') ? ' · WAIT' : label?.includes('อยู่ห้องเดิม') ? ' · อยู่ห้องเดิม' : '')
+const stayTag = (label?: string) =>
+  label?.includes('Wait') ? ' · WAIT' : label?.includes('อยู่ห้องเดิม') ? ' · อยู่ห้องเดิม' : label?.includes('The Dog มาที่') ? ' · วาง The Dog' : ''
 
 /** A locker or hook with someone on it says who, and what has happened to them. */
 function occupantTitle(p: Prop): string | null {
@@ -856,6 +857,8 @@ function guard(e: MouseEvent) {
       >
         <img :src="asset(DOG_MINI)" alt="The Dog" draggable="false" />
         <img v-if="st.killer.dogCard" class="dog-card" :src="asset(cardImage(st.killer.dogCard))" :alt="CARD_NAMES[st.killer.dogCard]" draggable="false" />
+        <!-- Scent of Blood: a click on The Dog leaves it where it stands; said under it, as a tablet has no tooltip -->
+        <b v-if="canAct('dog')" class="guard-name dog-tag">อยู่ที่เดิม</b>
       </component>
       <!-- The Knight's Guards: minis of their own, beside the killer's corner. Their three
            pictures are too alike to tell apart at this size, so each carries its own colour, its
@@ -1404,6 +1407,9 @@ button.tile.picked::after {
   text-align: center;
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.8);
   pointer-events: none;
+}
+.dog-tag {
+  color: #ffd27a;
 }
 /* several Guards in one room: one line of names under them, laid out as the minis are (the row
    is built right to left from the killer's corner), so it stays a single row over the props */
