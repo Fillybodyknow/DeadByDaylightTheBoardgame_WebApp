@@ -605,7 +605,7 @@ export function perkChoiceLabel(st: GameState, perk: PerkId, o: PerkOwner, w: Pe
     case 'clean_break':
       return `${st.survivors[o as number].name} หายบาดเจ็บ`
     case 'treacherous_crows':
-      return `เปิดการ์ดฆาตกร 1 ใบ แล้ววาง Crow ที่ ${roomName(st, c.room!)}`
+      return `เปิดการ์ดฆาตกรใบที่ ${c.index! + 1} แล้ววาง Crow ที่ ${roomName(st, c.room!)}`
     case 'shoulder_the_burden': {
       const t = (w as Extract<PerkWindow, { k: 'afterSabotage' }>).rescued!
       return `ย้าย sacrifice progress 1 แต้มไปบอร์ดของ ${name(t)} — ทั้งคู่ +1 ▲`

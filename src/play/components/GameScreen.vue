@@ -293,6 +293,8 @@ const palletMode = ref<string | null>(null)
 const revealing = ref<{ s: number; props: string[] } | null>(null)
 /** Calm Spirit: the crow to send to another room. */
 const calmCrow = ref<string | null>(null)
+/** Treacherous Crows: the crow to send to a connected room. */
+const crowsCrow = ref<string | null>(null)
 /** Ace in the Hole: the prop in Ace's room, waiting for the one to swap with. */
 const aceFirst = ref<string | null>(null)
 /** Fogwise: the path whose wall or pallet moves, waiting for where it goes. */
@@ -337,7 +339,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, crowsCrow, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
 
 watch(
   () => view.value.step,
@@ -348,6 +350,7 @@ watch(
     powerCard.value = null
     palletMode.value = null
     calmCrow.value = null
+    crowsCrow.value = null
     aceFirst.value = null
     fogwiseFrom.value = null
     breakoutTarget.value = null
@@ -543,7 +546,7 @@ function onSpot(key: string) {
   if (forkMoves.value && key.startsWith('room:')) forkMoves.value = null
   // a token to place (a Guard, an Afterpiece, a crow) is always picked from the chooser, even when
   // only one can go there: a click on the room shouldn't place one the player never chose
-  if (found.length === 1 && !found[0].icon) found[0].run()
+  if (found.length === 1 && !found[0].icon && !found[0].perk) found[0].run()
   else if (found.length) menu.value = { actions: found, x: pointer.x + 8, y: pointer.y + 8 }
 }
 
@@ -565,9 +568,8 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: `${PERKS.calm_spirit.name}: คลิกห้องที่จะส่ง Crow ไป`, cancel: () => (calmCrow.value = null) }
+  if (crowsCrow.value) return { text: `${PERKS.treacherous_crows.name}: คลิกห้องที่เชื่อมกันที่จะส่ง Crow ไป`, cancel: () => (crowsCrow.value = null) }
   if (painHook.value) return { text: `${PERKS.pain_resonance.name}: คลิกผู้รอดชีวิตในห้องที่เชื่อมกันที่เรืองแสง — คนนั้นบาดเจ็บ`, cancel: () => (painHook.value = null) }
-  if (aceFirst.value && perkPicked.value === 'treacherous_crows')
-    return { text: `${PERKS.treacherous_crows.name}: คลิกห้องที่เชื่อมกันที่จะส่ง Crow ไป (เปิดการ์ดฆาตกร 1 ใบ)`, cancel: () => (aceFirst.value = null) }
   if (aceFirst.value)
     return view.value.step.t === 'killerInteract'
       ? { text: 'เครื่องทรมานสตรีเหล็ก: คลิก Hook ที่จะสลับกับ Locker นี้', cancel: () => (aceFirst.value = null) }

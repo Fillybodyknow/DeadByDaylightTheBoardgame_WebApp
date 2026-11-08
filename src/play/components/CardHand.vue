@@ -121,9 +121,9 @@ const lowered = ref(false)
  * of. (A pointer raises it by hovering, in CSS.)
  */
 const up = computed(() => touch && (!!props.prompt || raised.value || (!props.passive && settings.handTouchRaise && !lowered.value)))
-// a new choice from the hand: it comes up again
+// a new choice from the hand (other cards, or the same cards for someone else or something else): it comes up again
 watch(
-  () => props.cards.map((c) => c.card).join(),
+  () => [props.cards.map((c) => c.card).join(), props.label, props.prompt].join('|'),
   () => (lowered.value = false),
 )
 
@@ -138,8 +138,13 @@ function onSlot(card: MoveCard, index: number) {
   emit('pick', card, index)
 }
 
+/**
+ * A tap on the map puts the hand down, to see what is under it. Not one on the side panel, its fold
+ * tab or the bars: folding and opening the panel left the hand down for good (a player's report).
+ */
 function lowerOnOutside(e: MouseEvent) {
-  if (!up.value || (e.target as Element | null)?.closest('.hand')) return
+  const at = e.target as Element | null
+  if (!up.value || at?.closest('.hand') || !at?.closest('.board')) return
   raised.value = false
   lowered.value = true
 }

@@ -311,6 +311,15 @@ function onPowerSlot() {
         <span v-if="st.survivors[s].knives" class="knives" :class="{ full: st.survivors[s].knives === 3 }" :title="`Knife ${st.survivors[s].knives}/3 — ▲ สูงสุดลดลง ${2 * st.survivors[s].knives!}${st.survivors[s].knives === 3 ? ' · หายบาดเจ็บไม่ได้' : ''} · เข้า Locker เพื่อทิ้ง`">
           <img :src="asset(KNIFE_IMAGE)" alt="Knife" /><b>{{ st.survivors[s].knives }}/3</b>
         </span>
+        <!-- Grim Embrace (The Artist): the ▲ on their board, each a sacrifice progress when they are hung -->
+        <span
+          v-if="st.survivors[s].embrace"
+          class="embrace"
+          :title="`อ้อมกอดของความกลัว: ${st.survivors[s].embrace} ▲ บนบอร์ด — ถ้าถูกแขวน ฆาตกรได้ Sacrifice Progress +${st.survivors[s].embrace}`"
+          @click.stop="emit('inspect', { k: 'perk', perk: 'grim_embrace', owner: 'killer' })"
+        >
+          <img :src="asset(perkImage('grim_embrace'))" alt="อ้อมกอดของความกลัว" /><b>{{ st.survivors[s].embrace }}</b><BpIcon />
+        </span>
         <!-- the hand's movement cards: the ones already face up this round are crossed out -->
         <span class="hand-strip" :title="handTitle(s)" :aria-label="handTitle(s)">
           <span v-for="c in handCards(s)" :key="c.card" class="hcard" :class="{ used: c.used }">
@@ -1010,6 +1019,22 @@ button.slot:hover .slot-crop {
 /* three: wounded for good until a locker */
 .knives.full img {
   box-shadow: 0 0 0 1px var(--blood-bright), 0 0 6px var(--blood-bright);
+}
+.embrace {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.74rem;
+  color: #d9b3ff;
+  cursor: pointer;
+}
+.embrace img {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  object-fit: cover;
+  object-position: 50% 18%;
+  box-shadow: 0 0 0 1px #9b59d0;
 }
 /* the sacrifice token, on the portrait's top-right corner */
 .token {

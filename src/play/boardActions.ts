@@ -38,9 +38,9 @@ import {
 } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import { boards } from './engine/boards'
-import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, SurvivorInteraction } from './engine/types'
+import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
-import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, DOG_MINI, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
+import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, DOG_MINI, GUARD_IMAGE, KILLER_CARD_BACK, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
 export type SpotKey = string
@@ -62,6 +62,8 @@ export interface BoardAction {
    * Knight's Guards, The Artist's crows). With one, the chooser opens even for a single choice.
    */
   icon?: string
+  /** A perk this choice uses: the chooser shows its card (use it, or not and do the plain thing). */
+  perk?: PerkId
 }
 
 /** What the screen is in the middle of choosing, beyond the engine's step. */
@@ -72,6 +74,8 @@ export interface BoardModes {
   revealing: Ref<{ s: number; props: string[] } | null>
   /** Calm Spirit: the crow being sent elsewhere. */
   calmCrow: Ref<string | null>
+  /** Treacherous Crows: the crow being sent to a connected room. */
+  crowsCrow: Ref<string | null>
   /** Ace in the Hole: the prop in Ace's room picked first. */
   aceFirst: Ref<string | null>
   /** Fogwise: the path whose wall or pallet was picked, waiting for the path it goes to. */
@@ -296,15 +300,18 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   }
 
   // Ace in the Hole / Iron Maiden: the first prop picked, the second to swap it with
-  // Treacherous Crows: the crow picked (in the same mode as Ace in the Hole's first prop), the rooms it may go to
-  const crowsPerk = s.t === 'survivorInteract' && modes.aceFirst.value ? perkButtons(st).find((x) => x.perk === 'treacherous_crows' && x.choices.some((c) => c.prop === modes.aceFirst.value)) : undefined
+  // Treacherous Crows: the crow picked, the connected rooms; a room with several of his cards still
+  // unseen asks which to reveal (each its own line in the chooser, his card's back as the picture)
+  const crowsPerk = s.t === 'survivorInteract' && modes.crowsCrow.value ? perkButtons(st).find((x) => x.perk === 'treacherous_crows') : undefined
   if (crowsPerk) {
     for (const c of crowsPerk.choices)
-      if (c.prop === modes.aceFirst.value)
+      if (c.prop === modes.crowsCrow.value) {
         add(`room:${c.room}`, `${PERKS.treacherous_crows.name}: ${perkChoiceLabel(st, 'treacherous_crows', crowsPerk.owner, crowsPerk.w, c)}`, () => {
-          modes.aceFirst.value = null
+          modes.crowsCrow.value = null
           go({ t: 'perk', perk: 'treacherous_crows', use: true, choice: c }, sfx.drop)()
         })
+        if (new Set(crowsPerk.choices.map((x) => x.index)).size > 1) out[out.length - 1].icon = KILLER_CARD_BACK
+      }
     return out
   }
   if (modes.aceFirst.value && (s.t === 'survivorInteract' || s.t === 'killerInteract')) {
@@ -414,11 +421,9 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       break
 
     case 'survivorInteract': {
-      // Calm Spirit pressed in the panel (it is an interaction, armed as a perk is): the crows in
-      // the room, then the room it goes to
-      if (perkPicked.value === 'calm_spirit') {
-        for (const crow of new Set(survivorInteractions(st, s.s).flatMap((i) => (i.k === 'calmSpirit' ? [i.prop] : []))))
-          add(`prop:${crow}`, `${PERKS.calm_spirit.name}: Crow ตัวนี้ (แล้วเลือกห้องที่จะส่งไป)`, () => ((modes.calmCrow.value = crow), sfx.click()))
+      // No One Left Behind's survivor picked (on the target, in the chooser): now their paths only
+      if (modes.breakoutTarget.value !== null) {
+        perkSpots(st, out, modes, 'no_one_left_behind')
         break
       }
       // a perk picked in the panel: only its targets
@@ -452,8 +457,10 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             pallets.add(i.prop)
             add(spotOf(i), 'ทิ้ง Pallet (แล้วเลือกเส้นทาง)', () => ((modes.palletMode.value = i.prop), sfx.click()))
           } else if (i.k === 'calmSpirit') {
-            // armed in the panel first (above): an ordinary click on a crow chases it
-            continue
+            // a click on the crow asks: chase it, or this perk (and then the room)
+            if (out.some((a) => a.key === `prop:${i.prop}` && a.perk === 'calm_spirit')) continue
+            add(spotOf(i), `${PERKS.calm_spirit.name}: ย้าย Crow ตัวนี้ไปห้องใดก็ได้ (แล้วเลือกห้อง)`, () => ((modes.calmCrow.value = i.prop), sfx.click()))
+            out[out.length - 1].perk = 'calm_spirit'
           } else if (i.k === 'diversion') {
             // Diversion: the killer first, then his paths (in its own mode, above). Once, however
             // many paths; with Power Struggle on him too, a click asks which. The Unknown: every
@@ -468,7 +475,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             add(i.k === 'powerStruggle' ? killerSpot : spotOf(i), survivorInteractionLabel(st, s.s, i), go({ t: 'interact', i }, sfx.select), 'act', 'target' in i ? i.target : null)
         }
       }
-      perkSpots(st, out, modes)
+      // the perks of this step with targets on the map: on those targets, asked at the click
+      onTargetSpots(st, out, modes)
       break
     }
     case 'turnStart':
@@ -599,6 +607,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         if (all.some(isPower)) add('killer', `ใช้พลัง: ${powerName(st)}`, () => ((modes.powerOn.value = true), sfx.click()))
         if (all.some((i) => i.k === 'undying'))
           add('killer', `ใช้ Perk: ไม่รู้จักตาย (${PERKS.undying.cost} ▲)`, () => ((modes.undyingOn.value = true), sfx.click()))
+        // Iron Maiden: on its lockers, asked at the click
+        onTargetSpots(st, out, modes)
         break
       }
       for (const i of killerInteractions(st).filter(isPower)) {
@@ -784,6 +794,27 @@ export function offerPerk(st: GameState): PerkId | null {
   return perksToPick(st) ? perkPicked.value : st.step.perk
 }
 
+/**
+ * Perks offered on their target, when it is clicked: the interact step's (a survivor's, the
+ * killer's Iron Maiden) with targets on the map. Their card isn't pressed first: it shows in the
+ * chooser at the click, next to what the target offers anyway (a crow: chase it, or the perk), as
+ * the players asked. Perks with no target (Wicked) are pressed in the panel.
+ */
+export function onTargetPerk(b: { w: PerkWindow; choices: PerkChoice[] }): boolean {
+  return (b.w.k === 'interact' || b.w.k === 'killerInteract') && b.choices.some(onMap)
+}
+
+/** Each on-target perk's first clicks, marked with the perk (the chooser shows its card). */
+function onTargetSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
+  if (perkPicked.value) return
+  for (const b of perkButtons(st)) {
+    if (!onTargetPerk(b)) continue
+    const start = out.length
+    perkSpots(st, out, modes, b.perk)
+    for (let i = start; i < out.length; i++) out[i].perk = b.perk
+  }
+}
+
 /** Killer perks armed in the panel first, as survivors' are: their targets look like his own interactions. */
 const ARMED_KILLER_PERKS: PerkId[] = ['all_shaking_thunder']
 
@@ -795,14 +826,15 @@ export function perksToPick(st: GameState): boolean {
     // (a killer's too when its targets are the ones he interacts with anyway: All-Shaking Thunder)
     return (s.owner !== 'killer' || ARMED_KILLER_PERKS.includes(s.perk)) && perkChoices(st, s.perk, s.owner, s.w).some(onMap)
   }
-  const n = new Set(perkButtons(st).map((b) => b.perk)).size
+  const n = new Set(perkButtons(st).flatMap((b) => (onTargetPerk(b) ? [] : [b.perk]))).size
   return (s.t === 'turnStart' || s.t === 'survivorInteract' || s.t === 'killerInteract') && n > 0
 }
 
-function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
+/** `only`: that perk's spots alone, whatever is picked (onTargetSpots). */
+function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes, only?: PerkId) {
   const pick = perksToPick(st)
   for (const b of perkButtons(st)) {
-    if (pick && perkPicked.value !== b.perk) continue
+    if (only ? b.perk !== only : pick && perkPicked.value !== b.perk) continue
     const name = PERKS[b.perk].name
     // Breakout moves one wounded survivor: pick who first, then where, so a board full of
     // wounded friends isn't one long list of person-and-path pairs.
@@ -856,10 +888,10 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
       }
       continue
     }
-    // Treacherous Crows: a crow in her room first, then the room it goes to (a mode, above)
+    // Treacherous Crows: the crow, then a connected room (and which card) in its own mode
     if (b.perk === 'treacherous_crows') {
       for (const crow of new Set(b.choices.map((c) => c.prop!)))
-        out.push({ key: `prop:${crow}`, label: `${name}: Crow ตัวนี้ (แล้วเลือกห้องที่จะส่งไป)`, style: 'act', run: () => ((modes.aceFirst.value = crow), sfx.click()) })
+        out.push({ key: `prop:${crow}`, label: `${name}: เปิดการ์ดฆาตกร 1 ใบ แล้วย้าย Crow ตัวนี้ไปห้องติดกัน (แล้วเลือกห้อง)`, style: 'act', run: () => ((modes.crowsCrow.value = crow), sfx.click()) })
       continue
     }
     // Windows of Opportunity: a pallet is one spot (then its path, as a pallet in her own room is)

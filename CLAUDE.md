@@ -238,10 +238,14 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   them `dropped` too, and a host who leaves hands the role on (`leaveRoom`).
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
-  already offers and show "เลือกบนแผนที่" instead. The exception is a survivor's perk aimed on the
-  map: it is armed in the side panel first ("ใช้ [perk]", glowing until pressed; `perksToPick`),
-  and only then are its targets on the map, so a path or generator clicked by habit stays an
-  ordinary move or repair.
+  already offers and show "เลือกบนแผนที่" instead. A perk of the interact step (a survivor's, or
+  Iron Maiden) with targets on the map is asked **on its target** (`onTargetPerk`): a click there
+  opens a window with the perks' cards (several at once to pick from, as in the edit-perks mode)
+  and the plain action under them, "ไม่ใช้ Perk — …" (`ChoiceMenu`, BoardAction `perk`). So do the
+  crow perks (Calm Spirit, Treacherous Crows). Other perks aimed on the map (the start of a turn,
+  All-Shaking Thunder) are armed in the side panel first ("ใช้ [perk]", glowing until pressed;
+  `perksToPick`), and only then are their targets on the map, so a path or generator clicked by
+  habit stays an ordinary move or repair.
 - **Movement cards are picked from the hand** (`CardHand`): point to draw a card up (the map shows
   where it goes), click to pick (it stays up), confirm in the side panel. In planning and on a
   bonus turn a path out of the room on the map picks the card of its colour too (`pathPick.ts`). This covers planning,

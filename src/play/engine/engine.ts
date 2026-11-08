@@ -4110,11 +4110,12 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     case 'treacherous_crows': {
       // her interaction: a crow in her room, with a card of his still to see; the crow then goes
       // into a connected room of her choice
-      if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract || crowsCard(st) < 0) return []
+      const cards = crowsCards(st)
+      if (w.k !== 'interact' || w.s !== o || st.activeSurvivor !== o || !st.canInteract || !cards.length) return []
       const rooms = [...connectedRooms(st, me!.room)]
       return propsIn(st, me!.room)
         .filter((p) => p.kind === 'crow' && p.revealed && !entityOn(st, { prop: p.id }))
-        .flatMap((p) => rooms.map((room) => ({ prop: p.id, room })))
+        .flatMap((p) => rooms.flatMap((room) => cards.map((index) => ({ prop: p.id, room, index }))))
     }
     case 'shoulder_the_burden':
       // she took someone off a hook, with a sacrifice progress on her board to give them
@@ -4755,7 +4756,7 @@ function usePerk(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWindow, c: Pe
       payPerk(st, o, perk)
       return makeHealthy(st, o as number, `${name(o as number)} หายบาดเจ็บ (เลิกฟ้าผ่า)`, o as number)
     case 'treacherous_crows': {
-      const index = crowsCard(st)
+      const index = c.index!
       const crow = st.props.find((p) => p.id === c.prop)!
       payPerk(st, o, perk, `เปิดการ์ดฆาตกรใบที่ ${index + 1}: ${CARD_NAMES[k.planned[index]]} แล้ววาง Crow ที่ ${roomName(st, c.room!)}`)
       k.shown.push(index)
@@ -5562,14 +5563,11 @@ function dogBite(st: GameState, s: number) {
   wound(st, s, 'power', `The Dog ขย้ำ ${st.survivors[s].name} — บาดเจ็บ`, true)
 }
 
-/**
- * Treacherous Crows: the killer's set card it reveals — the next he will play that nobody has seen
- * yet (a ruling: the card reads "one of", the one that matters is his next); -1 when there is none.
- */
-export function crowsCard(st: GameState): number {
+/** Treacherous Crows: the killer's set cards nobody has seen yet, one of which it reveals (her pick). */
+export function crowsCards(st: GameState): number[] {
   const k = st.killer
-  if (k.plannedShown) return -1
-  return k.planned.findIndex((_, i) => i >= k.revealedCount && !k.shown.includes(i))
+  if (k.plannedShown) return []
+  return k.planned.flatMap((_, i) => (i >= k.revealedCount && !k.shown.includes(i) ? [i] : []))
 }
 
 /** Jagged Compass: the rooms of the face-up generators not yet repaired with the most progress. */

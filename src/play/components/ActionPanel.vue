@@ -37,7 +37,7 @@ import { boardOf,
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
-import { STEP_NAME, actionKey, perkPicked, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
+import { onTargetPerk, STEP_NAME, actionKey, perkPicked, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import {
@@ -328,7 +328,12 @@ function stopSteps() {
 
 /** Perk buttons in this step (start of turn, interact, a roll). */
 // online, a perk button shows only on its owner's device
-const buttons = computed(() => perkButtons(props.st).filter((b) => b.owner === 'killer' || controls(props.st, b.owner)))
+const buttons = computed(() => perkButtons(props.st).filter((b) => (b.owner === 'killer' || controls(props.st, b.owner)) && !onTargetPerk(b)))
+/** The perks usable now that are asked on their target, a click on the map (not pressed here). */
+const targetPerks = computed(() => [
+  ...(calmSpirit.value.length ? [PERKS.calm_spirit.name] : []),
+  ...perkButtons(props.st).flatMap((b) => (onTargetPerk(b) && (b.owner === 'killer' || controls(props.st, b.owner)) ? [PERKS[b.perk].name] : [])),
+])
 
 /** All traps on the board, when the supply is empty and one must be moved. */
 const trapsOnBoard = computed(() => Object.keys(props.st.paths).filter((id) => props.st.paths[id].trap))
@@ -643,16 +648,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <p v-if="hasDiversion" class="board-hint">🎯 หันเหความสนใจ: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
       </div>
       <!-- a perk is picked first (its targets then show on the board), again to put it back -->
-      <p v-if="(buttons.length || calmSpirit.length) && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
-      <!-- Calm Spirit is an interaction, but pressed as a perk is: then a crow, then the room -->
-      <div v-if="calmSpirit.length">
-        <PerkCard
-          perk="calm_spirit"
-          :state="perkPicked === 'calm_spirit' ? 'picked' : perkPicked ? 'dim' : 'ready'"
-          :hint="perkPicked === 'calm_spirit' ? '🎯 คลิก Crow ในห้องคุณบนแผนที่ แล้วคลิกห้องที่จะส่งมันไป — กดการ์ดอีกครั้งเพื่อยกเลิก' : undefined"
-          @pick="pickInteractPerk('calm_spirit')"
-        />
-      </div>
+      <!-- the crow perks (Calm Spirit, Treacherous Crows) are asked on the crow: a click on it -->
+      <p v-if="targetPerks.length" class="board-hint">🎯 ใช้ได้: {{ targetPerks.join(' / ') }} — คลิกเป้าหมายบนแผนที่ แล้วเลือกว่าจะใช้ Perk หรือทำตามปกติ</p>
+      <p v-if="buttons.length && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
       <div v-for="b in buttons" :key="b.perk">
         <PerkCard
           :perk="b.perk"
@@ -909,6 +907,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           <span v-else-if="st.killer.powerUsed" class="muted small">ใช้พลังไปแล้วรอบนี้</span>
           <span v-else class="muted small">ใช้พลังไม่ได้จากห้องนี้</span>
         </div>
+        <p v-if="targetPerks.length" class="board-hint">🎯 ใช้ได้: {{ targetPerks.join(' / ') }} — คลิกเป้าหมายบนแผนที่ แล้วเลือกว่าจะใช้ Perk หรือไม่</p>
         <!-- a perk is picked first (its targets then show on the board), again to put it back -->
         <p v-if="buttons.length && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
         <div v-for="b in buttons" :key="b.perk">

@@ -3921,7 +3921,7 @@ describe('Taurie Cain', () => {
     expect(g.survivors[0].bp).toBe(4)
   })
 
-  it('Treacherous Crows: her interaction with a crow shows his next card, and the crow goes next door', () => {
+  it('Treacherous Crows: her interaction with a crow shows one of his unseen cards (her pick), and the crow goes next door', () => {
     const st = taurie('treacherous_crows')
     const crow = placeProp(st, 'crow', 'shack')
     st.killer.planned = ['vault', 'sneak']
@@ -3931,9 +3931,9 @@ describe('Taurie Cain', () => {
     st.step = { t: 'survivorInteract', s: 0, canInteract: true }
     st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
     const room = [...connectedRoomsOf(st, 'shack')][0]
-    expect(perkButtons(st).find((b) => b.perk === 'treacherous_crows')?.choices).toContainEqual({ prop: crow.id, room })
-    const g = apply(st, { t: 'perk', perk: 'treacherous_crows', use: true, choice: { prop: crow.id, room } })
-    expect(g.killer.shown).toEqual([0])
+    expect(perkButtons(st).find((b) => b.perk === 'treacherous_crows')?.choices).toEqual(expect.arrayContaining([{ prop: crow.id, room, index: 0 }, { prop: crow.id, room, index: 1 }]))
+    const g = apply(st, { t: 'perk', perk: 'treacherous_crows', use: true, choice: { prop: crow.id, room, index: 1 } })
+    expect(g.killer.shown).toEqual([1])
     expect(g.props.find((p) => p.id === crow.id)!.room).toBe(room)
     // that was her interaction
     expect(g.step.t).not.toBe('survivorInteract')

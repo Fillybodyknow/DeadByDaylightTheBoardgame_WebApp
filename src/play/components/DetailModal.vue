@@ -201,6 +201,10 @@ const item = computed(() => {
         <ul class="facts">
           <li :class="perkUsed(st, perk.owner, perk.perk) ? 'bad' : 'good'">{{ perkUsed(st, perk.owner, perk.perk) ? 'ใช้แล้วรอบนี้' : 'ยังใช้ได้รอบนี้' }}</li>
           <li><BpText :text="PERKS[perk.perk].when" /></li>
+          <!-- Grim Embrace: whose board holds his ▲, and how many (each a sacrifice progress at their hanging) -->
+          <li v-if="perk.perk === 'grim_embrace'">
+            <BpText :text="st.survivors.some((sv) => sv.embrace) ? `▲ บนบอร์ด: ${st.survivors.flatMap((sv) => (sv.embrace ? [`${sv.name} ${sv.embrace} ▲`] : [])).join(', ')}` : 'ยังไม่มี ▲ บนบอร์ดของใคร'" />
+          </li>
         </ul>
         <div class="item-wrap">
           <img v-if="perkImage(perk.perk)" class="item-img zoomable" title="คลิกเพื่อขยาย" @click="zoom" :src="asset(perkImage(perk.perk))" :alt="PERKS[perk.perk].name" />
