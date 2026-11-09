@@ -238,15 +238,37 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   them `dropped` too, and a host who leaves hands the role on (`leaveRoom`).
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
-  already offers and show "เลือกบนแผนที่" instead. A perk of the interact step (a survivor's, or
-  Iron Maiden) with targets on the map is asked **on its target** (`onTargetPerk`): a click there
-  asks in the side panel, with the perks' cards (several at once to pick from, as in the edit-perks
-  mode) and the plain action under them, "ไม่ใช้ Perk — …" (`targetAsk` in GameScreen, ActionPanel's
-  `ask`, BoardAction `perk`); no window over the map. Treacherous Crows' card is picked there too. So do the
-  crow perks (Calm Spirit, Treacherous Crows). Other perks aimed on the map (the start of a turn,
+  already offers and show "เลือกบนแผนที่" instead. A perk of the interact step that does **not**
+  take the interaction (Ace in the Hole, Iron Maiden: "before interacting") is asked **on its
+  target** (`onTargetPerk`): a click there asks in the side panel, with the perks' cards (several
+  at once to pick from, as in the edit-perks mode) and the plain action under them,
+  "ไม่ใช้ Perk — …" (`targetAsk` in GameScreen, ActionPanel's `ask`, BoardAction `perk`); no window
+  over the map. Its card is in the side panel as well, so a player who never clicks that target
+  still learns of it. Other perks aimed on the map (the start of a turn,
   All-Shaking Thunder) are armed in the side panel first ("ใช้ [perk]", glowing until pressed;
   `perksToPick`), and only then are their targets on the map, so a path or generator clicked by
   habit stays an ordinary move or repair.
+- **An interaction that buys the killer a ▲ is settled whole before any of it happens**
+  (`bonusAsk` in `boardActions.ts`): chasing a crow (p.12) and Power of Two. A click on the crow
+  (or on the friend) sends nothing — the panel asks for the card the bonus turn discards (from the
+  hand, or by clicking a path of its colour) and, where that colour leaves the room several ways,
+  which path; only "ยืนยัน" sends the lot (`confirmCrow`: the interaction, then the card, and the
+  move through `moveIntent` in GameScreen, since a perk may be offered on the card first). "ยกเลิก"
+  at any point costs nothing. Before this the ▲ was paid on the first click, and a card with no
+  path out loses the bonus turn's interaction too (`startSurvivorMove`), so a player could buy the
+  killer a ▲ for nothing — which is what happened (a player's report). Cards with no path show
+  "เดินไม่ได้" on the hand. Tutorial chapter 6 teaches the new order.
+- **A perk that takes the turn's interaction is asked before the interaction is** (`REPLACES_INTERACT`,
+  `interactGate` in `boardActions.ts`): the ten whose card says "As an interaction", "Instead of
+  interacting" or "When you would interact" (Balanced Landing, Calm Spirit, Kinship, No One Left
+  Behind, Prove Thyself, Solidarity, Treacherous Crows, Weaving Spiders, Wicked, Windows of
+  Opportunity). The side panel opens the step with "ใช้ Perk แทนการ Interact ไหม?", their cards,
+  and "ไม่ใช้ Perk — Interact ตามปกติ" (`plainInteract`, reset with the step; a way back under the
+  interactions). Nothing on the map takes a click until one is answered; pressing a card arms it
+  and only then are its targets there (Wicked, which aims at nothing, is used at once). While the
+  question is open the rooms this turn's one interaction could land in stay lit and the rest of
+  the board dims (`interactRooms`, `choiceRooms` in `focus.ts`), and the same once a card is
+  armed. Interacting by habit spent the turn and the perk with it, which players kept doing.
 - **Movement cards are picked from the hand** (`CardHand`): point to draw a card up (the map shows
   where it goes), click to pick (it stays up), confirm in the side panel. In planning and on a
   bonus turn a path out of the room on the map picks the card of its colour too (`pathPick.ts`). This covers planning,

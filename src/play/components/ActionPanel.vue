@@ -39,8 +39,8 @@ import { boardOf,
   usableHook,
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
-import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
-import { onTargetPerk, STEP_NAME, type BoardAction, actionKey, perkPicked, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
+import type { Action, GameState, KillerInteraction, MoveCard, PathKind, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
+import { onTargetPerk, STEP_NAME, type BoardAction, actionKey, aimedOnMap, gatePerks, interactGate, perkPicked, plainInteract, REPLACES_INTERACT, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import {
@@ -91,6 +91,8 @@ const props = defineProps<{
   onBoard: Set<string>
   /** Pain Resonance's hook interacted with, its survivor being picked on the board. */
   painArmed?: boolean
+  /** An interaction that buys a bonus turn with a ▲ for the killer, settled here before it is sent. */
+  bonusAsk?: { i: SurvivorInteraction; card: PathKind | null; path: string | null } | null
   /** Treacherous Crows: the crow picked on the map, and the killer's card picked here. */
   crowsCrow?: string | null
   crowsCard?: number | null
@@ -114,6 +116,9 @@ const emit = defineEmits<{
   powerCard: [card: MoveCard | null]
   /** Pain Resonance: interact with this hook, then pick the survivor (on the board); null: put back. */
   painHook: [hook: string | null]
+  bonusAsk: [pick: { i: SurvivorInteraction; card: PathKind | null; path: string | null } | null]
+  /** A confirmed crow bonus turn: the move it already settled, made when the engine asks for it. */
+  bonusMove: [move: { s: number; card: PathKind; path: string } | null]
   crowsCrow: [crow: string | null]
   crowsCard: [index: number | null]
   /** The target's question answered or put back. */
@@ -216,7 +221,8 @@ const hasDiversion = computed(() => {
 
 const sInteractions = computed(() => {
   const s = step.value
-  return s.t === 'survivorInteract' && s.canInteract ? survivorInteractions(props.st, s.s).filter((i) => i.k !== 'calmSpirit' && i.k !== 'diversion') : []
+  // (the crow is chased on the board, where the bonus turn it gives is settled first: `bonusAsk`)
+  return s.t === 'survivorInteract' && s.canInteract ? survivorInteractions(props.st, s.s).filter((i) => i.k !== 'calmSpirit' && i.k !== 'diversion' && i.k !== 'crow') : []
 })
 
 /**
@@ -226,13 +232,32 @@ const sInteractions = computed(() => {
 const panelInteractions = computed(() => sInteractions.value.filter((i) => i.k !== 'dropPallet' && here({ t: 'interact', i })))
 const hasPallet = computed(() => sInteractions.value.some((i) => i.k === 'dropPallet'))
 
-/** Calm Spirit: one entry per crow, each with the rooms it can be sent to. */
-const calmSpirit = computed(() => {
-  const s = step.value
-  if (s.t !== 'survivorInteract' || !s.canInteract) return []
-  const all = survivorInteractions(props.st, s.s).filter((i): i is Extract<SurvivorInteraction, { k: 'calmSpirit' }> => i.k === 'calmSpirit')
-  return [...new Set(all.map((i) => i.prop))].map((prop) => ({ prop, options: all.filter((i) => i.prop === prop) }))
-})
+/**
+ * The perks that take this turn's interaction (`REPLACES_INTERACT`): asked before anything else,
+ * because interacting by habit spends the turn and the perk with it. While the question is open
+ * the ordinary interactions wait; pressing a card arms it (the map then shows its targets), and
+ * "ไม่ใช้ Perk" lets the turn go on as usual (`plainInteract`, reset with the step).
+ */
+const gateCards = computed(() => gatePerks(props.st))
+const gateOpen = computed(() => interactGate(props.st))
+/** On screen: all of them while the question is open, the armed one alone after. */
+const shownGate = computed(() => (gateOpen.value ? gateCards.value : perkPicked.value && gateCards.value.includes(perkPicked.value) ? [perkPicked.value] : []))
+
+/** Pressing a gate card: one with nothing to aim at (Wicked) is used at once, the rest arm. */
+function pickGate(perk: PerkId) {
+  const b = perkButtons(props.st).find((x) => x.perk === perk)
+  const choice = b?.choices.length === 1 ? b.choices[0] : null
+  if (choice && !aimedOnMap(choice)) return act({ t: 'perk', perk, use: true, choice })
+  pickInteractPerk(perk)
+}
+
+/** What the armed gate card says to do next (Calm Spirit has no perk button of its own). */
+function gateHint(perk: PerkId): string | undefined {
+  if (perkPicked.value !== perk) return undefined
+  if (perk === 'calm_spirit') return '🎯 คลิก Crow ในห้องคุณบนแผนที่ แล้วเลือกห้องที่จะส่งมันไป — กดการ์ดอีกครั้งเพื่อยกเลิก'
+  const b = perkButtons(props.st).find((x) => x.perk === perk)
+  return b ? pickedHint(b) : undefined
+}
 
 const kInteractions = computed(() => {
   const s = step.value
@@ -346,6 +371,12 @@ function pickInteractPerk(perk: PerkId) {
   perkPicked.value = perkPicked.value === perk ? null : perk
 }
 
+/** "ไม่ใช้ Perk": the question is answered, the turn goes on with the ordinary interactions. */
+function declineGate() {
+  sfx.click()
+  plainInteract.value = true
+}
+
 /** Out of the flow altogether. */
 function stopSteps() {
   if (stepKind.value === 'haunt') emit('powerOn', false)
@@ -353,14 +384,18 @@ function stopSteps() {
 }
 
 
-/** Perk buttons in this step (start of turn, interact, a roll). */
+/**
+ * Perk buttons in this step (start of turn, interact, a roll). The interact step's perks with
+ * targets on the map are here too: their card is what says they can be used at all, and a player
+ * who never clicks that target would otherwise miss them (the players asked for this back).
+ * Pressing one arms it, as every other perk card; the click on the target still works meanwhile.
+ */
 // online, a perk button shows only on its owner's device
-const buttons = computed(() => perkButtons(props.st).filter((b) => (b.owner === 'killer' || controls(props.st, b.owner)) && !onTargetPerk(b)))
-/** The perks usable now that are asked on their target, a click on the map (not pressed here). */
-const targetPerks = computed(() => [
-  ...(calmSpirit.value.length ? [PERKS.calm_spirit.name] : []),
-  ...perkButtons(props.st).flatMap((b) => (onTargetPerk(b) && (b.owner === 'killer' || controls(props.st, b.owner)) ? [PERKS[b.perk].name] : [])),
-])
+const buttons = computed(() => perkButtons(props.st).filter((b) => b.owner === 'killer' || controls(props.st, b.owner)))
+/** The cards under the interactions: the ones that take the interaction are asked above instead. */
+const stepButtons = computed(() => buttons.value.filter((b) => !REPLACES_INTERACT.includes(b.perk)))
+/** Of those, the ones whose targets are on the map: their card says the map works too. */
+const targetPerks = computed(() => stepButtons.value.flatMap((b) => (onTargetPerk(b) ? [PERKS[b.perk].name] : [])))
 
 /** All traps on the board, when the supply is empty and one must be moved. */
 const trapsOnBoard = computed(() => Object.keys(props.st.paths).filter((id) => props.st.paths[id].trap))
@@ -428,6 +463,85 @@ function confirmBonus() {
   if (!bonusPick.value) return
   preview.value = null
   act({ t: 'bonus', card: bonusPick.value })
+}
+
+// ---------- chasing a crow: the whole bonus turn is settled here, then sent in one go ----------
+
+/** Whose bonus turn is being settled; null when nothing is. */
+const crowWho = computed(() => (step.value.t === 'survivorInteract' && props.bonusAsk ? step.value.s : null))
+/** What the question is about, in words: chasing a crow, or Power of Two on a friend. */
+const bonusWhat = computed(() => {
+  const i = props.bonusAsk?.i
+  if (!i) return ''
+  return i.k === 'partner' ? `${PERKS.power_of_two.name} กับ ${props.st.survivors[i.target].name}` : 'ไล่ Crow'
+})
+/** Each card in hand with where it would take them: none means the bonus turn is wasted (p.9). */
+const crowHand = computed<HandCard[]>(() => {
+  const s = crowWho.value
+  if (s === null) return []
+  return [...new Set(props.st.survivorHands[props.st.survivors[s].hand])].map((card) => {
+    const dead = isPathCard(card) && survivorMoves(props.st, s, card).length === 0
+    return { card, picked: props.bonusAsk!.card === card, ...(dead ? { badge: 'เดินไม่ได้' } : props.bonusAsk!.card === card ? { badge: 'Bonus Turn' } : {}) }
+  })
+})
+/** Where the picked card could take them (one of these is clicked on the map when there are several). */
+const crowDests = computed(() => {
+  const s = crowWho.value
+  const card = props.bonusAsk?.card
+  return s === null || !card ? [] : survivorMoves(props.st, s, card)
+})
+
+function pickCrowCard(card: MoveCard) {
+  if (!props.bonusAsk || !isPathCard(card)) return
+  sfx.click()
+  // one way out: it is settled at once, so the confirm is the only click left
+  const s = crowWho.value!
+  const only = survivorMoves(props.st, s, card)
+  const same = props.bonusAsk.card === card
+  emit('bonusAsk', same ? { ...props.bonusAsk, card: null, path: null } : { ...props.bonusAsk, card, path: only.length === 1 ? only[0].path.id : null })
+}
+
+/**
+ * Chase it, at last: the killer's ▲ (p.12), the card discarded and the move, all from one press.
+ * The move is handed up to be made when the engine asks for it — a perk may be offered on the
+ * card first. Nothing was sent before this, so every "ยกเลิก" above cost nothing.
+ */
+function confirmCrow() {
+  const pick = props.bonusAsk
+  const i = pick?.i
+  const s = crowWho.value
+  if (!i || !pick || s === null) return
+  preview.value = null
+  const card = pick.card
+  const path = pick.path
+  emit('bonusAsk', null)
+  if (!dispatch({ t: 'interact', i })) return
+  sfx.select()
+  // (`props.st` is the held view, which trails the game while the board plays, so it can't be
+  // asked whether the bonus turn is on offer: with an empty hand there is none and the second
+  // action is simply not legal — `dispatch` drops it and nothing else happens)
+  if (!card) return void dispatch({ t: 'declineBonus' })
+  if (path && isPathCard(card)) emit('bonusMove', { s, card, path })
+  dispatch({ t: 'bonus', card })
+}
+
+// the map: a path out of the room picks the card of its colour, as in any other bonus turn
+let crowPick = false
+watchEffect(() => {
+  const s = crowWho.value
+  if (s !== null && !props.bonusAsk?.card) {
+    pathPick.value = pathPickFor(props.st, props.st.survivors[s].room, [...new Set(props.st.survivorHands[props.st.survivors[s].hand])], pickCrowCard)
+    crowPick = true
+  } else if (crowPick) {
+    pathPick.value = null
+    crowPick = false
+  }
+})
+onBeforeUnmount(() => crowPick && (pathPick.value = null))
+
+function hoverCrow(card: MoveCard | null) {
+  const s = crowWho.value
+  preview.value = card && s !== null ? choicePreview(props.st, { card }, props.st.survivors[s].room, s) : null
 }
 
 // ---------- Scent of Blood, step 2: a card for The Dog, picked from the hand, then confirmed ----------
@@ -698,11 +812,41 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <!-- survivor interact -->
     <template v-else-if="step.t === 'survivorInteract'">
       <p v-if="!step.canInteract" class="warn">เคลื่อนที่ไม่สำเร็จ — เทิร์นนี้ Interact ไม่ได้</p>
+      <!-- it buys the killer a ▲: the whole bonus turn is settled here, and sent only on confirm -->
+      <template v-else-if="bonusAsk">
+        <p>
+          <b>{{ bonusWhat }}</b> — {{ st.killer.name }} ได้ +1 <BpIcon /> แล้วเล่น Bonus Turn: ทิ้งการ์ด 1 ใบ เคลื่อนที่ + Interact อีกครั้ง (หน้า 12)<br />
+          <span class="muted small">ยังไม่เสียอะไรจนกว่าจะกดยืนยัน — 👇 เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</span>
+        </p>
+        <p v-if="bonusAsk.card && !bonusAsk.path && crowDests.length" class="board-hint">🎯 คลิกเส้นทางที่จะไปบนแผนที่ ({{ crowDests.length }} ทาง)</p>
+        <p v-if="bonusAsk.card && crowDests.length === 0" class="warn">{{ CARD_NAMES[bonusAsk.card] }} ไม่มีเส้นทางจากห้องนี้ — เดินไม่ได้ และเสียการ Interact ของ Bonus Turn ไปด้วย</p>
+        <div class="buttons col way-on">
+          <button class="primary" :disabled="(!bonusAsk.card && crowHand.length > 0) || (crowDests.length > 0 && !bonusAsk.path)" @click="confirmCrow">
+            {{ !crowHand.length ? `ยืนยัน: ${bonusWhat} (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)` : !bonusAsk.card ? 'เลือกการ์ดก่อน' : crowDests.length && !bonusAsk.path ? 'เลือกเส้นทางบนแผนที่ก่อน' : `ยืนยัน: ${bonusWhat} แล้ว Bonus Turn ด้วย ${CARD_NAMES[bonusAsk.card]}` }}
+          </button>
+          <button @click="emit('bonusAsk', null), sfx.click()">ยกเลิก</button>
+        </div>
+        <CardHand :cards="crowHand" :label="`Bonus Turn — มือของ ${st.survivors[step.s].name}`" @pick="pickCrowCard" @hover="hoverCrow" />
+      </template>
+      <!-- the perks that ARE this turn's interaction are asked before it (`interactGate`) -->
+      <p v-else-if="gateOpen">
+        <b>ใช้ Perk แทนการ Interact ไหม?</b><br /><span class="muted small">Perk ด้านล่างนับเป็นการ Interact ของเทิร์นนี้ — กดการ์ดแล้วเลือกเป้าหมายบนแผนที่ หรือเลือก Interact ตามปกติ</span>
+      </p>
       <p v-else-if="sInteractions.length || hasDiversion">
-        Interact 1 อย่าง ที่ {{ roomName(st, st.survivors[step.s].room) }}<br /><span class="muted small">คลิกของหรือตัวละครที่เรืองแสงบนแผนที่ได้เลย</span>
+        <!-- with a perk armed the glowing spots are its targets, not the ordinary interactions -->
+        Interact 1 อย่าง ที่ {{ roomName(st, st.survivors[step.s].room) }}<br /><span v-if="!perkPicked" class="muted small">คลิกของหรือตัวละครที่เรืองแสงบนแผนที่ได้เลย</span>
       </p>
       <p v-else class="muted">ไม่มีอะไรให้ Interact ในห้องนี้</p>
-      <div class="buttons col">
+      <!-- the question's cards: one of them takes the place of the interaction -->
+      <PerkCard
+        v-for="p in shownGate"
+        :key="p"
+        :perk="p"
+        :state="perkPicked === p ? 'picked' : perkPicked ? 'dim' : 'ready'"
+        :hint="gateHint(p)"
+        @pick="pickGate(p)"
+      />
+      <div v-if="!gateOpen && !bonusAsk" class="buttons col">
         <!-- a perk picked: its targets only, the ordinary interactions wait -->
         <button v-for="(i, n) in perkPicked ? [] : panelInteractions" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="survivorInteractionLabel(st, step.s, i)" /></button>
         <p v-if="hasPallet && !perkPicked" class="board-hint">🎯 ทิ้ง Pallet: คลิก Pallet บนแผนที่ แล้วเลือกเส้นทาง</p>
@@ -710,10 +854,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <p v-if="hasDiversion" class="board-hint">🎯 หันเหความสนใจ: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
       </div>
       <!-- a perk is picked first (its targets then show on the board), again to put it back -->
-      <!-- the crow perks (Calm Spirit, Treacherous Crows) are asked on the crow: a click on it -->
-      <p v-if="targetPerks.length" class="board-hint">🎯 ใช้ได้: {{ targetPerks.join(' / ') }} — คลิกเป้าหมายบนแผนที่ แล้วเลือกว่าจะใช้ Perk หรือทำตามปกติ</p>
-      <p v-if="buttons.length && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
-      <div v-for="b in buttons" :key="b.perk">
+      <p v-if="stepButtons.length && !perkPicked && !bonusAsk" class="perk-lead">{{ PERK_LEAD }}</p>
+      <p v-if="targetPerks.length && !perkPicked && !bonusAsk" class="board-hint">🎯 {{ targetPerks.join(' / ') }} — กดการ์ดด้านล่าง หรือคลิกเป้าหมายบนแผนที่ได้เลย</p>
+      <div v-for="b in bonusAsk ? [] : stepButtons" :key="b.perk">
         <PerkCard
           :perk="b.perk"
           :state="perkPicked === b.perk ? 'picked' : perkPicked ? 'dim' : 'ready'"
@@ -727,7 +870,12 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </template>
         </PerkCard>
       </div>
-      <button class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
+      <div v-if="!bonusAsk" class="buttons col way-on">
+        <!-- the question's other answer; and a way back to it for a player who changes their mind -->
+        <button v-if="gateOpen" class="primary" @click="declineGate">ไม่ใช้ Perk — Interact ตามปกติ</button>
+        <button v-else-if="plainInteract && gateCards.length && !perkPicked" class="small" @click="plainInteract = false">↩ กลับไปดู Perk ที่ใช้แทน Interact</button>
+        <button class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
+      </div>
     </template>
 
     <!-- bonus turns -->
@@ -951,7 +1099,8 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
 
       <template v-else>
         <p>
-          Interact 1 อย่าง หรือใช้พลังแทน (1 ครั้ง/รอบ) ที่ {{ roomName(st, st.killer.room) }}<br /><span class="muted small"
+          <!-- with a perk armed the glowing spots are its targets, not his ordinary interactions -->
+          Interact 1 อย่าง หรือใช้พลังแทน (1 ครั้ง/รอบ) ที่ {{ roomName(st, st.killer.room) }}<br /><span v-if="!perkPicked" class="muted small"
             >คลิกของหรือผู้รอดชีวิตที่เรืองแสงบนแผนที่ — คลิกตัว {{ st.killer.name }} เพื่อใช้พลัง{{ kInteractions.undying.length ? ' หรือ ไม่รู้จักตาย' : '' }}</span
           >
         </p>
@@ -978,9 +1127,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           <span v-else-if="st.killer.powerUsed" class="muted small">ใช้พลังไปแล้วรอบนี้</span>
           <span v-else class="muted small">ใช้พลังไม่ได้จากห้องนี้</span>
         </div>
-        <p v-if="targetPerks.length" class="board-hint">🎯 ใช้ได้: {{ targetPerks.join(' / ') }} — คลิกเป้าหมายบนแผนที่ แล้วเลือกว่าจะใช้ Perk หรือไม่</p>
         <!-- a perk is picked first (its targets then show on the board), again to put it back -->
         <p v-if="buttons.length && !perkPicked" class="perk-lead">{{ PERK_LEAD }}</p>
+        <p v-if="targetPerks.length && !perkPicked" class="board-hint">🎯 {{ targetPerks.join(' / ') }} — กดการ์ดด้านล่าง หรือคลิกเป้าหมายบนแผนที่ได้เลย</p>
         <div v-for="b in buttons" :key="b.perk">
           <PerkCard
             :perk="b.perk"

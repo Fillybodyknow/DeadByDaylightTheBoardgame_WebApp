@@ -78,6 +78,27 @@ const end = (st: GameState, path: string, from: string) => {
   return p.a === from ? p.b : p.a
 }
 
+/**
+ * The rooms a set of perk choices would act in: the end of a path, the room a prop or a survivor
+ * is in, a room picked outright. Used to light the interact step's question — where this turn's
+ * one interaction could land — and leave the rest of the board dim.
+ */
+export function choiceRooms(st: GameState, from: string, choices: PerkChoice[]): string[] {
+  const out: string[] = []
+  const propRoom = (id: string) => {
+    const room = st.props.find((p) => p.id === id)?.room
+    if (room) out.push(room)
+  }
+  for (const c of choices) {
+    if (c.path) out.push(from, end(st, c.path, from))
+    if (c.prop) propRoom(c.prop)
+    if (c.prop2) propRoom(c.prop2)
+    if (c.target !== undefined) out.push(st.survivors[c.target].room)
+    if (c.room) out.push(c.room)
+  }
+  return [...new Set(out)]
+}
+
 const ROLL_WHAT: Record<RollContext['k'], (st: GameState, ctx: RollContext) => string> = {
   repair: (st, c) => `ซ่อม Generator ${progress(st, c)} — สำเร็จ +1, ยอดเยี่ยม +2`,
   openGate: (st, c) => `เปิด Exit Gate ${progress(st, c)} — สำเร็จ +1 (ครบ 3 = หนีรอด)`,

@@ -38,8 +38,9 @@ import {
 } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import { boards } from './engine/boards'
-import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, SurvivorInteraction } from './engine/types'
+import type { Action, GameState, KillerInteraction, MoveCard, PathKind, PerkChoice, PerkOwner, PerkWindow, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
+import { choiceRooms } from './focus'
 import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
 
 /** "path:<id>", "prop:<id>", "s:<survivor>", "killer" or "room:<id>". */
@@ -74,6 +75,15 @@ export interface BoardModes {
   revealing: Ref<{ s: number; props: string[] } | null>
   /** Calm Spirit: the crow being sent elsewhere. */
   calmCrow: Ref<string | null>
+  /**
+   * An interaction that buys a bonus turn with a ▲ for the killer (chasing a crow, p.12; Power
+   * of Two): the whole of it is settled before anything happens — the target, then the card to
+   * discard, then where it goes. Nothing reaches the engine until the player confirms, so backing
+   * out costs nothing. They used to pay the ▲ on the first click and only then find out whether
+   * the bonus turn was worth having — a card with no path out loses the interaction too
+   * (`startSurvivorMove`), so it could buy the killer a ▲ for nothing (a player's report).
+   */
+  bonusAsk: Ref<{ i: SurvivorInteraction; card: PathKind | null; path: string | null } | null>
   /** Treacherous Crows: the crow being sent to a connected room. */
   crowsCrow: Ref<string | null>
   /** Treacherous Crows: which of the killer's cards to reveal (picked in the side panel). */
@@ -274,6 +284,18 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     return out
   }
 
+  // A bonus turn being settled, with its card already picked: the paths it may take, so where it
+  // goes is known before any of it is sent (one card's colour can leave the room several ways).
+  if (modes.bonusAsk.value?.card && s.t === 'survivorInteract') {
+    const { card } = modes.bonusAsk.value
+    const from = st.survivors[s.s].room
+    for (const m of survivorMoves(st, s.s, card)) {
+      add(`path:${m.path.id}`, `Bonus Turn: ${pathLabel(st, m.path.id, from)}`, () => ((modes.bonusAsk.value = { ...modes.bonusAsk.value!, path: m.path.id }), sfx.click()))
+      out[out.length - 1].dest = m.to
+    }
+    return out
+  }
+
   if (modes.calmCrow.value && s.t === 'survivorInteract') {
     for (const i of survivorInteractions(st, s.s))
       if (i.k === 'calmSpirit' && i.prop === modes.calmCrow.value)
@@ -429,11 +451,20 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         perkSpots(st, out, modes, 'no_one_left_behind')
         break
       }
+      // Calm Spirit picked in the panel: its crows (the room it goes to is picked next, calmCrow)
+      if (perkPicked.value === 'calm_spirit' && modes.calmCrow.value === null) {
+        for (const i of survivorInteractions(st, s.s))
+          if (i.k === 'calmSpirit' && !out.some((a) => a.key === `prop:${i.prop}`))
+            add(spotOf(i), `${PERKS.calm_spirit.name}: ย้าย Crow ตัวนี้ไปห้องใดก็ได้ (แล้วเลือกห้อง)`, () => ((modes.calmCrow.value = i.prop), sfx.click()))
+        break
+      }
       // a perk picked in the panel: only its targets
       if (perkPicked.value && perksToPick(st)) {
         perkSpots(st, out, modes)
         break
       }
+      // the gate: the panel asks whether a perk takes this interaction before the map takes a click
+      if (interactGate(st)) break
       // Diversion, after clicking the killer: only his paths, each with the room it sends him to
       // (a fork asks which room next, as any move does)
       if (modes.diversion.value !== null) {
@@ -459,11 +490,15 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             if (pallets.has(i.prop)) continue
             pallets.add(i.prop)
             add(spotOf(i), 'ทิ้ง Pallet (แล้วเลือกเส้นทาง)', () => ((modes.palletMode.value = i.prop), sfx.click()))
+          } else if (i.k === 'crow' || (i.k === 'partner' && i.perk === 'power_of_two')) {
+            // it buys the killer a ▲: the bonus turn is settled in the panel first, then all of
+            // it is sent at once (`bonusAsk`). Collective Stealth is a 'partner' too, but free.
+            const what = i.k === 'crow' ? 'ไล่ Crow' : `${PERKS.power_of_two.name}: ${st.survivors[i.target].name}`
+            add(spotOf(i), `${what} (เลือกการ์ด Bonus Turn ก่อน)`, () => ((modes.bonusAsk.value = { i, card: null, path: null }), sfx.click()), 'act', i.k === 'partner' ? i.target : null)
           } else if (i.k === 'calmSpirit') {
-            // a click on the crow asks: chase it, or this perk (and then the room)
-            if (out.some((a) => a.key === `prop:${i.prop}` && a.perk === 'calm_spirit')) continue
-            add(spotOf(i), `${PERKS.calm_spirit.name}: ย้าย Crow ตัวนี้ไปห้องใดก็ได้ (แล้วเลือกห้อง)`, () => ((modes.calmCrow.value = i.prop), sfx.click()))
-            out[out.length - 1].perk = 'calm_spirit'
+            // Calm Spirit is the turn's interaction, so it is answered in the panel first
+            // (`interactGate`) and its crows come up only once its card is picked, above
+            continue
           } else if (i.k === 'diversion') {
             // Diversion: the killer first, then his paths (in its own mode, above). Once, however
             // many paths; with Power Struggle on him too, a click asks which. The Unknown: every
@@ -774,6 +809,65 @@ function hookSpot(st: GameState, add: (key: SpotKey, label: string, run: () => v
 export const perkPicked = ref<PerkId | null>(null)
 
 /**
+ * Perks that **are** the turn's interaction, or take its place: their card says "As an
+ * interaction", "Instead of interacting" or "When you would interact". Interacting by habit
+ * spends the turn and the perk is gone with it, so the interact step asks about these before
+ * anything else (`interactGate`): the card, or "ไม่ใช้ Perk". Ace in the Hole and Iron Maiden
+ * ("before interacting") and Botany Knowledge ("you can still interact this turn") leave the
+ * interaction alone, so they stay plain cards in the panel and don't ask.
+ */
+export const REPLACES_INTERACT: PerkId[] = [
+  'balanced_landing',
+  'calm_spirit',
+  'kinship',
+  'no_one_left_behind',
+  'prove_thyself',
+  'solidarity',
+  'treacherous_crows',
+  'weaving_spiders',
+  'wicked',
+  'windows_of_opportunity',
+]
+
+/** The player answered the gate with "interact as usual": the perks above are declined for now. */
+export const plainInteract = ref(false)
+
+/** The perks the interact step must ask about first; empty when the step has none of them. */
+export function gatePerks(st: GameState): PerkId[] {
+  const s = st.step
+  if (s.t !== 'survivorInteract' || !s.canInteract) return []
+  const out = perkButtons(st).flatMap((b) => (REPLACES_INTERACT.includes(b.perk) ? [b.perk] : []))
+  // Calm Spirit is an interaction with a crow, not a perk button, but it is the interaction
+  if (survivorInteractions(st, s.s).some((i) => i.k === 'calmSpirit')) out.push('calm_spirit')
+  return [...new Set(out)]
+}
+
+/** The gate is open: the panel is asking, and nothing on the map takes a click yet. */
+export function interactGate(st: GameState): boolean {
+  return !plainInteract.value && !perkPicked.value && gatePerks(st).length > 0
+}
+
+/**
+ * The rooms this turn's one interaction could land in, for the map's dimming: while the gate
+ * asks, every perk of the question and the survivor's own room (where an ordinary interaction
+ * happens); with one of them picked, that perk's rooms. Null when nothing of the sort is asked.
+ */
+export function interactRooms(st: GameState): { s: number; rooms: string[] } | null {
+  const s = st.step
+  if (s.t !== 'survivorInteract' || !s.canInteract) return null
+  const picked = perkPicked.value
+  const perks = picked ? (REPLACES_INTERACT.includes(picked) ? [picked] : []) : interactGate(st) ? gatePerks(st) : []
+  if (!perks.length) return null
+  const from = st.survivors[s.s].room
+  // (Calm Spirit is no perk button: its crows are in the survivor's own room)
+  const rooms = perks.flatMap((p) => {
+    const b = perkButtons(st).find((x) => x.perk === p)
+    return b ? choiceRooms(st, from, b.choices) : [from]
+  })
+  return { s: s.s, rooms: [...new Set([from, ...rooms])] }
+}
+
+/**
  * The Unknown: which of his minis a perk's targets are being picked for. A perk any of them may
  * take (Bitter Murmur, Agitation, Beast of Prey, Starstruck) asks for the mini first, as Diversion
  * does: every mini's paths glowing at once told nobody whose each one was. Null: none picked yet.
@@ -789,7 +883,8 @@ export function perkMinis(choices: PerkChoice[]): number[] {
 }
 
 /** A perk choice made by clicking the map (a path, a prop, a survivor, a room), not a card or a button. */
-const onMap = (c: PerkChoice) => !c.card && (!!c.path || !!c.prop || c.target !== undefined || !!c.room)
+export const aimedOnMap = (c: PerkChoice) => !c.card && (!!c.path || !!c.prop || c.target !== undefined || !!c.room)
+const onMap = aimedOnMap
 
 /**
  * A perk has to be picked (armed) in the panel before its targets show: with several offered at
@@ -820,7 +915,10 @@ export function onTargetPerk(b: { w: PerkWindow; choices: PerkChoice[] }): boole
 function onTargetSpots(st: GameState, out: BoardAction[], modes: BoardModes) {
   if (perkPicked.value) return
   for (const b of perkButtons(st)) {
-    if (!onTargetPerk(b)) continue
+    // the perks that take the interaction are answered in the panel first (`interactGate`), so
+    // their targets aren't on the map until one is picked: the board used to glow with every
+    // perk's targets at once, which read as "all of this is clickable"
+    if (!onTargetPerk(b) || REPLACES_INTERACT.includes(b.perk)) continue
     const start = out.length
     perkSpots(st, out, modes, b.perk)
     for (let i = start; i < out.length; i++) out[i].perk = b.perk
@@ -838,7 +936,10 @@ export function perksToPick(st: GameState): boolean {
     // (a killer's too when its targets are the ones he interacts with anyway: All-Shaking Thunder)
     return (s.owner !== 'killer' || ARMED_KILLER_PERKS.includes(s.perk)) && perkChoices(st, s.perk, s.owner, s.w).some(onMap)
   }
-  const n = new Set(perkButtons(st).flatMap((b) => (onTargetPerk(b) ? [] : [b.perk]))).size
+  // every perk of the step, the ones asked on their target too: their card is in the panel now,
+  // so pressing it must arm it like any other. Until one is pressed the targets stay on the map
+  // (`onTargetSpots`), so the click on the target still works.
+  const n = new Set([...perkButtons(st).map((b) => b.perk), ...gatePerks(st)]).size
   return (s.t === 'turnStart' || s.t === 'survivorInteract' || s.t === 'killerInteract') && n > 0
 }
 

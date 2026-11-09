@@ -3,8 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anim, settings } from '../../settings'
 import { botAction, botTurn, botsOnly, botsWaitedOn, onlineBotMove, peopleOnBothSides } from '../bots'
-import { anyMoves, boardOf, palletOn, survivorInteractions, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, crowsCards, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
-import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext } from '../engine/types'
+import { anyMoves, boardOf, isPathCard, palletOn, survivorInteractions, survivorMoves, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, crowsCards, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import type { Die, GameState, ItemUse, LogEntry, MoveCard, PathKind, RollContext, SurvivorInteraction } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showOfferings, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
 import { fxSound } from '../fx/audio'
@@ -22,7 +22,7 @@ import { canPing, pingArmed, pingWait } from '../pings'
 import { isQuestion, timeoutActions, waitKeyOf } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { STEP_NAME, boardActionKeys, offerPerk, perkPicked, perksToPick, unknownPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
+import { STEP_NAME, boardActionKeys, interactRooms, offerPerk, perkPicked, perksToPick, plainInteract, unknownPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, cardImage, killerMini, playerOf, survivorMini } from '../labels'
 import SettingsDialog from '../../components/SettingsDialog.vue'
 import VoiceButton from './VoiceButton.vue'
@@ -293,6 +293,15 @@ const palletMode = ref<string | null>(null)
 const revealing = ref<{ s: number; props: string[] } | null>(null)
 /** Calm Spirit: the crow to send to another room. */
 const calmCrow = ref<string | null>(null)
+/** Chasing a crow: the crow, the card the bonus turn discards and where it goes, before any of it is sent. */
+const bonusAsk = ref<{ i: SurvivorInteraction; card: PathKind | null; path: string | null } | null>(null)
+/**
+ * The move a settled bonus turn is to make, kept until the engine asks for it: a perk may be
+ * offered on the card first (`cardMove`), so the move step isn't always the very next one. If a
+ * perk moved the survivor and the path no longer leads out of their room, this is dropped and
+ * they pick on the map as usual.
+ */
+const moveIntent = ref<{ s: number; card: PathKind; path: string } | null>(null)
 /** Treacherous Crows: the crow to send to a connected room. */
 const crowsCrow = ref<string | null>(null)
 /** Treacherous Crows: the killer's card to reveal, picked in the side panel. */
@@ -342,7 +351,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, crowsCrow, crowsCard, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, bonusAsk, crowsCrow, crowsCard, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
 
 watch(
   () => view.value.step,
@@ -353,6 +362,7 @@ watch(
     powerCard.value = null
     palletMode.value = null
     calmCrow.value = null
+    bonusAsk.value = null
     crowsCrow.value = null
     targetAsk.value = null
     aceFirst.value = null
@@ -361,6 +371,7 @@ watch(
     diversion.value = null
     painHook.value = null
     perkPicked.value = null
+    plainInteract.value = false
     unknownPicked.value = null
     itemPick.value = null
     forkMoves.value = null
@@ -398,6 +409,16 @@ const boardFocus = computed(() => {
     if (crowsCrow.value && s.t === 'survivorInteract')
       f.dests.push(...new Set(perkChoices(st, 'treacherous_crows', s.s, { k: 'interact', s: s.s }).flatMap((c) => (c.prop === crowsCrow.value && c.room ? [c.room] : []))))
     return f
+  }
+  // Chasing a crow: where the bonus turn could take them — every card's paths while one is being
+  // picked, the picked card's alone after — so the whole of it is weighed before any of it happens
+  if (bonusAsk.value && view.value.step.t === 'survivorInteract') {
+    const st = view.value
+    const s = (st.step as Extract<typeof st.step, { t: 'survivorInteract' }>).s
+    const card = bonusAsk.value.card
+    const cards = card ? [card] : [...new Set(st.survivorHands[st.survivors[s].hand])]
+    const ms = cards.flatMap((c) => (isPathCard(c) ? survivorMoves(st, s, c) : []))
+    return { survivors: [s], killer: false, rooms: [st.survivors[s].room], paths: ms.map((m) => m.path.id), dests: ms.map((m) => m.to) }
   }
   // Breakout: the friend being moved, and every path they could take
   if (breakoutTarget.value !== null) {
@@ -467,6 +488,14 @@ const boardFocus = computed(() => {
     const cards = undyingCard.value ? [undyingCard.value] : undyingCards(st, kind)
     const reach = cards.flatMap((c) => undyingPaths(st, c, kind))
     return { ...base, paths: reach.flatMap((r) => r.paths), dests: reach.map((r) => r.to) }
+  }
+  // The interact step's question (`interactGate`): the rooms this turn's one interaction could
+  // land in stay lit and the rest of the board dims, so the choice reads as a place. Not once a
+  // perk's first click is made (Calm Spirit's crow, a pallet, Breakout's survivor): what is being
+  // picked then is a room or a path anywhere, and dimming would point at the wrong half.
+  if (!calmCrow.value && !crowsCrow.value && !palletMode.value && breakoutTarget.value === null && diversion.value === null) {
+    const lit = interactRooms(view.value)
+    if (lit) return { survivors: [lit.s], killer: false, rooms: lit.rooms, paths: [], dests: [] }
   }
   const focus = decisionFocus(view.value, powerMode.value)?.focus ?? null
   // a perk that has to be pressed first (perksToPick): until it is, no outline of where it would go
@@ -615,6 +644,13 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: `${PERKS.calm_spirit.name}: คลิกห้องที่จะส่ง Crow ไป`, cancel: () => (calmCrow.value = null) }
+  if (bonusAsk.value) {
+    const cancel = () => (bonusAsk.value = null)
+    const what = bonusAsk.value.i.k === 'crow' ? 'ไล่ Crow' : PERKS.power_of_two.name
+    if (!bonusAsk.value.card) return { text: `${what}: เลือกการ์ดที่จะทิ้งเล่น Bonus Turn (บนมือ หรือคลิกเส้นทางสีนั้น) — ยังไม่เสีย ▲`, cancel }
+    if (!bonusAsk.value.path) return { text: `${what}: คลิกเส้นทางที่จะไปบนแผนที่ — ยังไม่เสีย ▲`, cancel }
+    return { text: `${what}: กดยืนยันในแผงด้านข้าง`, cancel }
+  }
   if (targetAsk.value) return { text: 'เลือกในแผงด้านข้าง: ใช้ Perk หรือทำตามปกติ', cancel: () => (targetAsk.value = null) }
   if (crowsCrow.value) {
     const name = PERKS.treacherous_crows.name
@@ -1138,6 +1174,29 @@ watch(timeLeft, (t) => {
   } else showBanner({ title: 'หมดเวลาแล้ว!', sub: `ทั้งห้องกำลังรอ — ${askWhat.value}`, tone: 'game' })
 })
 
+/**
+ * The move a confirmed crow bonus turn already settled: made as soon as the engine asks for it.
+ * A perk offered on the card (`cardMove`: Inner Focus, Quick & Quiet) comes first and is answered
+ * as usual; the move follows. If the path is no longer one of theirs (a perk moved them), the
+ * intent is dropped and the map asks as it would for any move.
+ */
+watch(
+  () => [props.st.step, moveIntent.value] as const,
+  () => {
+    const want = moveIntent.value
+    if (!want) return
+    const s = props.st.step
+    if (s.t !== 'survivorMove' || s.s !== want.s || s.card !== want.card) {
+      // gone past the move it was for: the bonus turn moved on without it
+      if (props.st.survivors[want.s].acted || s.t === 'survivorInteract') moveIntent.value = null
+      return
+    }
+    moveIntent.value = null
+    if (survivorMoves(props.st, want.s, want.card).some((m) => m.path.id === want.path)) dispatch({ t: 'move', path: want.path })
+  },
+  { immediate: true },
+)
+
 // ---------- terror radius ----------
 
 /** 2 = the killer is in the room, 1 = in a connected room, 0 = out of range. */
@@ -1606,6 +1665,9 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           :on-board="onBoard"
           :ask="askActions"
           @ask="targetAsk = null"
+          :bonus-ask="bonusAsk"
+          @bonus-ask="bonusAsk = $event"
+          @bonus-move="moveIntent = $event"
           :crows-crow="crowsCrow"
           :crows-card="crowsCard"
           @crows-crow="crowsCrow = $event"

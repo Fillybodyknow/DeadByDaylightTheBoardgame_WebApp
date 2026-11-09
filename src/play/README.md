@@ -425,6 +425,47 @@ Burst's paths and For the People's generator look just like an ordinary move or 
 players clicking them by habit used the perk by mistake. Usable perks glow and pulse until one is
 armed. The killer's offers still put their targets on the map at once.
 
+Every perk of the interact step has its **card in the side panel**, the ones aimed on the map
+too. They used to be one line of small text there, so a player who never clicked that particular
+target never learnt the perk could be used at all — the players asked for the card back.
+
+A perk that **takes the turn's interaction** is asked before the interaction is
+(`REPLACES_INTERACT`, `interactGate` in `boardActions.ts`). Those are the ten whose card says
+"As an interaction", "Instead of interacting" or "When you would interact": Balanced Landing,
+Calm Spirit, Kinship, No One Left Behind, Prove Thyself, Solidarity, Treacherous Crows, Weaving
+Spiders, Wicked and Windows of Opportunity. The panel opens the step with "ใช้ Perk แทนการ
+Interact ไหม?", their cards, and "ไม่ใช้ Perk — Interact ตามปกติ"; nothing on the map takes a
+click until that is answered. Pressing a card arms it and its targets appear (Wicked aims at
+nothing, so it is used at once); "ไม่ใช้ Perk" (`plainInteract`, reset with the step) lets the
+turn go on as usual, with a way back to the question under the interactions. While the question
+is open — and while a card is armed — the rooms this turn's one interaction could land in stay
+lit and the rest of the board dims (`interactRooms`, `choiceRooms` in `focus.ts`). Before this,
+interacting out of habit spent the turn and the perk with it; the perks' targets were also all on
+the map at once, which lit half the board before anything had been chosen.
+
+Ace in the Hole, Iron Maiden ("before interacting") and Botany Knowledge ("you can still interact
+this turn") leave the interaction alone, so they don't ask: their card sits in the panel and a
+click on their target still asks there (`onTargetPerk`, the perk's card beside the plain action).
+
+### Interactions that buy the killer a ▲
+
+Chasing a crow (p.12) and Power of Two give the killer 1 ▲ and the survivor a bonus turn. The
+whole of it is **settled before any of it happens** (`bonusAsk` in `boardActions.ts`): the click
+on the crow (or on the friend) sends nothing, and the panel asks for the card the bonus turn
+discards — from the hand, or by clicking a path of its colour — and then, where that colour
+leaves the room several ways, which path. Only "ยืนยัน" sends it: the interaction, the card, and
+the move. The move goes through `moveIntent` in GameScreen rather than a third press, because a
+perk may be offered on the card first (`cardMove`: Inner Focus, Quick & Quiet); if a perk moved
+the survivor and the path is no longer theirs, the intent is dropped and the map asks as usual.
+"ยกเลิก" at any point costs nothing, and the rooms the bonus turn could reach stay lit while the
+rest of the board dims.
+
+The players were paying the ▲ on the first click and only then finding out whether the bonus turn
+was worth having — and a card with no path out of the room loses the bonus turn's interaction too
+(`startSurvivorMove`), so it could buy the killer a ▲ for nothing. Those cards now show
+"เดินไม่ได้" in the hand; they can still be picked, since the rules allow it. Tutorial chapter 6
+teaches the new order.
+
 ### Bots
 
 A seat can be played by the computer (`engine/bot.ts`). Offline, the players step marks which
