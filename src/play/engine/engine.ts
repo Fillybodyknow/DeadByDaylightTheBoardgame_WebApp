@@ -1312,13 +1312,7 @@ function handle(st: GameState, a: Action) {
         log(st, k.dogCard ? `The Dog ใช้การ์ด ${CARD_NAMES[k.dogCard]} ต่อ` : `${k.name} ไม่มอบการ์ดให้ The Dog`, 'killer')
         return
       }
-      if (!k.hand.includes(a.card)) fail('card not in hand')
-      k.hand.splice(k.hand.indexOf(a.card), 1)
-      const was = k.dogCard
-      // the card given before is discarded: back in his hand at cleanup, as his other cards
-      k.dogCard = a.card
-      log(st, `${k.name} มอบ ${CARD_NAMES[a.card]} ให้ The Dog${was ? ` (ทิ้ง ${CARD_NAMES[was]} ที่มอบไว้เดิม)` : ''}`, 'killer', { ev: { k: 'dogCard', card: a.card } })
-      return
+      return giveDog(st, a.card)
     }
     case 'dogMove': {
       if (a.t !== 'dogPath') break
@@ -5567,6 +5561,16 @@ function dogBite(st: GameState, s: number) {
 }
 
 /** Treacherous Crows: the killer's set cards nobody has seen yet, one of which it reveals (her pick). */
+/** Scent of Blood: a card from his hand to The Dog; the one it had is discarded (back at cleanup). */
+function giveDog(st: GameState, card: MoveCard) {
+  const k = st.killer
+  if (!k.hand.includes(card)) fail('card not in hand')
+  k.hand.splice(k.hand.indexOf(card), 1)
+  const was = k.dogCard
+  k.dogCard = card
+  log(st, `${k.name} มอบ ${CARD_NAMES[card]} ให้ The Dog${was ? ` (ทิ้ง ${CARD_NAMES[was]} ที่มอบไว้เดิม)` : ''}`, 'killer', { ev: { k: 'dogCard', card } })
+}
+
 export function crowsCards(st: GameState): number[] {
   const k = st.killer
   if (k.plannedShown) return []
@@ -5728,9 +5732,14 @@ export function powerOptions(st: GameState): KillerInteraction[] {
     case 'knight':
       return guardOptions(st).map(({ guard, room }) => ({ k: 'guard' as const, guard, room }))
     case 'houndmaster':
-      // Scent of Blood: The Dog into his room, or left where it stands; a card for it next
+      // Scent of Blood: The Dog into his room (a card for it next, or none), or left where it stands
+      // with a new card from his hand: left there with no new card would change nothing, and
+      // still cost his interaction (a player's report, 1.39.1)
       if (!k.dogRoom) return [{ k: 'dog' }]
-      return k.dogRoom === k.room ? [{ k: 'dog', stay: true }] : [{ k: 'dog' }, { k: 'dog', stay: true }]
+      return [
+        ...(k.dogRoom === k.room ? [] : [{ k: 'dog' as const }]),
+        ...[...new Set(k.hand)].map((card) => ({ k: 'dog' as const, stay: true, card })),
+      ]
     case 'clown': {
       // either token, into his room or a connected one (moved from where it stands)
       const rooms = [k.room, ...connectedRooms(st, k.room)]
@@ -5804,8 +5813,11 @@ function usePower(st: GameState, i: KillerInteraction) {
   k.powerUsed = true
   switch (i.k) {
     case 'dog': {
-      if (i.stay && k.dogRoom) log(st, `${k.name} ใช้ กลิ่นเลือด — The Dog อยู่ที่ ${roomName(st, k.dogRoom)} ต่อ`, 'killer')
-      else {
+      if (i.stay && k.dogRoom) {
+        log(st, `${k.name} ใช้ กลิ่นเลือด — The Dog อยู่ที่ ${roomName(st, k.dogRoom)} ต่อ`, 'killer')
+        // left where it stands: the card comes with the choice (a game from before 1.39.1 asks next)
+        if (i.card) return giveDog(st, i.card)
+      } else {
         const from = k.dogRoom ?? null
         k.dogRoom = k.room
         log(st, `${k.name} ใช้ กลิ่นเลือด — วาง The Dog ที่ ${roomName(st, k.room)}`, 'killer', { ev: { k: 'dog', from, to: k.room, path: '' } })

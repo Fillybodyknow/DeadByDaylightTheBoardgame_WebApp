@@ -271,7 +271,7 @@ export function killerInteractionLabel(st: GameState, i: KillerInteraction): str
       return `${GUARD_NAMES[i.guard]} → ${roomName(st, i.room)}${st.guards?.[i.guard] ? ' (ย้าย)' : ''}`
     case 'dog': {
       const k = st.killer
-      if (i.stay && k.dogRoom) return `กลิ่นเลือด: The Dog อยู่ที่ ${roomName(st, k.dogRoom)} ต่อ แล้วมอบการ์ด`
+      if (i.stay && k.dogRoom) return `กลิ่นเลือด: The Dog อยู่ที่ ${roomName(st, k.dogRoom)} ต่อ${i.card ? ` แล้วมอบ ${CARD_NAMES[i.card]}` : ' แล้วมอบการ์ด'}`
       return `กลิ่นเลือด: ${k.dogRoom ? 'ย้าย' : 'วาง'} The Dog มาที่ ${roomName(st, k.room)} แล้วมอบการ์ด`
     }
     case 'afterpiece':

@@ -4015,14 +4015,28 @@ describe('The Houndmaster', () => {
     expect(g.killer.hand.slice().sort()).toEqual(['crouch', 'sneak', 'vault', 'wait'])
   })
 
-  it('Scent of Blood: left where it stands, or brought over; giving no card keeps its own', () => {
+  it('Scent of Blood: left where it stands with a new card, or brought over; brought over, giving no card keeps its own', () => {
     const st = hm()
     Object.assign(st.killer, { dogRoom: 'backlot', dogCard: 'crouch', hand: ['sneak', 'wait', 'vault'] })
-    expect(killerInteractions(st).filter((i) => i.k === 'dog')).toEqual([{ k: 'dog' }, { k: 'dog', stay: true }])
-    let g = apply(st, { t: 'interact', i: { k: 'dog', stay: true } })
+    // staying always comes with a new card: staying with none would change nothing
+    expect(killerInteractions(st).filter((i) => i.k === 'dog')).toEqual([
+      { k: 'dog' },
+      { k: 'dog', stay: true, card: 'sneak' },
+      { k: 'dog', stay: true, card: 'wait' },
+      { k: 'dog', stay: true, card: 'vault' },
+    ])
+    let g = apply(st, { t: 'interact', i: { k: 'dog', stay: true, card: 'wait' } })
     expect(g.killer.dogRoom).toBe('backlot')
-    g = apply(g, { t: 'dogCard', card: null })
+    expect(g.killer.dogCard).toBe('wait')
+    expect(g.killer.hand.slice().sort()).toEqual(['sneak', 'vault'])
+    expect(g.step.t).not.toBe('dogCard')
+    // brought over: then no card keeps its own
+    g = apply(apply(st, { t: 'interact', i: { k: 'dog' } }), { t: 'dogCard', card: null })
     expect(g.killer.dogCard).toBe('crouch')
+    // with The Dog in his room already, staying (with a card) is the only way
+    const here = structuredClone(st)
+    here.killer.dogRoom = here.killer.room
+    expect(killerInteractions(here).filter((i) => i.k === 'dog').every((i) => i.k === 'dog' && i.stay && i.card)).toBe(true)
     // replaced: the old card is discarded (back at cleanup), the new one leaves his hand
     g = apply(apply(st, { t: 'interact', i: { k: 'dog' } }), { t: 'dogCard', card: 'vault' })
     expect(g.killer.dogRoom).toBe('shack')

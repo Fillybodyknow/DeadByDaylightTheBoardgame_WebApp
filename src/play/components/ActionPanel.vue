@@ -96,6 +96,8 @@ const props = defineProps<{
   /** Treacherous Crows: the crow picked on the map, and the killer's card picked here. */
   crowsCrow?: string | null
   crowsCard?: number | null
+  /** Scent of Blood: The Dog left where it stands, its new card being picked here. */
+  dogStay?: boolean
   /** A target clicked on the map that a perk may use: its actions, the perks' and the plain one. */
   ask?: BoardAction[]
 }>()
@@ -121,6 +123,7 @@ const emit = defineEmits<{
   bonusMove: [move: { s: number; card: PathKind; path: string } | null]
   crowsCrow: [crow: string | null]
   crowsCard: [index: number | null]
+  dogStay: [on: boolean]
   /** The target's question answered or put back. */
   ask: []
 }>()
@@ -551,15 +554,20 @@ watch(
   () => JSON.stringify(step.value),
   () => (dogPick.value = null),
 )
+/** The Dog left where it stands: its card is picked before the power is used, so going back costs nothing. */
+const dogStaying = computed(() => !!props.dogStay && step.value.t === 'killerInteract')
+watch(dogStaying, () => (dogPick.value = null))
 const dogHand = computed<HandCard[]>(() =>
-  step.value.t === 'dogCard' ? [...new Set(props.st.killer.hand)].map((card) => ({ card, picked: dogPick.value === card, ...(dogPick.value === card ? { badge: 'The Dog' } : {}) })) : [],
+  step.value.t === 'dogCard' || dogStaying.value ? [...new Set(props.st.killer.hand)].map((card) => ({ card, picked: dogPick.value === card, ...(dogPick.value === card ? { badge: 'The Dog' } : {}) })) : [],
 )
 function pickDog(card: MoveCard) {
   sfx.click()
   dogPick.value = dogPick.value === card ? null : card
 }
 function confirmDog() {
-  if (dogPick.value) act({ t: 'dogCard', card: dogPick.value })
+  if (!dogPick.value) return
+  if (dogStaying.value) act({ t: 'interact', i: { k: 'dog', stay: true, card: dogPick.value } })
+  else act({ t: 'dogCard', card: dogPick.value })
 }
 /** What The Dog would do with a card at the start of his first turn, from where it stands now. */
 function dogWhere(card: MoveCard): string {
@@ -674,8 +682,8 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     </template>
 
     <!-- The Houndmaster's Scent of Blood, step 2: the card The Dog runs with -->
-    <template v-else-if="step.t === 'dogCard'">
-      <p><Mini class="token-inline" :src="asset(DOG_MINI)" alt="" /> <b>กลิ่นเลือด</b> — มอบการ์ดเคลื่อนที่ 1 ใบจากมือให้ The Dog</p>
+    <template v-else-if="step.t === 'dogCard' || dogStaying">
+      <p><Mini class="token-inline" :src="asset(DOG_MINI)" alt="" /> <b>กลิ่นเลือด</b> — {{ dogStaying ? `The Dog อยู่ที่ ${roomName(st, st.killer.dogRoom!)} ต่อ: มอบการ์ดใบใหม่ 1 ใบจากมือ` : 'มอบการ์ดเคลื่อนที่ 1 ใบจากมือให้ The Dog' }}</p>
       <p class="small">
         ทุกรอบ ตอนเริ่มเทิร์นแรกของคุณ The Dog จะวิ่งตามการ์ดนี้ (ข้าม Pallet กำแพง และย้อนเส้นทางทางเดียวได้) แล้ว<b>ขย้ำ</b>ผู้รอดชีวิตที่ไม่บาดเจ็บในห้องที่ไปถึง 1 คน — คนนั้นยังถูกอุ้มได้ในรอบเดียวกัน
       </p>
@@ -684,7 +692,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p v-if="dogPick" class="small">{{ CARD_NAMES[dogPick] }}: {{ dogWhere(dogPick) }}</p>
       <div class="buttons col way-on">
         <button class="primary" :disabled="!dogPick" @click="confirmDog">{{ dogPick ? `ยืนยัน: มอบ ${CARD_NAMES[dogPick]} ให้ The Dog` : 'เลือกการ์ดจากมือก่อน' }}</button>
-        <button @click="act({ t: 'dogCard', card: null })">{{ st.killer.dogCard ? `ไม่มอบ — The Dog ใช้ ${CARD_NAMES[st.killer.dogCard]} ต่อ` : 'ไม่มอบการ์ด (The Dog ไม่วิ่ง)' }}</button>
+        <!-- staying with no new card would change nothing: it goes back, nothing used -->
+        <button v-if="dogStaying" @click="emit('dogStay', false)">ยกเลิก — กลับไปเลือกใหม่</button>
+        <button v-else @click="act({ t: 'dogCard', card: null })">{{ st.killer.dogCard ? `ไม่มอบ — The Dog ใช้ ${CARD_NAMES[st.killer.dogCard]} ต่อ` : 'ไม่มอบการ์ด (The Dog ไม่วิ่ง)' }}</button>
       </div>
       <CardHand :cards="dogHand" :label="`กลิ่นเลือด — มือของ ${st.killer.name}`" prompt="กลิ่นเลือด — เลือกการ์ดให้ The Dog" @pick="pickDog" />
     </template>
@@ -1063,6 +1073,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
               <img :src="asset(DOG_MINI)" alt="" /><span><b>{{ st.killer.dogRoom ? 'ย้าย' : 'วาง' }} The Dog มาที่ {{ roomName(st, st.killer.room) }}</b> — คลิกห้องของคุณ (หรือตัวคุณ) บนแผนที่</span>
             </li>
             <li v-if="st.killer.dogRoom && kInteractions.powers.some((i) => i.k === 'dog' && i.stay)">
+              <!-- (its card is then picked from the hand; "ยกเลิก" there goes back with nothing used) -->
               <img :src="asset(DOG_MINI)" alt="" /><span><b>ให้ The Dog อยู่ที่ {{ roomName(st, st.killer.dogRoom) }}</b> — คลิกตัว The Dog{{ st.killer.dogRoom === st.killer.room ? ' หรือห้องของคุณ' : '' }} บนแผนที่ (มอบการ์ดใหม่ได้)</span>
             </li>
           </ul>
@@ -1090,7 +1101,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             <li><img :src="asset(ANTIDOTE_IMAGE)" alt="" /><span><b>Antidote</b> — ใครเข้าห้องนั้นเดินต่อได้อีก 1 ทาง · {{ st.afterpiece?.antidote ? `อยู่ที่ ${roomName(st, st.afterpiece.antidote)}` : 'ยังไม่วาง' }}</span></li>
           </ul>
           <div class="buttons">
-            <button v-for="(i, n) in kInteractions.powers.filter((i) => here(powerAct(i)))" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
+            <button v-for="(i, n) in kInteractions.powers.filter((i) => here(powerAct(i)) && !(i.k === 'dog' && i.stay))" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
           </div>
         </template>
         <button v-if="!step.powerOnly" @click="emit('trapPath', null), emit('powerCard', null), emit('powerOn', false)">ยกเลิก ไม่ใช้พลัง</button>

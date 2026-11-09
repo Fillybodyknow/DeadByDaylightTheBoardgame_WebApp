@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.39.1',
+    date: '2026-11-09',
+    items: [
+      'กลิ่นเลือด (The Houndmaster): ให้ The Dog อยู่ที่เดิมต้องมอบการ์ดใบใหม่ เลือกการ์ดก่อนแล้วค่อยใช้พลัง กด "ยกเลิก" กลับไปเลือกใหม่ได้โดยไม่เสีย Interact',
+    ],
+  },
+  {
     version: '1.39.0',
     date: '2026-11-09',
     items: [

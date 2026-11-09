@@ -306,6 +306,9 @@ const moveIntent = ref<{ s: number; card: PathKind; path: string } | null>(null)
 const crowsCrow = ref<string | null>(null)
 /** Treacherous Crows: the killer's card to reveal, picked in the side panel. */
 const crowsCard = ref<number | null>(null)
+/** Scent of Blood: The Dog left where it stands, its new card being picked from the hand. */
+const dogStay = ref(false)
+watch(powerOn, () => (dogStay.value = false))
 watch(crowsCrow, () => (crowsCard.value = null))
 /** Ace in the Hole: the prop in Ace's room, waiting for the one to swap with. */
 const aceFirst = ref<string | null>(null)
@@ -351,7 +354,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, bonusAsk, crowsCrow, crowsCard, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, bonusAsk, crowsCrow, crowsCard, dogStay, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
 
 watch(
   () => view.value.step,
@@ -364,6 +367,7 @@ watch(
     calmCrow.value = null
     bonusAsk.value = null
     crowsCrow.value = null
+    dogStay.value = false
     targetAsk.value = null
     aceFirst.value = null
     fogwiseFrom.value = null
@@ -652,6 +656,7 @@ const modeBar = computed(() => {
     return { text: `${what}: กดยืนยันในแผงด้านข้าง`, cancel }
   }
   if (targetAsk.value) return { text: 'เลือกในแผงด้านข้าง: ใช้ Perk หรือทำตามปกติ', cancel: () => (targetAsk.value = null) }
+  if (dogStay.value) return { text: 'กลิ่นเลือด: เลือกการ์ดใหม่ให้ The Dog จากมือ', cancel: () => (dogStay.value = false) }
   if (crowsCrow.value) {
     const name = PERKS.treacherous_crows.name
     const cancel = () => (crowsCrow.value = null)
@@ -1668,6 +1673,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           :bonus-ask="bonusAsk"
           @bonus-ask="bonusAsk = $event"
           @bonus-move="moveIntent = $event"
+          :dog-stay="dogStay"
+          @dog-stay="dogStay = $event"
           :crows-crow="crowsCrow"
           :crows-card="crowsCard"
           @crows-crow="crowsCrow = $event"

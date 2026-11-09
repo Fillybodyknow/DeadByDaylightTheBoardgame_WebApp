@@ -304,7 +304,8 @@ export type KillerInteraction =
   /** The Knight: a Guard into his room or a connected one (moved if it is out already). */
   | { k: 'guard'; guard: Guard; room: string }
   /** The Houndmaster's Scent of Blood: The Dog into his room, or (`stay`) left where it is; a card for it next. */
-  | { k: 'dog'; stay?: boolean }
+  /** `stay`: left where it stands, with `card` the one given it (staying with no new card would change nothing) */
+  | { k: 'dog'; stay?: boolean; card?: MoveCard }
   /** The Oni: ▲ for each wounded survivor and Hex Totem in his room and connected rooms. */
   | { k: 'wrath' }
   /** The Deathslinger: secretly discard `card`; `target` guesses it or is reeled in. */

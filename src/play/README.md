@@ -927,6 +927,11 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
     his room, or leaves it where it stands; then he may give it one movement card from what is
     left in his hand, or none (it keeps its own). On the map: his room or his mini places it, The
     Dog's mini leaves it; the card is picked from his hand, the panel saying where it would run.
+    Left where it stands, it must get a new card (since 1.39.1, a player's report): staying with
+    none changes nothing and would still cost his interaction. So that card is picked before the
+    power is used (`{ k: 'dog', stay, card }`), and going back from there costs nothing. Brought
+    over, giving no card is still allowed (it did something: it moved). Already in his room,
+    staying is the only way, and his room or his mini do it too.
   - The card given stays with The Dog, face up for everyone, and out of his hand: at cleanup his
     hand comes back without it. A card given in its place discards the old one, which is back in
     his hand at the next cleanup as his other cards.

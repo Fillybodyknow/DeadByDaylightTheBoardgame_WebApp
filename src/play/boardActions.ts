@@ -88,6 +88,8 @@ export interface BoardModes {
   crowsCrow: Ref<string | null>
   /** Treacherous Crows: which of the killer's cards to reveal (picked in the side panel). */
   crowsCard: Ref<number | null>
+  /** Scent of Blood: The Dog left where it stands, its new card being picked from the hand. */
+  dogStay?: Ref<boolean>
   /** Ace in the Hole: the prop in Ace's room picked first. */
   aceFirst: Ref<string | null>
   /** Fogwise: the path whose wall or pallet was picked, waiting for the path it goes to. */
@@ -609,6 +611,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
 
     case 'killerInteract': {
       if (!s.canInteract) break
+      // Scent of Blood, The Dog staying: its card is picked from the hand, nothing on the map
+      if (modes.dogStay?.value) break
       // Undying / Yamaoka's Haunting, step by step: the card (from the hand, or a path of its
       // colour on the map), the room it reaches (a fork asks which, as any move does), the target.
       const kind = stepKind(st, modes)
@@ -680,13 +684,16 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             break
           case 'dog':
             // Scent of Blood: The Dog into his room (his room or his mini), or left where it is (The
-            // Dog). Already in his room, staying is the only way: his room and his mini do it too.
-            // One click does it (no chooser: there is only one thing to do there).
+            // Dog), its new card then picked from the hand (one spot for all of them). Already in
+            // his room, staying is the only way: his room and his mini do it too.
             if (i.stay) {
-              add('dog', label, run)
+              if (out.some((a) => a.key === 'dog')) break
+              const pick = () => ((modes.dogStay!.value = true), sfx.click())
+              const stay = `กลิ่นเลือด: The Dog อยู่ที่เดิม (แล้วเลือกการ์ดใหม่จากมือ)`
+              add('dog', stay, pick)
               if (st.killer.dogRoom === st.killer.room) {
-                add(`room:${st.killer.room}`, label, run)
-                add('killer', label, run)
+                add(`room:${st.killer.room}`, stay, pick)
+                add('killer', stay, pick)
               }
             } else {
               add(`room:${st.killer.room}`, label, run)
