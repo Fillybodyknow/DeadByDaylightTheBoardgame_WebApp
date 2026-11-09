@@ -2,8 +2,12 @@
 // One character's perk loadout before a trial (Bloodweb, Devout — p.19), laid out like the PC
 // game's: the 3 perk slots on top, the perks to choose from below as diamonds, and a details box
 // when pointing at one. A click on a slot picks which slot changes; a click on a perk below puts it
-// there. The icon is cut from the middle of the perk card (as `PerkDiamonds` does in the game).
-// A killer's Power and Passive cards sit under his name, since his perks are picked around them.
+// there. The icon is the diamond cut from the perk card beforehand (`perkIcon`, `perk-icons/`).
+// A row on top as the PC game's: a killer's Power and Passive, and the offering slot (online, `offering`)
+// — a click on it turns the store below into the side's offerings.
+//   `bare`: inside the online room's panel, whose corner button confirms: no name on top, and no
+//   confirm button below (only the way back, once confirmed). `readonly`: Adept, the printed perks
+//   as they are (the store is the offerings' only).
 import { computed, ref, watch } from 'vue'
 import BpIcon from '../../components/BpIcon.vue'
 import BpText from '../../components/BpText.vue'
@@ -14,9 +18,12 @@ import { sfx } from '../../sound'
 import { fxSound } from '../fx/audio'
 import { ownPerk, printedOf, type GameMode, type Side } from '../engine/loadout'
 import { PERKS, type PerkId } from '../engine/perks'
-import { perkImage, perkText } from '../labels'
+import { offeringIcon, perkIcon, perkText, perkTone, powerIcon } from '../labels'
 import Mini from './Mini.vue'
+import PcTip from './PcTip.vue'
 import PerkRichText from '../../components/PerkRichText.vue'
+import { offerings as OFFERING_CARDS } from '../../data'
+import { offeringName, offeringsOf, type OfferingId } from '../engine/offerings'
 
 const props = defineProps<{
   side: Side
@@ -31,9 +38,47 @@ const props = defineProps<{
   confirmed: boolean
   /** The player's own name, for whose loadout this is ("ผู้เล่น 2"). */
   who?: string
+  bare?: boolean
+  readonly?: boolean
+  /**
+   * The side's offerings, when the room burns any for it: picked here (`slots`, what is `picked`),
+   * or only shown (`note`: drawn, or the other side's turn).
+   */
+  offering?: { side: Side; slots: number; picked: OfferingId[]; problem: string; confirmed: boolean; note?: string } | null
 }>()
 const loadout = defineModel<PerkId[]>({ required: true })
-const emit = defineEmits<{ confirm: [on: boolean] }>()
+const emit = defineEmits<{ confirm: [on: boolean]; offerings: [list: OfferingId[]]; confirmOfferings: [on: boolean] }>()
+
+// ---------- the store below: the perks, or (from the offering slot) the side's offerings ----------
+
+const shelf = ref<'perks' | 'offerings'>(props.readonly && props.offering ? 'offerings' : 'perks')
+function openOfferings() {
+  if (!props.offering) return
+  sfx.click()
+  shelf.value = 'offerings'
+}
+const offeringCards = computed(() =>
+  props.offering
+    ? offeringsOf(props.offering.side).map((id) => {
+        const c = OFFERING_CARDS.find((x) => x.id === id)!
+        return { id, name: offeringName(id), en: c.name, icon: offeringIcon(c.image.en), text: c.text.th, flavor: c.flavor.th }
+      })
+    : [],
+)
+/** Burn this offering, or put it back (one slot: a click swaps it; more: the oldest goes when full). */
+function toggleOffering(id: OfferingId) {
+  const o = props.offering
+  if (!o || o.confirmed || o.note) return
+  sfx.select()
+  emit('offerings', o.picked.includes(id) ? o.picked.filter((x) => x !== id) : [...o.picked, id].slice(-o.slots))
+}
+const offeringTip = ref<{ id: OfferingId; x: number; y: number } | null>(null)
+const tipCard = computed(() => offeringCards.value.find((c) => c.id === offeringTip.value?.id) ?? null)
+function pointOffering(id: OfferingId, e: MouseEvent | FocusEvent) {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const x = r.right + 460 > window.innerWidth ? r.left - 452 : r.right + 12
+  offeringTip.value = { id, x: Math.max(8, x), y: Math.min(r.top, window.innerHeight - 300) }
+}
 
 const character = computed(() => (props.side === 'killer' ? killerById.get(props.characterId) : survivorById.get(props.characterId)))
 const printed = computed(() => printedOf(props.characterId))
@@ -46,7 +91,8 @@ watch(
 )
 
 function pickSlot(i: number) {
-  if (props.confirmed) return
+  shelf.value = 'perks'
+  if (props.confirmed || props.readonly) return
   sfx.click()
   slot.value = i
 }
@@ -129,15 +175,18 @@ function point(p: PerkId, e: MouseEvent | FocusEvent) {
 }
 // ---------- the killer's Power and Passive ----------
 
-/** His Power and Passive cards (Thai, as in the game), to see while picking perks. */
+/**
+ * His Power and Passive cards (Thai, as in the game), to see while picking perks: the power as its
+ * icon (the PC game's slot), the passive as a small card; pointing at either shows the whole card.
+ */
 const kit = computed(() => {
   if (props.side !== 'killer') return []
   const k = killerById.get(props.characterId)
   if (!k) return []
   return [
-    { label: 'POWER', name: thaiName(k.power.name) ?? k.power.name, src: k.power.image?.th ?? k.power.image?.en },
-    { label: 'PASSIVE', name: 'Passive', src: k.passiveImage?.th ?? k.passiveImage?.en },
-  ].filter((c): c is { label: string; name: string; src: string } => !!c.src)
+    { label: 'POWER', name: thaiName(k.power.name) ?? k.power.name, src: k.power.image?.th ?? k.power.image?.en, thumb: powerIcon(k.id), icon: true },
+    { label: 'PASSIVE', name: 'Passive', src: k.passiveImage?.th ?? k.passiveImage?.en, thumb: k.passiveImage?.th ?? k.passiveImage?.en, icon: false },
+  ].filter((c): c is { label: string; name: string; src: string; thumb: string; icon: boolean } => !!c.src && !!c.thumb)
 })
 /** The card pointed at, shown big under it (the cards are kept small to leave room for the perks). */
 const kitTip = ref<{ src: string; x: number; y: number } | null>(null)
@@ -155,14 +204,14 @@ function zoomKit(src: string) {
 }
 
 const face = (p: PerkId) => {
-  const img = perkImage(p)
+  const img = perkIcon(p)
   return img ? { backgroundImage: `url(${asset(img)})` } : {}
 }
 </script>
 
 <template>
   <div class="loadout" :class="[side, { done: confirmed }]">
-    <header class="head">
+    <header v-if="!bare" class="head">
       <Mini v-if="character" class="mini" :class="side === 'killer' ? 'aura-killer' : 'aura-survivor'" :src="asset(character.images.mini)" />
       <div>
         <strong>{{ character?.name }}</strong>
@@ -170,22 +219,43 @@ const face = (p: PerkId) => {
       </div>
     </header>
 
-    <!-- the killer's Power and Passive, under his name: his perks are picked around them -->
-    <div v-if="kit.length" class="kit">
-      <button
-        v-for="c in kit"
-        :key="c.label"
-        type="button"
-        class="kit-card"
-        :title="`${c.name} — คลิกเพื่อขยาย`"
-        @click="zoomKit(c.src)"
-        @mouseenter="pointKit(c.src, $event)"
-        @focus="pointKit(c.src, $event)"
-        @mouseleave="kitTip = null"
-        @blur="kitTip = null"
-      >
-        <img :src="asset(c.src)" :alt="c.name" draggable="false" />
-      </button>
+    <!-- the row on top, as the PC game's: the killer's Power and Passive, then the offering slot -->
+    <div v-if="kit.length || offering" class="kit">
+      <div v-for="c in kit" :key="c.label" class="kit-col">
+        <span class="kit-label">{{ c.icon ? 'พลัง' : 'Passive' }}</span>
+        <button
+          type="button"
+          class="kit-card"
+          :title="`${c.name} — คลิกเพื่อขยาย`"
+          @click="zoomKit(c.src)"
+          @mouseenter="pointKit(c.src, $event)"
+          @focus="pointKit(c.src, $event)"
+          @mouseleave="kitTip = null"
+          @blur="kitTip = null"
+        >
+          <img :class="{ icon: c.icon }" :src="asset(c.thumb)" :alt="c.name" draggable="false" />
+        </button>
+      </div>
+      <span v-if="kit.length && offering" class="kit-sep" aria-hidden="true" />
+      <div v-if="offering" class="kit-col">
+        <span class="kit-label">เครื่องเซ่น</span>
+        <div class="hex-row">
+          <button
+            v-for="n in Math.max(1, offering.slots)"
+            :key="n"
+            type="button"
+            class="hex slot-hex"
+            :class="{ on: shelf === 'offerings', empty: !offering.picked[n - 1] }"
+            :title="offering.note || 'เลือกเครื่องเซ่น'"
+            @click="openOfferings"
+            @mouseenter="offering.picked[n - 1] && pointOffering(offering.picked[n - 1], $event)"
+            @mouseleave="offeringTip = null"
+          >
+            <img v-if="offering.picked[n - 1]" :src="asset(offeringIcon(OFFERING_CARDS.find((x) => x.id === offering!.picked[n - 1])!.image.en))" alt="" />
+            <span v-else class="hex-plus">{{ offering.note ? '?' : '+' }}</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- the three perks played: a click picks which one changes -->
@@ -216,10 +286,42 @@ const face = (p: PerkId) => {
         <span v-if="!printed.includes(p)" class="slot-sub">วางทับ Perk บนกระดาน</span>
       </div>
     </div>
-    <button v-if="!confirmed" type="button" class="reset" @click="reset">↺ Perk เดิม</button>
-    <p v-if="!confirmed" class="hint muted">คลิกช่องด้านบนเพื่อเลือกช่องที่จะเปลี่ยน (กรอบทอง) แล้วคลิก Perk ด้านล่างเพื่อใส่</p>
+    <button v-if="!confirmed && !readonly" type="button" class="reset" @click="reset">↺ Perk เดิม</button>
+    <p v-if="!confirmed && !readonly" class="hint muted">คลิกช่องด้านบนเพื่อเลือกช่องที่จะเปลี่ยน (กรอบทอง) แล้วคลิก Perk ด้านล่างเพื่อใส่</p>
+    <p v-if="readonly" class="hint muted">Adept: ใช้ Perk ที่พิมพ์บนกระดาน เปลี่ยนไม่ได้</p>
+    <p v-if="bare && confirmed && !readonly && shelf === 'perks'" class="hint muted">🔒 ยืนยัน Perk แล้ว — แก้ได้ที่ปุ่ม “✎ แก้ Perk” ข้างปุ่มมุมขวาล่าง</p>
+
+    <!-- the side's offerings, from the offering slot: their hexagons, a click burns one -->
+    <template v-if="shelf === 'offerings' && offering">
+      <div class="store-head">
+        <p class="label">คลังเครื่องเซ่น <small class="muted">({{ offering.picked.length }}/{{ offering.slots }})</small></p>
+        <button type="button" class="back-perks" @click="shelf = 'perks'">← คลัง PERKS</button>
+      </div>
+      <p v-if="offering.note" class="hint muted">{{ offering.note }}</p>
+      <div v-else class="hex-store">
+        <button
+          v-for="c in offeringCards"
+          :key="c.id"
+          type="button"
+          class="hex"
+          :class="{ in: offering.picked.includes(c.id) }"
+          :disabled="offering.confirmed"
+          :aria-label="c.name"
+          @click="toggleOffering(c.id)"
+          @mouseenter="pointOffering(c.id, $event)"
+          @focus="pointOffering(c.id, $event)"
+          @mouseleave="offeringTip = null"
+          @blur="offeringTip = null"
+        >
+          <img :src="asset(c.icon)" alt="" />
+        </button>
+      </div>
+      <p v-if="offering.problem && !offering.confirmed && !offering.note" class="hint muted">{{ offering.problem }} — เผาตอนเริ่มเกม ทุกคนเห็นเมื่อเกมเริ่ม (หน้า 19)</p>
+      <p v-if="offering.confirmed && !offering.note" class="hint muted">🔒 ยืนยันเครื่องเซ่นแล้ว — แก้ได้ที่ปุ่ม “✎ แก้เครื่องเซ่น” ข้างปุ่มมุมขวาล่าง</p>
+    </template>
 
     <!-- what may be picked -->
+    <template v-else-if="!readonly">
     <div class="store-head">
       <p class="label">คลัง PERKS <small class="muted">({{ list.length }})</small></p>
       <input v-if="choices.length > PAGE" v-model="query" class="search" type="search" placeholder="ค้นหา Perk / ตัวละคร / คำในการ์ด" />
@@ -259,7 +361,9 @@ const face = (p: PerkId) => {
       <span class="muted">หน้า {{ page + 1 }}/{{ pages }}</span>
     </div>
 
-    <footer class="foot">
+    </template>
+
+    <footer v-if="!bare" class="foot">
       <p v-if="problem && !confirmed" class="problem">{{ problem }}</p>
       <button type="button" class="confirm" :class="{ primary: !confirmed }" :disabled="!confirmed && !!problem" @click="emit('confirm', !confirmed)">
         {{ confirmed ? '🔒 ยืนยันแล้ว (กดเพื่อแก้)' : '✓ ยืนยัน Perk' }}
@@ -273,29 +377,24 @@ const face = (p: PerkId) => {
     <div v-if="zoomed" class="kit-zoom" role="dialog" aria-modal="true" @click="zoomed = null">
       <img :src="asset(zoomed)" alt="" />
     </div>
-    <div v-if="tip" class="perk-tip" :class="[kind(tip.p), side]" :style="{ left: `${tip.x}px`, top: `${tip.y}px` }" role="tooltip">
-      <div class="tip-title">{{ PERKS[tip.p].name }}<small v-if="PERKS[tip.p].en !== PERKS[tip.p].name" class="en">{{ PERKS[tip.p].en }}</small></div>
-      <div class="tip-band">
-        <span>{{ ownerName(tip.p) }}</span>
-        <span>{{ KIND_TH[kind(tip.p)] }} · <BpText :text="PERKS[tip.p].cost ? `${PERKS[tip.p].cost} ▲` : 'ฟรี'" /></span>
-      </div>
+    <PcTip v-if="tip" :x="tip.x" :y="tip.y" :title="PERKS[tip.p].name" :en="PERKS[tip.p].en" :tone="perkTone(tip.p)">
+      <template #left>{{ ownerName(tip.p) }}</template>
+      <template #right>{{ KIND_TH[kind(tip.p)] }} · <BpText :text="PERKS[tip.p].cost ? `${PERKS[tip.p].cost} ▲` : 'ฟรี'" /></template>
       <p class="tip-text"><PerkRichText :text="perkText(tip.p)" /></p>
       <p class="tip-when">{{ PERKS[tip.p].when }}</p>
       <p v-if="taken.includes(tip.p)" class="tip-taken">การ์ดใบนี้มีคนใช้แล้ว — การ์ดมีใบเดียว</p>
       <p v-else-if="!printed.includes(tip.p) && loadout.includes(tip.p)" class="tip-laid">วางทับ Perk บนกระดาน</p>
-    </div>
+    </PcTip>
+    <PcTip v-if="offeringTip && tipCard" :x="offeringTip.x" :y="offeringTip.y" :title="tipCard.name" :en="tipCard.en" tone="offering">
+      <template #left>เครื่องเซ่น{{ offering?.side === 'killer' ? 'ฝั่งฆาตกร' : 'ฝั่งผู้รอดชีวิต' }}</template>
+      <template #right>เผาตอนเริ่มเกม</template>
+      <p class="tip-text"><BpText :text="tipCard.text.replaceAll('{BP}', '▲')" /></p>
+      <p class="tip-flavor">“{{ tipCard.flavor }}”</p>
+    </PcTip>
   </Teleport>
 </template>
 
 <style scoped>
-/* the English name beside the Thai one, as on the English cards */
-.en {
-  margin-left: 0.4em;
-  font-size: 0.72em;
-  font-weight: 500;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-}
 .loadout {
   --frame-own: linear-gradient(135deg, #e7d4ff, #7a4fc4);
   --frame-shared: linear-gradient(135deg, #d9f7a8, #4f7d1e);
@@ -328,13 +427,112 @@ const face = (p: PerkId) => {
   display: flex;
   flex-direction: column;
 }
-/* the killer's Power and Passive cards: a row of their own between the header and the perks */
+/* the row on top, as the PC game's: พลัง, Passive | เครื่องเซ่น */
 .kit {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.8rem;
+  align-items: flex-start;
+  gap: 1.4rem;
   margin-top: 0.3rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.14);
+}
+.kit-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.kit-label {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: #e3dcdc;
+}
+.kit-sep {
+  align-self: stretch;
+  width: 1px;
+  background: rgb(255 255 255 / 0.16);
+}
+.hex-row {
+  display: flex;
+  gap: 0.6rem;
+}
+/* an offering: its hexagon, as cut from the card */
+.hex {
+  position: relative;
+  width: 84px;
+  height: 94px;
+  padding: 0;
+  border: none;
+  background: none;
+  clip-path: polygon(50% 0, 100% 21%, 100% 79%, 50% 100%, 0 79%, 0 21%);
+  transition:
+    transform 0.15s,
+    filter 0.15s;
+}
+.hex img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hex:hover:not(:disabled),
+.hex:focus-visible {
+  transform: scale(1.08);
+  filter: brightness(1.2);
+}
+/* the slot: empty, a dark hexagon with a + (as the PC game's) */
+.slot-hex {
+  width: 88px;
+  height: 99px;
+  background: rgb(0 0 0 / 0.45);
+}
+.slot-hex.empty {
+  background: rgb(190 190 200 / 0.45);
+}
+.slot-hex.empty::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  clip-path: polygon(50% 0, 100% 21%, 100% 79%, 50% 100%, 0 79%, 0 21%);
+  background: rgb(18 18 22 / 0.92);
+}
+.hex-plus {
+  position: relative;
+}
+.slot-hex.on {
+  filter: drop-shadow(0 0 0 #fff) brightness(1.15);
+  outline: 2px solid #fff;
+}
+.hex-plus {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  font-size: 2rem;
+  color: rgb(255 255 255 / 0.55);
+}
+.hex-store {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 0.6rem 0.4rem;
+}
+/* burnt already: lit with a white edge */
+.hex.in {
+  filter: drop-shadow(0 0 8px rgb(255 255 255 / 0.65)) brightness(1.1);
+}
+.hex:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.hex.in:disabled {
+  opacity: 1;
+}
+.back-perks,
+.unlock {
+  align-self: flex-start;
+  font-size: 0.85rem;
+}
+.unlock {
+  align-self: center;
 }
 .kit-card {
   padding: 0;
@@ -354,8 +552,12 @@ const face = (p: PerkId) => {
 }
 .kit-card img {
   display: block;
-  height: 132px;
+  height: 88px;
   width: auto;
+}
+/* the power's icon: square, as the PC game's power slot */
+.kit-card img.icon {
+  width: 88px;
 }
 .head strong {
   font-family: var(--font-display);
@@ -382,23 +584,18 @@ const face = (p: PerkId) => {
   height: var(--d);
   padding: 0;
   border: none;
-  background: var(--frame-shared);
+  background: none;
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
   transition:
     transform 0.15s,
     filter 0.15s;
 }
-.dia.own {
-  background: var(--frame-own);
-}
-.dia.card {
-  background: var(--frame-card);
-}
+
 .dia.big {
   --d: 128px;
 }
 .dia.big .face {
-  inset: 7px;
+  inset: 0;
 }
 .dia:hover:not(:disabled),
 .dia:focus-visible {
@@ -406,15 +603,11 @@ const face = (p: PerkId) => {
   transform: scale(1.12);
   filter: brightness(1.15);
 }
-/* the icon: the diamond printed on the card, cut out and centred */
+/* the icon: the diamond cut from the card, its own frame in the card's colour (purple, green, gold) */
 .face {
   position: absolute;
-  /* a thick frame: its colour says printed on the board (purple, green) or a card (gold) */
-  inset: 5px;
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-  background-color: #222;
-  background-size: 230% auto;
-  background-position: 50% 14%;
+  inset: 0;
+  background-size: 100% 100%;
   background-repeat: no-repeat;
 }
 /* a slot: its diamond, the perk's name under it */
@@ -680,64 +873,6 @@ const face = (p: PerkId) => {
   box-shadow: 0 14px 40px rgb(0 0 0 / 0.75);
 }
 
-/* ---------- the box pointed at ---------- */
-.perk-tip {
-  position: fixed;
-  z-index: 80;
-  width: 420px;
-  pointer-events: none;
-  background: rgb(10 10 14 / 0.97);
-  border: 1px solid rgb(255 255 255 / 0.15);
-  box-shadow: 0 14px 40px rgb(0 0 0 / 0.7);
-}
-.tip-title {
-  padding: 0.7rem 1rem 0.45rem;
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  color: #fff;
-  border-bottom: 1px solid rgb(255 255 255 / 0.15);
-}
-/* the coloured band under the name: the perk's colour, owner on the left */
-.tip-band {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.35rem 1rem;
-  font-size: 0.95rem;
-  color: #fff;
-  background: linear-gradient(90deg, #6b3fa0, #4a2a72);
-}
-.perk-tip.shared .tip-band {
-  background: linear-gradient(90deg, #4f7d1e, #33531a);
-}
-.perk-tip.card .tip-band {
-  background: linear-gradient(90deg, #a8781c, #6e4d10);
-}
-.tip-text {
-  margin: 0;
-  padding: 0.75rem 1rem 0.4rem;
-  font-size: 1.08rem;
-  line-height: 1.6;
-  color: #eee;
-}
-.tip-when {
-  margin: 0;
-  padding: 0 1rem 0.75rem;
-  font-size: 0.9rem;
-  color: var(--muted);
-}
-.tip-taken,
-.tip-laid {
-  margin: 0;
-  padding: 0.4rem 1rem 0.65rem;
-  font-size: 0.92rem;
-}
-.tip-taken {
-  color: var(--blood-bright);
-}
-.tip-laid {
-  color: #ffe7a6;
-}
 @media (prefers-reduced-motion: reduce) {
   .slot.active .ring {
     animation: none;

@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anim, settings } from '../../settings'
 import { botAction, botTurn, botsOnly, botsWaitedOn, onlineBotMove, peopleOnBothSides } from '../bots'
-import { anyMoves, boardOf, isPathCard, palletOn, survivorInteractions, survivorMoves, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, crowsCards, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, isPathCard, killerMoves, palletOn, survivorInteractions, survivorMoves, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, crowsCards, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, PathKind, RollContext, SurvivorInteraction } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showOfferings, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
@@ -293,15 +293,24 @@ const palletMode = ref<string | null>(null)
 const revealing = ref<{ s: number; props: string[] } | null>(null)
 /** Calm Spirit: the crow to send to another room. */
 const calmCrow = ref<string | null>(null)
-/** Chasing a crow: the crow, the card the bonus turn discards and where it goes, before any of it is sent. */
-const bonusAsk = ref<{ i: SurvivorInteraction; card: PathKind | null; path: string | null } | null>(null)
 /**
- * The move a settled bonus turn is to make, kept until the engine asks for it: a perk may be
- * offered on the card first (`cardMove`), so the move step isn't always the very next one. If a
- * perk moved the survivor and the path no longer leads out of their room, this is dropped and
- * they pick on the map as usual.
+ * A bonus turn being settled before any of it is sent: the card it discards and where it goes, and
+ * for a crow or Power of Two the interaction itself (`i`). Also the bonus offers (a perk's or a
+ * power's, the killer's), which are card → room as well.
  */
-const moveIntent = ref<{ s: number; card: PathKind; path: string } | null>(null)
+const bonusAsk = ref<{ i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null>(null)
+/** A crow's (or Power of Two's) bonus card, sent when the engine offers that survivor the bonus turn. */
+const bonusIntent = ref<{ s: number; card: MoveCard | null; from: string } | null>(null)
+/**
+ * The move a settled bonus turn is to make, kept until the engine asks for it: the interaction and
+ * the card come first, and a perk may be offered on the card (`cardMove`), so the move step isn't
+ * always the very next one. `from`: the room it leaves — dropped only once they are no longer
+ * there (a perk moved them) or their turn is over, and then the map asks as usual.
+ */
+const moveIntent = ref<{ s: number | 'killer'; card: PathKind; path: string; from: string } | null>(null)
+function onBonusMove(m: { s: number | 'killer'; card: PathKind; path: string } | null) {
+  moveIntent.value = m && { ...m, from: m.s === 'killer' ? props.st.killer.room : props.st.survivors[m.s].room }
+}
 /** Treacherous Crows: the crow to send to a connected room. */
 const crowsCrow = ref<string | null>(null)
 /** Treacherous Crows: the killer's card to reveal, picked in the side panel. */
@@ -416,13 +425,14 @@ const boardFocus = computed(() => {
   }
   // Chasing a crow: where the bonus turn could take them — every card's paths while one is being
   // picked, the picked card's alone after — so the whole of it is weighed before any of it happens
-  if (bonusAsk.value && view.value.step.t === 'survivorInteract') {
+  const bs = view.value.step
+  const bwho = bs.t === 'survivorInteract' || bs.t === 'bonusOffer' ? bs.s : bs.t === 'killerBonusOffer' ? 'killer' : null
+  if (bonusAsk.value?.card && bwho !== null) {
     const st = view.value
-    const s = (st.step as Extract<typeof st.step, { t: 'survivorInteract' }>).s
     const card = bonusAsk.value.card
-    const cards = card ? [card] : [...new Set(st.survivorHands[st.survivors[s].hand])]
-    const ms = cards.flatMap((c) => (isPathCard(c) ? survivorMoves(st, s, c) : []))
-    return { survivors: [s], killer: false, rooms: [st.survivors[s].room], paths: ms.map((m) => m.path.id), dests: ms.map((m) => m.to) }
+    const ms = isPathCard(card) ? (bwho === 'killer' ? killerMoves(st, card) : survivorMoves(st, bwho, card)) : []
+    const from = bwho === 'killer' ? st.killer.room : st.survivors[bwho].room
+    return { survivors: bwho === 'killer' ? [] : [bwho], killer: bwho === 'killer', rooms: [from], paths: ms.map((m) => m.path.id), dests: ms.map((m) => m.to) }
   }
   // Breakout: the friend being moved, and every path they could take
   if (breakoutTarget.value !== null) {
@@ -618,7 +628,8 @@ function onSpot(key: string) {
   }
   // A fork's icon with moves to different rooms: pick the room on the board next.
   const dests = new Set(found.map((a) => a.dest))
-  if (found.length > 1 && found.every((a) => a.dest) && dests.size === found.length) {
+  const perkMove = !bonusAsk.value && key.startsWith('path:') && found.length > 0 && found.every((a) => a.dest) && !['survivorMove', 'killerMove'].includes(view.value.step.t)
+  if ((found.length > 1 && found.every((a) => a.dest) && dests.size === found.length) || perkMove) {
     forkMoves.value = found
     sfx.click()
     return
@@ -650,10 +661,10 @@ const modeBar = computed(() => {
   if (calmCrow.value) return { text: `${PERKS.calm_spirit.name}: คลิกห้องที่จะส่ง Crow ไป`, cancel: () => (calmCrow.value = null) }
   if (bonusAsk.value) {
     const cancel = () => (bonusAsk.value = null)
-    const what = bonusAsk.value.i.k === 'crow' ? 'ไล่ Crow' : PERKS.power_of_two.name
-    if (!bonusAsk.value.card) return { text: `${what}: เลือกการ์ดที่จะทิ้งเล่น Bonus Turn (บนมือ หรือคลิกเส้นทางสีนั้น) — ยังไม่เสีย ▲`, cancel }
-    if (!bonusAsk.value.path) return { text: `${what}: คลิกเส้นทางที่จะไปบนแผนที่ — ยังไม่เสีย ▲`, cancel }
-    return { text: `${what}: กดยืนยันในแผงด้านข้าง`, cancel }
+    const i = bonusAsk.value.i
+    const what = !i ? 'Bonus Turn' : i.k === 'crow' ? 'ไล่ Crow' : PERKS.power_of_two.name
+    if (!bonusAsk.value.card) return { text: `${what}: 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้น${i ? ' — ยังไม่เสีย ▲' : ''}`, cancel }
+    return { text: `${what} ด้วย ${CARD_NAMES[bonusAsk.value.card]}: 2. คลิกห้องที่จะไปบนแผนที่ แล้วไปทันที`, cancel }
   }
   if (targetAsk.value) return { text: 'เลือกในแผงด้านข้าง: ใช้ Perk หรือทำตามปกติ', cancel: () => (targetAsk.value = null) }
   if (dogStay.value) return { text: 'กลิ่นเลือด: เลือกการ์ดใหม่ให้ The Dog จากมือ', cancel: () => (dogStay.value = false) }
@@ -684,7 +695,10 @@ const modeBar = computed(() => {
   if (itemPick.value !== null) return { text: 'เลือกเป้าหมายของ item บนแผนที่', cancel: () => (itemPick.value = null) }
   if (forkMoves.value)
     return {
-      text: `ทางแยก: คลิกห้องที่จะไปบนแผนที่ — ${forkMoves.value.map((a) => roomName(view.value, a.dest!)).join(' · ')}`,
+      text:
+        forkMoves.value.length > 1
+          ? `ทางแยก: คลิกห้องที่จะไปบนแผนที่ — ${forkMoves.value.map((a) => roomName(view.value, a.dest!)).join(' · ')}`
+          : `คลิกห้อง ${roomName(view.value, forkMoves.value[0].dest!)} บนแผนที่เพื่อไป`,
       cancel: () => (forkMoves.value = null),
     }
   if (unknownPicked.value !== null) {
@@ -1185,15 +1199,40 @@ watch(timeLeft, (t) => {
  * as usual; the move follows. If the path is no longer one of theirs (a perk moved them), the
  * intent is dropped and the map asks as it would for any move.
  */
+// the bonus turn's card, once the engine asks for it (the interaction before it has landed)
+watch(
+  () => [props.st.step, bonusIntent.value] as const,
+  () => {
+    const want = bonusIntent.value
+    if (!want) return
+    const s = props.st.step
+    if (s.t === 'bonusOffer' && s.s === want.s) {
+      bonusIntent.value = null
+      dispatch(want.card ? { t: 'bonus', card: want.card } : { t: 'declineBonus' })
+    } else if (props.st.phase !== 'survivors' || props.st.survivors[want.s].acted || props.st.survivors[want.s].room !== want.from) bonusIntent.value = null
+  },
+  { immediate: true },
+)
 watch(
   () => [props.st.step, moveIntent.value] as const,
   () => {
     const want = moveIntent.value
     if (!want) return
     const s = props.st.step
+    // the killer's bonus turn: his move step with that card
+    if (want.s === 'killer') {
+      if (s.t === 'killerMove' && s.card === want.card) {
+        moveIntent.value = null
+        if (killerMoves(props.st, want.card).some((m) => m.path.id === want.path)) dispatch({ t: 'move', path: want.path })
+      } else if (props.st.phase !== 'killer' || props.st.killer.room !== want.from) moveIntent.value = null
+      return
+    }
     if (s.t !== 'survivorMove' || s.s !== want.s || s.card !== want.card) {
-      // gone past the move it was for: the bonus turn moved on without it
-      if (props.st.survivors[want.s].acted || s.t === 'survivorInteract') moveIntent.value = null
+      // gone past the move it was for: the turn is over, or they left the room another way. (Not
+      // on an interact step: online the one it was settled on can still be the step shown while the
+      // interaction is on its way, and dropping it there asked the player for the path again.)
+      const sv = props.st.survivors[want.s]
+      if (sv.acted || sv.room !== want.from || props.st.phase !== 'survivors') moveIntent.value = null
       return
     }
     moveIntent.value = null
@@ -1672,7 +1711,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           @ask="targetAsk = null"
           :bonus-ask="bonusAsk"
           @bonus-ask="bonusAsk = $event"
-          @bonus-move="moveIntent = $event"
+          @bonus-move="onBonusMove"
+          @bonus-card="bonusIntent = $event && { ...$event, from: st.survivors[$event.s].room }"
           :dog-stay="dogStay"
           @dog-stay="dogStay = $event"
           :crows-crow="crowsCrow"

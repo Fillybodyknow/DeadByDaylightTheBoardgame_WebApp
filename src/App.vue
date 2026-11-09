@@ -59,6 +59,9 @@ const inGame = computed(
       (route.name === 'replay' && !!replaying.value && !!game.value)),
 )
 
+/** An online room before its game (the lobby, the picks): laid out as a PC game's, the whole width. */
+const roomPage = computed(() => !phoneBlocked.value && !inGame.value && route.name === 'online' && !!session.data)
+
 const links = computed(() => [
   { to: '/', label: 'เมนู', icon: '🏠' },
   ...(section.value === 'offline'
@@ -129,7 +132,7 @@ const scene = computed(() =>
       <span class="lang-label">การ์ด: </span>{{ lang === 'th' ? 'TH' : 'EN' }}
     </button>
   </header>
-  <main class="page" :class="{ full: inGame }">
+  <main class="page" :class="{ full: inGame || roomPage }">
     <RouterView v-slot="{ Component }">
       <Transition name="page" mode="out-in">
         <PhoneBlock v-if="phoneBlocked" />

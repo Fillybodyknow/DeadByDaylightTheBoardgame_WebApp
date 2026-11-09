@@ -43,19 +43,45 @@ Each player plays on their own device. The host creates a room and shares its 4-
 the invite link). Everyone takes a seat (player 1 = killer, players 2.. = the survivor hands, p.19),
 and the host starts the game.
 
-- **The way into a game** (`OnlineRoom`, `session.ts`): Lobby (sides, ready) → the picks, a stage
-  at a time → the killer starts. A stage opens when everyone has finished the one before
-  (`pickStage`, derived from the room's data, so there is no stage field to drift): **characters**
-  (everyone confirms; a **Banlist** stage comes before it when the room sets one) → **perks** (only when the room's mode is Bloodweb or Devout) → **offerings** (only when the room burns them and a side picks) → **map**
-  (picked by whoever the setting says; drawn maps are settled at once — `boardSet`, so a map is
-  never "default MacMillan" by omission). The start button waits for the map. A step bar shows
-  where the room is and chips show who is done. A stage only goes forward: a player may take back
-  their own confirmation while others are still to confirm (the same stage), but once everyone has
-  confirmed the characters (or the bans) there is no way back — the UI has no button for it and
-  `lockPicks` / `lockBans` refuse.
-  The foot of the bans, characters and map stages is a sticky `StageBar` (progress dots, a line of
-  words, the confirm / start button), so the button is never lost under a long grid; the
-  characters stage keeps the team in a side panel (`.team-panel`) beside the pickers.
+- **A move is shown at once, then sent** (`send` in `game.ts`), and a device's moves go **one at a
+  time, in order** (`writeQueue`): the room checks each against its own state, which must already
+  hold the one before. Sent together (a crow's interaction, its bonus card and its path, from one
+  click), the second and third were refused and the player was asked for them again. While any of
+  this device's moves are still on their way, the room's states don't replace the one shown (it
+  would step back to before them); the room's is taken once the last has landed.
+- **The way into a game** (`OnlineRoom`, `session.ts`): Lobby (sides, ready) → the picks → the
+  killer starts. The rules' order is derived from the room's data (`pickStage`, no stage field to
+  drift): **characters** (everyone confirms; a **Banlist** before them when the room sets one) →
+  **perks** (only in Bloodweb or Devout: Bloodweb deals from every character, so all must be locked)
+  and **offerings** (only when the room burns them and a side picks) side by side → **map** (picked
+  by whoever the setting says; it may be picked any time in the picks; drawn maps are settled at
+  once — `boardSet`, so a map is never "default MacMillan" by omission). The start waits for all of
+  them. A player may take back their own confirmation while others are still to confirm, but once
+  everyone has confirmed the characters (or the bans) there is no way back — the UI has no button
+  for it and `lockPicks` / `lockBans` refuse.
+  **Laid out as the PC game's lobby** (one screen from the lobby to the start, the whole width):
+  the campfire behind in the side's colour, everyone on their places, standing as the big one does
+  (the portrait strip of each character's board; a dark pillar of the Entity's until there is one,
+  a + on an empty place) — the killer's against four survivors'; a click on an empty one takes it, the host's "เพิ่มบอท" seats a bot there), this
+  player's character big on the right (the portrait strip of its board), the perks it wears in the
+  corner, the chat above the one button in the corner. That button is whatever moves things on for
+  this player now (พร้อม, ดำเนินเกม, ยืนยันการแบน, ล็อกตัวละคร, ยืนยัน Perk, ยืนยันเครื่องเซ่น,
+  เริ่ม Trial), with a line of what the room waits on; when there is something to choose first it
+  opens that panel instead. A rail on the left opens a panel at a time: ตัวละคร (the side in the
+  lobby; the bans, then the characters), อุปกรณ์ (the killer's power, the perks, the offerings),
+  แผนที่, ห้อง (the settings, the ping colour, who watches). Each side sees its own scene, from the lobby on, as
+  the PC game's: the killer stands big with the four survivors' places across the fire (smaller);
+  a survivor stands in one line with the teammates, everyone the same size, no killer (unless the
+  room shows him); a spectator sees all five places. Before the killer has a character, his big one
+  is a tall pillar with his name. Lower on the rail, in the lobby, the
+  role switch (its icon the role it switches to: spectator → killer → survivor → spectator, skipping
+  a full side); in the corner the perks worn (pointing at one shows its box) and the name with the
+  role's icon, red for the killer. A panel not open yet says why; the
+  rail button of the room's next step glows (a ! on its corner) until the player opens it; nothing
+  opens by itself. A panel closes once its choice is made: the characters' when
+  every one of this player's is picked, the equipment's when the perks or the offerings are
+  confirmed. A confirmation is taken back beside the corner button ("✎ แก้ Perk", "✎ แก้เครื่องเซ่น"),
+  which opens the panel again; the corner button glows gold whenever it is the thing to press.
 - **Trust model: friends, not strangers.** Every device runs the same engine, so the room carries
   the **moves**, not the state: each device replays them and arrives at the same game (the engine
   is a pure reducer and its RNG lives in the state, so a replay is exact — nothing in
@@ -371,7 +397,8 @@ Entity speaking (`src/play/tutorial/`). The list has a tab per side (remembered 
   rules live in `engine/loadout.ts`; `createGame` takes each character's `perks`.
 - **Offerings** (p.19, `engine/offerings.ts`): the room setting `offerings` online, the players step
   offline: nobody, the survivors (1–2), the killer (1–2) or one each, picked or drawn (🎲). A side
-  that picks does so after the perks (`OfferingPicker`; online any survivor player sets the
+  that picks does so once the characters are in, beside the perks (`OfferingPicker`, the hexagons
+  cut from the cards; online any survivor player sets the
   survivors', hidden from the killer until the game starts; offline behind a hand-off card); a
   side drawn, or played by bots alone, takes the top cards of its shuffled offerings at the start
   (`drawOfferings`, from the game's seed). `GameState.offerings` holds them; they show under the
@@ -451,10 +478,20 @@ click on their target still asks there (`onTargetPerk`, the perk's card beside t
 
 Chasing a crow (p.12) and Power of Two give the killer 1 ▲ and the survivor a bonus turn. The
 whole of it is **settled before any of it happens** (`bonusAsk` in `boardActions.ts`): the click
-on the crow (or on the friend) sends nothing, and the panel asks for the card the bonus turn
-discards — from the hand, or by clicking a path of its colour — and then, where that colour
-leaves the room several ways, which path. Only "ยืนยัน" sends it: the interaction, the card, and
-the move. The move goes through `moveIntent` in GameScreen rather than a third press, because a
+on the crow (or on the friend) sends nothing; then the card is picked from the hand (or by clicking a
+path of its colour) and the rooms it reaches light up, and a click on one — always, a single one too — **sends it all at once**: the
+interaction, the card, and the move — as **one action**: the interaction carries them
+(`then: { card, path }`), and `apply` plays the card and the move on while the game asks that
+survivor for exactly them (`bonusThen`). Online that is one move to the room; sent as three, the
+later ones raced the first and were refused, and the player was asked for the card and the path
+again (players' reports, twice). If the game asks something else first (a perk offered on the
+card), it stops there, and the rest is sent once that is answered (`bonusIntent` and
+`moveIntent` in GameScreen). Only a card with no way out (its bonus turn wasted) or an
+empty hand waits for "ยืนยัน". Every bonus turn goes the same way (card → room → done): the ones
+a perk or a power offers (`bonusOffer`) and the killer's (`killerBonusOffer`, his move made by
+`moveIntent` too). A perk's or a power's move with no card (Dead Hard, Spine Chill, Agitation…)
+is a path, then its room (`forkMoves`, a single room too); an ordinary card move stays one click
+(the players asked for these, 1.39.2). The move goes through `moveIntent` in GameScreen rather than a third press, because a
 perk may be offered on the card first (`cardMove`: Inner Focus, Quick & Quiet); if a perk moved
 the survivor and the path is no longer theirs, the intent is dropped and the map asks as usual.
 "ยกเลิก" at any point costs nothing, and the rooms the bonus turn could reach stay lit while the

@@ -371,6 +371,35 @@ export function perkImage(perk: PerkId): string {
   return perkCard(perk)?.image?.th ?? ''
 }
 
+/**
+ * A perk's icon alone: the diamond cut from its card, clear outside its outline (`perk-icons/`,
+ * made from the English cards, whose art is the same). For the PC-style loadout.
+ */
+export function perkIcon(perk: PerkId): string {
+  return (perkCard(perk)?.image?.en ?? '').replace('/perks-en/', '/perk-icons/')
+}
+
+/**
+ * The colour of a perk's icon (`perkIcon`), for the box shown on it: a perk printed on a board keeps
+ * its board's icon wherever it is played (the character's own purple, the others' green), a perk on
+ * no board has the deck card's gold one.
+ */
+export function perkTone(perk: PerkId): 'own' | 'shared' | 'card' {
+  const d = PERKS[perk]
+  if (d.card) return 'card'
+  return d.index === 0 ? 'own' : 'shared'
+}
+
+/** An offering card's hexagon, cut out as a perk's diamond is (`offering-icons/`). */
+export function offeringIcon(image: string): string {
+  return image.replace(/\/offerings-(en|th)\//, '/offering-icons/')
+}
+
+/** A killer's power icon, the square cut from his POWER card (`power-icons/`). */
+export function powerIcon(killerId: string): string {
+  return (killerById.get(killerId)?.power.image?.en ?? '').replace('/power-en/', '/power-icons/')
+}
+
 export function ownerLabel(st: GameState, o: PerkOwner): string {
   return o === 'killer' ? st.killer.name : st.survivors[o].name
 }

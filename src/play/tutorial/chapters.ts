@@ -364,19 +364,19 @@ const bonus: Chapter = {
       pics: [PROP_IMAGE.crow],
     },
     {
-      say: '**Bonus Turn**: **ทิ้ง**การ์ด 1 ใบจากมือ แล้วเดินตามสีของมัน + Interact อีกครั้ง (หน้า 9) — ทั้งหมดนี้เลือกให้ครบก่อน แล้วค่อยกด**ยืนยัน** ฆาตกรถึงจะได้ ▲ เจ้าจึงเปลี่ยนใจได้ฟรีตลอดทาง',
+      say: '**Bonus Turn**: **ทิ้ง**การ์ด 1 ใบจากมือ แล้วเดินตามสีของมัน + Interact อีกครั้ง (หน้า 9) — เลือก**การ์ด**จากมือ หรือคลิก**เส้นทาง**สีนั้นบนแผนที่ แล้วคลิก**ห้อง**ที่จะไป ก็ไปทันที — ก่อนคลิกห้อง ฆาตกรยังไม่ได้ ▲ เจ้าจึงเปลี่ยนใจได้ฟรี',
       spot: (st) => ({ prop: propIn(st, 'ancient-tree', 'crow')?.id }),
       pics: [PROP_IMAGE.crow],
     },
     {
-      say: 'คลิกที่ **Crow** แล้วเลือกการ์ด **Sprint** (สีเขียว) กับเส้น**สีเขียว**ที่ไป **Mine Depths** จากนั้นกด**ยืนยัน**',
+      say: 'คลิกที่ **Crow** คลิก**เส้นทางสีเขียว** (หรือเลือก **Sprint** จากมือ) แล้วคลิกห้อง **Mine Depths**',
       spot: { path: 'p5' },
       // the whole bonus turn is settled before any of it is sent (`bonusAsk`), so the three
       // actions it makes all arrive together when the learner confirms
       task: {
         allow: (_st, a) => (a.t === 'interact' && a.i.k === 'crow') || (a.t === 'bonus' && a.card === 'sprint') || (a.t === 'move' && a.path === 'p5'),
         done: (st) => me(st).room === 'mine-depths',
-        hint: 'คลิก Crow ใน Ancient Tree แล้วเลือก Sprint กับเส้นทางไป Mine Depths จากนั้นกดยืนยัน',
+        hint: 'คลิก Crow ใน Ancient Tree คลิกเส้นทางสีเขียว (หรือ Sprint จากมือ) แล้วคลิกห้อง Mine Depths',
       },
     },
     {

@@ -988,15 +988,18 @@ function offeringSideOf(d: RoomData): LoadoutSide | null {
   return !seat ? null : Number(seat) === KILLER_PLAYER ? 'killer' : 'survivor'
 }
 
-/** Offerings are chosen after the perks (the cards on the table don't change with them). */
+/** Offerings are chosen once the characters are in, alongside the perks (neither changes the other). */
 const offeringOpen = (d: RoomData) => d.phase === 'pick' && everyoneLocked(d)
 
 /** How many offerings each side burns, by the room's settings. */
 export const offeringSlotsNow = computed(() => offeringSlots(roomSettings.value.offerings, roomSettings.value.offeringCount))
-/** Sides whose offerings aren't confirmed yet (once the characters and perks are in). */
+/**
+ * Sides whose offerings aren't confirmed yet, once the characters are in: alongside the perks, as
+ * the PC game's loadout tab holds both (nothing in one changes the other).
+ */
 export const offeringsWaiting = computed<LoadoutSide[]>(() => {
   const d = session.data
-  if (!d || !allLocked.value || perksWaiting.value.length) return []
+  if (!d || !allLocked.value) return []
   return pickingSides(d).filter((side) => !d.offeringsDone?.[side])
 })
 /** This device's side for the offerings, and what that side has picked so far. */

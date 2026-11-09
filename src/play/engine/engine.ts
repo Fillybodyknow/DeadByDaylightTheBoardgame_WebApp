@@ -969,9 +969,26 @@ export function apply(prev: GameState, action: Action): GameState {
   // The state never keeps a reference to the caller's action: one may hold a Vue proxy (the props
   // picked on the map), which a queued task would carry into the state, and the next structuredClone
   // of it would throw — every later action refused.
-  handle(st, JSON.parse(JSON.stringify(action)) as Action)
+  const a = JSON.parse(JSON.stringify(action)) as Action
+  handle(st, a)
   run(st)
-  return st
+  return a.t === 'interact' && a.then && prev.step.t === 'survivorInteract' ? bonusThen(st, prev.step.s, a.then) : st
+}
+
+/**
+ * The bonus turn a crow or Power of Two bought, settled with the interaction (`then`): its card and
+ * its move, played on at once while the game asks that survivor for exactly them. Anything else
+ * asked first (a perk offered on the card, say) stops it there, and the rest is asked as usual.
+ * One action, so online it reaches the room as one move: sent as three, the later ones raced the
+ * first and were refused, and the player was asked for the card and the path again.
+ */
+function bonusThen(st: GameState, s: number, then: { card: MoveCard | null; path?: string }): GameState {
+  if (st.step.t !== 'bonusOffer' || st.step.s !== s) return st
+  const offered = tryApply(st, then.card ? { t: 'bonus', card: then.card } : { t: 'declineBonus' })
+  if (!offered || !then.card || !then.path) return offered ?? st
+  const step = offered.step
+  if (step.t !== 'survivorMove' || step.s !== s || step.card !== then.card) return offered
+  return tryApply(offered, { t: 'move', path: then.path }) ?? offered
 }
 
 /** Like apply, but returns null instead of throwing for an illegal action. */

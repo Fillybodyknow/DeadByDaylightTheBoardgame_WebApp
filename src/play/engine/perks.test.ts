@@ -1054,6 +1054,39 @@ describe('The Twins, The Blight, Élodie and Felix', () => {
     void gen
   })
 
+  it('a crow chased with its bonus turn settled: the card and the move in the same action', () => {
+    const setup = () => {
+      const st = game('trapper')
+      only(st)
+      const crow = placeProp(st, 'crow', st.survivors[0].room)
+      st.phase = 'survivors'
+      st.activeSurvivor = 0
+      st.step = { t: 'survivorInteract', s: 0, canInteract: true }
+      st.queue = [{ k: 'endSurvivorTurn', s: 0 }]
+      return { st, crow }
+    }
+    const { st, crow } = setup()
+    const hand = st.survivorHands[st.survivors[0].hand]
+    const card = (['sneak', 'sprint', 'crouch', 'vault'] as PathKind[]).find((c) => hand.includes(c) && survivorMoves(st, 0, c).length > 0)!
+    const m = survivorMoves(st, 0, card)[0]
+    const bp = st.killer.bp
+    const after = apply(st, { t: 'interact', i: { k: 'crow', prop: crow.id }, then: { card, path: m.path.id } })
+    expect(after.killer.bp).toBe(bp + 1)
+    expect(after.survivors[0].room).toBe(m.to)
+    expect(after.survivorHands[after.survivors[0].hand]).not.toContain(card)
+    // the same as sent one by one
+    let apart = apply(st, { t: 'interact', i: { k: 'crow', prop: crow.id } })
+    apart = apply(apart, { t: 'bonus', card })
+    apart = apply(apart, { t: 'move', path: m.path.id })
+    expect(after).toEqual(apart)
+    // a path the card can't take: it stops at the move, asked as usual
+    const wrong = apply(setup().st, { t: 'interact', i: { k: 'crow', prop: crow.id }, then: { card, path: 'no-such-path' } })
+    expect(wrong.step).toMatchObject({ t: 'survivorMove', s: 0, card })
+    // no card: the bonus turn declined with it
+    const none = apply(setup().st, { t: 'interact', i: { k: 'crow', prop: crow.id }, then: { card: null } })
+    expect(none.step.t === 'bonusOffer').toBe(false)
+  })
+
   it('Blood Favour: everyone wounded and nobody hooked at cleanup is a sacrifice progress', () => {
     let st = game('blight')
     only(st, 'blood_favour')

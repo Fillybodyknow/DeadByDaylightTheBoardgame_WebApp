@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// A side's offerings before a trial (p.19): the side's cards in a row, a click on one shows it big
-// with its text, the button under it burns it (or puts it back), and a confirm button once the
+// A side's offerings before a trial (p.19): the side's offerings in a row as their hexagons (the
+// PC game's offering slot), a click on one shows its card big with its text, the button under it burns it (or puts it back), and a confirm button once the
 // count is right. Online and on one device alike.
 import { computed, ref } from 'vue'
 import { offerings as OFFERING_CARDS } from '../../data'
@@ -9,6 +9,7 @@ import { sfx } from '../../sound'
 import { offeringName, offeringsOf, type OfferingId } from '../engine/offerings'
 import type { Side } from '../engine/loadout'
 import BpText from '../../components/BpText.vue'
+import { offeringIcon } from '../labels'
 import ModalShell from './ModalShell.vue'
 
 const props = defineProps<{
@@ -55,7 +56,7 @@ function toggle(id: OfferingId) {
           :title="`ดู ${c.name} ใหญ่`"
           @click="zoomed = c.id"
         >
-          <img :src="asset(c.image)" :alt="c.name" loading="lazy" />
+          <img :src="asset(offeringIcon(c.image))" :alt="c.name" loading="lazy" />
           <b>{{ c.name }}</b>
           <small>{{ c.en }}</small>
         </button>
@@ -132,7 +133,7 @@ function toggle(id: OfferingId) {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  width: 210px;
+  width: 150px;
   padding: 6px;
   border: 2px solid transparent;
   border-radius: 10px;
@@ -144,9 +145,11 @@ function toggle(id: OfferingId) {
 .offer:hover {
   transform: translateY(-3px);
 }
+/* the hexagon cut from the card (`offering-icons/`) */
 .offer img {
-  width: 100%;
-  border-radius: 6px;
+  width: 96px;
+  height: 108px;
+  object-fit: contain;
 }
 .offer small {
   opacity: 0.6;

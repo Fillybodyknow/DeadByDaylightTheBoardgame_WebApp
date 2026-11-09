@@ -16,6 +16,7 @@ import {
   carnifexProps,
   connectedRoomsOf,
   hookHere,
+  isPathCard,
   isPower,
   itemUses,
   killerInteractions,
@@ -38,7 +39,7 @@ import {
 } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import { boards } from './engine/boards'
-import type { Action, GameState, KillerInteraction, MoveCard, PathKind, PerkChoice, PerkOwner, PerkWindow, SurvivorInteraction } from './engine/types'
+import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PerkOwner, PerkWindow, SurvivorInteraction } from './engine/types'
 import { dispatch } from './game'
 import { choiceRooms } from './focus'
 import { ANTIDOTE_IMAGE, DIRE_CROW_IMAGE, GUARD_IMAGE, PROP_IMAGE, TONIC_IMAGE, unknownMini, iconLabel, itemUseLabel, killerInteractionLabel, pathLabel, pathName, perkChoiceLabel, powerName, survivorInteractionLabel } from './labels'
@@ -83,7 +84,7 @@ export interface BoardModes {
    * the bonus turn was worth having — a card with no path out loses the interaction too
    * (`startSurvivorMove`), so it could buy the killer a ▲ for nothing (a player's report).
    */
-  bonusAsk: Ref<{ i: SurvivorInteraction; card: PathKind | null; path: string | null } | null>
+  bonusAsk: Ref<{ i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null>
   /** Treacherous Crows: the crow being sent to a connected room. */
   crowsCrow: Ref<string | null>
   /** Treacherous Crows: which of the killer's cards to reveal (picked in the side panel). */
@@ -286,13 +287,39 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     return out
   }
 
-  // A bonus turn being settled, with its card already picked: the paths it may take, so where it
-  // goes is known before any of it is sent (one card's colour can leave the room several ways).
-  if (modes.bonusAsk.value?.card && s.t === 'survivorInteract') {
-    const { card } = modes.bonusAsk.value
-    const from = st.survivors[s.s].room
-    for (const m of survivorMoves(st, s.s, card)) {
-      add(`path:${m.path.id}`, `Bonus Turn: ${pathLabel(st, m.path.id, from)}`, () => ((modes.bonusAsk.value = { ...modes.bonusAsk.value!, path: m.path.id }), sfx.click()))
+  // A bonus turn being settled (a crow chased, Power of Two, a perk's or a power's, the killer's):
+  // a path on the map sends it at once (its colour is the card); a card picked from the hand first
+  // lights the rooms it reaches, and a click on one (or on its path) sends it. Nothing asked after.
+  const bonusWho = s.t === 'survivorInteract' || s.t === 'bonusOffer' ? s.s : s.t === 'killerBonusOffer' ? 'killer' : null
+  if ((modes.bonusAsk.value || s.t === 'bonusOffer' || s.t === 'killerBonusOffer') && bonusWho !== null) {
+    const card = modes.bonusAsk.value?.card ?? null
+    // no card yet: a path out of their room picks the card of its colour (as the hand does); the room
+    // is clicked next, and that click sends the whole bonus turn (the players' order: card → room)
+    if (!card) {
+      const hand = bonusWho === 'killer' ? st.killer.hand : st.survivorHands[st.survivors[bonusWho].hand]
+      for (const c of new Set(hand)) {
+        if (!isPathCard(c)) continue
+        for (const m of bonusWho === 'killer' ? killerMoves(st, c) : survivorMoves(st, bonusWho, c)) {
+          // two paths that share one icon on the map (a fork) pick the same card: one spot for it,
+          // not a menu of two alike
+          if (out.some((a) => a.key === spotKey(st, `path:${m.path.id}`))) continue
+          // (no `dest`: the click picks the card at once, with no room asked in between)
+          add(`path:${m.path.id}`, `เลือกการ์ด ${CARD_NAMES[c]} สำหรับ Bonus Turn`, () => ((modes.bonusAsk.value = { ...(modes.bonusAsk.value ?? {}), card: c, path: null }), sfx.click()))
+        }
+      }
+      return out
+    }
+    if (!isPathCard(card)) return out
+    const ms = bonusWho === 'killer' ? killerMoves(st, card) : survivorMoves(st, bonusWho, card)
+    for (const m of ms) {
+      if (out.some((a) => a.key === `room:${m.to}`)) continue
+      add(`room:${m.to}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, m.to)}`, () => ((modes.bonusAsk.value = { ...modes.bonusAsk.value!, path: m.path.id, go: true }), sfx.click()))
+      out[out.length - 1].dest = m.to
+    }
+    // the path itself again (the one clicked to pick the card, or any of its colour): that room too —
+    // a player clicking the path a second time meant to go along it
+    for (const m of ms) {
+      add(`path:${m.path.id}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, m.to)}`, () => ((modes.bonusAsk.value = { ...modes.bonusAsk.value!, path: m.path.id, go: true }), sfx.click()))
       out[out.length - 1].dest = m.to
     }
     return out

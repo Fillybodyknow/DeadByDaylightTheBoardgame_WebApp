@@ -715,7 +715,18 @@ export type Action =
   /** Hang the carried survivor on the free hook in this room. */
   | { t: 'hang' }
   /** `emp`: the survivor he'd interact with has had their chance to discard an EMP. */
-  | { t: 'interact'; i: SurvivorInteraction | KillerInteraction; reacted?: boolean; left?: boolean; emp?: boolean }
+  | {
+      t: 'interact'
+      i: SurvivorInteraction | KillerInteraction
+      reacted?: boolean
+      left?: boolean
+      emp?: boolean
+      /**
+       * A crow chased or Power of Two: the bonus turn settled with it (its card, null for none, and
+       * the path it takes), played on in the same action as far as the game lets it (`apply`).
+       */
+      then?: { card: MoveCard | null; path?: string }
+    }
   | { t: 'endTurn' }
   | { t: 'bonus'; card: MoveCard }
   | { t: 'declineBonus' }

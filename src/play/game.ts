@@ -95,6 +95,9 @@ function save() {
 
 type Online = NonNullable<typeof online.value>
 
+/** This device's moves on their way to the room, sent one after another (`send`). */
+let writeQueue: Promise<unknown> = Promise.resolve()
+
 /** Online: make `seat`'s move here at once, then send it to the room. `own`: this device's player's (not a bot's). */
 function send(o: Online, seat: number, action: Action, own = false): boolean {
   const cur = game.value
@@ -107,12 +110,18 @@ function send(o: Online, seat: number, action: Action, own = false): boolean {
   pendingWrites.value++
   // the room's game the move landed on: what an undo of it goes back to
   const landed: { st?: GameState } = {}
-  void o.room
-    .sendMove((latest) => {
+  // One write at a time, in order: a move sent right after another (a crow's interaction, its
+  // bonus card, its path) is checked against the room's state, which must hold the one before it
+  // first — sent together, the second was refused and the player asked for it all again.
+  const write = writeQueue.then(() =>
+    o.room.sendMove((latest) => {
       if (!latest || !mayAct(latest, seat, action) || !tryApply(latest, action)) return null
       landed.st = latest
       return action
-    })
+    }),
+  )
+  writeQueue = write.catch(() => false)
+  void write
     .then(
       (ok) => {
         if (!ok) return resync(o)
@@ -121,7 +130,14 @@ function send(o: Online, seat: number, action: Action, own = false): boolean {
       },
       () => resync(o),
     )
-    .finally(() => pendingWrites.value--)
+    .finally(() => {
+      pendingWrites.value--
+      // the last of them landed: the room's state now holds every one (and anyone else's since)
+      if (pendingWrites.value === 0 && online.value?.room === o.room) {
+        const latest = o.latest()
+        if (latest) game.value = latest
+      }
+    })
   return true
 }
 
@@ -167,6 +183,9 @@ function resync(o: NonNullable<typeof online.value>) {
 
 /** A new state from the room (another player acted, or ours came back). */
 export function receive(st: GameState | null) {
+  // this device's own moves still on their way: the state shown holds them already, and the room's
+  // would step back to before them for a moment; it is taken once the last has landed (`send`)
+  if (st && game.value && pendingWrites.value > 0) return
   game.value = st
 }
 

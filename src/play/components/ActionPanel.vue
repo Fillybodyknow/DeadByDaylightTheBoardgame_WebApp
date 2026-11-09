@@ -7,6 +7,7 @@ import { computed, onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import { offeringName } from '../engine/offerings'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
+import { fxSound } from '../fx/audio'
 import { boardOf,
   CARD_NAMES,
   crowsCards,
@@ -92,7 +93,7 @@ const props = defineProps<{
   /** Pain Resonance's hook interacted with, its survivor being picked on the board. */
   painArmed?: boolean
   /** An interaction that buys a bonus turn with a ▲ for the killer, settled here before it is sent. */
-  bonusAsk?: { i: SurvivorInteraction; card: PathKind | null; path: string | null } | null
+  bonusAsk?: { i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null
   /** Treacherous Crows: the crow picked on the map, and the killer's card picked here. */
   crowsCrow?: string | null
   crowsCard?: number | null
@@ -118,9 +119,11 @@ const emit = defineEmits<{
   powerCard: [card: MoveCard | null]
   /** Pain Resonance: interact with this hook, then pick the survivor (on the board); null: put back. */
   painHook: [hook: string | null]
-  bonusAsk: [pick: { i: SurvivorInteraction; card: PathKind | null; path: string | null } | null]
+  bonusAsk: [pick: { i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null]
   /** A confirmed crow bonus turn: the move it already settled, made when the engine asks for it. */
-  bonusMove: [move: { s: number; card: PathKind; path: string } | null]
+  bonusMove: [move: { s: number | 'killer'; card: PathKind; path: string } | null]
+  /** The bonus turn's card (null: none), to be sent when the engine offers the bonus turn. */
+  bonusCard: [pick: { s: number; card: MoveCard | null } | null]
   crowsCrow: [crow: string | null]
   crowsCard: [index: number | null]
   dogStay: [on: boolean]
@@ -243,6 +246,13 @@ const hasPallet = computed(() => sInteractions.value.some((i) => i.k === 'dropPa
  */
 const gateCards = computed(() => gatePerks(props.st))
 const gateOpen = computed(() => interactGate(props.st))
+// the question opens: the alert every perk question gives (PerkPrompt's), for the player it asks
+watch(
+  () => (gateOpen.value && props.st.step.t === 'survivorInteract' && controls(props.st, props.st.step.s) ? JSON.stringify(props.st.step) : null),
+  (now, was) => {
+    if (now && now !== was) fxSound.perk(false)
+  },
+)
 /** On screen: all of them while the question is open, the armed one alone after. */
 const shownGate = computed(() => (gateOpen.value ? gateCards.value : perkPicked.value && gateCards.value.includes(perkPicked.value) ? [perkPicked.value] : []))
 
@@ -416,136 +426,110 @@ const revealChoices = computed(() => {
   return [...byCat].map(([category, prop]) => ({ category, prop }))
 })
 
-const bonusCards = computed(() => {
+
+// ---------- a bonus turn: the card from the hand, then the room on the map, and it goes ----------
+//
+// One flow for every bonus turn (the players asked for it): chasing a crow and Power of Two (whose
+// interaction is sent with it), and the bonus turns offered (a perk's or a power's, the killer's).
+// The card is picked from the hand; the rooms it can reach then light up on the map, and a click on
+// one — always, a single one too — sends all of it: the interaction if any, the card, and the move
+// (`moveIntent` in GameScreen makes it when the engine asks). "ยกเลิก" until then costs nothing.
+
+/** Who plays the bonus turn being settled: a survivor, the killer, or nobody. */
+const bonusWho = computed<number | 'killer' | null>(() => {
   const s = step.value
-  if (s.t === 'bonusOffer') return [...new Set(props.st.survivorHands[props.st.survivors[s.s].hand])]
-  if (s.t === 'killerBonusOffer') return [...new Set(props.st.killer.hand)] // The Blight holds two of each
-  return []
+  if (s.t === 'survivorInteract') return props.bonusAsk ? s.s : null
+  if (s.t === 'bonusOffer') return s.s
+  if (s.t === 'killerBonusOffer') return 'killer'
+  return null
 })
-
-// ---------- bonus turn: the card is picked from the hand along the bottom, then confirmed ----------
-
-const bonusPick = ref<MoveCard | null>(null)
-watch(
-  () => JSON.stringify(step.value),
-  () => (bonusPick.value = null),
-)
-onBeforeUnmount(() => (preview.value = null))
-
-const bonusHand = computed<HandCard[]>(() => bonusCards.value.map((card) => ({ card, picked: bonusPick.value === card, ...(bonusPick.value === card ? { badge: 'Bonus Turn' } : {}) })))
-
-/** Who moves with the bonus card, for the map preview. */
-const bonusOwner = computed<number | 'killer'>(() => (step.value.t === 'bonusOffer' ? step.value.s : 'killer'))
-
-function pickBonus(card: MoveCard) {
-  sfx.click()
-  bonusPick.value = bonusPick.value === card ? null : card
-}
-
-function hoverBonus(card: MoveCard | null) {
-  const o = bonusOwner.value
-  preview.value = card ? choicePreview(props.st, { card }, o === 'killer' ? props.st.killer.room : props.st.survivors[o].room, o) : null
-}
-
-// the map: a path out of the room picks the bonus card of its colour, as the hand does
-let ownPick = false
-watchEffect(() => {
-  const s = step.value
-  if (s.t === 'bonusOffer' || s.t === 'killerBonusOffer') {
-    const o = bonusOwner.value
-    pathPick.value = pathPickFor(props.st, o === 'killer' ? props.st.killer.room : props.st.survivors[o].room, bonusCards.value, pickBonus)
-    ownPick = true
-  } else if (ownPick) {
-    pathPick.value = null
-    ownPick = false
-  }
-})
-onBeforeUnmount(() => ownPick && (pathPick.value = null))
-
-function confirmBonus() {
-  if (!bonusPick.value) return
-  preview.value = null
-  act({ t: 'bonus', card: bonusPick.value })
-}
-
-// ---------- chasing a crow: the whole bonus turn is settled here, then sent in one go ----------
-
-/** Whose bonus turn is being settled; null when nothing is. */
-const crowWho = computed(() => (step.value.t === 'survivorInteract' && props.bonusAsk ? step.value.s : null))
-/** What the question is about, in words: chasing a crow, or Power of Two on a friend. */
+/** What it is, in words: chasing a crow, Power of Two on a friend, or a bonus turn offered. */
 const bonusWhat = computed(() => {
   const i = props.bonusAsk?.i
-  if (!i) return ''
+  if (!i) return 'Bonus Turn'
   return i.k === 'partner' ? `${PERKS.power_of_two.name} กับ ${props.st.survivors[i.target].name}` : 'ไล่ Crow'
 })
-/** Each card in hand with where it would take them: none means the bonus turn is wasted (p.9). */
-const crowHand = computed<HandCard[]>(() => {
-  const s = crowWho.value
-  if (s === null) return []
-  return [...new Set(props.st.survivorHands[props.st.survivors[s].hand])].map((card) => {
-    const dead = isPathCard(card) && survivorMoves(props.st, s, card).length === 0
-    return { card, picked: props.bonusAsk!.card === card, ...(dead ? { badge: 'เดินไม่ได้' } : props.bonusAsk!.card === card ? { badge: 'Bonus Turn' } : {}) }
-  })
+const bonusCards = computed<MoveCard[]>(() => {
+  const w = bonusWho.value
+  if (w === null) return []
+  return w === 'killer' ? [...new Set(props.st.killer.hand)] : [...new Set(props.st.survivorHands[props.st.survivors[w].hand])]
 })
-/** Where the picked card could take them (one of these is clicked on the map when there are several). */
-const crowDests = computed(() => {
-  const s = crowWho.value
-  const card = props.bonusAsk?.card
-  return s === null || !card ? [] : survivorMoves(props.st, s, card)
-})
-
-function pickCrowCard(card: MoveCard) {
-  if (!props.bonusAsk || !isPathCard(card)) return
+/** Where a card takes them from their room: none means the bonus turn's move is wasted (p.9). */
+function bonusMoves(card: MoveCard) {
+  const w = bonusWho.value
+  if (w === null || !isPathCard(card)) return []
+  return w === 'killer' ? killerMoves(props.st, card) : survivorMoves(props.st, w, card)
+}
+const bonusPick = computed(() => props.bonusAsk?.card ?? null)
+/** The rooms the picked card reaches (clicked on the map). */
+const bonusRooms = computed(() => (bonusPick.value ? [...new Set(bonusMoves(bonusPick.value).map((m) => m.to))] : []))
+const bonusHand = computed<HandCard[]>(() =>
+  bonusCards.value.map((card) => {
+    const dead = isPathCard(card) && bonusMoves(card).length === 0
+    return { card, picked: bonusPick.value === card, ...(dead ? { badge: 'เดินไม่ได้' } : bonusPick.value === card ? { badge: 'Bonus Turn' } : {}) }
+  }),
+)
+function pickBonus(card: MoveCard) {
   sfx.click()
-  // one way out: it is settled at once, so the confirm is the only click left
-  const s = crowWho.value!
-  const only = survivorMoves(props.st, s, card)
-  const same = props.bonusAsk.card === card
-  emit('bonusAsk', same ? { ...props.bonusAsk, card: null, path: null } : { ...props.bonusAsk, card, path: only.length === 1 ? only[0].path.id : null })
+  const same = bonusPick.value === card
+  emit('bonusAsk', same ? (props.bonusAsk?.i ? { ...props.bonusAsk, card: null, path: null } : null) : { ...(props.bonusAsk ?? {}), card, path: null })
+}
+function hoverBonus(card: MoveCard | null) {
+  const w = bonusWho.value
+  if (w === null) return
+  preview.value = card ? choicePreview(props.st, { card }, w === 'killer' ? props.st.killer.room : props.st.survivors[w].room, w) : null
 }
 
 /**
- * Chase it, at last: the killer's ▲ (p.12), the card discarded and the move, all from one press.
- * The move is handed up to be made when the engine asks for it — a perk may be offered on the
- * card first. Nothing was sent before this, so every "ยกเลิก" above cost nothing.
+ * Send the bonus turn settled: the interaction first for a crow or Power of Two (the killer's ▲,
+ * p.12), then the card, and the move handed up to be made when the engine asks for it (a perk may
+ * be offered on the card first).
  */
-function confirmCrow() {
+function sendBonus() {
   const pick = props.bonusAsk
-  const i = pick?.i
-  const s = crowWho.value
-  if (!i || !pick || s === null) return
+  const w = bonusWho.value
+  if (w === null) return
   preview.value = null
-  const card = pick.card
-  const path = pick.path
+  const card = pick?.card ?? null
+  const path = pick?.path ?? null
   emit('bonusAsk', null)
-  if (!dispatch({ t: 'interact', i })) return
-  sfx.select()
-  // (`props.st` is the held view, which trails the game while the board plays, so it can't be
-  // asked whether the bonus turn is on offer: with an empty hand there is none and the second
-  // action is simply not legal — `dispatch` drops it and nothing else happens)
-  if (!card) return void dispatch({ t: 'declineBonus' })
-  if (path && isPathCard(card)) emit('bonusMove', { s, card, path })
+  if (path && card && isPathCard(card)) emit('bonusMove', { s: w, card, path })
+  if (pick?.i) {
+    // one action carries it all (`then`): the engine plays the card and the move on at once, so
+    // nothing is left to send after it (sent apart, online, the later ones were refused)
+    const then = { card, ...(path && card && isPathCard(card) ? { path } : {}) }
+    // kept too (from before the action, while they are still in their room): if the game asks
+    // something else first (a perk on the card), the rest goes when that is answered
+    if (w !== 'killer') emit('bonusCard', { s: w, card })
+    if (!dispatch({ t: 'interact', i: pick.i, then })) return void (emit('bonusCard', null), emit('bonusMove', null))
+    sfx.select()
+    return
+  }
+  if (!card) return
   dispatch({ t: 'bonus', card })
 }
-
-// the map: a path out of the room picks the card of its colour, as in any other bonus turn
-let crowPick = false
+onBeforeUnmount(() => (preview.value = null))
+// before a card is picked, a path out of their room on the map picks the card of its colour too (as
+// the hand does); the room is then clicked as usual
+let bonusPathPick = false
 watchEffect(() => {
-  const s = crowWho.value
-  if (s !== null && !props.bonusAsk?.card) {
-    pathPick.value = pathPickFor(props.st, props.st.survivors[s].room, [...new Set(props.st.survivorHands[props.st.survivors[s].hand])], pickCrowCard)
-    crowPick = true
-  } else if (crowPick) {
+  const w = bonusWho.value
+  if (w !== null && !bonusPick.value) {
+    pathPick.value = pathPickFor(props.st, w === 'killer' ? props.st.killer.room : props.st.survivors[w].room, bonusCards.value, pickBonus)
+    bonusPathPick = true
+  } else if (bonusPathPick) {
     pathPick.value = null
-    crowPick = false
+    bonusPathPick = false
   }
 })
-onBeforeUnmount(() => crowPick && (pathPick.value = null))
-
-function hoverCrow(card: MoveCard | null) {
-  const s = crowWho.value
-  preview.value = card && s !== null ? choicePreview(props.st, { card }, props.st.survivors[s].room, s) : null
-}
+onBeforeUnmount(() => bonusPathPick && (pathPick.value = null))
+// the room clicked on the map: it all goes
+watch(
+  () => props.bonusAsk?.go,
+  (go) => {
+    if (go) sendBonus()
+  },
+)
 
 // ---------- Scent of Blood, step 2: a card for The Dog, picked from the hand, then confirmed ----------
 
@@ -826,17 +810,19 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <template v-else-if="bonusAsk">
         <p>
           <b>{{ bonusWhat }}</b> — {{ st.killer.name }} ได้ +1 <BpIcon /> แล้วเล่น Bonus Turn: ทิ้งการ์ด 1 ใบ เคลื่อนที่ + Interact อีกครั้ง (หน้า 12)<br />
-          <span class="muted small">ยังไม่เสียอะไรจนกว่าจะกดยืนยัน — 👇 เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</span>
+          <span class="muted small">ยังไม่เสียอะไรจนกว่าจะคลิกห้อง — ยกเลิกได้</span>
         </p>
-        <p v-if="bonusAsk.card && !bonusAsk.path && crowDests.length" class="board-hint">🎯 คลิกเส้นทางที่จะไปบนแผนที่ ({{ crowDests.length }} ทาง)</p>
-        <p v-if="bonusAsk.card && crowDests.length === 0" class="warn">{{ CARD_NAMES[bonusAsk.card] }} ไม่มีเส้นทางจากห้องนี้ — เดินไม่ได้ และเสียการ Interact ของ Bonus Turn ไปด้วย</p>
+        <p v-if="!bonusPick" class="board-hint">👇 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</p>
+        <p v-else-if="bonusRooms.length" class="board-hint">🎯 2. คลิกห้องที่จะไปบนแผนที่ ({{ bonusRooms.map((r) => roomName(st, r)).join(' · ') }}) — ไปทันที</p>
+        <p v-else-if="isPathCard(bonusPick)" class="warn">{{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ — เดินไม่ได้ และเสียการ Interact ของ Bonus Turn ไปด้วย</p>
         <div class="buttons col way-on">
-          <button class="primary" :disabled="(!bonusAsk.card && crowHand.length > 0) || (crowDests.length > 0 && !bonusAsk.path)" @click="confirmCrow">
-            {{ !crowHand.length ? `ยืนยัน: ${bonusWhat} (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)` : !bonusAsk.card ? 'เลือกการ์ดก่อน' : crowDests.length && !bonusAsk.path ? 'เลือกเส้นทางบนแผนที่ก่อน' : `ยืนยัน: ${bonusWhat} แล้ว Bonus Turn ด้วย ${CARD_NAMES[bonusAsk.card]}` }}
+          <!-- nothing to click on the map (no card left, or a card that can't move): confirmed here -->
+          <button v-if="!bonusCards.length || (bonusPick && !bonusRooms.length)" class="primary" @click="sendBonus">
+            {{ !bonusCards.length ? `ยืนยัน: ${bonusWhat} (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)` : `ยืนยัน: ${bonusWhat} แล้ว Bonus Turn ด้วย ${CARD_NAMES[bonusPick!]}` }}
           </button>
           <button @click="emit('bonusAsk', null), sfx.click()">ยกเลิก</button>
         </div>
-        <CardHand :cards="crowHand" :label="`Bonus Turn — มือของ ${st.survivors[step.s].name}`" @pick="pickCrowCard" @hover="hoverCrow" />
+        <CardHand :cards="bonusHand" :label="`Bonus Turn — มือของ ${st.survivors[step.s].name}`" @pick="pickBonus" @hover="hoverBonus" />
       </template>
       <!-- the perks that ARE this turn's interaction are asked before it (`interactGate`) -->
       <p v-else-if="gateOpen">
@@ -884,7 +870,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         <!-- the question's other answer; and a way back to it for a player who changes their mind -->
         <button v-if="gateOpen" class="primary" @click="declineGate">ไม่ใช้ Perk — Interact ตามปกติ</button>
         <button v-else-if="plainInteract && gateCards.length && !perkPicked" class="small" @click="plainInteract = false">↩ กลับไปดู Perk ที่ใช้แทน Interact</button>
-        <button class="end" @click="act({ t: 'endTurn' })">จบเทิร์น</button>
+        <button v-if="!gateOpen" class="end" @click="act({ t: 'endTurn' })">จบเทิร์น (ไม่ทำอะไรต่อ)</button>
       </div>
     </template>
 
@@ -896,9 +882,13 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p v-else-if="step.t === 'bonusOffer'">Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง (หน้า 9)</p>
       <p v-else-if="step.free"><b>สลิปสตรีม</b> — การ์ดทั้งหมดกลับเข้ามือแล้ว เลือกการ์ด 1 ใบเล่น Bonus Turn (ไม่เสีย ▲)</p>
       <p v-else>จ่าย {{ bonusCost(st) }} <BpIcon /> (มี {{ st.killer.bp }}) เพื่อเล่นเทิร์นที่ 3? (หน้า 10)</p>
-      <p class="muted small">👇 ชี้ไพ่บนมือด้านล่างเพื่อดูเส้นทาง · คลิกเพื่อเลือก แล้วกดยืนยัน</p>
-      <div class="buttons col">
-        <button class="primary" :disabled="!bonusPick" @click="confirmBonus">{{ bonusPick ? `ยืนยัน: Bonus Turn ด้วย ${CARD_NAMES[bonusPick]}` : 'เลือกการ์ดจากมือก่อน' }}</button>
+      <p v-if="!bonusPick" class="board-hint">👇 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</p>
+      <p v-else-if="bonusRooms.length" class="board-hint">🎯 2. คลิกห้องที่จะไปบนแผนที่ ({{ bonusRooms.map((r) => roomName(st, r)).join(' · ') }}) — ไปทันที</p>
+      <p v-else-if="isPathCard(bonusPick)" class="warn">{{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ — เดินไม่ได้ และเสียการ Interact ของ Bonus Turn ไปด้วย</p>
+      <div class="buttons col way-on">
+        <!-- Wait, or a card that can't move: nothing to click on the map, so it is confirmed here -->
+        <button v-if="bonusPick && !bonusRooms.length" class="primary" @click="sendBonus">ยืนยัน: Bonus Turn ด้วย {{ CARD_NAMES[bonusPick] }}</button>
+        <button v-if="bonusPick" @click="emit('bonusAsk', null), sfx.click()">ยกเลิก (เลือกการ์ดใหม่)</button>
         <button v-if="step.t !== 'killerBonusOffer' || !step.free" @click="act({ t: 'declineBonus' })">ไม่เล่น</button>
       </div>
       <CardHand
@@ -1289,8 +1279,23 @@ p {
 .buttons.col button {
   text-align: left;
 }
+/* ending the turn: small, quiet and set apart from the answers above it, so it isn't hit instead */
 .end {
   justify-self: start;
+  margin-top: 0.9rem;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  background: none;
+  border: 1px dashed rgb(255 255 255 / 0.3);
+  color: var(--muted);
+}
+.buttons.col .end {
+  align-self: flex-start;
+  text-align: center;
+}
+.end:hover {
+  color: var(--text);
+  border-color: rgb(255 255 255 / 0.55);
 }
 .flip {
   display: flex;

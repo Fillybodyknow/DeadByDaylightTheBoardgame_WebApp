@@ -54,7 +54,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 | `src/play/components/` | Game UI: `GameScreen` (layout), `Board`, `ActionPanel`, `PerkPrompt`, `Planning`, `CardHand`, `StatusPanel` (player tiles), `ObjectiveHud` (both sides' goals, under the tiles), modals |
 | `src/play/engine/loadout.ts` | Game modes Adept / Bloodweb / Devout (p.19): the perk-card deck, Bloodweb's draws, what a loadout may hold; `createGame` takes each character's `perks` |
 | `src/play/engine/offerings.ts` | Offerings (p.19): ids, sides, all ten played (`READY_OFFERINGS`), how many a side burns. Room settings `offerings` / `offeringCount` / `offeringRandom`; `createGame` takes `offerings` and `drawOfferings`; effects in `engine.ts` (`hasOffering`) |
-| `src/play/components/PerkLoadout.vue` | The perk loadout screen (PC game style): 3 slots, a honeycomb of perk cards with cost badges, a details box (`PerkRichText` lights key words) |
+| `src/play/components/PerkLoadout.vue` | The perk loadout screen (PC game style): 3 slots, a honeycomb of perk icons with cost badges, a details box as the PC game's (a see-through head in the perk's colour; `PerkRichText` lights key words) |
+| `public/assets/*/perk-icons`, `offering-icons`, `power-icons` | The icon alone, cut from each perk / offering / power card (the English ones): the diamond, hexagon or square, clear outside its outline (`perkIcon`, `offeringIcon`, `powerIcon` in `labels.ts`). Made by a script that finds each outline on its card; a new card needs its icon made too |
 | `src/play/boardActions.ts` | Everything clickable on the board right now |
 | `src/play/focus.ts` | Board highlights and the facts listed for a decision |
 | `src/play/labels.ts` | Thai labels for actions, perk choices, windows |
@@ -187,8 +188,8 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   `online/pingColors.ts`). Everyone sees it, the killer too (no secret talk, p.8); spam is limited on the device and by
   the database rules. Not part of the game: never saved or replayed.
 - **Chat (online):** one channel for the room, the killer reads it too (p.8), spectators may write
-  (`chat.ts`, `ChatPanel`, `ChatDock`). Lobby: a panel beside the room on wide screens, a 💬 button
-  otherwise. Game: a 💬 tab under the side panel's tab opens a drawer (Enter to type), an unread
+  (`chat.ts`, `ChatPanel`, `ChatDock`). Room (lobby and picks): in the corner above the room's
+  button, as the PC game's. Game: a 💬 tab under the side panel's tab opens a drawer (Enter to type), an unread
   badge, and each new message as a 6 s bubble beside the sender's tile. Never saved or replayed.
   Notices in it (joined, left, kicked, lost connection, back) come from the members' changes.
 - **Voice (online):** one channel for the room, WebRTC between the devices, the room carrying only
@@ -236,6 +237,16 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   `onDisconnect`, `Room.presence`); in a game they keep their seat, marked `dropped`. Re-set after
   every reconnection (`settle` in `session.ts`). Leaving with the button from the picks on marks
   them `dropped` too, and a host who leaves hands the role on (`leaveRoom`).
+- **The online room is laid out as the PC game's lobby** (`OnlineRoom`): one screen from the lobby
+  to the start, the whole width under the top bar — the campfire in the side's colour, everyone on
+  their places, standing (each board's portrait strip, a dark pillar until a character is picked;
+  an empty one taken with a click), this player's character big on the right, the
+  perks worn in the corner, the chat above **one button** in the corner that does whatever moves
+  things on for this player now (or opens the panel where there is a choice to make first). A rail on
+  the left opens one panel at a time — ตัวละคร, อุปกรณ์ (power, perks, offerings), แผนที่, ห้อง — over
+  a see-through slate; the rail button of the room's next step glows until opened (nothing opens by
+  itself). Details in
+  `src/play/README.md` → Online play.
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board
   already offers and show "เลือกบนแผนที่" instead. A perk of the interact step that does **not**
@@ -251,9 +262,11 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 - **An interaction that buys the killer a ▲ is settled whole before any of it happens**
   (`bonusAsk` in `boardActions.ts`): chasing a crow (p.12) and Power of Two. A click on the crow
   (or on the friend) sends nothing — the panel asks for the card the bonus turn discards (from the
-  hand, or by clicking a path of its colour) and, where that colour leaves the room several ways,
-  which path; only "ยืนยัน" sends the lot (`confirmCrow`: the interaction, then the card, and the
-  move through `moveIntent` in GameScreen, since a perk may be offered on the card first). "ยกเลิก"
+  hand, or by clicking a path of its colour), then the room on the map, and that click sends the
+  lot as one action (`sendBonus`): the interaction with `then: { card, path }`, which the engine
+  plays on (`bonusThen`), so online it is one move to the room (sent as three, the later ones were
+  refused and the player asked again). A perk asked on the card first stops it there; the rest
+  goes once that is answered (`bonusIntent` / `moveIntent` in GameScreen). "ยกเลิก"
   at any point costs nothing. Before this the ▲ was paid on the first click, and a card with no
   path out loses the bonus turn's interaction too (`startSurvivorMove`), so a player could buy the
   killer a ▲ for nothing — which is what happened (a player's report). Cards with no path show

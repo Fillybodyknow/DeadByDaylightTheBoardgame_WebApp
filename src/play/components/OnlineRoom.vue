@@ -1,15 +1,19 @@
 <script setup lang="ts">
-// An online room before the game.
-//   Lobby: laid out as a PC game's — the killer's slot against four survivor slots (a click on an
-//   empty one takes that side), the room's settings, and a bar at the foot to say ready; the host
-//   goes on when everyone is.
-//   Picks: survivor players pick their survivors (they see each other's, no duplicates, and
-//   nothing of the killer's side); the killer picks and sees the survivors' picks; when
-//   everyone has locked in, the killer starts the game (the host, when a bot is the killer).
-//   Bots: the host seats them in the lobby; they are always ready and get drawn characters.
-import { computed, ref, watch } from 'vue'
+// An online room before the game, laid out as the PC game's lobby (one screen from the lobby to
+// the start): the campfire behind, the players on their places (the killer's against the four
+// survivors' — a click on an empty one takes it), this player's character big on the right, the
+// chat and the one button that moves things on in the corner.
+//   A rail on the left opens a panel at a time: ตัวละคร (the side in the lobby; the bans and the
+//   character in the picks), อุปกรณ์ (the killer's power, the perks and the offerings), แผนที่ and
+//   ห้อง (the room's settings, the ping colour, the bots, who watches).
+//   The rules' order stays the room's (session.ts): the bans before the characters, every character
+//   locked before the perks (Bloodweb deals from them all); a panel not open yet says why. The
+//   offerings are set alongside the perks.
+//   Survivors never see the killer's pick (unless the room shows it); Devout's perks stay each
+//   player's own until the game.
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { killerById, survivorById } from '../../data'
-import { asset, cssUrl } from '../../i18n'
+import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { fxSound } from '../fx/audio'
 import { KILLER_PLAYER } from '../engine/seats'
@@ -65,19 +69,20 @@ import {
   slotsOf,
   startable,
   startOnlineGame,
+  bansDone,
+  allLocked,
 } from '../online/session'
-import { cardChoices, printedOf, takenBy } from '../engine/loadout'
-import type { PerkId } from '../engine/perks'
+import { cardChoices, ownPerk, printedOf, takenBy } from '../engine/loadout'
+import { PERKS, type PerkId } from '../engine/perks'
 import BanPicker from './BanPicker.vue'
-import ChatDock from './ChatDock.vue'
+import ChatPanel from './ChatPanel.vue'
 import CharacterPicker from './CharacterPicker.vue'
-import StageBar from './StageBar.vue'
 import { PING_COLORS, pingHex } from '../online/pingColors'
 import PerkLoadout from './PerkLoadout.vue'
-import OfferingPicker from './OfferingPicker.vue'
+import PcTip from './PcTip.vue'
+import PerkRichText from '../../components/PerkRichText.vue'
 import { offeringProblem, type OfferingId } from '../engine/offerings'
 import MapPicker from './MapPicker.vue'
-import Mini from './Mini.vue'
 import RoomSettingsCard from './RoomSettingsCard.vue'
 import SyncBadge from './SyncBadge.vue'
 import VoiceButton from './VoiceButton.vue'
@@ -86,9 +91,11 @@ import { lobbyLacks } from '../online/lfg'
 import { playableKillers } from '../online/settings'
 import { openProfile } from '../../profile'
 import { voice } from '../voice'
+import { perkIcon, perkText, perkTone } from '../labels'
 
 const data = computed(() => session.data!)
 const code = computed(() => session.room?.code ?? '')
+const inLobby = computed(() => data.value.phase === 'lobby')
 
 // ---------- invite ----------
 
@@ -133,6 +140,35 @@ function onLfgPosted() {
   setTimeout(() => (lfgPosted.value = false), 2500)
 }
 
+// ---------- the room fills the screen under the app's top bar ----------
+
+/** The top bar's height, for the room to take the rest of the screen (the bar wraps on a narrow one). */
+let barWatch: ResizeObserver | null = null
+onMounted(() => {
+  const bar = document.querySelector<HTMLElement>('.topbar')
+  if (!bar) return
+  const set = () => document.documentElement.style.setProperty('--topbar-h', `${bar.offsetHeight}px`)
+  set()
+  barWatch = new ResizeObserver(set)
+  barWatch.observe(bar)
+})
+onBeforeUnmount(() => barWatch?.disconnect())
+
+// ---------- the panels on the left ----------
+
+type Tab = 'chars' | 'gear' | 'map' | 'room'
+const tab = ref<Tab | null>(null)
+function openTab(t: Tab) {
+  sfx.click()
+  tab.value = tab.value === t ? null : t
+}
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'chars', label: 'ตัวละคร' },
+  { id: 'gear', label: 'อุปกรณ์' },
+  { id: 'map', label: 'แผนที่' },
+  { id: 'room', label: 'ห้อง' },
+]
+
 // ---------- lobby ----------
 
 // someone joins or leaves the lobby: a sound (not for the room as you open it)
@@ -146,7 +182,7 @@ watch(
 )
 
 /**
- * Your own name on your seat opens the profile (the top bar's): the name is set there only, and
+ * Your own name on your place opens the profile (the top bar's): the name is set there only, and
  * the room follows it (session.ts).
  */
 function rename() {
@@ -154,9 +190,9 @@ function rename() {
   openProfile()
 }
 
-/** The lineup: the killer's slot, four survivor slots (empty ones null), and who hasn't chosen. */
+/** The lineup: the killer's place, four survivor places (empty ones null), and who hasn't chosen. */
 const killerMember = computed(() => memberList.value.find((m) => m.side === 'killer') ?? null)
-/** The four survivor slots: each member in the slot they took, those without one in the first free. */
+/** The four survivor places: each member in the one they took, those without one in the first free. */
 const survivorMembers = computed(() => {
   const on = memberList.value.filter((m) => m.side === 'survivor')
   const slots: ((typeof on)[number] | null)[] = [null, null, null, null]
@@ -180,11 +216,6 @@ const colorHolder = (color: string) => {
 /** The seated players (a side taken): only they say ready; the others watch the game. */
 const seated = computed(() => memberList.value.filter((m) => m.side))
 const readyCount = computed(() => seated.value.filter((m) => m.ready || m.bot).length)
-/** The silhouettes on the slots: the figure on the Sprint card, the skull on a card's back. */
-// each survivor seat shows one of the four movement cards (Sneak, Sprint, Crouch, Vault), the killer's the skull
-const SEAT_CARDS = ['sneak', 'sprint', 'crouch', 'vault'] as const
-const artVars = { ...Object.fromEntries(SEAT_CARDS.map((c) => [`--${c}`, cssUrl(`assets/movement/${c}.webp`)])), '--skull': cssUrl('assets/movement/back-skull.webp') }
-const seatArt = (i: number) => `var(--${SEAT_CARDS[i % SEAT_CARDS.length]})`
 
 const killerTaken = computed(() => memberList.value.some((m) => m.side === 'killer' && m.id !== session.me))
 const survivorCount = computed(() => memberList.value.filter((m) => m.side === 'survivor').length)
@@ -192,6 +223,32 @@ const survivorCount = computed(() => memberList.value.filter((m) => m.side === '
 function side(s: 'killer' | 'survivor') {
   sfx.click()
   void setSide(me.value?.side === s ? null : s)
+}
+function watchOnly() {
+  sfx.click()
+  void setSide(null)
+}
+
+/**
+ * The rail's role switch (the lobby): to the next role there is room for, as the PC game's —
+ * spectator → killer → survivor → spectator.
+ */
+const nextRole = computed<{ side: 'killer' | 'survivor' | null; label: string } | null>(() => {
+  const order: ('killer' | 'survivor' | null)[] = [null, 'killer', 'survivor']
+  const at = order.indexOf(me.value?.side ?? null)
+  for (let i = 1; i < order.length; i++) {
+    const s = order[(at + i) % order.length]
+    if (s === 'killer' && killerTaken.value) continue
+    if (s === 'survivor' && survivorCount.value >= 4) continue
+    return { side: s, label: s === 'killer' ? 'เปลี่ยนเป็นฆาตกร' : s === 'survivor' ? 'เปลี่ยนเป็นผู้รอดชีวิต' : 'เปลี่ยนเป็นผู้ชม' }
+  }
+  return null
+})
+function switchRole() {
+  const r = nextRole.value
+  if (!r || session.busy) return
+  sfx.click()
+  void setSide(r.side)
 }
 
 /** The host may kick anyone else out of the lobby. */
@@ -203,22 +260,22 @@ function kick(id: string) {
   void kickMember(id)
 }
 
-/** Your own seat, while not ready yet: a click on it leaves that side. */
-const leavable = (id: string | undefined) => !!id && id === session.me && !me.value?.ready
 /** Voice: this member is speaking now, and their mic's state in words. */
 const talking = (id: string | undefined) => !!id && !!voice.speaking[id]
 const voiceTitle = (id: string) => (voice.roster[id]?.m ? 'อยู่ในห้องเสียง — ไมค์ปิด' : 'อยู่ในห้องเสียง')
 
-/** A click on a seat: an empty one takes that side, your own one leaves it. */
-/** `slot`: which survivor slot was clicked (the one taken). */
+/**
+ * A click on a place: an empty one takes that side (`slot`: which survivor place). A taken one,
+ * your own too, does nothing: the side is changed with the rail's role switch only (a click on
+ * your own place used to leave the side, which looked like that button going off by itself).
+ */
 function clickSeat(s: 'killer' | 'survivor', id: string | undefined, slot?: number) {
   if (!id) return takeSlot(s, slot)
-  if (leavable(id) && !session.busy) side(s)
 }
 
 /**
- * A click on an empty slot: take that side (moving over from the other one), in that slot; a
- * survivor already moves to the empty survivor slot clicked.
+ * A click on an empty place: take that side (moving over from the other one), at that place; a
+ * survivor already moves to the empty survivor place clicked.
  */
 function takeSlot(s: 'killer' | 'survivor', slot?: number) {
   if (session.busy) return
@@ -233,12 +290,12 @@ function takeSlot(s: 'killer' | 'survivor', slot?: number) {
   void setSide(s, slot)
 }
 
-/** Host: a bot takes the killer's side or the first free survivor slot. */
-function seatBot(s: 'killer' | 'survivor') {
+/** Host: a bot takes the killer's side or a survivor place (`seat`, else the first free). */
+function seatBot(s: 'killer' | 'survivor', seat?: number) {
   sfx.click()
-  void addBot(s)
+  void addBot(s, seat)
 }
-/** The killers a bot can play, for the host's pick on its seat. */
+/** The killers a bot can play, for the host's pick on its place. */
 const botKillers = playableKillers()
 function pickBotKiller(id: string, pick: string) {
   sfx.click()
@@ -275,7 +332,6 @@ const amKiller = computed(() => mySeat.value === KILLER_PLAYER)
 const mySlots = computed(() => (mySeat.value ? slotsOf(mySeat.value) : []))
 const locked = computed(() => !!mySeat.value && !!data.value.locked[String(mySeat.value)])
 
-
 /** The slot this player is filling now: the first of theirs still empty, or the one tapped. */
 const activeSlot = ref<number | null>(null)
 watch(
@@ -292,10 +348,12 @@ const survivorSlots = computed(() =>
   [0, 1, 2, 3].map((slot) => {
     const player = Number(Object.keys(data.value.seats).find((p) => slotsOf(Number(p)).includes(slot)) ?? 0)
     const id = data.value.picks[String(slot)]
+    const seat = data.value.seats[String(player)]
     return {
       slot,
       player,
-      who: (botSeat(data.value, player) ? '🤖 ' : '') + (data.value.seats[String(player)]?.name ?? ''),
+      memberId: seat?.id,
+      who: seat?.name ?? '',
       mine: player === mySeat.value,
       bot: botSeat(data.value, player),
       character: id ? survivorById.get(id) : undefined,
@@ -316,8 +374,8 @@ const boardChooser = computed(() =>
   botSeat(data.value, KILLER_PLAYER) && roomSettings.value.map !== 'host' ? 'สุ่ม' : { killer: 'ฆาตกร', host: 'หัวห้อง', random: 'สุ่ม' }[roomSettings.value.map],
 )
 
-/** The killer's pick, for the survivors when the room shows it. */
-const shownKiller = computed(() => (roomSettings.value.showKiller && data.value.picks.killer ? killerById.get(data.value.picks.killer) : undefined))
+/** The killer's character, for whoever may see it: the killer, or everyone when the room shows it. */
+const killerChar = computed(() => (data.value.picks.killer && (amKiller.value || roomSettings.value.showKiller) ? killerById.get(data.value.picks.killer) : undefined))
 
 function pickKiller(id: string) {
   fxSound.charPick()
@@ -350,6 +408,34 @@ const myPicks = computed(() => mySlots.value.map((s) => data.value.picks[String(
 const myPicksComplete = computed(() =>
   amKiller.value ? !!data.value.picks.killer : mySlots.value.length > 0 && mySlots.value.every((s) => data.value.picks[String(s)]),
 )
+// every character of this player picked: the characters' panel closes, the scene shows them (a
+// survivor playing several closes it with the last one)
+watch(
+  () => (myPicksComplete.value ? (amKiller.value ? (data.value.picks.killer ?? '') : myPicks.value.join(',')) : null),
+  (picked, was) => {
+    // every pick that completes them (a character changed for another too), not only the first
+    if (picked && picked !== was && tab.value === 'chars') tab.value = null
+  },
+)
+const picksMissing = computed(() => (amKiller.value ? (data.value.picks.killer ? 0 : 1) : mySlots.value.length - myPicks.value.length))
+
+function toggleLock() {
+  // a character changing deals the perks again: everyone sets theirs anew
+  if (locked.value && perkStage.value && !confirm('เปลี่ยนตัวละครจะล้าง Perk ที่ทุกคนแต่งไว้ ให้แต่งใหม่ทั้งหมด — ต่อไหม?')) return
+  if (locked.value) fxSound.charUnconfirm()
+  else fxSound.charConfirm()
+  void lockPicks(!locked.value)
+}
+
+// ---------- the bans ----------
+
+const myBansLocked = computed(() => !!mySeat.value && !!data.value.bansLocked?.[String(mySeat.value)])
+const banWaiting = computed(() => Array.from({ length: data.value.players }, (_, i) => String(i + 1)).filter((p) => !data.value.bansLocked?.[p] && !botSeat(data.value, p)).length)
+function toggleBans() {
+  if (myBansLocked.value) fxSound.charUnconfirm()
+  else fxSound.charConfirm()
+  void lockBans(!myBansLocked.value)
+}
 
 // ---------- perks (Bloodweb, Devout): this device's characters, once everyone is locked in ----------
 
@@ -360,14 +446,51 @@ const myLoadouts = computed(() =>
     return c ? [{ ...c, perks: roomLoadouts.value[key] ?? printedOf(c.id) }] : []
   }),
 )
+/** The character whose perks the panel shows (a player with several switches between them). */
+const loadoutKey = ref<string | null>(null)
+const shownLoadout = computed(() => myLoadouts.value.find((c) => c.key === loadoutKey.value) ?? myLoadouts.value[0] ?? null)
 const perkTaken = (key: string) => [...takenBy(perkChars.value, roomLoadouts.value, key)]
 const perkDone = (key: string) => !!data.value.perksDone?.[key]
 function confirmLoadout(key: string, on: boolean) {
   sfx.select()
   void confirmPerks(key, on)
+  // confirmed: the panel closes, as the characters' does (what is left glows on the rail)
+  if (on && tab.value === 'gear') tab.value = null
 }
+/** This player's loadouts still to confirm. */
+const myPerksOpen = computed(() => (roomSettings.value.mode === 'adept' || !perkStage.value ? [] : myLoadouts.value.filter((c) => !perkDone(c.key))))
 
-// ---------- offerings (p.19): this player's side's, once the characters and perks are in ----------
+/** The character this player sees big on the right, and wears in the corner: the one picked. */
+const myCharacter = computed(() => {
+  if (inLobby.value || !mySeat.value) return null
+  if (amKiller.value) {
+    const id = data.value.picks.killer
+    return id ? { side: 'killer' as const, key: 'killer', c: killerById.get(id) } : null
+  }
+  const slot = activeSlot.value ?? mySlots.value[0]
+  const id = slot !== undefined && slot !== null ? data.value.picks[String(slot)] : undefined
+  return id ? { side: 'survivor' as const, key: String(slot), c: survivorById.get(id) } : null
+})
+/** A perk worn, pointed at: its box beside it (to the left: the corner is on the right). */
+const wornTip = ref<{ p: PerkId; x: number; y: number } | null>(null)
+function pointWorn(p: PerkId, e: MouseEvent | FocusEvent) {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  wornTip.value = { p, x: Math.max(8, r.left - 452), y: Math.min(r.top, window.innerHeight - 320) }
+}
+/** Its colour: the character's own (purple), printed on its board (green), or a card laid (gold). */
+function wornKind(p: PerkId): 'own' | 'shared' | 'card' {
+  const id = myCharacter.value?.c?.id
+  if (!id || !printedOf(id).includes(p)) return 'card'
+  return ownPerk(p) ? 'own' : 'shared'
+}
+/** Its perks: the loadout set, or the ones printed on its board. */
+const myCharacterPerks = computed<PerkId[]>(() => {
+  const m = myCharacter.value
+  if (!m?.c) return []
+  return roomLoadouts.value[m.key] ?? printedOf(m.c.id)
+})
+
+// ---------- offerings (p.19): this player's side's, once the characters are in ----------
 
 /** This side's slots, when it picks its offerings now (null: nothing to pick here). */
 const myOfferingSlots = computed(() => {
@@ -381,223 +504,579 @@ function pickOfferings(list: OfferingId[]) {
 function confirmMyOfferings(on: boolean) {
   sfx.select()
   void confirmOfferings(on)
+  if (on && tab.value === 'gear') tab.value = null
 }
 
-function toggleLock() {
-  // a character changing deals the perks again: everyone sets theirs anew
-  if (locked.value && perkStage.value && !confirm('เปลี่ยนตัวละครจะล้าง Perk ที่ทุกคนแต่งไว้ ให้แต่งใหม่ทั้งหมด — ต่อไหม?')) return
-  if (locked.value) fxSound.charUnconfirm()
-  else fxSound.charConfirm()
-  void lockPicks(!locked.value)
-}
-
+/**
+ * What this player confirmed and may take back while the room still waits (beside the corner
+ * button, where it is seen — not inside the panel): each character's perks, the side's offerings.
+ * Taking one back opens the equipment panel on it.
+ */
+const undos = computed(() => {
+  if (inLobby.value || !mySeat.value || startable.value) return []
+  const out: { key: string; label: string; run: () => void }[] = []
+  if (roomSettings.value.mode !== 'adept' && perkStage.value)
+    for (const c of myLoadouts.value)
+      if (perkDone(c.key))
+        out.push({
+          key: `p${c.key}`,
+          label: myLoadouts.value.length > 1 ? `✎ แก้ Perk ${c.side === 'killer' ? 'Killer' : `Survivor ${Number(c.key) + 1}`}` : '✎ แก้ Perk',
+          run: () => {
+            confirmLoadout(c.key, false)
+            loadoutKey.value = c.key
+            tab.value = 'gear'
+          },
+        })
+  if (myOfferingSlots.value && myOfferingsDone.value)
+    out.push({
+      key: 'o',
+      label: '✎ แก้เครื่องเซ่น',
+      run: () => {
+        confirmMyOfferings(false)
+        tab.value = 'gear'
+      },
+    })
+  return out
+})
+/** The offering slot in the loadout: picked here, or only shown (drawn, or this side burns none). */
+const offeringSlot = computed(() => {
+  const side = myOfferingSide.value
+  if (!side) return null
+  if (myOfferingSlots.value) return { side, slots: myOfferingSlots.value, picked: myOfferings.value, problem: myOfferingProblem.value, confirmed: myOfferingsDone.value }
+  const slots = offeringSlotsNow.value[side]
+  if (!slots) return null
+  return { side, slots, picked: [], problem: '', confirmed: true, note: roomSettings.value.offeringRandom ? 'เครื่องเซ่นสุ่มให้ตอนเริ่มเกม' : 'เลือกเครื่องเซ่นได้หลังทุกคนล็อกตัวละคร' }
+})
 
 function start() {
   sfx.entity()
   void startOnlineGame()
 }
 
-// ---------- the confirm bar of the characters stage ----------
-
-/** How many are done, as the others may see it (the killer's own progress is only the killer's unless shown). */
-const barTotal = computed(() => (amKiller.value || roomSettings.value.showKiller ? data.value.players : data.value.players - 1))
-const barDone = computed(() =>
-  Array.from({ length: data.value.players }, (_, i) => i + 1).filter(
-    (p) => (data.value.locked[String(p)] || botSeat(data.value, p)) && (p !== KILLER_PLAYER || amKiller.value || roomSettings.value.showKiller),
-  ).length,
-)
-const picksMissing = computed(() => (amKiller.value ? (data.value.picks.killer ? 0 : 1) : mySlots.value.length - myPicks.value.length))
-
-// ---------- the bans ----------
-
-const myBansLocked = computed(() => !!mySeat.value && !!data.value.bansLocked?.[String(mySeat.value)])
-const banWaiting = computed(() => Array.from({ length: data.value.players }, (_, i) => String(i + 1)).filter((p) => !data.value.bansLocked?.[p] && !botSeat(data.value, p)).length)
-function toggleBans() {
-  if (myBansLocked.value) fxSound.charUnconfirm()
-  else fxSound.charConfirm()
-  void lockBans(!myBansLocked.value)
-}
-
-// ---------- the stages ----------
-
-const stage = pickStage
-/** The steps of the picks, in order (bans and perks only when the room sets them). */
-const steps = computed(() => [
-  ...(roomSettings.value.banlist ? [{ id: 'bans', label: 'แบนตัวละคร' }] : []),
-  { id: 'chars', label: 'เลือกตัวละคร' },
-  ...(roomSettings.value.mode !== 'adept' ? [{ id: 'perks', label: 'แต่ง Perk' }] : []),
-  ...(roomSettings.value.offerings !== 'none' && !roomSettings.value.offeringRandom ? [{ id: 'offerings', label: 'เลือก Offering' }] : []),
-  { id: 'map', label: 'เลือกแผนที่' },
-])
-const stepIndex = computed(() => Math.max(0, steps.value.findIndex((s) => s.id === stage.value)))
+// ---------- who is done with what: the places' marks ----------
 
 /** Which player each character key belongs to: 'killer' is player 1, a survivor slot its hand's player. */
 function playerOfKey(key: string): number {
-  return key === 'killer' ? KILLER_PLAYER : survivorSlots.value[Number(key)]?.player ?? 0
+  return key === 'killer' ? KILLER_PLAYER : (survivorSlots.value[Number(key)]?.player ?? 0)
 }
 
 /**
- * Each player and whether they are done with this stage (null: not shown — the killer's own
+ * Whether a player is done with what the room waits on now (null: not shown — the killer's own
  * progress is only the killer's, unless the room shows the killer).
  */
-const seatStatus = computed(() =>
-  Array.from({ length: data.value.players }, (_, i) => i + 1).map((player) => {
-    const killer = player === KILLER_PLAYER
-    const hidden = stage.value === 'chars' && killer && !amKiller.value && !roomSettings.value.showKiller
-    // a bot has nothing to do before the game
-    const done = botSeat(data.value, player)
-      ? true
-      : stage.value === 'bans'
-        ? !!data.value.bansLocked?.[String(player)]
-        : stage.value === 'chars'
-          ? !!data.value.locked[String(player)]
-          : stage.value === 'perks'
-            ? perkChars.value.filter((c) => playerOfKey(c.key) === player).every((c) => perkDone(c.key))
-            : stage.value === 'offerings'
-              ? !offeringsWaiting.value.includes(killer ? 'killer' : 'survivor')
-              : true
-    return { player, killer, bot: botSeat(data.value, player), name: data.value.seats[String(player)]?.name ?? '', mine: player === mySeat.value, done: hidden ? null : done }
-  }),
-)
+function seatDone(player: number): boolean | null {
+  const killer = player === KILLER_PLAYER
+  if (botSeat(data.value, player)) return true
+  const st = pickStage.value
+  if (st === 'chars' && killer && !amKiller.value && !roomSettings.value.showKiller) return null
+  if (st === 'bans') return !!data.value.bansLocked?.[String(player)]
+  if (st === 'chars') return !!data.value.locked[String(player)]
+  const perks = perkChars.value.filter((c) => playerOfKey(c.key) === player).every((c) => perkDone(c.key))
+  const offerings = !offeringsWaiting.value.includes(killer ? 'killer' : 'survivor')
+  return (roomSettings.value.mode === 'adept' || perks) && offerings
+}
 
+// ---------- the one button in the corner: what moves things on for this player now ----------
+
+interface Action {
+  label: string
+  /** The line beside it: what the room waits on. */
+  note: string
+  run?: () => void
+  /** The panel it opens instead, when there is something to do there first. */
+  open?: Tab
+  done?: boolean
+  primary?: boolean
+}
+
+const action = computed<Action>(() => {
+  const d = data.value
+  if (inLobby.value) {
+    const waitLine = lobbyBlocker.value || (isHost.value ? 'ทุกคนพร้อมแล้ว' : 'ทุกคนพร้อมแล้ว — รอหัวห้องดำเนินเกม')
+    const note = `พร้อม ${readyCount.value}/${seated.value.length} · ${waitLine}`
+    if (!me.value?.side) return { label: 'เลือกฝั่ง', note: 'คลิกที่ว่างเพื่อเป็น Killer หรือ Survivor — ไม่เลือกก็ดูเกมได้', open: 'chars' }
+    if (!me.value.ready) return { label: 'พร้อม', note, run: toggleReady, primary: true }
+    if (isHost.value && !lobbyBlocker.value) return { label: 'ดำเนินเกม', note: 'ทุกคนพร้อมแล้ว — ไปเลือกตัวละคร', run: proceed, primary: true }
+    return { label: 'พร้อมแล้ว', note: `${note} · กดเพื่อยกเลิก`, run: toggleReady, done: true }
+  }
+  if (!mySeat.value) {
+    if (mayStart.value && startable.value) return { label: 'เริ่ม Trial', note: 'ทุกอย่างพร้อมแล้ว', run: start, primary: true }
+    return { label: 'ผู้ชม', note: 'คุณดูเกมนี้ — เกมเริ่มเมื่อทุกคนเลือกเสร็จ' }
+  }
+  const stage = pickStage.value
+  if (stage === 'bans') {
+    if (!myBansLocked.value) return { label: 'ยืนยันการแบน', note: `แบนแล้วกดยืนยัน · ยืนยันแล้ว ${d.players - banWaiting.value}/${d.players}`, run: toggleBans, primary: true }
+    return { label: 'ยืนยันแล้ว', note: `รอผู้เล่นคนอื่นแบน (${banWaiting.value}) · กดเพื่อแก้`, run: toggleBans, done: true }
+  }
+  if (!locked.value) {
+    if (!myPicksComplete.value) return { label: 'เลือกตัวละคร', note: `เลือกอีก ${picksMissing.value} ตัว`, open: 'chars' }
+    return { label: 'ล็อกตัวละคร', note: 'เลือกครบแล้ว — ล็อกได้เลย', run: toggleLock, primary: true }
+  }
+  if (!allLocked.value) return { label: 'ล็อกแล้ว', note: 'รอทุกคนล็อกตัวละคร · กดเพื่อแก้', run: toggleLock, done: true }
+  const open = myPerksOpen.value[0]
+  if (open) {
+    const problem = perkProblem(open.key, open.perks)
+    // seen before confirmed: the panel is opened first (it no longer opens by itself)
+    if (tab.value !== 'gear' || shownLoadout.value?.key !== open.key || problem) return { label: 'แต่ง Perk', note: problem || `ยืนยัน Perk ของ ${open.side === 'killer' ? 'Killer' : `Survivor ${Number(open.key) + 1}`}`, open: 'gear' }
+    return { label: 'ยืนยัน Perk', note: `${myPerksOpen.value.length > 1 ? `อีก ${myPerksOpen.value.length} ตัว · ` : ''}ยืนยันแล้วแก้ไม่ได้จนกว่าจะกดยกเลิก`, run: () => confirmLoadout(open.key, true), primary: true }
+  }
+  if (myOfferingSide.value && myOfferingSlots.value && !myOfferingsDone.value) {
+    if (tab.value !== 'gear' || myOfferingProblem.value) return { label: 'เลือกเครื่องเซ่น', note: myOfferingProblem.value || 'เปิดแผงอุปกรณ์ แล้วกดช่องเครื่องเซ่น', open: 'gear' }
+    return { label: 'ยืนยันเครื่องเซ่น', note: 'เผาตอนเริ่มเกม — ทุกคนเห็นเมื่อเกมเริ่ม', run: () => confirmMyOfferings(true), primary: true }
+  }
+  if (!mapDone.value && mayPickBoard.value) return { label: 'เลือกแผนที่', note: 'คุณเป็นคนเลือกแผนที่', open: 'map' }
+  if (mayStart.value) {
+    if (startable.value) return { label: 'เริ่ม Trial', note: 'ทุกอย่างพร้อมแล้ว', run: start, primary: true }
+    return { label: 'รอ', note: waitingLine.value }
+  }
+  return { label: startable.value ? 'พร้อมแล้ว' : 'รอ', note: startable.value ? (botSeat(d, KILLER_PLAYER) ? 'รอหัวห้องเริ่มเกม' : 'รอ Killer เริ่มเกม') : waitingLine.value, done: startable.value }
+})
+
+/** What the room still waits on, in words (the picks). */
+const waitingLine = computed(() => {
+  if (!allLocked.value) return 'รอทุกคนล็อกตัวละคร'
+  if (perksWaiting.value.length) return `รอแต่ง Perk (${perksWaiting.value.length} ตัว)`
+  if (offeringsWaiting.value.length) return `รอ${offeringsWaiting.value.includes('killer') ? ' Killer' : 'ฝั่ง Survivor'}เลือกเครื่องเซ่น`
+  if (!mapDone.value) return `รอ${boardChooser.value}เลือกแผนที่`
+  return 'ทุกอย่างพร้อมแล้ว'
+})
+
+function runAction() {
+  const a = action.value
+  if (session.busy) return
+  if (a.run) return a.run()
+  if (a.open) {
+    sfx.click()
+    tab.value = a.open
+    if (a.open === 'gear' && myPerksOpen.value[0]) loadoutKey.value = myPerksOpen.value[0].key
+  }
+}
+
+/**
+ * The panel the room's next step is in for this player: its rail button glows until it is opened.
+ * Nothing opens by itself — the player opens it (the players asked: a panel popping up over the
+ * scene the moment everyone was ready took the room away from them).
+ */
+const nextTab = computed<Tab | null>(() => {
+  if (inLobby.value || !mySeat.value) return null
+  // until this player's bans and character are locked (the lock itself is the corner button's):
+  // a closed panel with nothing glowing read as "done" before it was
+  if (!bansDone.value) return myBansLocked.value ? null : 'chars'
+  if (!locked.value) return 'chars'
+  if (allLocked.value && (myPerksOpen.value.length || (myOfferingSlots.value && !myOfferingsDone.value))) return 'gear'
+  if (allLocked.value && !mapDone.value && mayPickBoard.value) return 'map'
+  return null
+})
+// back to the lobby: no panel left open from the picks
+watch(inLobby, (lobby) => lobby && (tab.value = null))
+
+// ---------- the big figure on the right, the side's colour ----------
+
+/** The left strip of a character's board (its portrait), shown as the PC game shows its model. */
+const hero = computed(() => {
+  const m = myCharacter.value
+  if (!m?.c) return null
+  return { src: asset(m.c.images.boardTh), killer: m.side === 'killer', name: m.c.name }
+})
+/** The side this player plays: the scene's colour (red for the killer, cold for the survivors). */
+const mySide = computed<'killer' | 'survivor' | null>(() => (inLobby.value ? (me.value?.side ?? null) : mySeat.value ? (amKiller.value ? 'killer' : 'survivor') : null))
+
+// ---------- the panels' headings ----------
+
+const tabLocked = computed<Record<Tab, string>>(() => ({
+  chars: '',
+  gear: inLobby.value ? 'แต่ง Perk และเครื่องเซ่นได้หลังเลือกตัวละคร' : !allLocked.value ? 'รอทุกคนล็อกตัวละครก่อน (Bloodweb แจกการ์ดจากตัวละครทุกตัว)' : '',
+  map: inLobby.value ? `เลือกแผนที่หลังเริ่มเลือกตัวละคร — ${boardChooser.value}เป็นคนเลือก` : '',
+  room: '',
+}))
 </script>
 
 <template>
-  <div class="room">
-    <!-- the room bar: its name and phase, the code (a click copies it), the invite, leaving -->
-    <header class="room-bar">
-      <div class="rb-title">
-        <p class="rb-phase">{{ data.phase === 'lobby' ? 'Lobby' : steps[stepIndex]?.label }}</p>
+  <div class="pc-room" :class="[mySide ?? 'none', { 'panel-open': !!tab }]">
+    <div class="tint" aria-hidden="true" />
+
+    <!-- the rail: a panel at a time -->
+    <nav class="rail" aria-label="เมนูห้อง">
+      <button
+        v-for="t in TABS"
+        :key="t.id"
+        type="button"
+        class="rail-btn"
+        :class="{ on: tab === t.id, ask: tab !== t.id && nextTab === t.id }"
+        :aria-pressed="tab === t.id"
+        :title="t.label"
+        @click="openTab(t.id)"
+      >
+        <svg v-if="t.id === 'chars'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg>
+        <svg v-else-if="t.id === 'gear'" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8.5 5v10L12 22l-8.5-5V7z" /><path d="M12 7l4.3 2.5v5L12 17l-4.3-2.5v-5z" /></svg>
+        <svg v-else-if="t.id === 'map'" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z" /><path d="M9 4v14M15 6v14" /></svg>
+        <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /><circle cx="9" cy="6" r="2" /><circle cx="15" cy="12" r="2" /><circle cx="8" cy="18" r="2" /></svg>
+        <span>{{ t.label }}</span>
+      </button>
+      <!-- the lobby: switch role, as the PC game's — the icon is the role a click switches to -->
+      <button
+        v-if="inLobby && nextRole"
+        type="button"
+        class="rail-btn role-btn"
+        :disabled="session.busy"
+        :aria-label="nextRole.label"
+        @click="switchRole"
+      >
+        <span class="swap" aria-hidden="true">⟳</span>
+        <svg v-if="nextRole.side === 'killer'" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c-4.7 0-8 3.2-8 7.6 0 2.6 1.2 4.6 3 5.8v3.6h2.2v-2h1.6v2h2.4v-2h1.6v2H17v-3.6c1.8-1.2 3-3.2 3-5.8 0-4.4-3.3-7.6-8-7.6z" /><circle cx="8.8" cy="10.6" r="1.9" /><circle cx="15.2" cy="10.6" r="1.9" /><path d="M12 13.4l-1 2h2z" /></svg>
+        <svg v-else-if="nextRole.side === 'survivor'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="9" r="3" /><path d="M6.5 18.2c1.2-2.6 3.2-4 5.5-4s4.3 1.4 5.5 4" /></svg>
+        <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /></svg>
+        <span class="rail-tip">{{ nextRole.label }}</span>
+      </button>
+    </nav>
+
+    <!-- the room: its name and phase, the code (a click copies it), the invite -->
+    <header class="top">
+      <div class="title">
+        <small>{{ inLobby ? 'Lobby' : 'เตรียม Trial' }}</small>
         <h1>{{ data.passwordHash ? '🔒 ' : '' }}{{ data.name || `ห้อง ${code}` }}</h1>
       </div>
-      <button type="button" class="code-chip" title="คลิกเพื่อคัดลอกรหัสห้อง" @click="copy('code')">
-        <small>รหัสห้อง</small>
-        <strong>{{ code }}</strong>
-        <span class="copied" :class="{ on: copied === 'code' }">{{ copied === 'code' ? '✓ คัดลอกแล้ว' : '📋' }}</span>
+      <button type="button" class="chip code" title="คลิกเพื่อคัดลอกรหัสห้อง" @click="copy('code')">
+        <small>รหัสห้อง</small><strong>{{ code }}</strong><span>{{ copied === 'code' ? '✓' : '📋' }}</span>
       </button>
-      <button type="button" class="invite" @click="copy('link')">{{ copied === 'link' ? '✓ คัดลอกลิงก์แล้ว' : '🔗 ลิงก์เชิญเพื่อน' }}</button>
-      <button v-if="data.phase === 'lobby'" type="button" class="invite" title="ส่งประกาศไปที่ห้องแชตหาผู้เล่น พร้อมห้องนี้" @click="openLfg">
-        {{ lfgPosted ? '✓ ลงประกาศแล้ว' : '📢 ประกาศหาคน' }}
-      </button>
-      <span class="spacer" />
+      <button type="button" class="chip" @click="copy('link')">{{ copied === 'link' ? '✓ คัดลอกลิงก์แล้ว' : '🔗 ลิงก์เชิญเพื่อน' }}</button>
+      <button v-if="inLobby" type="button" class="chip" title="ส่งประกาศไปที่ห้องแชตหาผู้เล่น พร้อมห้องนี้" @click="openLfg">{{ lfgPosted ? '✓ ลงประกาศแล้ว' : '📢 ประกาศหาคน' }}</button>
+      <span class="grow" />
       <VoiceButton />
       <SyncBadge />
-      <button type="button" class="leave" @click="leaveRoom">⎋ ออกจากห้อง</button>
     </header>
 
-    <!-- ================= lobby ================= -->
-    <template v-if="data.phase === 'lobby'">
-      <!-- the lineup: the killer against the four survivors, one slot per player -->
-      <section class="stage" :style="artVars">
-        <div class="lineup">
-          <div class="side-label killer">Killer <small>{{ killerMember ? 1 : 0 }}/1</small></div>
-          <div class="side-label survivor">Survivor <small>{{ survivorCount }}/4</small></div>
+    <!-- this player, in the corner: the name (the profile) and the perks worn -->
+    <aside class="me-box">
+      <div v-if="myCharacterPerks.length" class="worn" aria-label="Perk ที่ใส่">
+        <img
+          v-for="(p, i) in myCharacterPerks"
+          :key="p"
+          :class="`w${i}`"
+          :src="asset(perkIcon(p))"
+          :alt="PERKS[p].name"
+          tabindex="0"
+          @mouseenter="pointWorn(p, $event)"
+          @focus="pointWorn(p, $event)"
+          @mouseleave="wornTip = null"
+          @blur="wornTip = null"
+        />
+      </div>
+      <PcTip v-if="wornTip" :x="wornTip.x" :y="wornTip.y" :title="PERKS[wornTip.p].name" :en="PERKS[wornTip.p].en" :tone="perkTone(wornTip.p)">
+        <template #left>{{ myCharacter?.c?.name }}</template>
+        <template #right>{{ { own: 'Perk เฉพาะตัว', shared: 'Perk บนกระดาน', card: 'การ์ด Perk' }[wornKind(wornTip.p)] }} · {{ PERKS[wornTip.p].cost ? `${PERKS[wornTip.p].cost} ▲` : 'ฟรี' }}</template>
+        <p class="tip-text"><PerkRichText :text="perkText(wornTip.p)" /></p>
+        <p class="tip-when">{{ PERKS[wornTip.p].when }}</p>
+      </PcTip>
+      <button
+        type="button"
+        class="me-name"
+        :class="mySide ?? 'watch'"
+        :title="`${mySide === 'killer' ? 'ฆาตกร' : mySide === 'survivor' ? 'ผู้รอดชีวิต' : 'ผู้ชม'}${isHost ? ' · หัวห้อง' : ''} — คลิกเพื่อเปลี่ยนชื่อ (โปรไฟล์)`"
+        @click="rename"
+      >
+        <span>{{ isHost ? '👑 ' : '' }}{{ me?.name ?? 'ผู้เล่น' }}</span>
+        <svg v-if="mySide === 'killer'" class="role-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c-4.7 0-8 3.2-8 7.6 0 2.6 1.2 4.6 3 5.8v3.6h2.2v-2h1.6v2h2.4v-2h1.6v2H17v-3.6c1.8-1.2 3-3.2 3-5.8 0-4.4-3.3-7.6-8-7.6z" /><circle cx="8.8" cy="10.6" r="1.9" /><circle cx="15.2" cy="10.6" r="1.9" /><path d="M12 13.4l-1 2h2z" /></svg>
+        <svg v-else-if="mySide === 'survivor'" class="role-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="9" r="3" /><path d="M6.5 18.2c1.2-2.6 3.2-4 5.5-4s4.3 1.4 5.5 4" /></svg>
+        <svg v-else class="role-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" /><circle cx="12" cy="12" r="3.2" /></svg>
+      </button>
+    </aside>
 
-          <!-- the killer's slot -->
-          <component
-            :is="killerMember ? 'div' : 'button'"
-            class="seat killer"
-            :class="{ empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready || killerMember?.bot, bot: killerMember?.bot, leavable: leavable(killerMember?.id), talking: talking(killerMember?.id) }"
-            :disabled="!killerMember && session.busy ? true : undefined"
-            :title="leavable(killerMember?.id) ? 'คลิกเพื่อออกจากฝั่ง Killer' : undefined"
-            @click="clickSeat('killer', killerMember?.id)"
+    <!-- ================= the scene: everyone on their places ================= -->
+    <section class="scene" aria-label="ผู้เล่นในห้อง">
+      <!-- the lobby: a place per player, taken with a click -->
+      <div v-if="inLobby" class="places">
+        <component
+          :is="killerMember ? 'div' : 'button'"
+          v-if="mySide !== 'survivor'"
+          class="place killer"
+          :class="{ 'hero-place': mySide === 'killer', empty: !killerMember, me: killerMember?.id === session.me, ready: killerMember?.ready || killerMember?.bot, talking: talking(killerMember?.id) }"
+          :disabled="!killerMember && session.busy ? true : undefined"
+          :title="killerMember ? undefined : 'คลิกเพื่อเป็น Killer'"
+          @click="clickSeat('killer', killerMember?.id)"
+        >
+          <span class="side-tag">KILLER</span>
+          <span class="figure killer"><span class="pillar" aria-hidden="true"><span class="plus">{{ killerMember ? '' : '+' }}</span></span></span>
+          <template v-if="killerMember">
+            <button v-if="killerMember.id === session.me" type="button" class="pname mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ killerMember.id === data.host ? '👑 ' : '' }}{{ killerMember.name }} ✎</button>
+            <span v-else class="pname">{{ killerMember.id === data.host ? '👑 ' : '' }}{{ killerMember.name }}</span>
+            <span class="pstate">
+              <i v-if="!killerMember.bot" class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />
+              {{ killerMember.bot ? '🤖 บอท' : killerMember.ready ? '✓ พร้อม' : 'ยังไม่พร้อม' }}
+              <i v-if="voice.roster[killerMember.id]" :title="voiceTitle(killerMember.id)">{{ voice.roster[killerMember.id].m ? '🔇' : '🎙️' }}</i>
+            </span>
+            <!-- the host picks the bot killer's character, or leaves it to the draw (only the host sees it) -->
+            <select
+              v-if="killerMember.bot && isHost"
+              class="bot-pick"
+              :value="killerMember.pick ?? ''"
+              :disabled="session.busy"
+              title="ตัวละครของบอท Killer"
+              @click.stop
+              @change="pickBotKiller(killerMember.id, ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">🎲 สุ่ม Killer</option>
+              <option v-for="k in botKillers" :key="k.id" :value="k.id">{{ k.name }}</option>
+            </select>
+            <button v-if="canKick(killerMember.id)" type="button" class="kick" :title="killerMember.bot ? 'เอาบอทออก' : 'เตะออกจากห้อง'" @click.stop="killerMember.bot ? dropBot(killerMember.id) : kick(killerMember.id)">✕</button>
+          </template>
+          <template v-else>
+            <span class="pname">ว่าง</span>
+            <span class="pstate">คลิกเพื่อเป็น Killer</span>
+            <button v-if="isHost" type="button" class="bot-add" :disabled="session.busy" @click.stop="seatBot('killer')">🤖 เพิ่มบอท</button>
+          </template>
+        </component>
+
+        <span v-if="!mySide" class="vs" aria-hidden="true">VS</span>
+
+        <component
+          :is="m ? 'div' : 'button'"
+          v-for="(m, i) in survivorMembers"
+          :key="m?.id ?? `empty-${i}`"
+          class="place survivor"
+          :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready || m?.bot, talking: talking(m?.id) }"
+          :disabled="!m && session.busy ? true : undefined"
+          :title="m ? undefined : me?.side === 'survivor' ? 'คลิกเพื่อย้ายมาที่นี่' : 'คลิกเพื่อเป็น Survivor'"
+          @click="clickSeat('survivor', m?.id, i)"
+        >
+          <span class="side-tag">SURVIVOR {{ i + 1 }}</span>
+          <span class="figure"><span class="pillar" aria-hidden="true"><span class="plus">{{ m ? '' : '+' }}</span></span></span>
+          <template v-if="m">
+            <button v-if="m.id === session.me" type="button" class="pname mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }} ✎</button>
+            <span v-else class="pname">{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}</span>
+            <span class="pstate">
+              <i v-if="!m.bot" class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />
+              {{ m.bot ? '🤖 บอท' : m.ready ? '✓ พร้อม' : 'ยังไม่พร้อม' }}
+              <i v-if="voice.roster[m.id]" :title="voiceTitle(m.id)">{{ voice.roster[m.id].m ? '🔇' : '🎙️' }}</i>
+            </span>
+            <!-- 3 survivor players: one of them plays two survivors -->
+            <button
+              v-if="doubleId"
+              type="button"
+              class="double"
+              :class="{ on: doubleId === m.id }"
+              :disabled="session.busy || doubleId === m.id || (!isHost && m.id !== session.me)"
+              :title="doubleId === m.id ? 'คนนี้คุม Survivor 2 ตัว' : 'ให้คนนี้คุม Survivor 2 ตัว'"
+              @click.stop="setDouble(m.id)"
+            >
+              {{ doubleId === m.id ? '👥 คุม 2 ตัว' : 'ให้คุม 2 ตัว' }}
+            </button>
+            <button v-if="canKick(m.id)" type="button" class="kick" :title="m.bot ? 'เอาบอทออก' : 'เตะออกจากห้อง'" @click.stop="m.bot ? dropBot(m.id) : kick(m.id)">✕</button>
+          </template>
+          <template v-else>
+            <span class="pname">ว่าง</span>
+            <span class="pstate">{{ me?.side === 'survivor' ? 'คลิกเพื่อย้ายมาที่นี่' : 'คลิกเพื่อเป็น Survivor' }}</span>
+            <button v-if="isHost" type="button" class="bot-add" :disabled="session.busy || survivorCount >= 4" @click.stop="seatBot('survivor', i)">🤖 เพิ่มบอท</button>
+          </template>
+        </component>
+      </div>
+
+      <!-- the picks: each character as it is picked (the killer's hidden from the survivors) -->
+      <div v-else class="places">
+        <div v-if="amKiller || !mySeat || roomSettings.showKiller" class="place killer" :class="{ me: amKiller, ready: seatDone(KILLER_PLAYER) === true, 'hero-place': amKiller }">
+          <span class="side-tag">KILLER</span>
+          <span class="figure killer">
+            <img v-if="killerChar" class="strip" :src="asset(killerChar.images.boardTh)" :alt="killerChar.name" draggable="false" />
+            <span v-else class="pillar" aria-hidden="true"><span class="plus">?</span></span>
+          </span>
+          <span class="pname">{{ data.seats[String(KILLER_PLAYER)]?.name ?? '' }}{{ amKiller ? ' (คุณ)' : '' }}</span>
+          <span class="pstate">{{ killerChar?.name ?? (amKiller ? 'เลือกฆาตกร' : '???') }}</span>
+          <span class="done-mark">{{ seatDone(KILLER_PLAYER) === null ? '' : seatDone(KILLER_PLAYER) ? '✓' : '…' }}</span>
+        </div>
+        <span v-if="!mySeat || (!amKiller && roomSettings.showKiller)" class="vs" aria-hidden="true">VS</span>
+        <component
+          :is="s.mine && !locked ? 'button' : 'div'"
+          v-for="s in survivorSlots"
+          :key="s.slot"
+          class="place survivor"
+          :class="{ me: s.mine, active: s.mine && activeSlot === s.slot && !locked, ready: seatDone(s.player) === true, }"
+          @click="s.mine && !locked ? ((activeSlot = s.slot), (tab = 'chars')) : undefined"
+        >
+          <span class="side-tag">SURVIVOR {{ s.slot + 1 }}</span>
+          <span class="figure">
+            <img v-if="s.character" class="strip" :src="asset(s.character.images.boardTh)" :alt="s.character.name" draggable="false" />
+            <span v-else class="pillar" aria-hidden="true"><span class="plus">?</span></span>
+          </span>
+          <span class="pname">{{ s.bot ? '🤖 ' : '' }}{{ s.who }}{{ s.mine ? ' (คุณ)' : '' }}</span>
+          <span class="pstate">{{ s.character?.name ?? (s.mine ? 'เลือกตัวละคร' : s.bot ? 'บอทเลือกหลังผู้เล่น' : 'กำลังเลือก…') }}</span>
+          <span class="done-mark">{{ seatDone(s.player) ? '✓' : '…' }}</span>
+        </component>
+      </div>
+      <p v-if="inLobby" class="split">{{ splitNote }}</p>
+      <!-- a survivor's lobby has no killer's place on it (each side sees its own scene): who holds it,
+           and the host's bot for it, said in a box of its own -->
+      <div v-if="inLobby && mySide === 'survivor'" class="killer-seat">
+        <span class="ks-label">ฆาตกร</span>
+        <template v-if="killerMember">
+          <b>{{ killerMember.bot ? '🤖 ' : '' }}{{ killerMember.name }}</b>
+          <small :class="{ ok: killerMember.ready || killerMember.bot }">{{ killerMember.bot || killerMember.ready ? '✓ พร้อม' : 'ยังไม่พร้อม' }}</small>
+          <select
+            v-if="killerMember.bot && isHost"
+            class="bot-pick"
+            :value="killerMember.pick ?? ''"
+            :disabled="session.busy"
+            title="ตัวละครของบอท Killer"
+            @change="pickBotKiller(killerMember.id, ($event.target as HTMLSelectElement).value)"
           >
-            <span class="art" aria-hidden="true" />
-            <template v-if="killerMember">
-              <span v-if="killerMember.id === data.host" class="crown" title="หัวห้อง">👑</span>
-              <button v-if="killerMember.id === session.me" type="button" class="seat-name mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ killerMember.name }} <i>✎</i></button>
-              <span v-else class="seat-name">{{ killerMember.name }}</span>
-              <span class="seat-sub"><i v-if="!killerMember.bot" class="ping-dot" :style="{ '--c': pingHex(pingColors[killerMember.id]) }" title="สี Ping" />{{ killerMember.bot ? '🤖 บอท' : killerMember.id === session.me ? 'คุณ' : 'ฆาตกร' }}<i v-if="voice.roster[killerMember.id]" class="vc-ico" :title="voiceTitle(killerMember.id)">{{ voice.roster[killerMember.id].m ? '🔇' : '🎙️' }}</i></span>
-              <!-- the host picks the bot killer's character, or leaves it to the draw (only the host sees it) -->
-              <select
-                v-if="killerMember.bot && isHost"
-                class="bot-pick"
-                :value="killerMember.pick ?? ''"
-                :disabled="session.busy"
-                title="ตัวละครของบอท Killer"
-                @click.stop
-                @change="pickBotKiller(killerMember.id, ($event.target as HTMLSelectElement).value)"
-              >
-                <option value="">🎲 สุ่ม Killer</option>
-                <option v-for="k in botKillers" :key="k.id" :value="k.id">{{ k.name }}</option>
-              </select>
-              <span v-if="talking(killerMember.id)" class="talk-pill">🔊 กำลังพูด</span>
-              <span v-if="leavable(killerMember.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
-              <button v-if="canKick(killerMember.id) && killerMember.bot" type="button" class="kick" title="เอาบอทออก" @click.stop="dropBot(killerMember.id)">✕ เอาออก</button>
-              <button v-else-if="canKick(killerMember.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(killerMember.id)">✕ เตะ</button>
-            </template>
-            <template v-else>
-              <span class="plus" aria-hidden="true">+</span>
-              <span class="seat-name">ว่าง</span>
-              <span class="seat-sub">คลิกเพื่อเป็น Killer</span>
-            </template>
-            <span class="stamp">พร้อม</span>
-          </component>
+            <option value="">🎲 สุ่ม Killer</option>
+            <option v-for="k in botKillers" :key="k.id" :value="k.id">{{ k.name }}</option>
+          </select>
+          <button v-if="canKick(killerMember.id)" type="button" class="ks-btn" @click="killerMember.bot ? dropBot(killerMember.id) : kick(killerMember.id)">{{ killerMember.bot ? '✕ เอาบอทออก' : '✕ เตะ' }}</button>
+        </template>
+        <template v-else>
+          <b class="empty">ว่าง</b>
+          <button v-if="isHost" type="button" class="ks-btn add" :disabled="session.busy" @click="seatBot('killer')">🤖 เพิ่มบอทฆาตกร</button>
+          <small v-else>รอผู้เล่นมาเป็นฆาตกร</small>
+        </template>
+      </div>
 
-          <span class="vs" aria-hidden="true">VS</span>
+      <!-- this player's character, big: the portrait from their board -->
+      <!-- the killer only: a survivor stands in the team's line, as big as the others -->
+      <figure v-if="hero && mySide === 'killer'" class="hero killer">
+        <img :src="hero.src" :alt="hero.name" draggable="false" />
+        <figcaption>{{ hero.name }}</figcaption>
+      </figure>
+      <figure v-else-if="mySide === 'killer'" class="hero placeholder killer">
+        <span class="pillar big" aria-hidden="true"><span class="plus">?</span></span>
+        <figcaption class="ph-cap">
+          <b>{{ me?.name }}</b>
+          <small>{{ inLobby ? (me?.ready ? '✓ พร้อม' : 'ยังไม่พร้อม') : 'เลือกตัวละคร' }}</small>
+        </figcaption>
+      </figure>
+    </section>
 
-          <!-- four survivor slots -->
-          <component
-            :is="m ? 'div' : 'button'"
-            v-for="(m, i) in survivorMembers"
-            :key="m?.id ?? `empty-${i}`"
-            class="seat survivor"
-            :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready || m?.bot, bot: m?.bot, leavable: leavable(m?.id), talking: talking(m?.id) }"
-            :style="{ '--i': i, '--art': seatArt(i) }"
-            :disabled="!m && session.busy ? true : undefined"
-            :title="leavable(m?.id) ? 'คลิกเพื่อออกจากฝั่ง Survivor' : undefined"
-            @click="clickSeat('survivor', m?.id, i)"
-          >
-            <span class="art" aria-hidden="true" />
-            <template v-if="m">
-              <span v-if="m.id === data.host" class="crown" title="หัวห้อง">👑</span>
-              <button v-if="m.id === session.me" type="button" class="seat-name mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ m.name }} <i>✎</i></button>
-              <span v-else class="seat-name">{{ m.name }}</span>
-              <span class="seat-sub"><i v-if="!m.bot" class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.bot ? '🤖 บอท' : m.id === session.me ? 'คุณ' : 'ผู้รอดชีวิต' }}<i v-if="voice.roster[m.id]" class="vc-ico" :title="voiceTitle(m.id)">{{ voice.roster[m.id].m ? '🔇' : '🎙️' }}</i></span>
-              <span v-if="talking(m.id)" class="talk-pill">🔊 กำลังพูด</span>
-              <!-- 3 survivor players: one of them plays two survivors -->
-              <button
-                v-if="doubleId"
-                type="button"
-                class="double"
-                :class="{ on: doubleId === m.id }"
-                :disabled="session.busy || doubleId === m.id || (!isHost && m.id !== session.me)"
-                :title="doubleId === m.id ? 'คนนี้คุม Survivor 2 ตัว' : 'ให้คนนี้คุม Survivor 2 ตัว'"
-                @click.stop="setDouble(m.id)"
-              >
-                {{ doubleId === m.id ? '👥 คุม 2 ตัว' : 'ให้คุม 2 ตัว' }}
-              </button>
-              <span v-if="leavable(m.id)" class="leave-hint" aria-hidden="true">✕ ออกจากฝั่ง</span>
-              <button v-if="canKick(m.id) && m.bot" type="button" class="kick" title="เอาบอทออก" @click.stop="dropBot(m.id)">✕ เอาออก</button>
-              <button v-else-if="canKick(m.id)" type="button" class="kick" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕ เตะ</button>
-            </template>
-            <template v-else>
-              <span class="plus" aria-hidden="true">+</span>
-              <span class="seat-name">ว่าง</span>
-              <span class="seat-sub">{{ me?.side === 'survivor' ? 'คลิกเพื่อย้ายมาช่องนี้' : 'คลิกเพื่อเป็น Survivor' }}</span>
-            </template>
-            <span class="stamp">พร้อม</span>
-          </component>
+    <!-- ================= the panel of the rail's tab ================= -->
+    <section v-if="tab" class="panel" :aria-label="TABS.find((t) => t.id === tab)?.label">
+      <header class="panel-head">
+        <i class="ring" :class="mySide ?? ''" />
+        <div>
+          <b>{{ myCharacter?.c?.name ?? me?.name ?? '' }}</b>
+          <small>{{ TABS.find((t) => t.id === tab)?.label }}</small>
+        </div>
+        <button type="button" class="close" aria-label="ปิดแผง" @click="tab = null">✕</button>
+      </header>
+      <p v-if="tabLocked[tab]" class="locked-note">🔒 {{ tabLocked[tab] }}</p>
+
+      <!-- ===== ตัวละคร ===== -->
+      <template v-if="tab === 'chars'">
+        <!-- the lobby: which side -->
+        <div v-if="inLobby" class="sides">
+          <button type="button" class="side-btn killer" :class="{ on: me?.side === 'killer' }" :disabled="session.busy || (killerTaken && me?.side !== 'killer')" @click="side('killer')">
+            <b>ฆาตกร</b><small>{{ killerTaken && me?.side !== 'killer' ? 'มีคนเลือกแล้ว' : '1 คน' }}</small>
+          </button>
+          <button type="button" class="side-btn survivor" :class="{ on: me?.side === 'survivor' }" :disabled="session.busy || (survivorCount >= 4 && me?.side !== 'survivor')" @click="side('survivor')">
+            <b>ผู้รอดชีวิต</b><small>{{ survivorCount }}/4 คน</small>
+          </button>
+          <button type="button" class="side-btn watch" :class="{ on: !me?.side }" :disabled="session.busy || !me?.side" @click="watchOnly">
+            <b>ผู้ชม</b><small>ดูเกมอย่างเดียว</small>
+          </button>
+          <p class="note">{{ splitNote }}</p>
+          <p class="note">ตัวละครเลือกได้เมื่อทุกคนกดพร้อม แล้วหัวห้องกดดำเนินเกม</p>
         </div>
 
-        <p v-if="isHost" class="bot-add">
-          <span class="muted">🤖 เพิ่มบอท</span>
-          <button type="button" class="bot-btn" :disabled="session.busy || !!killerMember" @click="seatBot('killer')">+ Killer</button>
-          <button type="button" class="bot-btn" :disabled="session.busy || survivorCount >= 4" @click="seatBot('survivor')">+ Survivor</button>
-          <small class="muted">บอทพร้อมเสมอ ได้ตัวละครแบบสุ่ม (Killer เลือกได้ที่ช่องของบอท) ยังไม่ใช้ Perk — เครื่องหัวห้องเป็นคนเล่นให้</small>
-        </p>
-        <p v-if="bench.length" class="bench">
-          <span class="muted">ยังไม่เลือกฝั่ง:</span>
-          <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me, talking: talking(m.id) }">
-            <i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" title="สี Ping" />{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}<i v-if="voice.roster[m.id]" class="vc-ico" :title="voiceTitle(m.id)">{{ voice.roster[m.id].m ? '🔇' : '🎙️' }}</i>
-            <button v-if="canKick(m.id)" type="button" class="kick small" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕</button>
-          </span>
-          <span v-if="!me?.side" class="bench-hint">คลิกช่องว่างด้านบนเพื่อเลือกฝั่ง</span>
-        </p>
-        <p class="split muted">{{ splitNote }}</p>
+        <!-- the Banlist (room setting): each side bans characters of the other -->
+        <template v-else-if="!bansDone && mySeat">
+          <h3>🚫 แบนตัวละคร{{ amKiller ? ' Survivor' : ' Killer' }}</h3>
+          <p class="note">
+            {{
+              amKiller
+                ? `คุณแบน Survivor ได้ไม่เกิน ${roomSettings.banCount} ตัว — Survivor จะไม่เห็นจนกว่าทั้งสองฝั่งยืนยัน`
+                : `ทีม Survivor ช่วยกันแบน Killer ได้ไม่เกิน ${roomSettings.banCount} ตัว (ใครแก้ก็ต้องยืนยันใหม่ทุกคน) — Killer จะไม่เห็นจนกว่าทั้งสองฝั่งยืนยัน`
+            }}
+          </p>
+          <BanPicker :kind="amKiller ? 'survivor' : 'killer'" :banned="myBans" :max="roomSettings.banCount" :locked="myBansLocked" @toggle="toggleBan" />
+        </template>
+
+        <template v-else-if="mySeat">
+          <p v-if="roomSettings.banlist && revealedBans.length" class="banned">
+            🚫
+            <span v-for="id in revealedBans" :key="id">{{ (survivorById.get(id) ?? killerById.get(id))?.name }}</span>
+          </p>
+          <p v-if="roomSettings.random" class="note">🎲 หัวห้องตั้งให้สุ่มตัวละครทุกคน — ดูบนแท่น แล้วกดล็อกที่มุมขวาล่าง</p>
+          <!-- a player with several survivors: which one is being picked -->
+          <div v-if="mySlots.length > 1 && !roomSettings.random" class="slot-tabs">
+            <button v-for="s in mySlots" :key="s" type="button" :class="{ on: activeSlot === s }" :disabled="locked" @click="activeSlot = s">
+              Survivor {{ s + 1 }}<small>{{ survivorById.get(data.picks[String(s)] ?? '')?.name ?? 'ยังไม่เลือก' }}</small>
+            </button>
+          </div>
+          <CharacterPicker
+            v-if="mySlots.length && !roomSettings.random"
+            kind="survivor"
+            :taken="[...takenByOthers]"
+            :banned="revealedBans"
+            :selected="myPicks"
+            :remaining="mySlots.length - myPicks.length"
+            :locked="locked"
+            taken-label="เพื่อนเลือกแล้ว"
+            :roll-title="activeSlot !== null ? `สุ่ม Survivor ตัวที่ ${activeSlot + 1}` : ''"
+            @pick="pickSurvivor"
+            @unpick="unpickSurvivor"
+          />
+          <CharacterPicker
+            v-if="amKiller && !roomSettings.random"
+            kind="killer"
+            :selected="data.picks.killer ? [data.picks.killer] : []"
+            :banned="revealedBans"
+            :remaining="data.picks.killer ? 0 : 1"
+            :locked="locked"
+            @pick="pickKiller"
+            @unpick="unpickKiller"
+          />
+          <p v-if="locked" class="note">🔒 ล็อกแล้ว — กดที่มุมขวาล่างเพื่อแก้</p>
+        </template>
+        <p v-else class="note">คุณไม่ได้อยู่ในเกมนี้ — รอดูได้เมื่อเกมเริ่ม</p>
+      </template>
+
+      <!-- ===== อุปกรณ์ ===== -->
+      <template v-else-if="tab === 'gear'">
+        <template v-if="!tabLocked.gear && mySeat">
+          <!-- a player with several characters: whose perks -->
+          <div v-if="myLoadouts.length > 1" class="slot-tabs">
+            <button v-for="c in myLoadouts" :key="c.key" type="button" :class="{ on: shownLoadout?.key === c.key }" @click="loadoutKey = c.key">
+              {{ c.side === 'killer' ? 'Killer' : `Survivor ${Number(c.key) + 1}` }}<small>{{ roomSettings.mode === 'adept' ? 'Perk บนกระดาน' : perkDone(c.key) ? '✓ ยืนยันแล้ว' : 'ยังไม่ยืนยัน' }}</small>
+            </button>
+          </div>
+          <!-- as the PC game's: พลัง, Passive | เครื่องเซ่น on top, the perks, then the store (perks or offerings) -->
+          <PerkLoadout
+            v-if="shownLoadout"
+            :key="shownLoadout.key"
+            bare
+            :readonly="roomSettings.mode === 'adept'"
+            :model-value="shownLoadout.perks"
+            :side="shownLoadout.side"
+            :character-id="shownLoadout.id"
+            :mode="roomSettings.mode"
+            :who="shownLoadout.side === 'killer' ? 'Killer' : `Survivor ${Number(shownLoadout.key) + 1}`"
+            :choices="roomSettings.mode === 'adept' ? [] : cardChoices(roomSettings.mode, shownLoadout, perkHands[shownLoadout.key])"
+            :taken="perkTaken(shownLoadout.key)"
+            :problem="roomSettings.mode === 'adept' ? '' : perkProblem(shownLoadout.key, shownLoadout.perks)"
+            :confirmed="roomSettings.mode === 'adept' || perkDone(shownLoadout.key)"
+            :offering="offeringSlot"
+            @update:model-value="(p: PerkId[]) => setLoadout(shownLoadout!.key, p)"
+            @confirm="(on: boolean) => confirmLoadout(shownLoadout!.key, on)"
+            @offerings="pickOfferings"
+            @confirm-offerings="confirmMyOfferings"
+          />
+        </template>
+        <p v-else-if="!mySeat && !inLobby" class="note">คุณไม่ได้อยู่ในเกมนี้ — รอดูได้เมื่อเกมเริ่ม</p>
+      </template>
+
+      <!-- ===== แผนที่ ===== -->
+      <template v-else-if="tab === 'map'">
+        <template v-if="!inLobby">
+          <MapPicker v-if="mayPickBoard" :model-value="data.board ?? ''" @update:model-value="setBoard" />
+          <MapPicker v-else-if="mapDone" :model-value="data.board ?? 'macmillan'" :chooser="boardChooser" readonly />
+          <p v-else class="note">รอ{{ boardChooser }}เลือกแผนที่…</p>
+        </template>
+      </template>
+
+      <!-- ===== ห้อง ===== -->
+      <template v-else>
+        <RoomSettingsCard />
         <!-- the colour of this player's pings in the game: one each, none the same -->
         <div v-if="me" class="ping-pick" role="radiogroup" aria-label="สี Ping ของคุณ">
-          <span class="ping-pick-label">📍 สี Ping ของคุณ <small class="muted">— ระหว่างเกมคลิกขวาบนแผนที่ หรือชี้แล้วกด Q (แท็บเล็ต: กดค้าง) ทุกคนในห้องเห็น รวม Killer</small></span>
+          <span class="label">📍 สี Ping ของคุณ</span>
+          <small class="note">ระหว่างเกมคลิกขวาบนแผนที่ หรือชี้แล้วกด Q (แท็บเล็ต: กดค้าง) — ทุกคนในห้องเห็น รวม Killer</small>
           <span class="swatches">
             <button
               v-for="c in PING_COLORS"
@@ -616,273 +1095,35 @@ const seatStatus = computed(() =>
             </button>
           </span>
         </div>
-      </section>
-
-      <!-- the room's settings: everyone reads them before saying ready -->
-      <RoomSettingsCard />
-
-      <!-- the bar at the foot: how many are ready, ready, and the host's go -->
-      <footer class="ready-bar">
-        <div class="rb-status">
-          <span class="ready-line">
-            <span class="ready-pips" aria-hidden="true"><i v-for="m in seated" :key="m.id" :class="{ on: m.ready || m.bot }" /></span>
-            พร้อม {{ readyCount }}/{{ seated.length }}
+        <div v-if="bench.length" class="bench">
+          <span class="label">ผู้ชม (ยังไม่เลือกฝั่ง)</span>
+          <span v-for="m in bench" :key="m.id" class="bench-chip" :class="{ me: m.id === session.me, talking: talking(m.id) }">
+            <i class="ping-dot" :style="{ '--c': pingHex(pingColors[m.id]) }" />{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}{{ m.id === session.me ? ' (คุณ)' : '' }}
+            <button v-if="canKick(m.id)" type="button" class="kick small" title="เตะออกจากห้อง" @click.stop="kick(m.id)">✕</button>
           </span>
-          <small class="muted">{{ lobbyBlocker || (isHost ? 'ผู้เล่นพร้อมแล้ว — ดำเนินเกมได้เลย' : 'ผู้เล่นพร้อมแล้ว — รอหัวห้องดำเนินเกม') }}{{ seated.length < memberList.length ? ` · คนที่ยังไม่เลือกฝั่ง ${memberList.length - seated.length} คนจะเป็นผู้ชม` : '' }}</small>
         </div>
-        <button class="ready-btn" :class="{ primary: !me?.ready, done: me?.ready }" :disabled="session.busy || !me?.side" @click="toggleReady">
-          <span>{{ me?.ready ? '✓ พร้อมแล้ว' : me?.side ? 'พร้อม' : 'เป็นผู้ชม' }}</span>
-          <small v-if="me?.ready">กดเพื่อยกเลิก</small>
-        </button>
-        <button v-if="isHost" class="go-btn primary" :disabled="!!lobbyBlocker || session.busy" @click="proceed">ดำเนินเกม ➜</button>
-      </footer>
-    </template>
-
-    <!-- ================= the picks, a stage at a time ================= -->
-    <template v-else>
-      <!-- where the room is: characters → perks (when the room sets them) → map → start -->
-      <ol class="steps" aria-label="ขั้นตอน">
-        <li v-for="(st, i) in steps" :key="st.id" :class="{ done: i < stepIndex, now: i === stepIndex }">
-          <span class="num">{{ i < stepIndex ? '✓' : i + 1 }}</span>
-          {{ st.label }}
-        </li>
-      </ol>
-
-      <!-- who has finished this stage -->
-      <section v-if="seatStatus.length" class="who-done" aria-label="สถานะผู้เล่น">
-        <span v-for="p in seatStatus" :key="p.player" class="pchip" :class="{ ok: p.done, killer: p.killer, me: p.mine }">
-          <b>{{ p.done === null ? '·' : p.done ? '✓' : '…' }}</b>
-          {{ p.killer ? '🔪 ' : '' }}{{ p.bot ? '🤖 ' : '' }}{{ p.name }}{{ p.mine ? ' (คุณ)' : '' }}
-        </span>
-      </section>
-
-      <!-- ===== 0 · the Banlist (room setting): each side bans characters of the other ===== -->
-      <template v-if="stage === 'bans'">
-        <section v-if="mySeat" class="card">
-          <h2>🚫 แบนตัวละคร{{ amKiller ? ' Survivor' : ' Killer' }}</h2>
-          <p class="muted small">
-            {{
-              amKiller
-                ? `คุณแบน Survivor ได้ไม่เกิน ${roomSettings.banCount} ตัว — Survivor จะไม่เห็นจนกว่าทั้งสองฝั่งยืนยัน`
-                : `ทีม Survivor ช่วยกันแบน Killer ได้ไม่เกิน ${roomSettings.banCount} ตัว (เพื่อนร่วมทีมเห็นรายการเดียวกัน ใครแก้ก็ต้องยืนยันใหม่ทุกคน) — Killer จะไม่เห็นจนกว่าทั้งสองฝั่งยืนยัน`
-            }}
-          </p>
-          <BanPicker :kind="amKiller ? 'survivor' : 'killer'" :banned="myBans" :max="roomSettings.banCount" :locked="myBansLocked" @toggle="toggleBan" />
-        </section>
-        <StageBar v-if="mySeat" :done="data.players - banWaiting" :total="data.players">
-          {{ myBansLocked ? 'ยืนยันแล้ว — รอผู้เล่นคนอื่น' : 'แบนให้เรียบร้อยแล้วกดยืนยัน' }}
-          <template #actions>
-            <button class="lockbtn" :class="{ primary: !myBansLocked }" :disabled="session.busy" @click="toggleBans">
-              {{ myBansLocked ? '🔒 ยืนยันแล้ว (กดเพื่อแก้)' : 'ยืนยันการแบน' }}
-            </button>
-          </template>
-        </StageBar>
       </template>
+    </section>
 
-      <!-- ===== 1 · characters ===== -->
-      <template v-else-if="stage === 'chars'">
-        <!-- the bans, public now -->
-        <section v-if="roomSettings.banlist && revealedBans.length" class="card banned-card">
-          <h2>🚫 ตัวละครที่ถูกแบน</h2>
-          <p class="banned-list">
-            <span v-for="id in revealedBans" :key="id" class="banned-chip">
-              <img :src="asset((survivorById.get(id) ?? killerById.get(id))?.images.mini ?? '')" alt="" />
-              {{ (survivorById.get(id) ?? killerById.get(id))?.name }}
-            </span>
-          </p>
-        </section>
+    <!-- the room's chat: above the button, as the PC game's -->
+    <section v-if="session.room?.chat" class="chat-box" aria-label="แชทในห้อง">
+      <ChatPanel />
+    </section>
 
-        <div class="pick-layout">
-          <!-- the lineup: the survivor team (everyone sees it, the killer included) and the killer's own pick -->
-          <aside class="team-panel card" aria-label="ทีมของเกมนี้">
-            <h2>ทีม Survivor</h2>
-            <div class="slots">
-              <button
-                v-for="s in survivorSlots"
-                :key="s.slot"
-                class="slot"
-                :class="{ mine: s.mine, active: s.mine && activeSlot === s.slot && !locked, locked: s.locked }"
-                :disabled="!s.mine || locked"
-                @click="activeSlot = s.slot"
-              >
-                <Mini v-if="s.character" class="mini aura-survivor" :src="asset(s.character.images.mini)" />
-                <span v-else class="empty">?</span>
-                <span class="slot-text">
-                  <strong>{{ s.character?.name ?? (s.mine ? 'เลือกตัวละคร' : s.bot ? 'บอทเลือกหลังผู้เล่น' : 'กำลังเลือก…') }}</strong>
-                  <small class="muted">ผู้เล่น {{ s.player }} · {{ s.who }}{{ s.mine ? ' (คุณ)' : '' }}</small>
-                </span>
-                <span v-if="s.locked" class="lock">🔒</span>
-              </button>
-            </div>
-
-            <!-- the killer: your own pick, or — when the room shows it — the killer's for the survivors -->
-            <template v-if="amKiller || roomSettings.showKiller">
-              <h2 class="team-killer">ฆาตกร</h2>
-              <div class="drawn">
-                <Mini v-if="amKiller ? data.picks.killer : shownKiller" class="mini aura-killer" :src="asset((amKiller ? killerById.get(data.picks.killer ?? '') : shownKiller)?.images.mini ?? '')" />
-                <span v-else class="empty">?</span>
-                <span>
-                  <small class="muted">{{ amKiller ? 'ตัวที่คุณเลือก' : `ฆาตกร${data.locked['1'] ? ' (ยืนยันแล้ว)' : ''}` }}</small>
-                  <strong class="killer-name">{{ (amKiller ? killerById.get(data.picks.killer ?? '') : shownKiller)?.name ?? 'กำลังเลือก…' }}</strong>
-                </span>
-              </div>
-            </template>
-          </aside>
-
-          <div class="pick-main">
-            <!-- characters drawn for everyone (room settings): nothing to pick, only to confirm -->
-            <section v-if="roomSettings.random && mySeat" class="card">
-              <h2>🎲 สุ่มตัวละครให้แล้ว</h2>
-              <p class="muted">หัวห้องตั้งให้สุ่มตัวละครทุกคน — ตรวจดูทีมด้านซ้ายแล้วกดยืนยันด้านล่าง</p>
-            </section>
-
-            <!-- survivor players pick survivors -->
-            <section v-if="mySlots.length && !roomSettings.random" class="card">
-              <h2>เลือก Survivor {{ mySlots.length > 1 ? `(คุณคุม ${mySlots.length} ตัว — แตะช่องทีมด้านซ้ายเพื่อสลับ)` : '' }}</h2>
-              <CharacterPicker
-                kind="survivor"
-                :taken="[...takenByOthers]"
-                :banned="revealedBans"
-                :selected="myPicks"
-                :remaining="mySlots.length - myPicks.length"
-                :locked="locked"
-                taken-label="เพื่อนเลือกแล้ว"
-                :roll-title="activeSlot !== null ? `สุ่ม Survivor ตัวที่ ${activeSlot + 1}` : ''"
-                @pick="pickSurvivor"
-                @unpick="unpickSurvivor"
-              />
-            </section>
-
-            <!-- the killer picks a killer; survivors never see this part -->
-            <section v-if="amKiller && !roomSettings.random" class="card killer-card">
-              <h2>🔪 เลือกฆาตกร</h2>
-              <CharacterPicker
-                kind="killer"
-                :selected="data.picks.killer ? [data.picks.killer] : []"
-                :banned="revealedBans"
-                :remaining="data.picks.killer ? 0 : 1"
-                :locked="locked"
-                @pick="pickKiller"
-                @unpick="unpickKiller"
-              />
-            </section>
-
-            <section v-if="!mySlots.length && !amKiller" class="card">
-              <p class="muted">คุณไม่ได้อยู่ในเกมนี้ — รอดูได้เมื่อเกมเริ่ม</p>
-            </section>
-          </div>
-        </div>
-
-        <StageBar v-if="mySeat" :done="barDone" :total="barTotal">
-          {{
-            locked
-              ? 'ยืนยันตัวละครแล้ว — รอผู้เล่นคนอื่น'
-              : myPicksComplete
-                ? 'เลือกครบแล้ว — กดยืนยันได้เลย'
-                : `เลือกอีก ${picksMissing} ตัว`
-          }}
-          <template #actions>
-            <button class="lockbtn" :class="{ primary: !locked }" :disabled="session.busy || !myPicksComplete" @click="toggleLock">
-              {{ locked ? '🔒 ล็อกแล้ว (กดเพื่อแก้)' : 'ยืนยันตัวละคร' }}
-            </button>
-          </template>
-        </StageBar>
-      </template>
-
-      <!-- ===== 2 · perks (Bloodweb, Devout): once every character is locked in ===== -->
-      <template v-else-if="stage === 'perks'">
-        <section v-if="myLoadouts.length" class="perks-stage">
-          <h2>🃏 แต่ง Perk — {{ roomSettings.mode === 'devout' ? 'Devout' : 'Bloodweb' }}</h2>
-          <p class="muted small">
-            {{ roomSettings.mode === 'devout' ? 'เลือก Perk ได้สูงสุด 3 ใบ — คนอื่นไม่เห็นจนกว่าเกมจะเริ่ม' : 'การ์ดที่จั่วได้ 5 ใบ เลือกวางทับ Perk บนกระดานได้สูงสุด 3 ใบ' }}
-            · การ์ดมีใบเดียว: Perk ที่มีคนใช้แล้วจะมืดลง
-          </p>
-          <PerkLoadout
-            v-for="c in myLoadouts"
-            :key="c.key"
-            :model-value="c.perks"
-            :side="c.side"
-            :character-id="c.id"
-            :mode="roomSettings.mode"
-            :who="c.side === 'killer' ? 'Killer' : `Survivor ${Number(c.key) + 1}`"
-            :choices="cardChoices(roomSettings.mode, c, perkHands[c.key])"
-            :taken="perkTaken(c.key)"
-            :problem="perkProblem(c.key, c.perks)"
-            :confirmed="perkDone(c.key)"
-            @update:model-value="(p: PerkId[]) => setLoadout(c.key, p)"
-            @confirm="(on: boolean) => confirmLoadout(c.key, on)"
-          />
-        </section>
-        <section v-else class="card wait-card">
-          <h2>🃏 กำลังแต่ง Perk</h2>
-          <p class="muted">คุณไม่ได้แต่ง Perk ในเกมนี้ — รอผู้เล่นอื่นแต่งให้เสร็จ</p>
-        </section>
-        <section v-if="mySeat" class="card actions">
-          <p class="muted center">{{ perksWaiting.length ? `รอทุกคนแต่ง Perk (${perksWaiting.length} ตัว)` : '' }}</p>
-        </section>
-      </template>
-
-      <!-- ===== 3 · offerings (room settings): each side that burns them picks, hidden from the other ===== -->
-      <template v-else-if="stage === 'offerings'">
-        <OfferingPicker
-          v-if="myOfferingSide && myOfferingSlots"
-          :model-value="myOfferings"
-          :side="myOfferingSide"
-          :slots="myOfferingSlots"
-          :problem="myOfferingProblem"
-          :confirmed="myOfferingsDone"
-          @update:model-value="pickOfferings"
-          @confirm="confirmMyOfferings"
-        />
-        <section v-else class="card wait-card">
-          <h2>🔥 กำลังเลือก Offering</h2>
-          <p class="muted">{{ offeringsWaiting.includes('killer') ? 'Killer' : 'ฝั่ง Survivor' }} กำลังเลือก Offering — จะรู้ตอนเริ่มเกม</p>
-        </section>
-        <section v-if="mySeat" class="card actions">
-          <p class="muted center">{{ offeringsWaiting.length ? 'รอเลือก Offering ให้ครบ' : '' }}</p>
-        </section>
-      </template>
-
-      <!-- ===== 3 · the map, then the killer starts ===== -->
-      <template v-else>
-        <!-- whoever picks the board: the killer, or the host -->
-        <MapPicker v-if="mayPickBoard" :model-value="data.board ?? ''" @update:model-value="setBoard" />
-        <MapPicker v-else-if="mapDone" :model-value="data.board ?? 'macmillan'" :chooser="boardChooser" readonly />
-        <section v-else class="card wait-card">
-          <h2>🗺 เลือกแผนที่</h2>
-          <p class="muted">รอ{{ boardChooser }}เลือกแผนที่…</p>
-        </section>
-
-        <!-- a bot killer: the host starts, even watching -->
-        <StageBar v-if="mySeat || mayStart">
-          {{
-            !mapDone
-              ? `รอ${boardChooser}เลือกแผนที่`
-              : mayStart
-                ? 'ทุกอย่างพร้อมแล้ว — เริ่มเกมได้'
-                : botSeat(data, KILLER_PLAYER)
-                  ? 'ทุกอย่างพร้อมแล้ว — รอหัวห้องเริ่มเกม'
-                  : 'ทุกอย่างพร้อมแล้ว — รอ Killer ดำเนินเกม'
-          }}
-          <template #actions>
-            <button v-if="mayStart" class="primary big-go" :disabled="!startable || session.busy" @click="start">
-              {{ startable ? 'ดำเนินเกม — เริ่ม Trial' : 'เลือกแผนที่ก่อน' }}
-            </button>
-          </template>
-        </StageBar>
-      </template>
-
-      <section v-if="!mySeat" class="card">
-        <p class="muted">คุณไม่ได้อยู่ในเกมนี้ — รอดูได้เมื่อเกมเริ่ม</p>
-      </section>
-
-      <button v-if="isHost" class="back" @click="backToLobby">← กลับ Lobby</button>
-    </template>
-
-    <p v-if="session.error" class="error">{{ session.error }}</p>
-
-    <!-- the room's chat: beside the column on a wide screen, a 💬 button otherwise -->
-    <ChatDock mode="room" />
+    <!-- the foot: leaving on the left, the one button that moves things on in the corner -->
+    <footer class="foot">
+      <button type="button" class="back-btn" @click="leaveRoom">‹ ออกจากห้อง</button>
+      <button v-if="isHost && !inLobby" type="button" class="back-btn" @click="backToLobby">‹ กลับ Lobby</button>
+      <p v-if="session.error" class="error">{{ session.error }}</p>
+      <span class="grow" />
+      <div v-if="undos.length" class="undos">
+        <button v-for="u in undos" :key="u.key" type="button" class="undo-btn" :disabled="session.busy" @click="u.run">{{ u.label }}</button>
+      </div>
+      <div class="go" :class="{ primary: action.primary, done: action.done }">
+        <button type="button" class="go-btn" :disabled="session.busy || (!action.run && !action.open)" @click="runAction">{{ action.label }}</button>
+        <p class="go-note">{{ action.note }}</p>
+      </div>
+    </footer>
 
     <LfgPostDialog
       :open="lfgOpen"
@@ -897,989 +1138,1039 @@ const seatStatus = computed(() =>
 </template>
 
 <style scoped>
-/* ---------- the room bar ---------- */
-.room-bar {
+/* ---------- the room: the whole page under the top bar ---------- */
+.pc-room {
+  --rail: 92px;
+  --head: 76px;
+  --foot: 84px;
+  --slate: 48 56 64;
   position: relative;
+  height: calc(var(--vh, 100vh) - var(--topbar-h, 58px));
+  min-height: 600px;
+  overflow: hidden;
+  color: #ece6e6;
+}
+/* the side's colour over the campfire (App draws the campfire behind every page) */
+.tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgb(0 0 0 / 0.25), rgb(0 0 0 / 0.1) 45%, rgb(0 0 0 / 0.55));
+}
+.killer > .tint {
+  background:
+    /* a dark blood-red, not a wash of it: the scene stays readable (the players found it too red) */
+    radial-gradient(ellipse at 70% 25%, rgb(170 20 30 / 0.14), transparent 60%),
+    linear-gradient(180deg, rgb(70 6 12 / 0.4), rgb(35 2 8 / 0.28) 45%, rgb(6 0 2 / 0.66));
+}
+.survivor > .tint {
+  background:
+    radial-gradient(ellipse at 70% 30%, rgb(90 130 180 / 0.18), transparent 60%),
+    linear-gradient(180deg, rgb(10 30 60 / 0.4), rgb(5 15 30 / 0.2) 45%, rgb(0 4 10 / 0.6));
+}
+
+/* ---------- the rail ---------- */
+.rail {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--rail);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 0;
+  background: linear-gradient(90deg, rgb(0 0 0 / 0.7), rgb(0 0 0 / 0.35));
+}
+.rail-btn {
+  position: relative;
+  width: 66px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0 6px;
+  background: rgb(10 8 9 / 0.85);
+  border: 1px solid #2a2224;
+  border-radius: 0;
+  color: #e8e1e1;
+  font-size: 0.72rem;
+}
+.rail-btn svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+.rail-btn:hover {
+  border-color: #c4a46a;
+}
+.rail-btn.on {
+  background: #1b1416;
+  border-color: #d9d2c3;
+  box-shadow: 0 0 0 1px #d9d2c3;
+}
+/* the role switch: lower on the rail, its label beside it on hover (as the PC game's) */
+.role-btn {
+  margin-top: auto;
+  margin-bottom: 22vh;
+  padding: 12px 0;
+}
+.role-btn svg {
+  width: 34px;
+  height: 34px;
+}
+.swap {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.8rem;
+  color: #ff5a5a;
+}
+.rail-tip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  padding: 6px 10px;
+  background: rgb(10 8 9 / 0.92);
+  border: 1px solid #3a3133;
+  font-size: 0.9rem;
+  color: #eee;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.role-btn:hover .rail-tip,
+.role-btn:focus-visible .rail-tip {
+  opacity: 1;
+}
+/* the panel where something waits for this player: a glow until opened */
+.rail-btn.ask {
+  border-color: #f5c542;
+  color: #ffd27a;
+  background: rgb(60 44 10 / 0.9);
+  box-shadow: 0 0 0 2px #f5c542, 0 0 18px rgb(245 197 66 / 0.75);
+  animation: ask 1.2s ease-in-out infinite;
+}
+/* a "!" on its corner, as the PC game's notice */
+.rail-btn.ask::after {
+  content: '!';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #c8141d;
+  border: 2px solid #fff;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+@keyframes ask {
+  50% {
+    box-shadow: 0 0 0 2px #f5c542, 0 0 30px rgb(245 197 66 / 0.95);
+    transform: scale(1.05);
+  }
+}
+
+/* ---------- the room's name and code ---------- */
+.top {
+  position: absolute;
+  z-index: 4;
+  left: calc(var(--rail) + 24px);
+  right: 300px;
+  top: 14px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.8rem 1rem;
-  padding: 0.9rem 1.2rem;
-  background: linear-gradient(90deg, rgb(40 6 8 / 0.92), rgb(10 11 14 / 0.9) 55%);
-  border: 1px solid var(--line-strong);
-  border-left: 3px solid var(--blood);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.55);
-  animation: drop-in 0.4s ease-out both;
+  gap: 10px 12px;
 }
-@keyframes drop-in {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-}
-.rb-title {
-  min-width: 0;
-}
-.rb-phase {
-  margin: 0;
+.title small {
+  display: block;
   font-family: var(--font-display);
-  font-size: 0.8rem;
-  /* not the wide tracking of a Latin eyebrow: it breaks Thai apart */
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--blood-bright);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  color: #d9a3a3;
 }
-.rb-title h1 {
+.title h1 {
   margin: 0;
   font-size: 1.6rem;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-shadow: 0 2px 10px rgb(0 0 0 / 0.8);
+  color: #fff;
+  text-shadow: 0 2px 10px #000;
 }
-/* the code, big and red; a click copies it */
-.code-chip {
-  display: grid;
-  grid-template-columns: auto auto;
+.chip {
+  display: inline-flex;
   align-items: center;
-  column-gap: 0.6rem;
-  padding: 0.25rem 0.9rem 0.35rem;
-  background: rgb(0 0 0 / 0.55);
-  border: 1px solid rgb(255 59 48 / 0.45);
-}
-.code-chip small {
-  grid-column: 1 / -1;
-  font-family: 'Sarabun', sans-serif;
-  font-size: 0.72rem;
-  color: var(--muted);
-  text-align: left;
-}
-.code-chip strong {
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgb(10 8 9 / 0.8);
+  border: 1px solid #3a3133;
+  border-radius: 0;
+  color: #e8e1e1;
   font-family: var(--font-display);
-  font-size: 1.9rem;
-  line-height: 1.05;
-  letter-spacing: 0.3em;
-  color: var(--blood-bright);
-  text-shadow: 0 0 14px rgb(255 40 40 / 0.55);
+  font-size: 0.92rem;
 }
-.copied {
-  font-size: 0.85rem;
+.chip.code small {
   color: var(--muted);
-  transition: color 0.15s;
+  font-size: 0.75rem;
 }
-.copied.on {
-  color: var(--ok);
+.chip.code strong {
+  letter-spacing: 0.12em;
+  color: #ffd27a;
 }
-.invite,
-.leave {
-  padding: 0.5rem 0.9rem;
-}
-.leave {
-  background: none;
-}
-.spacer {
+.grow {
   flex: 1;
 }
+/* a panel open covers the room's name, as the PC game's does (it would show through) */
+.panel-open .top {
+  visibility: hidden;
+}
 
-/* ---------- the lineup ---------- */
-.stage {
-  display: grid;
-  gap: 0.7rem;
-  padding: 1.2rem 1.2rem 1rem;
-  background:
-    radial-gradient(ellipse at 50% 120%, rgb(255 110 40 / 0.16), transparent 60%),
-    linear-gradient(180deg, rgb(8 9 12 / 0.35), rgb(8 9 12 / 0.8));
-  border: 1px solid var(--line-strong);
-  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+/* ---------- this player, in the corner ---------- */
+.me-box {
+  position: absolute;
+  z-index: 4;
+  right: 24px;
+  top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
-.lineup {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) 64px repeat(4, minmax(0, 1fr));
-  grid-template-rows: auto auto;
-  align-items: stretch;
-  column-gap: 0.75rem;
-  row-gap: 0.45rem;
+.me-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: right;
 }
-.side-label {
+.me-name span {
+  font-size: 1.05rem;
+  color: #f2eeee;
+  text-shadow: 0 1px 6px #000;
+}
+.role-ico {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+/* the killer's name in red, as the PC game's */
+.me-name.killer {
+  color: #ff4040;
+}
+.me-name.killer span {
+  color: #ff4a4a;
+}
+.ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 3px solid #6b5f5f;
+  background: rgb(20 14 16 / 0.85);
   font-family: var(--font-display);
-  font-size: 1rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  font-style: normal;
+  font-size: 1.4rem;
+  color: #fff;
 }
-.side-label small {
-  margin-left: 0.3rem;
-  letter-spacing: 0.05em;
-  color: var(--muted);
+.ring.killer {
+  border-color: #b3262e;
 }
-.lineup > .seat,
-.lineup > .vs {
-  grid-row: 2;
+.ring.survivor {
+  border-color: #5f8fbf;
 }
-.side-label.killer {
-  grid-column: 1;
-  color: #ff6b62;
+/* the perks worn, as the PC game's diamond of three under the name */
+.worn {
+  position: relative;
+  width: 168px;
+  height: 140px;
 }
-.side-label.survivor {
-  grid-column: 3 / -1;
-  color: #ffd56a;
+.worn img {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  cursor: help;
+  transition: transform 0.15s, filter 0.15s;
+}
+.worn img:hover,
+.worn img:focus-visible {
+  z-index: 1;
+  transform: scale(1.12);
+  filter: brightness(1.2);
+  outline: none;
+}
+.worn .w0 {
+  left: 45px;
+  top: 0;
+}
+.worn .w1 {
+  left: 0;
+  top: 45px;
+}
+.worn .w2 {
+  left: 90px;
+  top: 45px;
+}
+
+/* ---------- the scene: the places ---------- */
+.scene {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+.places {
+  position: absolute;
+  left: calc(var(--rail) + 2%);
+  right: 46%;
+  bottom: calc(var(--foot) + 70px);
+  display: flex;
+  /* the figures in one line along their tops, whatever is written under each */
+  align-items: flex-start;
+  justify-content: center;
+  gap: 18px;
 }
 .vs {
   align-self: center;
-  justify-self: center;
   font-family: var(--font-display);
-  font-size: 2rem;
-  font-style: italic;
-  color: var(--blood-bright);
-  text-shadow:
-    0 0 18px rgb(255 30 30 / 0.7),
-    0 2px 0 #000;
-  animation: throb 2.4s ease-in-out infinite;
+  font-size: 1.6rem;
+  color: rgb(255 255 255 / 0.55);
+  text-shadow: 0 0 12px #000;
 }
-@keyframes throb {
-  50% {
-    transform: scale(1.12);
-    text-shadow:
-      0 0 28px rgb(255 30 30 / 0.95),
-      0 2px 0 #000;
-  }
-}
-
-/* a seat: a tall card with the side's silhouette, the player's name over its foot */
-.seat {
-  --tone: 217 162 39;
+/* a place: the character standing (or a dark pillar), the name plate under it */
+.place {
+  --fig-h: clamp(210px, 38vh, 340px);
   position: relative;
+  flex: 0 1 auto;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
   align-items: center;
-  gap: 0.15rem;
-  min-height: 300px;
-  padding: 0.8rem 0.6rem 0.9rem;
-  border: 1px solid rgb(var(--tone) / 0.35);
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 0 4px 8px;
+  background: none;
+  border: none;
   border-radius: 0;
-  background: linear-gradient(180deg, rgb(255 255 255 / 0.03), rgb(var(--tone) / 0.12));
+  color: inherit;
   text-align: center;
-  overflow: hidden;
-  animation: seat-in 0.5s ease-out both;
-  animation-delay: calc(var(--i, 0) * 70ms + 80ms);
-  transition:
-    transform 0.2s,
-    border-color 0.2s,
-    box-shadow 0.2s;
 }
-.seat.killer {
-  --tone: 255 59 48;
-  animation-delay: 0s;
+button.place {
+  cursor: pointer;
 }
-@keyframes seat-in {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
+button.place:hover:not(:disabled) .figure {
+  filter: brightness(1.25) drop-shadow(0 0 12px rgb(255 255 255 / 0.35));
 }
-/* the silhouette: white art on black, screened onto the card, fog rising over its feet */
-.seat .art {
+/* this player's own place, while their character stands big on the right: not twice */
+.place.hero-place {
+  display: none;
+}
+/* above the place: nothing on it (a kick, a tall empty place) covers it */
+.side-tag {
   position: absolute;
-  inset: 0 0 25% 0;
-  background: var(--art) center 46% / 210% auto no-repeat;
-  mix-blend-mode: screen;
-  opacity: 0.85;
-  filter: drop-shadow(0 0 16px rgb(var(--tone) / 0.6)) sepia(1) saturate(2.2) hue-rotate(5deg);
-  transition:
-    opacity 0.3s,
-    filter 0.3s;
-  pointer-events: none;
+  top: -22px;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: rgb(255 255 255 / 0.45);
 }
-.seat.killer .art {
-  background: var(--skull) center 47% / 240% auto no-repeat;
-  filter: drop-shadow(0 0 18px rgb(255 30 30 / 0.7));
+.place.killer .side-tag {
+  color: rgb(255 120 120 / 0.65);
 }
-.seat::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 45%;
-  background: linear-gradient(0deg, rgb(5 6 8 / 0.95), transparent);
-  pointer-events: none;
-}
-.seat > :not(.art) {
+/* the character standing: the portrait strip on the left of its board, as the big one on the right */
+.figure {
   position: relative;
-  z-index: 1;
+  height: var(--fig-h);
+  /* the strip down to above the board's ITEM CARD label */
+  aspect-ratio: 0.421;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent), linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent), radial-gradient(ellipse 52% 22% at 0 0, transparent 72%, #000 100%);
+  -webkit-mask-composite: source-in, source-in;
+  mask-image: linear-gradient(180deg, #000 70%, transparent), linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent), radial-gradient(ellipse 52% 22% at 0 0, transparent 72%, #000 100%);
+  mask-composite: intersect;
+  transition: filter 0.15s;
 }
-.seat-name {
+.figure.killer {
+  aspect-ratio: 0.334;
+}
+.strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 392%;
+  max-width: none;
+}
+/* nobody's character yet: a dark pillar of the Entity's, as the PC game's empty places */
+.pillar {
+  position: absolute;
+  inset: 0 18%;
+  display: flex;
+  justify-content: center;
+  padding-top: 32%;
+  background:
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0) 0 5px, rgb(0 0 0 / 0.55) 5px 7px, rgb(0 0 0 / 0) 7px 11px),
+    linear-gradient(180deg, rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.6) 55%, rgb(0 0 0 / 0.85));
+}
+.plus {
+  font-size: 3.4rem;
+  font-weight: 300;
+  line-height: 1;
+  color: rgb(255 255 255 / 0.85);
+  text-shadow: 0 0 14px rgb(0 0 0 / 0.9);
+}
+.place.me .figure,
+.place.active .figure {
+  filter: drop-shadow(0 0 10px rgb(245 197 66 / 0.55));
+}
+.place.talking .figure {
+  filter: drop-shadow(0 0 12px rgb(79 179 106 / 0.8));
+}
+.place.me .pname {
+  color: #ffd27a;
+}
+.pname {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-display);
-  font-size: 1.3rem;
-  font-weight: 600;
+  font-size: 1rem;
   color: #fff;
-  text-shadow: 0 2px 6px #000;
-}
-/* your own name: a click renames */
-button.seat-name.mine {
-  padding: 0;
-  border: none;
   background: none;
+  border: none;
+  padding: 0;
+}
+.pname.mine {
   cursor: pointer;
+  text-decoration: underline dotted rgb(255 255 255 / 0.4);
 }
-button.seat-name.mine i {
-  font-style: normal;
-  font-size: 0.8em;
-  color: rgb(var(--tone));
-  opacity: 0.7;
-}
-button.seat-name.mine:hover i {
-  opacity: 1;
-}
-.seat-sub {
+.pstate {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 0.85rem;
-  color: rgb(var(--tone));
+  color: #f0a35a;
 }
-/* the host's pick of a bot killer's character */
-.bot-pick {
-  max-width: 100%;
-  margin-top: 0.2rem;
-  padding: 0.15rem 0.4rem;
-  font-size: 0.85rem;
-  border: 1px solid rgb(var(--tone) / 0.6);
-  background: rgb(0 0 0 / 0.7);
-  color: #fff;
+.place.ready .pstate {
+  color: #7fe08f;
 }
-/* the host's kick: on the seat's top-right, where a player's own "leave" hint sits for themselves */
+.place.empty .pstate {
+  color: #cfc6c6;
+}
+.done-mark {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  font-size: 1.1rem;
+  color: #f0a35a;
+}
+.place.ready .done-mark {
+  color: #7fe08f;
+}
+.ping-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--c);
+  display: inline-block;
+}
+.hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
 .kick {
-  position: absolute !important;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 3;
-  padding: 0.1rem 0.5rem;
-  font-size: 0.78rem;
-  border: 1px solid rgb(255 90 80 / 0.7);
-  background: rgb(60 10 10 / 0.85);
-  color: #ffb0a8;
-  opacity: 0.55;
-  transition: opacity 0.15s;
-}
-.seat:hover .kick,
-.kick:hover,
-.kick:focus-visible {
-  opacity: 1;
-  background: var(--blood);
-  color: #fff;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px 7px;
+  font-size: 0.8rem;
+  background: rgb(10 8 9 / 0.85);
+  border: 1px solid #5a2a2e;
+  color: #ff8a8a;
 }
 .kick.small {
-  position: static !important;
-  margin-left: 0.3rem;
-  padding: 0 0.35rem;
-  opacity: 0.7;
+  position: static;
+  padding: 0 5px;
 }
-@media (hover: none) {
-  .kick {
-    opacity: 1;
-  }
-}
-/* voice: a mic after the name while in the channel; speaking, the seat (or the bench chip) glows
-   green in time and says so on top */
-.vc-ico {
-  margin-left: 0.3rem;
-  font-style: normal;
-  font-size: 0.85em;
-}
-.seat.talking {
-  border-color: #3fae6a !important;
-  animation:
-    seat-in 0.5s ease-out both,
-    seat-talk 0.9s ease-in-out infinite;
-}
-@keyframes seat-talk {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 2px #3fae6a,
-      0 0 18px rgb(63 174 106 / 0.55);
-  }
-  50% {
-    box-shadow:
-      0 0 0 3px #5fe08f,
-      0 0 34px rgb(63 174 106 / 0.95);
-  }
-}
-/* just above the name: the seat's top corners hold the crown and the host's kick */
-.talk-pill {
-  position: absolute !important;
-  bottom: 4.1rem;
-  left: 50%;
-  translate: -50% 0;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  background: #3fae6a;
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 700;
-  white-space: nowrap;
-  box-shadow: 0 0 12px rgb(63 174 106 / 0.8);
-}
-.bench-chip.talking {
-  border-color: #3fae6a;
-  background: rgb(63 174 106 / 0.3);
-  box-shadow: 0 0 12px rgb(63 174 106 / 0.7);
-}
-.crown {
-  position: absolute !important;
-  top: 0.5rem;
-  left: 0.55rem;
-  font-size: 1.2rem;
-  filter: drop-shadow(0 0 6px rgb(255 214 106 / 0.8));
-}
-/* this player's seat: a bright frame */
-.seat.me {
-  border-color: rgb(var(--tone));
-  box-shadow:
-    0 0 0 1px rgb(var(--tone)) inset,
-    0 0 24px rgb(var(--tone) / 0.35);
-}
-/* your own seat, not ready yet: a click leaves the side, said while pointing at it */
-.seat.leavable {
-  cursor: pointer;
-}
-.leave-hint {
-  position: absolute !important;
-  top: 0.5rem;
-  right: 0.5rem;
-  padding: 0.1rem 0.5rem;
-  border: 1px solid rgb(var(--tone) / 0.6);
-  background: rgb(0 0 0 / 0.7);
-  color: #fff;
+.bot-add,
+.double,
+.bot-pick {
   font-size: 0.78rem;
-  opacity: 0;
-  transform: translateY(-4px);
-  transition:
-    opacity 0.15s,
-    transform 0.15s;
-  pointer-events: none;
-}
-.seat.leavable:hover .leave-hint {
-  opacity: 1;
-  transform: none;
-}
-.seat.leavable:hover {
-  border-color: var(--blood-bright);
-}
-/* on a tablet there is no pointing: the hint stays */
-@media (hover: none) {
-  .leave-hint {
-    opacity: 1;
-    transform: none;
-  }
-}
-.double {
-  margin-top: 0.35rem;
-  padding: 0.15rem 0.55rem;
-  font-size: 0.8rem;
-  background: rgb(0 0 0 / 0.5);
+  padding: 4px 8px;
+  background: rgb(10 8 9 / 0.85);
+  border: 1px solid #3a3133;
+  color: #cfc6c6;
+  max-width: 100%;
 }
 .double.on {
-  border-color: #ffd56a;
-  color: #ffd56a;
-  background: rgb(255 214 106 / 0.12);
-  opacity: 1;
+  border-color: #f5c542;
+  color: #ffd27a;
 }
-/* an empty seat: dark, a dashed frame and a +, a click takes it */
-.seat.empty {
-  border-style: dashed;
-  background: rgb(0 0 0 / 0.35);
-  cursor: pointer;
-  font: inherit;
+/* the killer's seat, for a survivor (whose scene has no killer on it): top of the scene */
+.killer-seat {
+  position: absolute;
+  z-index: 3;
+  left: calc(var(--rail) + 24px);
+  /* under the room's name, above the places' labels */
+  top: 76px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: rgb(10 8 9 / 0.8);
+  border: 1px solid #5a2a2e;
+  border-left: 4px solid #b3262e;
 }
-.seat.empty .art {
-  opacity: 0.12;
-  filter: grayscale(1);
-}
-.seat.empty .seat-name {
-  color: var(--muted);
-  font-size: 1.05rem;
-}
-.seat.empty .seat-sub {
-  color: var(--muted);
+.ks-label {
+  font-family: var(--font-display);
   font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  color: #ff8a8a;
 }
-.plus {
+.killer-seat b {
   font-family: var(--font-display);
-  font-size: 2.6rem;
-  line-height: 1;
-  color: rgb(var(--tone) / 0.5);
-  margin-bottom: auto;
-  margin-top: 30%;
-  transition:
-    transform 0.2s,
-    color 0.2s;
+  color: #fff;
 }
-.seat.empty:hover:not(:disabled) {
-  transform: translateY(-4px);
-  border-color: rgb(var(--tone));
-  box-shadow: 0 0 24px rgb(var(--tone) / 0.3);
+.killer-seat b.empty {
+  color: #cfc6c6;
 }
-.seat.empty:hover:not(:disabled) .plus {
-  transform: scale(1.2) rotate(90deg);
-  color: rgb(var(--tone));
+.killer-seat small {
+  color: #f0a35a;
 }
-.seat.empty:hover:not(:disabled) .art {
-  opacity: 0.35;
+.killer-seat small.ok {
+  color: #7fe08f;
 }
-.seat.empty:disabled {
-  opacity: 0.55;
-  filter: none;
-  cursor: default;
+.ks-btn {
+  font-size: 0.85rem;
+  padding: 5px 10px;
+  background: rgb(10 8 9 / 0.85);
+  border: 1px solid #3a3133;
+  color: #e8e1e1;
 }
-.seat.waiting .plus {
-  animation: breathe 2s ease-in-out infinite;
+.ks-btn.add {
+  border-color: #b3262e;
 }
-@keyframes breathe {
-  50% {
-    opacity: 0.3;
-  }
-}
-/* ready: a green glow along the foot and a stamp that slams on */
-.stamp {
-  position: absolute !important;
-  top: 34%;
-  left: 50%;
-  padding: 0.15rem 0.9rem;
-  border: 3px solid var(--ok);
-  color: var(--ok);
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  background: rgb(5 20 10 / 0.6);
-  box-shadow: 0 0 18px rgb(79 179 106 / 0.45);
-  transform: translate(-50%, -50%) rotate(-12deg) scale(2.2);
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    transform 0.22s cubic-bezier(0.3, 1.6, 0.5, 1),
-    opacity 0.15s;
-}
-.seat.ready .stamp {
-  opacity: 1;
-  transform: translate(-50%, -50%) rotate(-12deg) scale(1);
-}
-.seat.ready {
-  border-color: rgb(79 179 106 / 0.75);
-  box-shadow:
-    inset 0 -40px 40px -20px rgb(79 179 106 / 0.45),
-    0 0 18px rgb(79 179 106 / 0.25);
+.split {
+  position: absolute;
+  left: calc(var(--rail) + 2%);
+  right: 46%;
+  bottom: calc(var(--foot) + 40px);
+  margin: 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: rgb(255 255 255 / 0.6);
+  text-shadow: 0 1px 6px #000;
 }
 
-/* the host seats bots: one row under the lineup */
-.bot-add {
+/* this player's character, big on the right: the portrait strip of their board */
+.hero {
+  position: absolute;
+  z-index: 1;
+  right: calc(min(400px, 34%) + 48px);
+  bottom: 0;
+  margin: 0;
+  height: 78%;
+  /* the strip down to above the board's ITEM CARD label */
+  aspect-ratio: 0.421;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent), linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent), radial-gradient(ellipse 52% 22% at 0 0, transparent 72%, #000 100%);
+  -webkit-mask-composite: source-in, source-in;
+  mask-image: linear-gradient(180deg, #000 70%, transparent), linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent), radial-gradient(ellipse 52% 22% at 0 0, transparent 72%, #000 100%);
+  mask-composite: intersect;
+  pointer-events: none;
+}
+/* the killer: bigger, as the PC game's (he towers over the survivors) */
+.hero.killer {
+  height: 92%;
+  aspect-ratio: 0.334;
+}
+.hero img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 392%;
+  max-width: none;
+}
+.hero figcaption {
+  display: none;
+}
+/* no character yet: a tall pillar of the Entity's, fading in from above, the name under it */
+.hero.placeholder,
+.hero.placeholder.killer {
+  height: 70%;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.pillar.big {
+  inset: 0 24% calc(var(--foot) + 64px);
+  padding-top: 55%;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%);
+  mask-image: linear-gradient(180deg, transparent, #000 22%);
+}
+.pillar.big .plus {
+  font-size: 5rem;
+}
+.hero figcaption.ph-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* above the foot (the corner button) */
+  bottom: calc(var(--foot) + 8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-shadow: 0 1px 8px #000;
+}
+.ph-cap b {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: #fff;
+}
+.ph-cap small {
+  color: #f0a35a;
+}
+/* the killer looks at the survivors across the fire: they stand further off, smaller */
+.pc-room.killer .place {
+  /* as tall as the screen allows, and narrow enough that all four stay clear of the killer */
+  --fig-h: clamp(260px, min(50vh, 24.5vw), 470px);
+}
+/* a survivor's team in one line, everyone the same size (the PC game's survivor lobby), up to the chat */
+.pc-room.survivor .places,
+.pc-room.survivor .split {
+  right: calc(min(400px, 34%) + 40px);
+}
+.pc-room.survivor .place {
+  --fig-h: clamp(260px, 50vh, 540px);
+}
+.pc-room.survivor .place.me .pname {
+  font-size: 1.15rem;
+}
+
+/* ---------- the panel ---------- */
+.panel {
+  position: absolute;
+  z-index: 5;
+  left: var(--rail);
+  top: 0;
+  bottom: var(--foot);
+  width: min(980px, 60%, calc(100% - var(--rail)));
+  overflow-y: auto;
+  padding: 22px 30px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: linear-gradient(90deg, rgb(var(--slate) / 0.88) 0%, rgb(var(--slate) / 0.8) 88%, rgb(var(--slate) / 0.4));
+  backdrop-filter: blur(3px);
+  box-shadow: 12px 0 40px rgb(0 0 0 / 0.35);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.panel-head .ring {
+  width: 46px;
+  height: 46px;
+  background: none;
+}
+.panel-head b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: #fff;
+}
+.panel-head small {
+  color: #c9c3c3;
+}
+.close {
+  margin-left: auto;
+  padding: 4px 10px;
+  background: rgb(10 12 14 / 0.6);
+  border: 1px solid rgb(255 255 255 / 0.25);
+  color: #ddd;
+}
+/* the pickers keep their own boxes elsewhere (offline); here they sit on the panel's slate */
+.panel :deep(.loadout),
+.panel :deep(.card) {
+  background: rgb(0 0 0 / 0.22);
+  border-color: rgb(255 255 255 / 0.12);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.panel h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #cfc8c8;
+}
+.locked-note {
+  margin: 0;
+  padding: 10px 14px;
+  background: rgb(0 0 0 / 0.3);
+  border-left: 3px solid #f0a35a;
+  color: #f3dcc3;
+}
+.label {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: #e3dcdc;
+}
+.sides {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.sides .note {
+  grid-column: 1 / -1;
+}
+.side-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 10px;
+  background: rgb(10 12 14 / 0.55);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 0;
+  color: #fff;
+}
+.side-btn b {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+.side-btn small {
+  color: #c9c3c3;
+}
+.side-btn.on {
+  border-color: #f2ece4;
+  box-shadow: 0 0 0 2px #f2ece4;
+}
+.side-btn.killer.on {
+  background: rgb(110 14 22 / 0.6);
+}
+.side-btn.survivor.on {
+  background: rgb(20 50 90 / 0.6);
+}
+.slot-tabs {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.6rem;
-  margin: 0.2rem 0 0;
+  gap: 6px;
 }
-.bot-btn {
-  padding: 0.2rem 0.8rem;
-  font-size: 0.9rem;
+.slot-tabs button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 12px;
+  background: rgb(10 12 14 / 0.5);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 0;
+  color: #fff;
+}
+.slot-tabs button small {
+  color: #c9c3c3;
+}
+.slot-tabs button.on {
+  border-color: #f5c542;
+  box-shadow: inset 0 -2px 0 #f5c542;
+}
+.banned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.banned span {
+  padding: 2px 8px;
+  background: rgb(120 20 30 / 0.5);
+  border: 1px solid #7a2a30;
+  font-size: 0.85rem;
+}
+.ping-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swatch {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--c);
+  border: 2px solid rgb(0 0 0 / 0.5);
+}
+.swatch.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--c);
+}
+.swatch.taken {
+  opacity: 0.45;
+}
+.holder {
+  font-size: 0.8rem;
+  color: #000;
+  font-weight: 700;
 }
 .bench {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.4rem;
-  margin: 0.2rem 0 0;
+  gap: 6px;
+}
+.bench .label {
+  width: 100%;
 }
 .bench-chip {
-  padding: 0.1rem 0.6rem;
-  border: 1px solid var(--line-strong);
-  background: rgb(0 0 0 / 0.4);
-  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgb(10 12 14 / 0.5);
+  border: 1px solid rgb(255 255 255 / 0.18);
 }
 .bench-chip.me {
-  border-color: var(--text);
-}
-.bench-hint {
-  color: var(--warn);
-  font-size: 0.88rem;
-  animation: breathe 2s ease-in-out infinite;
-}
-.split {
-  margin: 0;
-  font-size: 0.85rem;
+  border-color: #f5c542;
 }
 
-/* ---------- ping colours: a dot on every seat, and this player's picker ---------- */
-.ping-dot {
-  display: inline-block;
-  width: 0.62em;
-  height: 0.62em;
-  margin-right: 0.35em;
-  border-radius: 50%;
-  background: var(--c);
-  box-shadow: 0 0 6px var(--c);
-  vertical-align: 0.05em;
-}
-.ping-pick {
+/* ---------- the chat, above the corner's button ---------- */
+.chat-box {
+  position: absolute;
+  z-index: 3;
+  right: 24px;
+  bottom: calc(var(--foot) + 8px);
+  width: min(400px, 34%);
+  height: min(300px, 34%);
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.8rem;
-  margin-top: 0.4rem;
+  background: rgb(0 0 0 / 0.55);
+  border: 1px solid rgb(255 255 255 / 0.1);
 }
-.ping-pick-label {
-  font-size: 0.9rem;
-}
-.swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-.swatch {
-  position: relative;
-  width: 1.9rem;
-  height: 1.9rem;
-  min-height: 0;
-  padding: 0;
-  border-radius: 50%;
-  border: 2px solid rgb(255 255 255 / 0.25);
-  background: var(--c);
-  cursor: pointer;
-  transition:
-    transform 0.12s,
-    box-shadow 0.12s;
-}
-.swatch:hover:not(:disabled) {
-  transform: scale(1.12);
-}
-.swatch.on {
-  border-color: #fff;
-  box-shadow:
-    0 0 0 3px rgb(0 0 0 / 0.6),
-    0 0 12px var(--c);
-}
-/* someone else's: dimmed, with their initial on it */
-.swatch.taken {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-.swatch .holder {
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: #111;
-}
-
-/* ---------- the ready bar, held at the foot of the screen ---------- */
-.ready-bar {
-  position: sticky;
-  bottom: 0.6rem;
-  z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.8rem 1.2rem;
-  padding: 0.75rem 1rem;
-  background: rgb(8 9 12 / 0.94);
-  border: 1px solid var(--line-strong);
-  border-top: 2px solid var(--blood);
-  box-shadow: 0 -6px 30px rgb(0 0 0 / 0.7);
-  backdrop-filter: blur(6px);
-}
-.rb-status {
+.chat-box > :deep(*) {
   flex: 1;
-  display: grid;
-  min-width: 14rem;
+  min-width: 0;
 }
-.ready-line {
+
+/* ---------- the foot ---------- */
+.foot {
+  position: absolute;
+  z-index: 6;
+  left: calc(var(--rail) + 20px);
+  right: 24px;
+  bottom: 16px;
+  height: calc(var(--foot) - 16px);
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 12px;
+}
+/* taking back a confirmation: beside the corner button, where it is seen */
+.undos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: center;
+}
+.undo-btn {
+  padding: 8px 14px;
+  background: rgb(10 8 9 / 0.88);
+  border: 1px solid #6b5631;
+  border-radius: 0;
+  color: #ffd27a;
   font-family: var(--font-display);
-  font-size: 1.1rem;
+  font-size: 0.92rem;
+  white-space: nowrap;
 }
-.ready-pips {
-  display: inline-flex;
-  gap: 4px;
+.undo-btn:hover:not(:disabled) {
+  border-color: #f5c542;
+  background: rgb(40 30 8 / 0.9);
 }
-.ready-pips i {
-  width: 12px;
-  height: 12px;
-  transform: rotate(45deg);
-  border: 1px solid var(--line-strong);
-  background: rgb(255 255 255 / 0.05);
-  transition:
-    background 0.2s,
-    box-shadow 0.2s;
+.back-btn {
+  padding: 10px 18px;
+  background: rgb(10 8 9 / 0.85);
+  border: none;
+  border-left: 4px solid #b3262e;
+  border-radius: 0;
+  color: #eee;
+  font-family: var(--font-display);
+  font-size: 1rem;
 }
-.ready-pips i.on {
-  border-color: var(--ok);
-  background: var(--ok);
-  box-shadow: 0 0 8px rgb(79 179 106 / 0.7);
+.error {
+  margin: 0;
+  color: var(--blood-bright);
 }
-/* READY: the big one, breathing while not pressed yet */
-.ready-btn {
-  display: grid;
-  justify-items: center;
-  min-width: 13rem;
-  padding: 0.75rem 1.6rem;
-  font-size: 1.35rem;
-  line-height: 1.1;
-}
-.ready-btn small {
-  font-size: 0.72rem;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  opacity: 0.8;
-}
-.ready-btn.primary:not(:disabled) {
-  animation: call 1.8s ease-in-out infinite;
-}
-@keyframes call {
-  50% {
-    filter: drop-shadow(0 0 14px rgb(255 40 40 / 0.75));
-  }
-}
-.ready-btn.done {
-  border-color: var(--ok);
-  color: var(--ok);
-  background: rgb(79 179 106 / 0.12);
-  box-shadow: 0 0 16px rgb(79 179 106 / 0.3);
+/* the one button: "พร้อม", then whatever the room waits on from this player */
+.go {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  background: rgb(8 6 7 / 0.9);
+  border: 1px solid #3a3133;
 }
 .go-btn {
-  padding: 0.85rem 1.6rem;
-  font-size: 1.2rem;
+  min-width: 220px;
+  padding: 0 40px;
+  border: none;
+  border-radius: 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(90deg, rgb(70 70 74 / 0.9), rgb(40 40 44 / 0.9));
 }
-.go-btn:not(:disabled) {
-  animation: call 1.2s ease-in-out infinite;
+.go.primary .go-btn {
+  background: linear-gradient(90deg, rgb(150 18 26 / 0.95), rgb(80 8 12 / 0.95));
+}
+/* it is the thing to press now (ล็อกตัวละคร after picking, ยืนยัน…, เริ่ม Trial): a gold glow, as the
+   rail's button of the next panel */
+.go.primary {
+  border-color: #f5c542;
+  animation: go-ask 1.2s ease-in-out infinite;
+}
+@keyframes go-ask {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px #f5c542, 0 0 12px rgb(245 197 66 / 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 2px #f5c542, 0 0 30px rgb(245 197 66 / 0.95);
+  }
+}
+.go.primary .go-btn:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+.go.done .go-btn {
+  background: linear-gradient(90deg, rgb(30 80 44 / 0.9), rgb(18 50 28 / 0.9));
+}
+.go-btn:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+.go-note {
+  width: 260px;
+  margin: 0;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: #f0a35a;
+}
+.go.done .go-note {
+  color: #b9d9be;
 }
 
-@media (max-width: 1000px) {
-  .lineup {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .side-label.killer,
-  .side-label.survivor,
-  .lineup > .seat.killer {
-    grid-column: 1 / -1;
-  }
-  .side-label.killer {
-    grid-row: 1;
-  }
-  .lineup > .seat.killer {
-    grid-row: 2;
-  }
-  .side-label.survivor {
-    grid-row: 3;
-  }
-  .lineup > .seat.survivor {
-    grid-row: 4;
-  }
-  .vs {
+/* ---------- narrower screens (a tablet): the big figure goes, the panel covers the scene ---------- */
+@media (max-width: 1280px) {
+  .hero {
     display: none;
   }
-  .seat.killer {
-    min-height: 200px;
+  /* the figures stop short of the chat in the corner */
+  .places,
+  .split {
+    right: calc(min(360px, 38%) + 36px);
   }
-  .seat {
-    min-height: 240px;
+  .place {
+    --fig-h: clamp(180px, 30vh, 260px);
+  }
+  .place.hero-place {
+    display: flex;
+  }
+  .pc-room.survivor .place {
+    --fig-h: clamp(190px, 36vh, 320px);
+  }
+  /* the killer's view on a tablet: the big one is gone, all five in the line fit beside the chat */
+  .pc-room.killer .place {
+    --fig-h: clamp(180px, 30vh, 260px);
+  }
+  .pc-room.survivor .places,
+  .pc-room.survivor .split {
+    right: calc(min(360px, 38%) + 36px);
+  }
+  .chat-box {
+    width: min(360px, 38%);
+    height: 240px;
+  }
+}
+@media (max-width: 900px) {
+  .pc-room {
+    --rail: 72px;
+    height: auto;
+    min-height: calc(var(--vh, 100vh) - var(--topbar-h, 58px));
+    overflow: visible;
+    padding: 0 12px 110px calc(var(--rail) + 12px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .rail-btn {
+    width: 56px;
+  }
+  .top,
+  .me-box,
+  .scene,
+  .places,
+  .split,
+  .chat-box {
+    position: static;
+  }
+  .top {
+    padding-top: 12px;
+  }
+  .me-box {
+    align-items: flex-start;
+  }
+  .places {
+    flex-wrap: wrap;
+  }
+  .chat-box {
+    width: auto;
+    height: 260px;
+  }
+  .panel {
+    position: fixed;
+    top: var(--topbar-h, 58px);
+    width: calc(100% - var(--rail));
+  }
+  .foot {
+    position: fixed;
+    left: calc(var(--rail) + 8px);
+    right: 8px;
+    bottom: 8px;
+  }
+  .go-btn {
+    min-width: 0;
+    padding: 0 20px;
+  }
+  .go-note {
+    width: auto;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .room-bar,
-  .seat,
-  .vs,
-  .bench-hint,
-  .seat.waiting .plus,
-  .ready-btn.primary:not(:disabled),
-  .go-btn:not(:disabled) {
+  .rail-btn.ask,
+  .go.primary {
     animation: none;
   }
-}
-/* where the picks are: numbered steps, the finished ones ticked, the current one lit */
-.steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.steps li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.9rem 0.4rem 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  background: rgb(10 11 14 / 0.7);
-  color: var(--muted);
-  font-family: var(--font-display);
-  letter-spacing: 0.04em;
-}
-.steps .num {
-  display: grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.08);
-  font-size: 0.8rem;
-}
-.steps li + li::before {
-  content: '';
-  width: 1.1rem;
-  height: 2px;
-  margin-right: 0.15rem;
-  background: var(--line-strong);
-}
-.steps li.done + li::before,
-.steps li.done + li.now::before {
-  background: rgb(80 200 120 / 0.6);
-}
-.steps li.done {
-  color: var(--ok);
-  border-color: rgb(80 200 120 / 0.4);
-}
-.steps li.done .num {
-  background: rgb(80 200 120 / 0.2);
-}
-.steps li.now {
-  color: #fff;
-  border-color: var(--blood-bright);
-  background: linear-gradient(90deg, rgb(70 8 12 / 0.85), rgb(20 10 12 / 0.85));
-  box-shadow: 0 0 14px rgb(255 59 48 / 0.3);
-}
-.steps li.now .num {
-  background: var(--blood);
-}
-/* who has finished the stage */
-.who-done {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-.pchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  background: rgb(10 11 14 / 0.7);
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-.pchip.ok {
-  border-color: rgb(80 200 120 / 0.5);
-  color: var(--text);
-}
-.pchip.ok b {
-  color: var(--ok);
-}
-.pchip.me {
-  box-shadow: inset 0 0 0 1px rgb(255 214 120 / 0.5);
-}
-/* the bans, once public */
-.banned-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0;
-}
-.banned-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.15rem 0.7rem 0.15rem 0.2rem;
-  border: 1px solid var(--blood-dim);
-  border-radius: 99px;
-  background: rgb(40 6 8 / 0.6);
-  font-size: 0.88rem;
-}
-.banned-chip img {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  object-fit: cover;
-  filter: grayscale(1) brightness(0.6);
-}
-.wait-card h2 {
-  margin-bottom: 0.3rem;
-}
-.big-go {
-  font-weight: 700;
-}
-.perks-stage {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.perks-stage h2 {
-  margin: 0;
-}
-.room {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1rem;
-}
-.spacer {
-  flex: 1;
-}
-.small {
-  font-size: 0.85rem;
-}
-.center {
-  text-align: center;
-}
-h2 {
-  margin-top: 0;
-}
-input {
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  padding: 0.5rem 0.7rem;
-}
-/* the two sides as big cards, side by side: the room's main choice */
-.drawn {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-.drawn .mini {
-  width: 56px;
-  height: 56px;
-}
-.killer-name {
-  display: block;
-  font-size: 1.15rem;
-}
-.double {
-  padding: 0.15rem 0.55rem;
-  font-size: 0.8rem;
-  background: none;
-}
-.double.on {
-  border-color: #ffd56a;
-  color: #ffd56a;
-  background: rgb(255 214 106 / 0.1);
-  opacity: 1;
-}
-.big {
-  width: 100%;
-  padding: 0.8rem;
-  font-size: 1.1rem;
-}
-/* the characters stage: the lineup stays beside the pickers while they scroll */
-.pick-layout {
-  display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 1rem;
-  align-items: start;
-}
-.team-panel {
-  position: sticky;
-  top: 0.8rem;
-  display: grid;
-  gap: 0.6rem;
-}
-.team-panel h2 {
-  margin: 0;
-  font-size: 1.05rem;
-  letter-spacing: 0.04em;
-}
-.team-killer {
-  margin-top: 0.4rem !important;
-  color: var(--blood-bright);
-}
-.pick-main {
-  display: grid;
-  gap: 1rem;
-  min-width: 0;
-}
-@media (max-width: 900px) {
-  .pick-layout {
-    grid-template-columns: 1fr;
-  }
-  .team-panel {
-    position: static;
-  }
-}
-.slots {
-  display: grid;
-  gap: 0.5rem;
-  grid-template-columns: 1fr;
-}
-.slot {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem;
-  text-align: left;
-  background: rgb(0 0 0 / 0.3);
-}
-.slot:disabled {
-  opacity: 1;
-  cursor: default;
-}
-.slot.mine {
-  border-color: rgb(217 162 39 / 0.6);
-}
-.slot.active {
-  border-color: var(--warn);
-  box-shadow: 0 0 0 2px var(--warn) inset;
-}
-.slot .mini,
-.slot .empty,
-.drawn .empty {
-  width: 48px;
-  height: 48px;
-  flex: none;
-}
-.slot .empty,
-.drawn .empty {
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  border: 1px dashed var(--line-strong);
-  color: var(--muted);
-}
-.slot-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.lock {
-  margin-left: auto;
-}
-.killer-card {
-  border-color: var(--blood-dim);
-}
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-.lockbtn {
-  padding: 0.7rem;
-  font-size: 1.05rem;
-}
-.back {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  color: var(--muted);
-}
-.error {
-  color: var(--blood-bright);
 }
 </style>
