@@ -1760,8 +1760,10 @@ button.place:hover:not(:disabled) .figure {
 }
 /* the killer looks at the survivors across the fire: they stand further off, smaller */
 .pc-room.killer .place {
-  /* as tall as the screen allows, and narrow enough that all four stay clear of the killer */
-  --fig-h: clamp(260px, min(50vh, 24.5vw, 100vh - 400px), 470px);
+  /* Smaller again at the user's word: they are the ones being looked at, not the one looking,
+     and the killer's own figure should carry the screen. Narrow enough that all four stay clear
+     of him, and `100vh - 400px` keeps their labels out of the room header. */
+  --fig-h: clamp(220px, min(42vh, 21vw, 100vh - 400px), 400px);
 }
 /* a survivor's team in one line, everyone the same size (the PC game's survivor lobby), up to the chat */
 .pc-room.survivor .places,

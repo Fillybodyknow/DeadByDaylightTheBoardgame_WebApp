@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.39.3',
+    date: '2026-11-10',
+    items: [
+      'ล็อบบี้ฝั่งฆาตกร: ย่อช่องผู้รอดชีวิตให้เล็กลงอีกราว 12% — ผู้รอดชีวิตยืนไกลออกไป ตัวฆาตกรเด่นขึ้น',
+    ],
+  },
+  {
     version: '1.39.2',
     date: '2026-11-10',
     items: [
