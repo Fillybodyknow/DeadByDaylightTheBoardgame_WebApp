@@ -36,6 +36,7 @@ import {
   touchingPaths,
   unknownRooms,
   usableHook,
+  tryApply,
 } from './engine/engine'
 import { PERKS, type PerkId } from './engine/perks'
 import { boards } from './engine/boards'
@@ -608,7 +609,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           if (c.target !== who) continue
           const run = go({ t: 'perk', perk, use: true, choice: c }, sfx.drop)
           add(`path:${c.path}`, `${name}: ${perkChoiceLabel(st, perk, s.owner, s.w, c)}`, () => ((modes.breakoutTarget.value = null), run()))
-          out[out.length - 1].dest = perkDest(st, s.owner, c)
+          out[out.length - 1].dest = perkDest(st, perk, s.owner, c)
         }
         break
       }
@@ -632,7 +633,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
         else if (c.path) {
           add(`path:${c.path}`, label, run)
           // where it leads: at a fork the room is then picked on the map, as for any move
-          out[out.length - 1].dest = perkDest(st, s.owner, c)
+          out[out.length - 1].dest = perkDest(st, perk, s.owner, c)
         } else if (c.prop) add(`prop:${c.prop}`, label, run)
         else if (c.target !== undefined) add(`s:${c.target}`, label, run, 'act', c.target)
         // a Guard into a room (Face the Darkness): the room, with the Guard's picture
@@ -826,14 +827,21 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
  * Where a perk's move along a path takes its mover (the survivor it targets, or its owner): the
  * path's other end. Undefined when the mover isn't at either end (nothing to pick then).
  */
-function perkDest(st: GameState, owner: PerkOwner, c: PerkChoice): string | undefined {
+function perkDest(st: GameState, perk: PerkId, owner: PerkOwner, c: PerkChoice): string | undefined {
   const mover = c.target ?? owner
   // (The Unknown: the mini the choice moves, `index`)
   const from = mover !== 'killer' ? st.survivors[mover].room : c.index !== undefined && st.killer.unknowns ? (unknownRooms(st)[c.index] ?? st.killer.room) : st.killer.room
   // a pallet stops the killer: it breaks and he stays (Agitation, Beast of Prey, Bitter Murmur)
   if (mover === 'killer' && palletOn(st, c.path!)) return undefined
   const p = pathDef(st, c.path!)
-  return p.a === from ? p.b : p.b === from ? p.a : undefined
+  const dest = p.a === from ? p.b : p.b === from ? p.a : undefined
+  if (!dest || c.index !== undefined) return dest
+  // Only a perk that moves someone takes the room next: one that lays something on the path
+  // (Dissolution's ▲, the Entity, a wall) is a single tap on it. A path out of the mover's room
+  // was taken for a move, and the player was asked for a room nobody was going to (a player's report).
+  const next = tryApply(st, { t: 'perk', perk, use: true, choice: c })
+  if (!next) return dest
+  return (mover === 'killer' ? next.killer.room : next.survivors[mover].room) === from ? undefined : dest
 }
 
 /** Perks offered that move a survivor along a path: picked as Breakout is, the survivor then the path. */
@@ -1065,7 +1073,7 @@ function perkSpots(st: GameState, out: BoardAction[], modes: BoardModes, only?: 
       const label = `${name}: ${perkChoiceLabel(st, b.perk, b.owner, b.w, c)}`
       const run = go({ t: 'perk', perk: b.perk, use: true, choice: c }, sfx.select)
       const action = run.action
-      if (c.path) out.push({ key: spotKey(st, `path:${c.path}`), label, style: 'act', run, action, dest: perkDest(st, b.owner, c) })
+      if (c.path) out.push({ key: spotKey(st, `path:${c.path}`), label, style: 'act', run, action, dest: perkDest(st, b.perk, b.owner, c) })
       else if (c.target !== undefined) out.push({ key: `s:${c.target}`, label, style: 'act', run, who: c.target, action })
       // a prop (Windows of Opportunity: in a connected room)
       else if (c.prop) out.push({ key: `prop:${c.prop}`, label, style: 'act', run, action })
