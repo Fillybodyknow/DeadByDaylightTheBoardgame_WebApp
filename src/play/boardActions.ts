@@ -85,6 +85,12 @@ export interface BoardModes {
    * (`startSurvivorMove`), so it could buy the killer a ▲ for nothing (a player's report).
    */
   bonusAsk: Ref<{ i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null>
+  /**
+   * Interacting with a friend to use **their** perk (Collective Stealth, Power of Two): the perk's
+   * card is shown and agreed to first. A click on the mini used to set it off at once, so the
+   * player never saw what the perk did, and it spends that friend's one use for the round.
+   */
+  partnerAsk: Ref<Extract<SurvivorInteraction, { k: 'partner' }> | null>
   /** Treacherous Crows: the crow being sent to a connected room. */
   crowsCrow: Ref<string | null>
   /** Treacherous Crows: which of the killer's cards to reveal (picked in the side panel). */
@@ -494,6 +500,8 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       }
       // the gate: the panel asks whether a perk takes this interaction before the map takes a click
       if (interactGate(st)) break
+      // a friend's perk being read in the panel: nothing else is clickable until it is answered
+      if (modes.partnerAsk.value) break
       // Diversion, after clicking the killer: only his paths, each with the room it sends him to
       // (a fork asks which room next, as any move does)
       if (modes.diversion.value !== null) {
@@ -519,11 +527,14 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             if (pallets.has(i.prop)) continue
             pallets.add(i.prop)
             add(spotOf(i), 'ทิ้ง Pallet (แล้วเลือกเส้นทาง)', () => ((modes.palletMode.value = i.prop), sfx.click()))
-          } else if (i.k === 'crow' || (i.k === 'partner' && i.perk === 'power_of_two')) {
+          } else if (i.k === 'crow') {
             // it buys the killer a ▲: the bonus turn is settled in the panel first, then all of
-            // it is sent at once (`bonusAsk`). Collective Stealth is a 'partner' too, but free.
-            const what = i.k === 'crow' ? 'ไล่ Crow' : `${PERKS.power_of_two.name}: ${st.survivors[i.target].name}`
-            add(spotOf(i), `${what} (เลือกการ์ด Bonus Turn ก่อน)`, () => ((modes.bonusAsk.value = { i, card: null, path: null }), sfx.click()), 'act', i.k === 'partner' ? i.target : null)
+            // it is sent at once (`bonusAsk`)
+            add(spotOf(i), 'ไล่ Crow (เลือกการ์ด Bonus Turn ก่อน)', () => ((modes.bonusAsk.value = { i, card: null, path: null }), sfx.click()))
+          } else if (i.k === 'partner') {
+            // their friend's perk: its card is read and agreed to first (`partnerAsk`)
+            const name = PERKS[i.perk].name
+            add(spotOf(i), `ใช้ ${name} ของ ${st.survivors[i.target].name} (ดูการ์ดก่อน)`, () => ((modes.partnerAsk.value = i), sfx.click()), 'act', i.target)
           } else if (i.k === 'calmSpirit') {
             // Calm Spirit is the turn's interaction, so it is answered in the panel first
             // (`interactGate`) and its crows come up only once its card is picked, above

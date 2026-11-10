@@ -11,7 +11,7 @@
 //   offerings are set alongside the perks.
 //   Survivors never see the killer's pick (unless the room shows it); Devout's perks stay each
 //   player's own until the game.
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { killerById, survivorById } from '../../data'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
@@ -85,6 +85,7 @@ import { offeringProblem, type OfferingId } from '../engine/offerings'
 import MapPicker from './MapPicker.vue'
 import RoomSettingsCard from './RoomSettingsCard.vue'
 import SyncBadge from './SyncBadge.vue'
+import SettingsDialog from '../../components/SettingsDialog.vue'
 import VoiceButton from './VoiceButton.vue'
 import LfgPostDialog from './LfgPostDialog.vue'
 import { lobbyLacks } from '../online/lfg'
@@ -142,17 +143,8 @@ function onLfgPosted() {
 
 // ---------- the room fills the screen under the app's top bar ----------
 
-/** The top bar's height, for the room to take the rest of the screen (the bar wraps on a narrow one). */
-let barWatch: ResizeObserver | null = null
-onMounted(() => {
-  const bar = document.querySelector<HTMLElement>('.topbar')
-  if (!bar) return
-  const set = () => document.documentElement.style.setProperty('--topbar-h', `${bar.offsetHeight}px`)
-  set()
-  barWatch = new ResizeObserver(set)
-  barWatch.observe(bar)
-})
-onBeforeUnmount(() => barWatch?.disconnect())
+// (the room takes the whole screen: the page's top bar stands down here, so there is no height
+// to measure and subtract any more — it used to leave a black strip the bar's height at the foot)
 
 // ---------- the panels on the left ----------
 
@@ -741,8 +733,36 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
       </button>
       <button type="button" class="chip" @click="copy('link')">{{ copied === 'link' ? '✓ คัดลอกลิงก์แล้ว' : '🔗 ลิงก์เชิญเพื่อน' }}</button>
       <button v-if="inLobby" type="button" class="chip" title="ส่งประกาศไปที่ห้องแชตหาผู้เล่น พร้อมห้องนี้" @click="openLfg">{{ lfgPosted ? '✓ ลงประกาศแล้ว' : '📢 ประกาศหาคน' }}</button>
+      <!-- a survivor's lobby has no killer's place on it (each side sees its own scene): who holds it,
+           and the host's bot for it, said in a box of its own -->
+      <div v-if="inLobby && mySide === 'survivor'" class="killer-seat">
+        <span class="ks-label">ฆาตกร</span>
+        <template v-if="killerMember">
+          <b>{{ killerMember.bot ? '🤖 ' : '' }}{{ killerMember.name }}</b>
+          <small :class="{ ok: killerMember.ready || killerMember.bot }">{{ killerMember.bot || killerMember.ready ? '✓ พร้อม' : 'ยังไม่พร้อม' }}</small>
+          <select
+            v-if="killerMember.bot && isHost"
+            class="bot-pick"
+            :value="killerMember.pick ?? ''"
+            :disabled="session.busy"
+            title="ตัวละครของบอท Killer"
+            @change="pickBotKiller(killerMember.id, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">🎲 สุ่ม Killer</option>
+            <option v-for="k in botKillers" :key="k.id" :value="k.id">{{ k.name }}</option>
+          </select>
+          <button v-if="canKick(killerMember.id)" type="button" class="ks-btn" @click="killerMember.bot ? dropBot(killerMember.id) : kick(killerMember.id)">{{ killerMember.bot ? '✕ เอาบอทออก' : '✕ เตะ' }}</button>
+        </template>
+        <template v-else>
+          <b class="empty">ว่าง</b>
+          <button v-if="isHost" type="button" class="ks-btn add" :disabled="session.busy" @click="seatBot('killer')">🤖 เพิ่มบอทฆาตกร</button>
+          <small v-else>รอผู้เล่นมาเป็นฆาตกร</small>
+        </template>
+      </div>
       <span class="grow" />
       <VoiceButton />
+      <!-- the page's own top bar is gone here, so settings live with the room's other buttons -->
+      <SettingsDialog />
       <SyncBadge />
     </header>
 
@@ -903,32 +923,6 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
         </component>
       </div>
       <p v-if="inLobby" class="split">{{ splitNote }}</p>
-      <!-- a survivor's lobby has no killer's place on it (each side sees its own scene): who holds it,
-           and the host's bot for it, said in a box of its own -->
-      <div v-if="inLobby && mySide === 'survivor'" class="killer-seat">
-        <span class="ks-label">ฆาตกร</span>
-        <template v-if="killerMember">
-          <b>{{ killerMember.bot ? '🤖 ' : '' }}{{ killerMember.name }}</b>
-          <small :class="{ ok: killerMember.ready || killerMember.bot }">{{ killerMember.bot || killerMember.ready ? '✓ พร้อม' : 'ยังไม่พร้อม' }}</small>
-          <select
-            v-if="killerMember.bot && isHost"
-            class="bot-pick"
-            :value="killerMember.pick ?? ''"
-            :disabled="session.busy"
-            title="ตัวละครของบอท Killer"
-            @change="pickBotKiller(killerMember.id, ($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">🎲 สุ่ม Killer</option>
-            <option v-for="k in botKillers" :key="k.id" :value="k.id">{{ k.name }}</option>
-          </select>
-          <button v-if="canKick(killerMember.id)" type="button" class="ks-btn" @click="killerMember.bot ? dropBot(killerMember.id) : kick(killerMember.id)">{{ killerMember.bot ? '✕ เอาบอทออก' : '✕ เตะ' }}</button>
-        </template>
-        <template v-else>
-          <b class="empty">ว่าง</b>
-          <button v-if="isHost" type="button" class="ks-btn add" :disabled="session.busy" @click="seatBot('killer')">🤖 เพิ่มบอทฆาตกร</button>
-          <small v-else>รอผู้เล่นมาเป็นฆาตกร</small>
-        </template>
-      </div>
 
       <!-- this player's character, big: the portrait from their board -->
       <!-- the killer only: a survivor stands in the team's line, as big as the others -->
@@ -1145,7 +1139,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
   --foot: 84px;
   --slate: 48 56 64;
   position: relative;
-  height: calc(var(--vh, 100vh) - var(--topbar-h, 58px));
+  height: var(--vh, 100vh);
   min-height: 600px;
   overflow: hidden;
   color: #ece6e6;
@@ -1330,6 +1324,24 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
 .grow {
   flex: 1;
 }
+/* The settings button sits with the room's other buttons (the page's top bar is gone here).
+   Its component has two root nodes, so no scoped class of ours lands on it: reached with :deep. */
+.top :deep(.settings-btn) {
+  flex: none;
+  width: auto;
+  min-width: 0;
+  padding: 8px 12px;
+  background: rgb(10 8 9 / 0.8);
+  border: 1px solid #3a3133;
+  border-radius: 0;
+  color: #e8e1e1;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.top :deep(.settings-btn:hover) {
+  border-color: #6b585c;
+}
 /* a panel open covers the room's name, as the PC game's does (it would show through) */
 .panel-open .top {
   visibility: hidden;
@@ -1454,7 +1466,9 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
 }
 /* a place: the character standing (or a dark pillar), the name plate under it */
 .place {
-  --fig-h: clamp(210px, 38vh, 340px);
+  /* `100vh - 400px` keeps the labels clear of the room header, however short the screen:
+     the line hangs from the bottom, so a tall figure pushes them up into it. */
+  --fig-h: clamp(210px, min(38vh, 100vh - 400px), 340px);
   position: relative;
   flex: 0 1 auto;
   display: flex;
@@ -1622,12 +1636,11 @@ button.place:hover:not(:disabled) .figure {
   color: #ffd27a;
 }
 /* the killer's seat, for a survivor (whose scene has no killer on it): top of the scene */
+/* In the room's own header row, with the code and the invite link. It used to float under the
+   room's name, over the lineup's band: the two were 9px apart at best and crossed on a short or
+   narrow screen, where the line of figures (bottom-anchored, `50vh` tall) climbs into it — it
+   covered SURVIVOR 1 (a player's report). The header is a wrapping row, so nothing can collide. */
 .killer-seat {
-  position: absolute;
-  z-index: 3;
-  left: calc(var(--rail) + 24px);
-  /* under the room's name, above the places' labels */
-  top: 76px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1748,7 +1761,7 @@ button.place:hover:not(:disabled) .figure {
 /* the killer looks at the survivors across the fire: they stand further off, smaller */
 .pc-room.killer .place {
   /* as tall as the screen allows, and narrow enough that all four stay clear of the killer */
-  --fig-h: clamp(260px, min(50vh, 24.5vw), 470px);
+  --fig-h: clamp(260px, min(50vh, 24.5vw, 100vh - 400px), 470px);
 }
 /* a survivor's team in one line, everyone the same size (the PC game's survivor lobby), up to the chat */
 .pc-room.survivor .places,
@@ -1756,7 +1769,7 @@ button.place:hover:not(:disabled) .figure {
   right: calc(min(400px, 34%) + 40px);
 }
 .pc-room.survivor .place {
-  --fig-h: clamp(260px, 50vh, 540px);
+  --fig-h: clamp(260px, min(50vh, 100vh - 400px), 540px);
 }
 .pc-room.survivor .place.me .pname {
   font-size: 1.15rem;
@@ -2117,7 +2130,7 @@ button.place:hover:not(:disabled) .figure {
   .pc-room {
     --rail: 72px;
     height: auto;
-    min-height: calc(var(--vh, 100vh) - var(--topbar-h, 58px));
+    min-height: var(--vh, 100vh);
     overflow: visible;
     padding: 0 12px 110px calc(var(--rail) + 12px);
     display: flex;
@@ -2150,7 +2163,7 @@ button.place:hover:not(:disabled) .figure {
   }
   .panel {
     position: fixed;
-    top: var(--topbar-h, 58px);
+    top: 0;
     width: calc(100% - var(--rail));
   }
   .foot {

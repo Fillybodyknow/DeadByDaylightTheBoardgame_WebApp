@@ -94,6 +94,8 @@ const props = defineProps<{
   painArmed?: boolean
   /** An interaction that buys a bonus turn with a ▲ for the killer, settled here before it is sent. */
   bonusAsk?: { i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null
+  /** A friend's perk (Collective Stealth, Power of Two) being read before it is used. */
+  partnerAsk?: Extract<SurvivorInteraction, { k: 'partner' }> | null
   /** Treacherous Crows: the crow picked on the map, and the killer's card picked here. */
   crowsCrow?: string | null
   crowsCard?: number | null
@@ -120,6 +122,7 @@ const emit = defineEmits<{
   /** Pain Resonance: interact with this hook, then pick the survivor (on the board); null: put back. */
   painHook: [hook: string | null]
   bonusAsk: [pick: { i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null]
+  partnerAsk: [ask: Extract<SurvivorInteraction, { k: 'partner' }> | null]
   /** A confirmed crow bonus turn: the move it already settled, made when the engine asks for it. */
   bonusMove: [move: { s: number | 'killer'; card: PathKind; path: string } | null]
   /** The bonus turn's card (null: none), to be sent when the engine offers the bonus turn. */
@@ -228,7 +231,10 @@ const hasDiversion = computed(() => {
 const sInteractions = computed(() => {
   const s = step.value
   // (the crow is chased on the board, where the bonus turn it gives is settled first: `bonusAsk`)
-  return s.t === 'survivorInteract' && s.canInteract ? survivorInteractions(props.st, s.s).filter((i) => i.k !== 'calmSpirit' && i.k !== 'diversion' && i.k !== 'crow') : []
+  // (a friend's perk is read on its card first, `partnerAsk`, so it is only on the board too)
+  return s.t === 'survivorInteract' && s.canInteract
+    ? survivorInteractions(props.st, s.s).filter((i) => i.k !== 'calmSpirit' && i.k !== 'diversion' && i.k !== 'crow' && i.k !== 'partner')
+    : []
 })
 
 /**
@@ -237,6 +243,23 @@ const sInteractions = computed(() => {
  */
 const panelInteractions = computed(() => sInteractions.value.filter((i) => i.k !== 'dropPallet' && here({ t: 'interact', i })))
 const hasPallet = computed(() => sInteractions.value.some((i) => i.k === 'dropPallet'))
+
+/**
+ * What this room offers that lives only on the map: a crow to chase, a friend's perk, a pallet to
+ * drop, Calm Spirit's crow, Diversion. Each gets its line below — without them the panel said
+ * "ไม่มีอะไรให้ Interact ในห้องนี้" in a room whose only interaction was one of these, so a player
+ * with a crow beside them was told there was nothing to do (a player's report).
+ */
+const boardOnly = computed(() => {
+  const s = step.value
+  if (s.t !== 'survivorInteract' || !s.canInteract) return []
+  return survivorInteractions(props.st, s.s).filter((i) => i.k === 'crow' || i.k === 'partner' || i.k === 'calmSpirit' || i.k === 'dropPallet' || i.k === 'diversion')
+})
+const hasCrow = computed(() => boardOnly.value.some((i) => i.k === 'crow'))
+/** One line per friend whose perk can be used here. */
+const partners = computed(() =>
+  boardOnly.value.flatMap((i) => (i.k === 'partner' ? [`${PERKS[i.perk].name} ของ ${props.st.survivors[i.target].name}`] : [])),
+)
 
 /**
  * The perks that take this turn's interaction (`REPLACES_INTERACT`): asked before anything else,
@@ -434,6 +457,23 @@ const revealChoices = computed(() => {
 // The card is picked from the hand; the rooms it can reach then light up on the map, and a click on
 // one — always, a single one too — sends all of it: the interaction if any, the card, and the move
 // (`moveIntent` in GameScreen makes it when the engine asks). "ยกเลิก" until then costs nothing.
+
+// ---------- a friend's perk: its card is read and agreed to before it is used ----------
+
+/**
+ * Collective Stealth and Power of Two are the friend's perks, set off by interacting with them:
+ * a click on their mini used to use the perk on the spot, so the player never read what it did —
+ * and it spends that friend's one use of it for the round. The card is shown first.
+ */
+function usePartner() {
+  const i = props.partnerAsk
+  if (!i) return
+  emit('partnerAsk', null)
+  // Power of Two gives a bonus turn: its card and room are settled next, and only then is any
+  // of it sent (`bonusAsk`). Collective Stealth has nothing to settle, so it goes now.
+  if (i.perk === 'power_of_two') return emit('bonusAsk', { i, card: null, path: null })
+  if (dispatch({ t: 'interact', i })) sfx.select()
+}
 
 /** Who plays the bonus turn being settled: a survivor, the killer, or nobody. */
 const bonusWho = computed<number | 'killer' | null>(() => {
@@ -806,6 +846,20 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
     <!-- survivor interact -->
     <template v-else-if="step.t === 'survivorInteract'">
       <p v-if="!step.canInteract" class="warn">เคลื่อนที่ไม่สำเร็จ — เทิร์นนี้ Interact ไม่ได้</p>
+      <!-- a friend's perk: read the card, then say whether to use it (it is their one use) -->
+      <template v-else-if="partnerAsk">
+        <p>
+          <b>ใช้ Perk ของ {{ st.survivors[partnerAsk.target].name }} ไหม?</b><br />
+          <span class="muted small">Interact กับเขาแทน — นี่คือการ Interact ของเทิร์นนี้ และใช้โควต้า Perk ของเขารอบนี้ไปด้วย</span>
+        </p>
+        <PerkCard :perk="partnerAsk.perk" state="static" :title="`${PERKS[partnerAsk.perk].name} — ของ ${st.survivors[partnerAsk.target].name}`" />
+        <div class="buttons col way-on">
+          <button class="primary" @click="usePartner">
+            <FaceLabel :st="st" :who="partnerAsk.target" :text="`ใช้ ${PERKS[partnerAsk.perk].name}`" />
+          </button>
+          <button @click="emit('partnerAsk', null), sfx.click()">ยกเลิก</button>
+        </div>
+      </template>
       <!-- it buys the killer a ▲: the whole bonus turn is settled here, and sent only on confirm -->
       <template v-else-if="bonusAsk">
         <p>
@@ -822,13 +876,20 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           </button>
           <button @click="emit('bonusAsk', null), sfx.click()">ยกเลิก</button>
         </div>
-        <CardHand :cards="bonusHand" :label="`Bonus Turn — มือของ ${st.survivors[step.s].name}`" @pick="pickBonus" @hover="hoverBonus" />
+        <!-- a card is being asked for, so the hand glows and names what wants it, as everywhere else -->
+        <CardHand
+          :cards="bonusHand"
+          :label="`Bonus Turn — มือของ ${st.survivors[step.s].name}`"
+          :prompt="bonusPick ? undefined : `${bonusWhat} — เลือกการ์ดที่จะทิ้งเล่น Bonus Turn`"
+          @pick="pickBonus"
+          @hover="hoverBonus"
+        />
       </template>
       <!-- the perks that ARE this turn's interaction are asked before it (`interactGate`) -->
       <p v-else-if="gateOpen">
         <b>ใช้ Perk แทนการ Interact ไหม?</b><br /><span class="muted small">Perk ด้านล่างนับเป็นการ Interact ของเทิร์นนี้ — กดการ์ดแล้วเลือกเป้าหมายบนแผนที่ หรือเลือก Interact ตามปกติ</span>
       </p>
-      <p v-else-if="sInteractions.length || hasDiversion">
+      <p v-else-if="sInteractions.length || boardOnly.length">
         <!-- with a perk armed the glowing spots are its targets, not the ordinary interactions -->
         Interact 1 อย่าง ที่ {{ roomName(st, st.survivors[step.s].room) }}<br /><span v-if="!perkPicked" class="muted small">คลิกของหรือตัวละครที่เรืองแสงบนแผนที่ได้เลย</span>
       </p>
@@ -842,17 +903,20 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         :hint="gateHint(p)"
         @pick="pickGate(p)"
       />
-      <div v-if="!gateOpen && !bonusAsk" class="buttons col">
+      <div v-if="!gateOpen && !bonusAsk && !partnerAsk" class="buttons col">
         <!-- a perk picked: its targets only, the ordinary interactions wait -->
         <button v-for="(i, n) in perkPicked ? [] : panelInteractions" :key="n" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="survivorInteractionLabel(st, step.s, i)" /></button>
         <p v-if="hasPallet && !perkPicked" class="board-hint">🎯 ทิ้ง Pallet: คลิก Pallet บนแผนที่ แล้วเลือกเส้นทาง</p>
+        <!-- these live only on the map, so the panel says they are there at all -->
+        <p v-if="hasCrow && !perkPicked" class="board-hint">🎯 ไล่ Crow: คลิก Crow บนแผนที่ แล้วเลือกการ์ด Bonus Turn ({{ st.killer.name }} ได้ +1 ▲)</p>
+        <p v-if="partners.length && !perkPicked" class="board-hint">🎯 {{ partners.join(' / ') }}: คลิกตัวเขาบนแผนที่เพื่อดูการ์ด Perk ก่อนใช้</p>
         <!-- Diversion is played on the board: the killer, then the path -->
         <p v-if="hasDiversion" class="board-hint">🎯 หันเหความสนใจ: คลิกตัว {{ st.killer.name }} บนแผนที่ แล้วเลือกเส้นทางที่จะส่งไป</p>
       </div>
       <!-- a perk is picked first (its targets then show on the board), again to put it back -->
-      <p v-if="stepButtons.length && !perkPicked && !bonusAsk" class="perk-lead">{{ PERK_LEAD }}</p>
-      <p v-if="targetPerks.length && !perkPicked && !bonusAsk" class="board-hint">🎯 {{ targetPerks.join(' / ') }} — กดการ์ดด้านล่าง หรือคลิกเป้าหมายบนแผนที่ได้เลย</p>
-      <div v-for="b in bonusAsk ? [] : stepButtons" :key="b.perk">
+      <p v-if="stepButtons.length && !perkPicked && !bonusAsk && !partnerAsk" class="perk-lead">{{ PERK_LEAD }}</p>
+      <p v-if="targetPerks.length && !perkPicked && !bonusAsk && !partnerAsk" class="board-hint">🎯 {{ targetPerks.join(' / ') }} — กดการ์ดด้านล่าง หรือคลิกเป้าหมายบนแผนที่ได้เลย</p>
+      <div v-for="b in bonusAsk || partnerAsk ? [] : stepButtons" :key="b.perk">
         <PerkCard
           :perk="b.perk"
           :state="perkPicked === b.perk ? 'picked' : perkPicked ? 'dim' : 'ready'"
@@ -866,7 +930,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </template>
         </PerkCard>
       </div>
-      <div v-if="!bonusAsk" class="buttons col way-on">
+      <div v-if="!bonusAsk && !partnerAsk" class="buttons col way-on">
         <!-- the question's other answer; and a way back to it for a player who changes their mind -->
         <button v-if="gateOpen" class="primary" @click="declineGate">ไม่ใช้ Perk — Interact ตามปกติ</button>
         <button v-else-if="plainInteract && gateCards.length && !perkPicked" class="small" @click="plainInteract = false">↩ กลับไปดู Perk ที่ใช้แทน Interact</button>

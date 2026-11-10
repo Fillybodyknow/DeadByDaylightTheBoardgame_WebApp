@@ -177,7 +177,13 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 - **Every action shows before its result.** A player's action (a move with its card, an attack,
   a pallet, a locker, the killer's power, a passive) gets a short card in the middle of the
   screen first (`casts.ts` builds them from the log, `ActionReveal` shows them in the perk
-  cards' queue). Perks, items and rolls have their own reveals and are left out there.
+  cards' queue). Perks, items and rolls have their own reveals and are left out there. At most
+  three a batch (`count`), and one owner's second **move** of a batch is left to the board
+  (`shownFor`, written by a move and read by one — nothing else marks an owner). Marking them
+  for any card at all took the move's own card away when something else of theirs came first: a
+  crow's bonus turn, whose interaction and move are one action now (`then`), showed the chase but
+  never the card it was played with, and a power that hit two survivors at once swallowed the
+  killer's move after it (players' reports).
 - **Online, the player being waited on is told** (`notifyTurn` in `GameScreen`): the skill-check
   warning and a chime, a banner saying what is asked, the side panel glowing, and with the tab in
   the background a blinking title and a system notification. While it stays their turn a gold
@@ -238,7 +244,14 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   every reconnection (`settle` in `session.ts`). Leaving with the button from the picks on marks
   them `dropped` too, and a host who leaves hands the role on (`leaveRoom`).
 - **The online room is laid out as the PC game's lobby** (`OnlineRoom`): one screen from the lobby
-  to the start, the whole width under the top bar — the campfire in the side's colour, everyone on
+  to the start, **the whole screen** — the page's top bar stands down here as it does in a game
+  (`roomPage` in `App.vue`), since the room already says which room it is, how to leave it and how
+  to get back to the menu, and the profile opens from your own seat; the ⚙ settings button moved
+  into the room's own header beside the mic, and so did the killer's seat on a survivor's screen
+  ("ฆาตกร ว่าง / เพิ่มบอทฆาตกร"): floating under the room's name it covered SURVIVOR 1 on a short
+  or narrow screen, since the line of figures hangs from the bottom and climbs as the screen
+  shortens — `--fig-h` is capped at `100vh - 400px` so its labels stay clear of that band.
+  The campfire in the side's colour, everyone on
   their places, standing (each board's portrait strip, a dark pillar until a character is picked;
   an empty one taken with a click), this player's character big on the right, the
   perks worn in the corner, the chat above **one button** in the corner that does whatever moves
@@ -271,6 +284,16 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   path out loses the bonus turn's interaction too (`startSurvivorMove`), so a player could buy the
   killer a ▲ for nothing — which is what happened (a player's report). Cards with no path show
   "เดินไม่ได้" on the hand. Tutorial chapter 6 teaches the new order.
+- **Using a friend's perk shows their card first** (`partnerAsk` in `boardActions.ts`): Collective
+  Stealth and Power of Two belong to another survivor and are set off by interacting with them, so
+  a click on their mini used to use the perk on the spot — the player never read what it did, and
+  it spends that friend's one use of it for the round. The click now only opens the panel: the
+  perk's card with its full text and whose it is, then "ใช้ [perk]" or "ยกเลิก" (which costs
+  nothing). Collective Stealth then goes; Power of Two goes on into the bonus turn's settlement
+  (`bonusAsk`). Neither is a panel button any more (`sInteractions` leaves `partner` out), so the
+  card can't be skipped. The card says the interacting survivor chooses ("they may interact with
+  you instead"), so the owner is **not** asked to agree — if that should change it needs a ruling
+  and an engine step, since online it is another player's answer.
 - **A perk that takes the turn's interaction is asked before the interaction is** (`REPLACES_INTERACT`,
   `interactGate` in `boardActions.ts`): the ten whose card says "As an interaction", "Instead of
   interacting" or "When you would interact" (Balanced Landing, Calm Spirit, Kinship, No One Left
@@ -301,9 +324,12 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
     players and the panel's column, with room for full-size cards; raised, they cover the map's foot.
   - **The bottom-right corner** (as it was first): over the panel's foot; the panel stops above it.
 
-  Sunk, only the card names show; it rises while the pointer is on a card (or when a perk asks for
-  one). On a tablet a hand to pick from comes up by itself, so one tap picks; a tap elsewhere puts
-  it down and a tap on it raises it again. The side panel's way on (a plan's confirm, a perk's
+  Sunk, only the card names show; it rises while the pointer is on a card. **A hand a card is
+  being asked of comes up by itself** (`prompt`, the glowing chip naming what wants it) — on a
+  desktop too, where it used to lie sunk until the pointer happened to find it; a click on the
+  map puts it down to see what is underneath, and the next question raises it again (`up` in
+  `CardHand`). On a tablet a hand to pick from comes up by itself whether or not a card is asked
+  for, so one tap picks; a tap elsewhere puts it down and a tap on it raises it again. The side panel's way on (a plan's confirm, a perk's
   confirm and "don't use") is sticky at its foot, on a strip of the panel's colour (`.way-on` round
 a plan's confirm, `.choices` in PerkPrompt) so nothing scrolling under it shows through. It has no label of its own. Each card's button stays still and only the card face inside it moves, so the card
   can't bounce under the pointer. Online, while nothing asks for a card, the player's own hand
@@ -375,7 +401,7 @@ local backend syncs browser tabs.
 
 ## Settings
 
-The ⚙ button (top bar and the game's rail) opens `src/components/SettingsDialog.vue`, a PC-game
+The ⚙ button (the top bar, the online room's own header, and the game's rail) opens `src/components/SettingsDialog.vue`, a PC-game
 style window with tabs: Sound (volumes, mute, chase music), Display (animation speed, reduce motion,
 card language, the hand of cards: where it floats, how it is laid, a picked card, the hover height,
 a tablet's auto-raise), Online (turn sound, background notice, 20 s reminder), Data (clear the offline

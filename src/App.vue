@@ -110,8 +110,10 @@ const scene = computed(() =>
   <EntityWelcome />
   <LfgToasts v-if="!inGame" />
 
-  <!-- in a full game, the game's own top bar (round, room, mute, leave) takes over -->
-  <header v-if="!inGame" class="topbar">
+  <!-- in a full game, the game's own top bar (round, room, mute, leave) takes over; the online
+       room is the PC game's lobby and stands alone too — it says which room it is and how to
+       leave it, the profile is on your own seat, and its header carries the settings button -->
+  <header v-if="!inGame && !roomPage" class="topbar">
     <RouterLink to="/" class="brand" aria-label="ดบดล — เมนู">
       <img :src="asset('icon.svg')" alt="" />
       <span>ดบดล <small v-if="SUBTITLE[section]">{{ SUBTITLE[section] }}</small></span>

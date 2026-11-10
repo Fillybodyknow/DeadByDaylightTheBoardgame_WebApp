@@ -299,6 +299,8 @@ const calmCrow = ref<string | null>(null)
  * power's, the killer's), which are card → room as well.
  */
 const bonusAsk = ref<{ i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null>(null)
+/** A friend's perk (Collective Stealth, Power of Two) being read in the panel before it is used. */
+const partnerAsk = ref<Extract<SurvivorInteraction, { k: 'partner' }> | null>(null)
 /** A crow's (or Power of Two's) bonus card, sent when the engine offers that survivor the bonus turn. */
 const bonusIntent = ref<{ s: number; card: MoveCard | null; from: string } | null>(null)
 /**
@@ -363,7 +365,7 @@ function confirmOppression() {
   }
 }
 
-const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, bonusAsk, crowsCrow, crowsCard, dogStay, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
+const modes: BoardModes = { powerOn, trapPath, palletMode, revealing, calmCrow, bonusAsk, partnerAsk, crowsCrow, crowsCard, dogStay, aceFirst, fogwiseFrom, breakoutTarget, itemPick, powerCard, forkMoves, multiPick, undyingOn, undyingCard, undyingRoom, diversion, painHook }
 
 watch(
   () => view.value.step,
@@ -375,6 +377,7 @@ watch(
     palletMode.value = null
     calmCrow.value = null
     bonusAsk.value = null
+    partnerAsk.value = null
     crowsCrow.value = null
     dogStay.value = false
     targetAsk.value = null
@@ -659,6 +662,11 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: `${PERKS.calm_spirit.name}: คลิกห้องที่จะส่ง Crow ไป`, cancel: () => (calmCrow.value = null) }
+  if (partnerAsk.value)
+    return {
+      text: `${PERKS[partnerAsk.value.perk].name} ของ ${view.value.survivors[partnerAsk.value.target].name}: อ่านการ์ดในแผงด้านข้าง แล้วเลือกว่าจะใช้หรือไม่`,
+      cancel: () => (partnerAsk.value = null),
+    }
   if (bonusAsk.value) {
     const cancel = () => (bonusAsk.value = null)
     const i = bonusAsk.value.i
@@ -1711,6 +1719,8 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           @ask="targetAsk = null"
           :bonus-ask="bonusAsk"
           @bonus-ask="bonusAsk = $event"
+          :partner-ask="partnerAsk"
+          @partner-ask="partnerAsk = $event"
           @bonus-move="onBonusMove"
           @bonus-card="bonusIntent = $event && { ...$event, from: st.survivors[$event.s].room }"
           :dog-stay="dogStay"

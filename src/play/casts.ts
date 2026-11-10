@@ -150,12 +150,17 @@ export class CastBuilder {
           ? `ได้ Knife: ${this.powerHits.map((s) => `${this.st.survivors[s].name} (${this.st.survivors[s].knives ?? 0}/3)`).join(', ')}`
           : `บาดเจ็บ: ${this.powerHits.map((s) => this.st.survivors[s].name).join(', ')}`
         sub = `${sub ? `${sub} · ` : ''}${who}`
-        this.shownFor.add(key)
         this.count++
         return { owner, kind, title, sub, image, targets: this.powerHits, ...(victor ? { victor } : {}) }
       }
     }
-    this.shownFor.add(key)
+    // A move, and only a move, marks its owner. `shownFor` is read in the move branch alone: it
+    // is there to keep one owner's *second* move of a batch off the screen, so marking them for
+    // any other card took the move's own card away when something else of theirs came first —
+    // a crow's bonus turn (its interaction and its move are one action now, `then`) showed the
+    // chase but never the card it was played with, and a power that hit two survivors at once
+    // swallowed the killer's move after it (players' reports).
+    if (kind === 'move') this.shownFor.add(key)
     this.count++
     return { owner, kind, title, sub: sub ?? '', image, target, ...(victor ? { victor } : {}) }
   }

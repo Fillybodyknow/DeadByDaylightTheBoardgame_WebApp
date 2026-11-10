@@ -118,9 +118,16 @@ const lowered = ref(false)
 /**
  * Up, on a tablet: a hand to pick from, unless a tap put it down (or the player turned that off:
  * settings handTouchRaise); a hand to look at, raised by a tap; any hand a perk is asking a card
- * of. (A pointer raises it by hovering, in CSS.)
+ * of. On a desktop: a hand being asked for a card, which used to lie sunk with only the names
+ * showing until the pointer found it — the game asked and nothing on screen came to meet the
+ * player (a player's report). A click on the map still puts it down to see what is underneath,
+ * and the pointer raises any hand by hovering (in CSS).
  */
-const up = computed(() => touch && (!!props.prompt || raised.value || (!props.passive && settings.handTouchRaise && !lowered.value)))
+const up = computed(() =>
+  touch
+    ? !!props.prompt || raised.value || (!props.passive && settings.handTouchRaise && !lowered.value)
+    : !!props.prompt && !lowered.value,
+)
 // a new choice from the hand (other cards, or the same cards for someone else or something else): it comes up again
 watch(
   () => [props.cards.map((c) => c.card).join(), props.label, props.prompt].join('|'),

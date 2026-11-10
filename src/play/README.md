@@ -497,6 +497,28 @@ the survivor and the path is no longer theirs, the intent is dropped and the map
 "ยกเลิก" at any point costs nothing, and the rooms the bonus turn could reach stay lit while the
 rest of the board dims.
 
+What lives **only** on the map — a crow, a friend's perk, a pallet, Calm Spirit's crow, Diversion —
+has its own line in the panel (`boardOnly`), because they are not panel buttons. Without them the
+panel said "ไม่มีอะไรให้ Interact ในห้องนี้" in a room whose only interaction was one of these, so
+a player standing beside a crow was told there was nothing to do (a player's report, 1.39.2).
+While a card is being asked for, the hand glows and names what wants it (`prompt`), as it does
+wherever a perk asks for a card; on a desktop it still rises on hover, on a tablet by itself.
+
+**A friend's perk is read before it is used** (`partnerAsk`). Collective Stealth and Power of Two
+are the *other* survivor's perks, set off by interacting with them. A click on their mini used to
+use the perk on the spot: the player never read what it did, and it spends that friend's one use
+of it for the round (`payPerk` charges the owner; both cost 0 ▲, so only the use is spent). The
+click now opens the panel with the perk's card, its full text and whose it is, and "ใช้ [perk]"
+or "ยกเลิก" — which costs nothing, since nothing has been sent. Collective Stealth then goes;
+Power of Two goes on into the settlement above. Neither shows as a panel button any more
+(`sInteractions` leaves `partner` out), so the card cannot be skipped (a player's report, 1.39.2).
+
+Their card gives the choice to the interacting survivor ("When another Survivor would interact in
+your space, **they may** interact with you instead"), so the owner is **not** asked to agree,
+even though the general perk rule (p.16) makes a perk its owner's decision. Asking the owner
+would be a ruling of its own and needs an engine step (online it is another player's answer,
+as `weavePay` is for Weaving Spiders), so it was left out for now.
+
 The players were paying the ▲ on the first click and only then finding out whether the bonus turn
 was worth having — and a card with no path out of the room loses the bonus turn's interaction too
 (`startSurvivorMove`), so it could buy the killer a ▲ for nothing. Those cards now show
