@@ -546,7 +546,14 @@ const targets = computed(() => {
   return t
 })
 /** What the board already offers: the side panels leave these out and point at the board. */
-const onBoard = computed(() => (viewTurn.value ? boardActionKeys(actions.value) : new Set<string>()))
+// (while a fork asks for its room, the other paths are still the map's: the panel keeps leaving
+// them out rather than listing every one as a button, as it did under Beast of Prey's room)
+const onBoard = computed(() => {
+  if (!viewTurn.value) return new Set<string>()
+  const keys = boardActionKeys(actions.value)
+  if (forkMoves.value) for (const k of boardActionKeys(boardActions(view.value, { ...modes, forkMoves: shallowRef(null) }))) keys.add(k)
+  return keys
+})
 
 /** Online planning: what this device has already sent, while the others finish. */
 const myPlanDone = computed(() => {
@@ -629,10 +636,11 @@ function onSpot(key: string) {
     fxSound.perk(view.value.step.t === 'killerInteract')
     return
   }
-  // A fork's icon with moves to different rooms: pick the room on the board next.
+  // A fork's icon with moves to different rooms: pick the room on the board next. A path with one
+  // room at its other end moves at once, a perk's move too (Beast of Prey, Dead Hard…): asking for
+  // that room as well was one tap too many (the user's call, after Dissolution became one tap)
   const dests = new Set(found.map((a) => a.dest))
-  const perkMove = !bonusAsk.value && key.startsWith('path:') && found.length > 0 && found.every((a) => a.dest) && !['survivorMove', 'killerMove'].includes(view.value.step.t)
-  if ((found.length > 1 && found.every((a) => a.dest) && dests.size === found.length) || perkMove) {
+  if (found.length > 1 && found.every((a) => a.dest) && dests.size === found.length) {
     forkMoves.value = found
     sfx.click()
     return

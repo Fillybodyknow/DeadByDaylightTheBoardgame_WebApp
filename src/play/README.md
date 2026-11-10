@@ -490,8 +490,9 @@ card), it stops there, and the rest is sent once that is answered (`bonusIntent`
 empty hand waits for "ยืนยัน". Every bonus turn goes the same way (card → room → done): the ones
 a perk or a power offers (`bonusOffer`) and the killer's (`killerBonusOffer`, his move made by
 `moveIntent` too). A perk's or a power's move with no card (Dead Hard, Spine Chill, Agitation…)
-is a path, then its room (`forkMoves`, a single room too); an ordinary card move stays one click
-(the players asked for these, 1.39.2). The move goes through `moveIntent` in GameScreen rather than a third press, because a
+is one tap on the path, as an ordinary card move is; only a fork's icon, with several rooms
+behind it, asks for the room next (`forkMoves`). (1.39.2 asked for the room after every perk
+move; the user then asked for one tap, as Dissolution's.) The move goes through `moveIntent` in GameScreen rather than a third press, because a
 perk may be offered on the card first (`cardMove`: Inner Focus, Quick & Quiet); if a perk moved
 the survivor and the path is no longer theirs, the intent is dropped and the map asks as usual.
 "ยกเลิก" at any point costs nothing, and the rooms the bonus turn could reach stay lit while the
