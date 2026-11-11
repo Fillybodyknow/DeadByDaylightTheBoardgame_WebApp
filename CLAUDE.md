@@ -281,7 +281,9 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   **Changing sides is a move, not a redraw** — each side sees its own scene across the fire, so
   the camera walks round it: the near ground (`.scene`: the line and your own figure) swings in
   from the way you came (`turn-near`), the light behind it a third as far (`.light` wrapping the
-  tint and the firepulse, `turn-far`), and the dark itself rolls through over the top
+  tint and the firepulse, `turn-far` — so the side's colour is reached as `.killer .tint`, not as
+  a direct child of the room: wrapping it is what took that colour away in 1.40.0), and the dark
+  itself rolls through over the top
   (`.fogsweep`: not mist but The Entity's, its red low in the bank as the scene's own glow is),
   taking the room while the swap happens underneath. It stays under the rail and the header, so
   the room is never unreadable. `--turn` on the room says which way (the killer's
@@ -289,6 +291,12 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   they play on the change and nowhere else.
   The fire's light rides `.strip` and `.pillar`, never `.figure`: that one's `filter` belongs to
   hovering a seat and to `.me`. `.talking` animates it on purpose — speech outranks a hover.
+  **The trial beginning makes the fire take the room** (`.flareup`): it blooms out of the campfire,
+  fills the lobby and burns down to nothing, over the alarm's first beats — which are already
+  sounding and already throbbing the screen red (`MatchBeat`), so this adds the light and not a
+  second shake. No waiting to arrange and no state of its own: the room stays on screen for the
+  alarm's 4.6 s (`OnlineView`), and every device sees the game appear on the room at the same
+  moment, so the whole room gets it together. It clears itself on `animationend`.
   **The trial beginning shuts every panel of the room's** (the rail's, the settings window — which
   exposes `close` for it — and the announce dialog): the game's alarm plays over the room as it
   stands (`introStage` 'beat'), so one left open would cover the moment, and still be there on

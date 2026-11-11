@@ -151,6 +151,8 @@ function onLfgPosted() {
 type Tab = 'chars' | 'gear' | 'map' | 'room'
 const tab = ref<Tab | null>(null)
 const settingsDialog = ref<{ close: () => void } | null>(null)
+/** The trial has begun and the fire is taking the room (the alarm plays over it: `OnlineView`). */
+const starting = ref(false)
 
 /**
  * The trial begins: shut every panel of the room's first. The game's own alarm plays over the
@@ -165,6 +167,10 @@ watch(
     tab.value = null
     lfgOpen.value = false
     settingsDialog.value?.close()
+    // and the fire takes the room. No waiting to arrange and no state of its own: the alarm
+    // plays over this page for its 4.6 s (`OnlineView` keeps the room under it), and every
+    // device sees the game appear on the room at the same moment, so everyone gets it together.
+    starting.value = true
   },
 )
 function openTab(t: Tab) {
@@ -709,6 +715,8 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
       <div class="firepulse" />
     </div>
     <div class="roomfog" aria-hidden="true" />
+    <!-- the trial begins: the campfire takes the whole room before the trial swallows it -->
+    <div v-if="starting" class="flareup" aria-hidden="true" @animationend="starting = false" />
     <!-- and a bank of fog blows through while the room turns, covering the swap -->
     <div :key="`gust-${mySide ?? 'none'}`" class="fogsweep" aria-hidden="true" />
 
@@ -1214,6 +1222,42 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
   }
 }
 
+/* The trial begins. The fire blooms out of the campfire and takes the room, then burns down to
+   nothing as the loading page comes. It plays over the alarm's first beats, which are already
+   sounding and already throbbing the screen red (`MatchBeat`) — so this adds the light, not
+   another shake. Under the rail and the header, like everything else here. */
+.flareup {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  /* its resting state, for the moment between the last frame and `animationend` taking it away
+     (and under `reduce-motion`, where the animation is cut to nothing) */
+  opacity: 0;
+  background:
+    radial-gradient(ellipse 26% 22% at 47% 56%, rgb(255 236 190 / 0.95), rgb(255 150 50 / 0.6) 45%, transparent 72%),
+    radial-gradient(ellipse 70% 60% at 47% 58%, rgb(255 120 40 / 0.35), transparent 70%);
+  animation: flareup 1700ms cubic-bezier(0.1, 0.8, 0.3, 1);
+}
+@keyframes flareup {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  46% {
+    opacity: 0.85;
+    transform: scale(1.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
 /* ---------- changing sides: the camera walks round the fire ----------
    Each side sees its own scene across the fire, so changing sides is a move, not a redraw. The
    near ground (`.scene`: the line and your own figure) swings the furthest, the light behind it
@@ -1283,13 +1327,13 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
   pointer-events: none;
   background: linear-gradient(180deg, rgb(0 0 0 / 0.25), rgb(0 0 0 / 0.1) 45%, rgb(0 0 0 / 0.55));
 }
-.killer > .tint {
+.killer .tint {
   background:
     /* a dark blood-red, not a wash of it: the scene stays readable (the players found it too red) */
     radial-gradient(ellipse at 70% 25%, rgb(170 20 30 / 0.14), transparent 60%),
     linear-gradient(180deg, rgb(70 6 12 / 0.4), rgb(35 2 8 / 0.28) 45%, rgb(6 0 2 / 0.66));
 }
-.survivor > .tint {
+.survivor .tint {
   background:
     radial-gradient(ellipse at 70% 30%, rgb(90 130 180 / 0.18), transparent 60%),
     linear-gradient(180deg, rgb(10 30 60 / 0.4), rgb(5 15 30 / 0.2) 45%, rgb(0 4 10 / 0.6));
