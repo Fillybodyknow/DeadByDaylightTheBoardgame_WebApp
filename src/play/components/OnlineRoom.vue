@@ -150,6 +150,23 @@ function onLfgPosted() {
 
 type Tab = 'chars' | 'gear' | 'map' | 'room'
 const tab = ref<Tab | null>(null)
+const settingsDialog = ref<{ close: () => void } | null>(null)
+
+/**
+ * The trial begins: shut every panel of the room's first. The game's own alarm plays over the
+ * room as it stands (`introStage` 'beat' in `intro.ts` holds this page), so a panel left open
+ * would sit over the moment the room is meant to be seen in — and the player would come back to
+ * a game with the lobby's panel still on top of it.
+ */
+watch(
+  () => !!session.data?.game,
+  (started) => {
+    if (!started) return
+    tab.value = null
+    lfgOpen.value = false
+    settingsDialog.value?.close()
+  },
+)
 function openTab(t: Tab) {
   sfx.click()
   tab.value = tab.value === t ? null : t
@@ -684,8 +701,16 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
 </script>
 
 <template>
-  <div class="pc-room" :class="[mySide ?? 'none', { 'panel-open': !!tab }]">
-    <div class="tint" aria-hidden="true" />
+  <div class="pc-room" :class="[mySide ?? 'none', { 'panel-open': !!tab }]" :style="{ '--turn': mySide === 'killer' ? -1 : mySide === 'survivor' ? 1 : 0 }">
+    <!-- the light of the room. Keyed by the side, so changing sides swings it too — a shorter
+         way than the line, which is nearer the camera (`turn`). -->
+    <div :key="`light-${mySide ?? 'none'}`" class="light" aria-hidden="true">
+      <div class="tint" />
+      <div class="firepulse" />
+    </div>
+    <div class="roomfog" aria-hidden="true" />
+    <!-- and a bank of fog blows through while the room turns, covering the swap -->
+    <div :key="`gust-${mySide ?? 'none'}`" class="fogsweep" aria-hidden="true" />
 
     <!-- the rail: a panel at a time -->
     <nav class="rail" aria-label="เมนูห้อง">
@@ -762,7 +787,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
       <span class="grow" />
       <VoiceButton />
       <!-- the page's own top bar is gone here, so settings live with the room's other buttons -->
-      <SettingsDialog />
+      <SettingsDialog ref="settingsDialog" />
       <SyncBadge />
     </header>
 
@@ -803,7 +828,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
     </aside>
 
     <!-- ================= the scene: everyone on their places ================= -->
-    <section class="scene" aria-label="ผู้เล่นในห้อง">
+    <section :key="`scene-${mySide ?? 'none'}`" class="scene" aria-label="ผู้เล่นในห้อง">
       <!-- the lobby: a place per player, taken with a click -->
       <div v-if="inLobby" class="places">
         <component
@@ -854,6 +879,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
           v-for="(m, i) in survivorMembers"
           :key="m?.id ?? `empty-${i}`"
           class="place survivor"
+          :style="{ '--i': i }"
           :class="{ empty: !m, me: m?.id === session.me, ready: m?.ready || m?.bot, talking: talking(m?.id) }"
           :disabled="!m && session.busy ? true : undefined"
           :title="m ? undefined : me?.side === 'survivor' ? 'คลิกเพื่อย้ายมาที่นี่' : 'คลิกเพื่อเป็น Survivor'"
@@ -893,7 +919,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
 
       <!-- the picks: each character as it is picked (the killer's hidden from the survivors) -->
       <div v-else class="places">
-        <div v-if="amKiller || !mySeat || roomSettings.showKiller" class="place killer" :class="{ me: amKiller, ready: seatDone(KILLER_PLAYER) === true, 'hero-place': amKiller }">
+        <div v-if="amKiller || !mySeat || roomSettings.showKiller" class="place killer" :style="{ '--i': 0 }" :class="{ me: amKiller, ready: seatDone(KILLER_PLAYER) === true, 'hero-place': amKiller }">
           <span class="side-tag">KILLER</span>
           <span class="figure killer">
             <img v-if="killerChar" class="strip" :src="asset(killerChar.images.boardTh)" :alt="killerChar.name" draggable="false" />
@@ -909,6 +935,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
           v-for="s in survivorSlots"
           :key="s.slot"
           class="place survivor"
+          :style="{ '--i': s.slot + 1 }"
           :class="{ me: s.mine, active: s.mine && activeSlot === s.slot && !locked, ready: seatDone(s.player) === true, }"
           @click="s.mine && !locked ? ((activeSlot = s.slot), (tab = 'chars')) : undefined"
         >
@@ -940,6 +967,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
     </section>
 
     <!-- ================= the panel of the rail's tab ================= -->
+    <Transition name="panel">
     <section v-if="tab" class="panel" :aria-label="TABS.find((t) => t.id === tab)?.label">
       <header class="panel-head">
         <i class="ring" :class="mySide ?? ''" />
@@ -1098,6 +1126,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
         </div>
       </template>
     </section>
+    </Transition>
 
     <!-- the room's chat: above the button, as the PC game's -->
     <section v-if="session.room?.chat" class="chat-box" aria-label="แชทในห้อง">
@@ -1113,7 +1142,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
       <div v-if="undos.length" class="undos">
         <button v-for="u in undos" :key="u.key" type="button" class="undo-btn" :disabled="session.busy" @click="u.run">{{ u.label }}</button>
       </div>
-      <div class="go" :class="{ primary: action.primary, done: action.done }">
+      <div :key="action.label" class="go" :class="{ primary: action.primary, done: action.done }">
         <button type="button" class="go-btn" :disabled="session.busy || (!action.run && !action.open)" @click="runAction">{{ action.label }}</button>
         <p class="go-note">{{ action.note }}</p>
       </div>
@@ -1144,6 +1173,109 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
   overflow: hidden;
   color: #ece6e6;
 }
+/* The campfire is alive: its light swells and falls over the whole room. Slow, and at 7 s out of
+   step with the scene's own 40 s drift (App.vue), so the two never beat together. */
+.firepulse {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 34% 30% at 47% 56%, rgb(255 150 60 / 0.16), transparent 70%);
+  animation: firepulse 7s ease-in-out infinite;
+}
+@keyframes firepulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  38% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0.7;
+  }
+}
+/* Fog in front of everyone, not only behind them (`App.vue` drifts its own behind the scene):
+   two slow banks, far apart in pace, so the room has air between the camera and the fire. Thin
+   enough to read through — it sits under the rail, the header and the panel. */
+.roomfog {
+  position: absolute;
+  inset: -10%;
+  /* above `.scene` (2), which holds the figures, and below the rail, the header and the panel */
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 45% 18% at 30% 72%, rgb(190 205 225 / 0.07), transparent 70%),
+    radial-gradient(ellipse 38% 14% at 72% 64%, rgb(190 205 225 / 0.05), transparent 70%);
+  animation: roomfog 85s ease-in-out infinite alternate;
+}
+@keyframes roomfog {
+  to {
+    transform: translate3d(6%, -2%, 0) scale(1.08);
+  }
+}
+
+/* ---------- changing sides: the camera walks round the fire ----------
+   Each side sees its own scene across the fire, so changing sides is a move, not a redraw. The
+   near ground (`.scene`: the line and your own figure) swings the furthest, the light behind it
+   a third as far, and a bank of fog blows through while the swap happens underneath. `--turn` on
+   the room says which way: the killer's view is one side of the fire, the survivors' the other.
+   All three are keyed by the side in the template, so they play on the change and nowhere else. */
+.scene {
+  animation: turn-near 520ms cubic-bezier(0.22, 0.75, 0.3, 1);
+}
+.light {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: turn-far 620ms cubic-bezier(0.22, 0.75, 0.3, 1);
+}
+@keyframes turn-near {
+  from {
+    opacity: 0.25;
+    transform: translateX(calc(var(--turn, 0) * 7%)) scale(1.03);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes turn-far {
+  from {
+    transform: translateX(calc(var(--turn, 0) * 2.2%)) scale(1.02);
+  }
+  to {
+    transform: none;
+  }
+}
+/* The gust: not mist but the dark itself, rolling through in the way the camera went and gone
+   again — The Entity's, so its red is in the low edge of it, as the scene's own glow is. Dense
+   enough to take the room while the swap happens underneath. */
+.fogsweep {
+  position: absolute;
+  inset: -15%;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse 46% 60% at 32% 54%, rgb(5 3 5 / 0.88), rgb(8 5 8 / 0.5) 45%, transparent 72%),
+    radial-gradient(ellipse 58% 50% at 64% 62%, rgb(7 4 7 / 0.78), transparent 74%),
+    radial-gradient(ellipse 70% 30% at 50% 100%, rgb(90 10 18 / 0.3), transparent 70%);
+  animation: fogsweep 760ms ease-out;
+}
+@keyframes fogsweep {
+  0% {
+    opacity: 0;
+    transform: translateX(calc(var(--turn, 0) * 26%)) scale(1.05);
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(calc(var(--turn, 0) * -16%)) scale(1.16);
+  }
+}
+
 /* the side's colour over the campfire (App draws the campfire behind every page) */
 .tint {
   position: absolute;
@@ -1489,6 +1621,22 @@ button.place {
 button.place:hover:not(:disabled) .figure {
   filter: brightness(1.25) drop-shadow(0 0 12px rgb(255 255 255 / 0.35));
 }
+/* An empty seat answers the pointer: the pillar lifts a little and its edge takes the colour of
+   the side it would put you on, so it reads as a place to step into and not just a bright patch. */
+.pillar {
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    box-shadow 180ms ease;
+}
+button.place:hover:not(:disabled) .pillar,
+button.place:focus-visible:not(:disabled) .pillar {
+  transform: translateY(-6px);
+  box-shadow: inset 0 0 0 1px rgb(245 197 66 / 0.5), 0 10px 22px rgb(0 0 0 / 0.5), 0 0 20px rgb(245 197 66 / 0.3);
+}
+button.place.killer:hover:not(:disabled) .pillar,
+button.place.killer:focus-visible:not(:disabled) .pillar {
+  box-shadow: inset 0 0 0 1px rgb(200 50 58 / 0.6), 0 10px 22px rgb(0 0 0 / 0.5), 0 0 20px rgb(179 38 46 / 0.4);
+}
 /* this player's own place, while their character stands big on the right: not twice */
 .place.hero-place {
   display: none;
@@ -1547,12 +1695,154 @@ button.place:hover:not(:disabled) .figure {
   color: rgb(255 255 255 / 0.85);
   text-shadow: 0 0 14px rgb(0 0 0 / 0.9);
 }
+
+/* ---------- the lobby comes alive ----------
+   Every place is keyed by who sits in it, so it mounts afresh when someone arrives, leaves or
+   picks a character: these play on that mount. Durations are written at full length — the
+   animation-speed setting scales them (`settings.ts`). Nothing needs a reduce-motion rule:
+   `html.reduce-motion *` in style.css cuts every animation page-wide, and each of these ends on
+   the element's resting state, so it simply arrives there at once.
+   The fire's light rides the `.strip` and the `.pillar`, never `.figure`: that one's `filter` is
+   spoken for by hovering a seat and by `.me`, and an animation there would beat both. The one
+   exception is `.talking`, which animates it on purpose — someone speaking outranks a hover. */
+
+/* A character picked: they rise out of the dark where the pillar stood, and from then on they
+   stand in the fire's light — the same 7 s as `.firepulse`, so the two breathe together and the
+   light reads as coming from the fire. (One shorthand, so the breath cannot restart the rise.) */
+.strip {
+  animation:
+    stand-up 900ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    firelight 7s ease-in-out 900ms infinite;
+}
+.pillar {
+  animation: firelight 7s ease-in-out infinite;
+}
+@keyframes firelight {
+  0%,
+  100% {
+    filter: brightness(1) saturate(1);
+  }
+  38% {
+    filter: brightness(1.12) saturate(1.1);
+  }
+  62% {
+    filter: brightness(0.96) saturate(0.97);
+  }
+}
+@keyframes stand-up {
+  from {
+    opacity: 0;
+    transform: translateY(5%) scale(1.04);
+    filter: brightness(0.25) contrast(1.2);
+  }
+  55% {
+    opacity: 1;
+    filter: brightness(1.5);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+/* and one flare of the side's colour from the ground up as they appear */
+.place .figure::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(0deg, rgb(245 197 66 / 0.75), transparent 60%);
+}
+.place.killer .figure::after {
+  background: linear-gradient(0deg, rgb(179 38 46 / 0.8), transparent 60%);
+}
+.place:not(.empty) .figure::after {
+  animation: lit 1100ms ease-out;
+}
+@keyframes lit {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Someone arrives, or the seat empties: the place fades up from below, so a change in the line is
+   seen as it happens and not noticed afterwards — and the whole line builds itself left to right
+   when the room turns to the picks, each place `--i` behind the last. `backwards` holds it down
+   through its wait (without it, it would show first and then drop to start); no `forwards`, so a
+   hover still has its say afterwards. One seat filling waits up to 280 ms, which reads as the
+   place lighting up rather than a lag. */
+.place {
+  animation: seat-in 450ms ease-out backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+@keyframes seat-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The ✓ when a seat is ready: it pops, and a ring opens out of it. */
+.place.ready .done-mark {
+  animation: tick-pop 520ms cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.place.ready .done-mark::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 2px solid #7fe08f;
+  border-radius: 50%;
+  opacity: 0;
+  animation: tick-ring 700ms ease-out;
+}
+@keyframes tick-pop {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes tick-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
 .place.me .figure,
 .place.active .figure {
   filter: drop-shadow(0 0 10px rgb(245 197 66 / 0.55));
 }
+/* Speaking: the glow breathes. Held at one value it said only "their mic is on". */
 .place.talking .figure {
   filter: drop-shadow(0 0 12px rgb(79 179 106 / 0.8));
+  animation: speaking 900ms ease-in-out infinite;
+}
+@keyframes speaking {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgb(79 179 106 / 0.55));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgb(79 179 106 / 0.95));
+  }
 }
 .place.me .pname {
   color: #ffd27a;
@@ -1707,6 +1997,20 @@ button.place:hover:not(:disabled) .figure {
   mask-composite: intersect;
   pointer-events: none;
 }
+/* standing, not a photograph: the one figure big enough for a breath to read at all */
+.hero img {
+  animation: breathe 6.5s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.012);
+  }
+}
 /* the killer: bigger, as the PC game's (he towers over the survivors) */
 .hero.killer {
   height: 92%;
@@ -1778,6 +2082,18 @@ button.place:hover:not(:disabled) .figure {
 }
 
 /* ---------- the panel ---------- */
+/* out of the rail it came, and back into it it goes (`panel` Transition in the template) */
+.panel-enter-active,
+.panel-leave-active {
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    opacity 260ms ease;
+}
+.panel-enter-from,
+.panel-leave-to {
+  opacity: 0;
+  transform: translateX(-28px);
+}
 .panel {
   position: absolute;
   z-index: 5;
@@ -2037,11 +2353,30 @@ button.place:hover:not(:disabled) .figure {
 }
 /* the one button: "พร้อม", then whatever the room waits on from this player */
 .go {
+  position: relative;
   display: flex;
   align-items: stretch;
   height: 100%;
+  overflow: hidden;
   background: rgb(8 6 7 / 0.9);
   border: 1px solid #3a3133;
+}
+/* The one button that moves things on changes what it does as the room goes (เลือกฝั่ง → พร้อม →
+   เริ่ม); it is keyed by its label, so a new one sweeps once to say it is a new thing to press. */
+.go::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 230 180 / 0.3) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: go-sweep 700ms ease-out;
+}
+@keyframes go-sweep {
+  to {
+    transform: translateX(120%);
+  }
 }
 .go-btn {
   min-width: 220px;

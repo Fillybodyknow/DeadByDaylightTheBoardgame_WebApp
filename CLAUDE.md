@@ -258,7 +258,42 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   things on for this player now (or opens the panel where there is a choice to make first). A rail on
   the left opens one panel at a time — ตัวละคร, อุปกรณ์ (power, perks, offerings), แผนที่, ห้อง — over
   a see-through slate; the rail button of the room's next step glows until opened (nothing opens by
-  itself). Details in
+  itself). **It moves** (all CSS, written at full length so the animation-speed setting scales it;
+  `html.reduce-motion` in `style.css` stands it all down): the campfire's light swells over the
+  room (`.firepulse`, 7 s, out of step with the scene's own 40 s drift in `App.vue`), a place
+  fades up from below as someone arrives or its seat empties (`seat-in`; every place is keyed by
+  who sits in it, so it mounts afresh), a character picked rises out of the dark with one flare of
+  the side's colour from the ground (`stand-up` on `.strip`, `lit` on `.figure::after`), the ✓ of
+  a ready seat pops and opens a ring (`tick-pop`, `tick-ring`), and the big figure on the right
+  breathes (`breathe` on `.hero img`). The whole line builds itself left to right when the room
+  turns to the picks: each place carries its spot as `--i` and waits `70ms` times it, held down
+  meanwhile by `animation-fill-mode: backwards` (no `forwards`, so a hover still has its say).
+  The rail's panel slides out of the rail and back into it (a `panel` Transition), a chat message
+  rises into place with its sender's colour flushing through it once (`said`, `said-flush` in
+  `ChatPanel`), and the one button in the corner sweeps when what it does changes — it is keyed
+  by its label, so a new one plays `go-sweep` to say it is a new thing to press.
+  An empty seat answers the pointer (the pillar lifts and its edge takes the side's colour),
+  everyone standing takes the fire's light (`firelight` on `.strip` and `.pillar`, the same 7 s as
+  `.firepulse` so the two breathe together), a speaker's green glow breathes (`speaking`; held at
+  one value it said only "their mic is on"), and thin fog drifts in front of everyone (`.roomfog`,
+  z-index **3** — `.scene`, which holds the figures, is 2 and comes after it in the DOM, so at 2
+  the fog sat behind them; the rail is 6 and the header 4, so it stays under those).
+  **Changing sides is a move, not a redraw** — each side sees its own scene across the fire, so
+  the camera walks round it: the near ground (`.scene`: the line and your own figure) swings in
+  from the way you came (`turn-near`), the light behind it a third as far (`.light` wrapping the
+  tint and the firepulse, `turn-far`), and the dark itself rolls through over the top
+  (`.fogsweep`: not mist but The Entity's, its red low in the bank as the scene's own glow is),
+  taking the room while the swap happens underneath. It stays under the rail and the header, so
+  the room is never unreadable. `--turn` on the room says which way (the killer's
+  view is one side of the fire, the survivors' the other); all three are keyed by the side, so
+  they play on the change and nowhere else.
+  The fire's light rides `.strip` and `.pillar`, never `.figure`: that one's `filter` belongs to
+  hovering a seat and to `.me`. `.talking` animates it on purpose — speech outranks a hover.
+  **The trial beginning shuts every panel of the room's** (the rail's, the settings window — which
+  exposes `close` for it — and the announce dialog): the game's alarm plays over the room as it
+  stands (`introStage` 'beat'), so one left open would cover the moment, and still be there on
+  coming back. The room watches `session.data.game` appearing for it.
+  Details in
   `src/play/README.md` → Online play.
 - **Board first.** Every action with a place on the board (path, prop, survivor, room) is
   clickable there. Each `BoardAction` carries its `action`; the side panels hide choices the board

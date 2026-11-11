@@ -114,7 +114,45 @@ onBeforeUnmount(() => (chatSeen.value = false))
   font-size: 0.82rem;
   padding: 0.4rem 0;
 }
+/* A message arrives: it rises into place and its own colour flushes through it once, so a new
+   line is seen without watching the box. (`html.reduce-motion` in style.css stands it down.) */
+.msg,
+.notice {
+  animation: said 320ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes said {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.msg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--hex);
+  opacity: 0;
+  animation: said-flush 900ms ease-out;
+}
+@keyframes said-flush {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.22;
+  }
+  100% {
+    opacity: 0;
+  }
+}
 .msg {
+  position: relative;
   justify-self: start;
   max-width: 85%;
   min-width: 5.5rem;

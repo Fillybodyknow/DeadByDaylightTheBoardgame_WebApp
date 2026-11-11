@@ -31,6 +31,8 @@ function toggle() {
 function close() {
   open.value = false
 }
+// the online room shuts every panel of its own when the trial starts, this one among them
+defineExpose({ close })
 function onKey(e: KeyboardEvent) {
   if (capturing.value) return onCapture(e)
   if (e.key === 'Escape' && open.value) {
