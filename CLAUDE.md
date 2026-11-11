@@ -72,6 +72,10 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 - Vue 3 `<script setup lang="ts">`, TypeScript strict. Match the surrounding code: naming, idiom
   and comment density. Code, comments and READMEs are in English; UI strings are in Thai.
 - Comments say why, in plain sentences. Rules cite the rulebook page: `(p.14)`.
+- A public asset path for CSS — a custom property a stylesheet reads as `url()` — goes through
+  `cssUrl` (`i18n.ts`), never `asset`: the built base is relative, and a relative url() handed to
+  a rule resolves against the bundled CSS in `assets/`, so it 404s on the deploy while working in
+  dev. `asset` is right for `src` and for an inline `style` the element itself carries.
 - Files use CRLF (git `core.autocrlf`). Editing tools keep it; scripts must too.
 - No new dependencies without a reason worth stating.
 

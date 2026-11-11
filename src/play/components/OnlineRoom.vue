@@ -13,7 +13,7 @@
 //   player's own until the game.
 import { computed, ref, watch } from 'vue'
 import { killerById, skillFaceImage, survivorById } from '../../data'
-import { asset } from '../../i18n'
+import { asset, cssUrl } from '../../i18n'
 import { sfx } from '../../sound'
 import { fxSound } from '../fx/audio'
 import { KILLER_PLAYER } from '../engine/seats'
@@ -700,11 +700,12 @@ const hero = computed(() => {
  * survivor seat, the skill die's skull on the killer's. It is drawn big and centred, and the
  * pillar clips what spills out. Taken and empty seats were both a bare dark pillar, so which were
  * filled could only be read off the small print under them (a player's report).
- * The path goes in as a CSS variable because the app may be served under a base path.
+ * The path goes in as a CSS variable, through `cssUrl`: a relative url() handed to a stylesheet
+ * that way resolves against the bundled CSS in assets/, not against the page.
  */
 const SEAT_CARDS: MoveCard[] = ['sprint', 'vault', 'sneak', 'crouch']
 const seatArt = (side: 'survivor' | 'killer', slot = 0) => ({
-  '--art': `url("${asset(side === 'killer' ? skillFaceImage(0) : cardImage(SEAT_CARDS[slot % SEAT_CARDS.length]))}")`,
+  '--art': cssUrl(side === 'killer' ? skillFaceImage(0) : cardImage(SEAT_CARDS[slot % SEAT_CARDS.length])),
 })
 
 /** The side this player plays: the scene's colour (red for the killer, cold for the survivors). */
