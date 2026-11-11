@@ -62,6 +62,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 | `src/play/fx/` | Sound effects (`audio.ts`) and the animation queue (`bus.ts`) |
 | `src/play/tutorial/` | Tutorial mode (`#/tutorial`): chapters for both sides (`chapters.ts` the survivors', `killer.ts` the killer's) on scenes built from the engine (`scene.ts`), The Entity's guide (`GuideBox`), the runner gating the learner's actions and playing everyone else |
 | `src/play/online/` | Firebase and local (multi-tab) backends, room session. The room carries **moves**, not states: each device replays them on the last checkpoint (`transport.ts`) |
+| `src/boot.ts`, `src/components/BootLoading.vue` | The launcher: what the menu waits for, and the shared pictures warmed behind it |
 | `src/data/` | Character, item and map data (Thai + English text, image paths) |
 | `public/assets/` | Card art, maps, minis, sounds (`app/sound/game/` = game sound clips) |
 | `public/sw.js`, `src/install.ts` | PWA: service worker and install button |
@@ -140,6 +141,16 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 
 ## UI rules the user asked for
 
+- **A visit opens on the launcher** (`BootLoading`, `boot.ts`): a loading page over the whole app,
+  as a PC game's — the mark over the campfire's realm, a quote or a rules tip, and a bar that
+  counts in the pictures the menu draws itself with (`bootAssets`); at least 1.1 s, at most 8 s, a
+  tap skips. Everything waits for it, the greeting below included (`booting` in `App.vue`). Once
+  it is gone, `warmShared()` fetches in the background what every trial needs whoever plays it
+  (the maps, the realms behind them, the props, the dice, the movement cards, the tokens, the
+  survivors' minis — about 8 MB, three at a time, into the browser's and the service worker's
+  caches), so `TrialLoading` has less left to fetch. The character art (over 100 MB) is never
+  warmed: a game fetches the boards it needs. Off at Settings → Data (`warmAssets`), and never on
+  a metered or 2G connection.
 - **A first visit is greeted by The Entity** (`EntityWelcome`, `welcome.ts`, `dbdl-welcomed`): on the
   menu only (not an invite link), it asks whether the player is new; a new one gets five pages of
   the world over the realms, then picks a side and lands in its first tutorial chapter
@@ -253,7 +264,11 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   shortens — `--fig-h` is capped at `100vh - 400px` so its labels stay clear of that band.
   The campfire in the side's colour, everyone on
   their places, standing (each board's portrait strip, a dark pillar until a character is picked;
-  an empty one taken with a click), this player's character big on the right, the
+  a taken seat's pillar carries its side's own card instead: a movement card (Wait aside), a
+  different one per survivor seat drawn to the pillar's full height, the skill die's skull (printed
+  upside down on the face, so turned round) on the killer's — the pillar's own background, centred,
+  the pillar clipping what spills out at the sides; an empty one
+  is the bare pillar and a +, taken with a click), this player's character big on the right, the
   perks worn in the corner, the chat above **one button** in the corner that does whatever moves
   things on for this player now (or opens the panel where there is a choice to make first). A rail on
   the left opens one panel at a time — ตัวละคร, อุปกรณ์ (power, perks, offerings), แผนที่, ห้อง — over

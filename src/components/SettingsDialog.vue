@@ -430,6 +430,10 @@ watch(tab, () => (confirming.value = null))
 
           <!-- data -->
           <template v-else>
+            <label class="switch">
+              <input v-model="settings.warmAssets" type="checkbox" />
+              <span><b>โหลดภาพที่ใช้ทุกเกมไว้ล่วงหน้า</b><small>หลังเข้าเมนูแล้ว ค่อย ๆ ดึงแผนที่ ฉากหลัง พร็อพ เต๋า การ์ดเดิน และมินิผู้รอดชีวิต (ราว 8 MB) ไว้เบื้องหลัง หน้าโหลดก่อนเข้าเกมจะเร็วขึ้น — ไม่ทำเมื่อเน็ตช้าหรือจำกัดปริมาณ</small></span>
+            </label>
             <div class="wipe">
               <span><b>ล้างเกมออฟไลน์ที่บันทึกไว้</b><small>{{ savedGame ? `มีเกมค้างอยู่ — รอบ ${game?.round}` : 'ไม่มีเกมค้าง' }}</small></span>
               <button type="button" :class="{ danger: confirming === 'game' }" :disabled="!savedGame" @click="wipe('game')">{{ confirming === 'game' ? 'ยืนยัน ล้างเลย' : done === 'game' ? '✓ ล้างแล้ว' : 'ล้าง' }}</button>

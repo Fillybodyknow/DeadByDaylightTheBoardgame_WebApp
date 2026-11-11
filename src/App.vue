@@ -7,6 +7,8 @@ import SettingsDialog from './components/SettingsDialog.vue'
 import UpdateBanner from './components/UpdateBanner.vue'
 import WhatsNew from './components/WhatsNew.vue'
 import EntityWelcome from './components/EntityWelcome.vue'
+import BootLoading from './components/BootLoading.vue'
+import { booting, warmShared } from './boot'
 import { asset, lang } from './i18n'
 import { game, replaying, tutorial } from './play/game'
 import { isPhone } from './play/device'
@@ -25,14 +27,21 @@ import LfgToasts from './play/components/LfgToasts.vue'
 const route = useRoute()
 
 // A first visit to the menu: The Entity greets the new player (not on an invite link straight to
-// a room, nor anywhere else: they came for something else)
+// a room, nor anywhere else: they came for something else). It waits for the loading page: the
+// launcher comes first, the greeting over the menu behind it.
 watch(
-  () => route.name,
-  (name) => {
-    if (name === 'menu' && !welcome.open && !welcomed()) openWelcome()
+  [() => route.name, booting],
+  ([name, loading]) => {
+    if (!loading && name === 'menu' && !welcome.open && !welcomed()) openWelcome()
   },
   { immediate: true },
 )
+
+/** The loading page is done: the app shows, and the shared pictures warm in the background. */
+function booted() {
+  booting.value = false
+  warmShared()
+}
 startUpdateWatch()
 
 // The part of the app the screen belongs to; shared screens (cards, rules) keep the last one.
@@ -104,6 +113,9 @@ const scene = computed(() =>
     <!-- campfire embers before the trial, Entity motes during it -->
     <Particles v-if="particles" :key="particles" :variant="particles" />
   </div>
+
+  <!-- the launcher: the app waits behind it on every visit -->
+  <BootLoading v-if="booting" @done="booted" />
 
   <UpdateBanner />
   <WhatsNew />

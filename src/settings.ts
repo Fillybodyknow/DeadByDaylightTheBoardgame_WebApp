@@ -39,6 +39,13 @@ export interface Settings {
   /** A room announced in the looking-for-players chat: a card on any page, a chime (lfgNotify.ts). */
   lfgNotify: boolean
   /**
+   * After the menu is up, fetch the pictures every trial needs (the maps, the realms, the props,
+   * the dice, the movement cards, the survivors' minis — about 8 MB) in the background, so a
+   * game's loading page has less to wait for (boot.ts). Off: everything is fetched when first
+   * needed, as before. A metered or crawling connection is left alone either way.
+   */
+  warmAssets: boolean
+  /**
    * Where the hand of movement cards floats (CardHand). `auto`: where it covers neither the map nor
    * the side panel's buttons nor the players — under the panel, in its column beside the map; or,
    * the panel floating over the map (a tablet), under the map between the players and the panel.
@@ -65,7 +72,7 @@ export interface Settings {
   handTouchRaise: boolean
 }
 
-const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true, lfgNotify: true, handPlace: 'auto', handLayout: 'fan', handPicked: 'raise', handHover: 'full', handTouchRaise: true }
+const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true, lfgNotify: true, warmAssets: true, handPlace: 'auto', handLayout: 'fan', handPicked: 'raise', handHover: 'full', handTouchRaise: true }
 
 const KEY = 'dbdl-settings'
 

@@ -12,11 +12,12 @@
 //   Survivors never see the killer's pick (unless the room shows it); Devout's perks stay each
 //   player's own until the game.
 import { computed, ref, watch } from 'vue'
-import { killerById, survivorById } from '../../data'
+import { killerById, skillFaceImage, survivorById } from '../../data'
 import { asset } from '../../i18n'
 import { sfx } from '../../sound'
 import { fxSound } from '../fx/audio'
 import { KILLER_PLAYER } from '../engine/seats'
+import type { MoveCard } from '../engine/types'
 import {
   addBot,
   backToLobby,
@@ -92,7 +93,7 @@ import { lobbyLacks } from '../online/lfg'
 import { playableKillers } from '../online/settings'
 import { openProfile } from '../../profile'
 import { voice } from '../voice'
-import { perkIcon, perkText, perkTone } from '../labels'
+import { cardImage, perkIcon, perkText, perkTone } from '../labels'
 
 const data = computed(() => session.data!)
 const code = computed(() => session.room?.code ?? '')
@@ -693,6 +694,19 @@ const hero = computed(() => {
   if (!m?.c) return null
   return { src: asset(m.c.images.boardTh), killer: m.side === 'killer', name: m.c.name }
 })
+/**
+ * The art behind a taken seat, before anyone has a character: the side's own card, laid into the
+ * pillar as its background — one of the four movement cards (Wait aside), a different one per
+ * survivor seat, the skill die's skull on the killer's. It is drawn big and centred, and the
+ * pillar clips what spills out. Taken and empty seats were both a bare dark pillar, so which were
+ * filled could only be read off the small print under them (a player's report).
+ * The path goes in as a CSS variable because the app may be served under a base path.
+ */
+const SEAT_CARDS: MoveCard[] = ['sprint', 'vault', 'sneak', 'crouch']
+const seatArt = (side: 'survivor' | 'killer', slot = 0) => ({
+  '--art': `url("${asset(side === 'killer' ? skillFaceImage(0) : cardImage(SEAT_CARDS[slot % SEAT_CARDS.length]))}")`,
+})
+
 /** The side this player plays: the scene's colour (red for the killer, cold for the survivors). */
 const mySide = computed<'killer' | 'survivor' | null>(() => (inLobby.value ? (me.value?.side ?? null) : mySeat.value ? (amKiller.value ? 'killer' : 'survivor') : null))
 
@@ -849,7 +863,11 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
           @click="clickSeat('killer', killerMember?.id)"
         >
           <span class="side-tag">KILLER</span>
-          <span class="figure killer"><span class="pillar" aria-hidden="true"><span class="plus">{{ killerMember ? '' : '+' }}</span></span></span>
+          <span class="figure killer"
+            ><span class="pillar killer" :class="{ taken: !!killerMember }" :style="killerMember ? seatArt('killer') : undefined" aria-hidden="true"
+              ><span v-if="!killerMember" class="plus">+</span></span
+            ></span
+          >
           <template v-if="killerMember">
             <button v-if="killerMember.id === session.me" type="button" class="pname mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ killerMember.id === data.host ? '👑 ' : '' }}{{ killerMember.name }} ✎</button>
             <span v-else class="pname">{{ killerMember.id === data.host ? '👑 ' : '' }}{{ killerMember.name }}</span>
@@ -894,7 +912,11 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
           @click="clickSeat('survivor', m?.id, i)"
         >
           <span class="side-tag">SURVIVOR {{ i + 1 }}</span>
-          <span class="figure"><span class="pillar" aria-hidden="true"><span class="plus">{{ m ? '' : '+' }}</span></span></span>
+          <span class="figure"
+            ><span class="pillar" :class="{ taken: !!m }" :style="m ? seatArt('survivor', i) : undefined" aria-hidden="true"
+              ><span v-if="!m" class="plus">+</span></span
+            ></span
+          >
           <template v-if="m">
             <button v-if="m.id === session.me" type="button" class="pname mine" title="เปลี่ยนชื่อ (โปรไฟล์)" @click.stop="rename">{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }} ✎</button>
             <span v-else class="pname">{{ m.id === data.host ? '👑 ' : '' }}{{ m.name }}</span>
@@ -931,7 +953,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
           <span class="side-tag">KILLER</span>
           <span class="figure killer">
             <img v-if="killerChar" class="strip" :src="asset(killerChar.images.boardTh)" :alt="killerChar.name" draggable="false" />
-            <span v-else class="pillar" aria-hidden="true"><span class="plus">?</span></span>
+            <span v-else class="pillar killer taken" :style="seatArt('killer')" aria-hidden="true" />
           </span>
           <span class="pname">{{ data.seats[String(KILLER_PLAYER)]?.name ?? '' }}{{ amKiller ? ' (คุณ)' : '' }}</span>
           <span class="pstate">{{ killerChar?.name ?? (amKiller ? 'เลือกฆาตกร' : '???') }}</span>
@@ -950,7 +972,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
           <span class="side-tag">SURVIVOR {{ s.slot + 1 }}</span>
           <span class="figure">
             <img v-if="s.character" class="strip" :src="asset(s.character.images.boardTh)" :alt="s.character.name" draggable="false" />
-            <span v-else class="pillar" aria-hidden="true"><span class="plus">?</span></span>
+            <span v-else class="pillar taken" :style="seatArt('survivor', s.slot)" aria-hidden="true" />
           </span>
           <span class="pname">{{ s.bot ? '🤖 ' : '' }}{{ s.who }}{{ s.mine ? ' (คุณ)' : '' }}</span>
           <span class="pstate">{{ s.character?.name ?? (s.mine ? 'เลือกตัวละคร' : s.bot ? 'บอทเลือกหลังผู้เล่น' : 'กำลังเลือก…') }}</span>
@@ -966,7 +988,7 @@ const tabLocked = computed<Record<Tab, string>>(() => ({
         <figcaption>{{ hero.name }}</figcaption>
       </figure>
       <figure v-else-if="mySide === 'killer'" class="hero placeholder killer">
-        <span class="pillar big" aria-hidden="true"><span class="plus">?</span></span>
+        <span class="pillar big killer taken" :style="seatArt('killer')" aria-hidden="true" />
         <figcaption class="ph-cap">
           <b>{{ me?.name }}</b>
           <small>{{ inLobby ? (me?.ready ? '✓ พร้อม' : 'ยังไม่พร้อม') : 'เลือกตัวละคร' }}</small>
@@ -1724,7 +1746,8 @@ button.place.killer:focus-visible:not(:disabled) .pillar {
 /* nobody's character yet: a dark pillar of the Entity's, as the PC game's empty places */
 .pillar {
   position: absolute;
-  inset: 0 18%;
+  /* a little wider than the figure's waist: a taken seat's card has room to be read */
+  inset: 0 11%;
   display: flex;
   justify-content: center;
   padding-top: 32%;
@@ -1732,6 +1755,64 @@ button.place.killer:focus-visible:not(:disabled) .pillar {
     repeating-linear-gradient(90deg, rgb(0 0 0 / 0) 0 5px, rgb(0 0 0 / 0.55) 5px 7px, rgb(0 0 0 / 0) 7px 11px),
     linear-gradient(180deg, rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.6) 55%, rgb(0 0 0 / 0.85));
 }
+/* ---------- a seat with someone in it ----------
+   Before anyone has a character every place is the same dark pillar, and which were taken could
+   only be read off the small print underneath. A taken seat's pillar carries the side's own card
+   as its background — a movement card, a different one per survivor seat, the skill die's skull
+   on the killer's — drawn big and centred, the pillar clipping what spills out of it. */
+.pillar {
+  overflow: hidden;
+}
+.pillar.taken {
+  background-image:
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0) 0 5px, rgb(0 0 0 / 0.55) 5px 7px, rgb(0 0 0 / 0) 7px 11px),
+    linear-gradient(180deg, rgb(245 197 66 / 0.07), rgb(0 0 0 / 0.08)),
+    linear-gradient(180deg, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0.22) 40%, rgb(0 0 0 / 0.8)),
+    var(--art, none);
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-size: auto, auto, auto, auto 100%;
+  background-position: 0 0, 0 0, 0 0, 50% 50%;
+  box-shadow: inset 0 1px 0 rgb(255 226 170 / 0.35);
+}
+/* the killer's: the die's skull. It is printed askew on the face, so it is turned upright, and a
+   layer of its own is what lets it turn at all. */
+.pillar.taken.killer {
+  background-image:
+    repeating-linear-gradient(90deg, rgb(0 0 0 / 0) 0 5px, rgb(0 0 0 / 0.55) 5px 7px, rgb(0 0 0 / 0) 7px 11px),
+    linear-gradient(180deg, rgb(179 38 46 / 0.22), rgb(0 0 0 / 0.08)),
+    linear-gradient(180deg, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0.22) 40%, rgb(0 0 0 / 0.8));
+  box-shadow: inset 0 1px 0 rgb(255 140 140 / 0.35);
+}
+.pillar.taken.killer::before {
+  content: '';
+  /* a square of its own, the pillar's middle: so turning it upright turns it on the spot, and the
+     mask below rounds it off evenly */
+  position: absolute;
+  top: 50%;
+  left: -90%;
+  right: -90%;
+  aspect-ratio: 1;
+  background: var(--art, none) no-repeat center / contain;
+  /* The skull is printed upside down on the die's face, tilted 8.5° with it, and sits a little
+     off the face's middle (measured off the art: its box is centred at 53.9% / 52.2%). Turning it
+     about that point and then shifting it by the same amount stands it upright in the middle. */
+  transform-origin: 53.9% 52.2%;
+  transform: translate(-3.9%, -52.2%) rotate(171.5deg);
+  /* the die's own near-black square is pushed to black, screened away, and its corners faded out,
+   so what is left on the pillar is the skull and its blood */
+  filter: contrast(1.7);
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(closest-side at 53.9% 52.2%, #000 50%, transparent 86%);
+  mask-image: radial-gradient(closest-side at 53.9% 52.2%, #000 50%, transparent 86%);
+  pointer-events: none;
+}
+
+/* The killer's figure is the narrower of the two — it is cut to his board's strip (0.334 against
+   a survivor's 0.421) — so his pillar takes the whole of it and comes out the width of theirs. */
+.place.killer .pillar {
+  inset: 0;
+}
+
 .plus {
   font-size: 3.4rem;
   font-weight: 300;
