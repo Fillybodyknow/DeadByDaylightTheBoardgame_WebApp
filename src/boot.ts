@@ -12,7 +12,7 @@
 //   four or five boards it actually needs.
 
 import { ref } from 'vue'
-import { components, survivorById } from './data'
+import { components, killerById, survivorById } from './data'
 import { asset } from './i18n'
 import { boards } from './play/engine/boards'
 import { PROP_IMAGE, cardImage } from './play/labels'
@@ -72,30 +72,73 @@ function sparing(): boolean {
   return !!c && (c.saveData === true || c.effectiveType === '2g' || c.effectiveType === 'slow-2g')
 }
 
-let warmed = false
 /**
- * Warm the shared pictures in the background, three at a time. Fetched, not decoded: the point is
- * to fill the caches, and a decoded image would hold memory for nothing. Never on a metered or
- * crawling connection, and never twice in one page.
+ * The pictures one character brings to a trial: their board (the strip of it the lobby and the
+ * loading page show, and the whole of it in their details), their mini on the map, their three
+ * perk cards, and for a killer the power and passive panels and the tokens. A few megabytes each.
  */
-export function warmShared() {
-  if (warmed || !settings.warmAssets || sparing()) return
-  warmed = true
-  const queue = warmAssets()
-  let at = 0
-  const next = (): Promise<void> => {
-    const path = queue[at++]
-    if (!path) return Promise.resolve()
-    // low priority where the browser knows the hint: nothing on screen is waiting for these
-    return fetch(asset(path), { cache: 'force-cache', priority: 'low' } as RequestInit)
+function characterAssets(kind: 'survivor' | 'killer', id: string): string[] {
+  const c = kind === 'killer' ? killerById.get(id) : survivorById.get(id)
+  if (!c) return []
+  const k = kind === 'killer' ? killerById.get(id) : undefined
+  const list = [
+    c.images.boardTh,
+    c.images.mini,
+    // the three printed on their board; a loadout's own cards are not known until they are set
+    ...c.perks.map((p) => p.image?.th),
+    k?.power.image?.th,
+    k?.passiveImage?.th,
+    ...(k?.tokens ?? []).map((t) => t.image),
+  ]
+  return list.filter((p): p is string => !!p)
+}
+
+/** Everything already sent to the queue, so nothing is fetched twice in one page. */
+const queued = new Set<string>()
+let running = 0
+const queue: string[] = []
+
+/** Three at a time, low priority: nothing on screen waits for any of this. */
+function pump() {
+  while (running < 3) {
+    const path = queue.shift()
+    if (!path) return
+    running++
+    void fetch(asset(path), { cache: 'force-cache', priority: 'low' } as RequestInit)
       .then(
         () => undefined,
         () => undefined,
       )
-      .then(next)
+      .then(() => {
+        running--
+        pump()
+      })
   }
-  const start = () => void Promise.all([next(), next(), next()])
-  const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback
-  if (idle) idle(start, { timeout: 4000 })
-  else window.setTimeout(start, 1500)
+}
+
+/** Put paths in the background queue. Fetched, not decoded: the point is only to fill the caches. */
+function warm(paths: string[], idle = false) {
+  if (!settings.warmAssets || sparing()) return
+  const fresh = paths.filter((p) => p && !queued.has(p))
+  if (!fresh.length) return
+  fresh.forEach((p) => queued.add(p))
+  queue.push(...fresh)
+  if (!idle) return pump()
+  const run = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback
+  if (run) run(pump, { timeout: 4000 })
+  else window.setTimeout(pump, 1500)
+}
+
+/** Once the menu is up: what every trial needs, whoever plays it. */
+export function warmShared() {
+  warm(warmAssets(), true)
+}
+
+/**
+ * A character has been locked in (the online room's picks): fetch what they bring, there and
+ * then, while the others are still choosing. The trial's own loading page is then left with
+ * almost nothing to wait for. Called again with the same character costs nothing.
+ */
+export function warmCharacter(kind: 'survivor' | 'killer', id: string | null | undefined) {
+  if (id) warm(characterAssets(kind, id))
 }

@@ -153,8 +153,13 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   (the maps, the realms behind them, the props, the dice, the movement cards, the tokens, the
   survivors' minis — about 8 MB, three at a time, into the browser's and the service worker's
   caches), so `TrialLoading` has less left to fetch. The character art (over 100 MB) is never
-  warmed: a game fetches the boards it needs. Off at Settings → Data (`warmAssets`), and never on
-  a metered or 2G connection.
+  warmed that way. Off at Settings → Data (`warmAssets`), and never on a metered or 2G connection.
+  A character's own art (their board, their three printed perk cards, a killer's power, passive
+  and tokens) is fetched the moment that character is locked in the online room's picks
+  (`warmCharacter`, the watch in `OnlineRoom`), while the others are still choosing, so
+  `TrialLoading` has almost nothing left to wait for. The killer's goes only to devices that may
+  see the killer (his own, or `showKiller`): on a survivor's it would show in the network tab what
+  the room keeps from them.
 - **A first visit is greeted by The Entity** (`EntityWelcome`, `welcome.ts`, `dbdl-welcomed`): on the
   menu only (not an invite link), it asks whether the player is new; a new one gets five pages of
   the world over the realms, then picks a side and lands in its first tutorial chapter

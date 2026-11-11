@@ -14,6 +14,7 @@
 import { computed, ref, watch } from 'vue'
 import { killerById, skillFaceImage, survivorById } from '../../data'
 import { asset, cssUrl } from '../../i18n'
+import { warmCharacter } from '../../boot'
 import { sfx } from '../../sound'
 import { fxSound } from '../fx/audio'
 import { KILLER_PLAYER } from '../engine/seats'
@@ -392,6 +393,19 @@ const boardChooser = computed(() =>
 
 /** The killer's character, for whoever may see it: the killer, or everyone when the room shows it. */
 const killerChar = computed(() => (data.value.picks.killer && (amKiller.value || roomSettings.value.showKiller) ? killerById.get(data.value.picks.killer) : undefined))
+
+// A character locked in: fetch what they bring to the trial now, while the others are still
+// choosing, so the loading page before the game has almost nothing left to wait for (boot.ts).
+// The killer's art only where the killer may be seen — on a survivor's device it would show in
+// the network tab what the room keeps from them.
+watch(
+  () => [data.value.picks.killer, ...[0, 1, 2, 3].map((s) => data.value.picks[String(s)])].join(','),
+  () => {
+    ;[0, 1, 2, 3].forEach((s) => warmCharacter('survivor', data.value.picks[String(s)]))
+    if (amKiller.value || roomSettings.value.showKiller) warmCharacter('killer', data.value.picks.killer)
+  },
+  { immediate: true },
+)
 
 function pickKiller(id: string) {
   fxSound.charPick()
