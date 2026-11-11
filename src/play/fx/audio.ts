@@ -37,9 +37,16 @@ const CLIPS = [
   'cleanse', 'pallet-drop', 'pallet-break', 'pick-up', 'hook', 'lever', 'gate-open', 'gates-powered',
   'vault', 'pallet-run', 'equip', 'unequip', 'lobby-join', 'lobby-leave', 'char-pick', 'char-confirm',
   'char-unconfirm', 'match-ready', 'locker-open', 'locker-close', 'locker-search', 'sabotage',
-  'crow-touch', 'crow-destroy', 'totem-touch', 'bw-refresh',
+  'crow-touch', 'crow-destroy', 'totem-touch', 'bw-refresh', 'pallet-impact',
 ] as const
 type Clip = (typeof CLIPS)[number]
+
+/**
+ * "Pallet Impact 1–13" of the PC game, one after another in pallet-impact.ogg: where each starts
+ * and how long it lasts (s). A kick plays one of them, never the same twice running.
+ */
+const IMPACTS: [number, number][] = [0.02, 0.42, 0.82, 1.22, 1.62, 1.96, 2.36, 2.69, 3.09, 3.49, 3.89, 4.29, 4.69].map((t, i, all) => [t, (all[i + 1] ?? 5) - t - 0.02])
+let lastImpact = -1
 
 const buffers = new Map<Clip, AudioBuffer>()
 let clipsLoaded: Promise<void> | null = null
@@ -58,8 +65,11 @@ function loadClips(c: AudioContext): Promise<void> {
   return clipsLoaded
 }
 
-/** Play a recorded clip, or `fallback` (synthesised) when it didn't load. */
-function clip(name: Clip, fallback: () => void = () => {}, gain = 0.7) {
+/**
+ * Play a recorded clip, or `fallback` (synthesised) when it didn't load. `part`: only this
+ * stretch of it (start and length, s), for a file holding several sounds.
+ */
+function clip(name: Clip, fallback: () => void = () => {}, gain = 0.7, part?: [number, number]) {
   const a = audio()
   if (!a) return
   void loadClips(a).then(() => {
@@ -70,7 +80,8 @@ function clip(name: Clip, fallback: () => void = () => {}, gain = 0.7) {
     const g = a.createGain()
     g.gain.value = gain
     src.connect(g).connect(out!)
-    src.start()
+    if (part) src.start(0, part[0], part[1])
+    else src.start()
   })
 }
 
@@ -165,6 +176,12 @@ const synth = {
   powered() {
     for (let i = 0; i < 3; i++) tone(440, 0.5, { type: 'sawtooth', gain: 0.07, at: i * 0.55, slideTo: 660 })
   },
+  /** A boot against wood: the killer kicking a pallet before it gives. */
+  kick() {
+    tone(95, 0.16, { gain: 0.45, slideTo: 55 })
+    noise(0.12, { type: 'lowpass', freq: 900, gain: 0.4 })
+    noise(0.06, { freq: 1600, q: 1.2, gain: 0.15, at: 0.02 })
+  },
   /** Wood cracking (pallet / wall broken). */
   crack() {
     noise(0.25, { freq: 700, q: 2, gain: 0.5 })
@@ -233,6 +250,11 @@ export const fxSound = {
   palletDrop: () => clip('pallet-drop', synth.crack),
   /** Pallet or breakable wall smashed. */
   palletBreak: () => clip('pallet-break', synth.crack),
+  /** The killer's kick at a pallet before it breaks. */
+  palletKick: () => {
+    lastImpact = (lastImpact + 1 + Math.floor(Math.random() * (IMPACTS.length - 1))) % IMPACTS.length
+    clip('pallet-impact', synth.kick, 0.8, IMPACTS[lastImpact])
+  },
   /** A crow revealed: it caws. */
   crow: () => clip('crow-caw', undefined, 0.5),
   /** Hex totem cleansed. */

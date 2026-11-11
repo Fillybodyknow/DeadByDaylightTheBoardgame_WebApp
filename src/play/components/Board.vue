@@ -10,7 +10,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { components } from '../../data'
 import { asset } from '../../i18n'
 import { CARD_NAMES, GUARD_NAMES, boardOf, charlotteRoom, palletOn, pathDef, propsIn, tokenOf, unknownRooms, victorRoom } from '../engine/engine'
-import type { GameEvent, GameState, Guard, Prop } from '../engine/types'
+import type { GameEvent, GameState, Guard, PathKind, Prop } from '../engine/types'
+import { ROUTES } from '../boardRoutes'
 import { fxSound } from '../fx/audio'
 import { holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
@@ -279,35 +280,39 @@ const hotDests = computed(() => new Set(preview.value?.dests ?? []))
 
 // ---------- effects ----------
 
-type FxKind = 'blood' | 'spikes' | 'burst' | 'debris' | 'snap' | 'float' | 'heal'
+type FxKind = 'blood' | 'spikes' | 'burst' | 'debris' | 'snap' | 'float' | 'heal' | 'scratch' | 'drip' | 'dust' | 'crowFly' | 'palletSmash'
 interface Fx {
   id: number
   kind: FxKind
   x: number
   y: number
+  /** Which way it lies (deg): a scratch mark. */
+  angle?: number
+  /** A pallet breaking with no one kicking it: it splits at once. */
+  quick?: boolean
+  /** How long it waits before its animation starts (ms, full length). */
+  wait?: number
+  /** How long it stays (ms, full length), when not its kind's. */
+  life?: number
   text?: string
   tone?: 'gold' | 'red' | 'green' | 'white'
 }
 
 const effects = ref<Fx[]>([])
 const flipping = ref<string[]>([])
-/** Pallets being thrown down now (their path icon's id): the token falls onto the path. */
-const dropping = ref<{ id: string; delay: number }[]>([])
-/** When a dropped pallet hits the path, into its fall (the CSS keyframe's 45% of 0.75 s). */
-const PALLET_HIT_MS = 335
 const shaking = ref(false)
 const boardEl = ref<HTMLElement>()
 let fxId = 0
 
 import { anim, reducedMotion } from '../../settings'
 
-const FX_MS: Record<FxKind, number> = { blood: 1100, spikes: 1600, burst: 1100, debris: 800, snap: 500, float: 1300, heal: 1100 }
+const FX_MS: Record<FxKind, number> = { blood: 1100, spikes: 1600, burst: 1100, debris: 800, snap: 500, float: 1300, heal: 1100, scratch: 2600, drip: 2800, dust: 650, crowFly: 1700, palletSmash: 1400 }
 
 function addFx(kind: FxKind, at: [number, number], extra: Partial<Fx> = {}, delay = 0) {
   const show = () => {
     const fx: Fx = { id: ++fxId, kind, x: at[0], y: at[1], ...extra }
     effects.value = [...effects.value, fx]
-    window.setTimeout(() => (effects.value = effects.value.filter((f) => f.id !== fx.id)), anim(FX_MS[kind]))
+    window.setTimeout(() => (effects.value = effects.value.filter((f) => f.id !== fx.id)), anim(extra.life ?? FX_MS[kind]))
   }
   if (delay) window.setTimeout(show, anim(delay))
   else show()
@@ -377,46 +382,456 @@ function unknownSwap(from: Map<string, Rect>, was: number): Map<string, Rect> {
 
 watch(
   () => props.st.log.length,
-  async (len, old) => {
+  (len, old) => {
     const from = unknownSwap(prevMinis, prevUnknownAt)
     prevMinis = new Map(rects.value.minis)
     prevUnknownAt = props.st.killer.unknownAt ?? 0
     if (old === undefined || len <= old) return
     const fresh = props.st.log.slice(old).flatMap((e) => (e.ev ? [e.ev] : []))
-    await nextTick()
     const walking = walk(fresh, from)
+    walkEnds = walking
+    killerWalks = fresh.some((e) => e.k === 'move' && e.who === 'killer')
+    fxEnds = 0
     let delay = 0
     for (const ev of fresh) delay = play(ev, delay)
     // Hits, hooks and repairs need a moment to be seen before the next question pops up.
     const big = fresh.some((e) => ['wound', 'hook', 'genDone', 'gatesPowered', 'rescue', 'trapSprung', 'palletBreak', 'wallBreak', 'palletDrop'].includes(e.k))
-    holdBoard(Math.max(walking, big ? anim(delay + 900) : 0))
+    holdBoard(Math.max(walking, fxEnds, big ? anim(delay + 900) : 0))
   },
+  // once the minis are in their new rooms on the page but before it is painted: waiting a tick
+  // let a frame or two show them there already, and the walk jumped back to start (a player saw
+  // the minis twitch)
+  { flush: 'post' },
 )
 
-/** Minis walk from where they were, through the middle of each path they took; returns how long it takes. */
+/**
+ * Element.animate, started at once: a new animation waits a frame or two for its start time, and
+ * the page meanwhile showed the mini where it was going (it flicked there and back before its
+ * walk, which players saw as a twitch).
+ */
+function animateNow(el: Element, frames: Keyframe[], opts: KeyframeAnimationOptions): Animation {
+  const a = el.animate(frames, opts)
+  a.startTime = document.timeline.currentTime
+  return a
+}
+
+/** When this batch's walk is over (ms, at the animation speed): a drop starts after it. */
+let walkEnds = 0
+/** When the last longer effect of this batch ends (a pallet pulled down): the board waits for it. */
+let fxEnds = 0
+/** The killer walks in this batch: a pallet he breaks on the way breaks where it is, with no run to it. */
+let killerWalks = false
+
+/** A pallet pulled down, at full length (ms): the run out, the pull, the fall, the settle. */
+const DROP = { pull: 170, fall: 210, settle: 170, stay: 200 }
+
+/**
+ * A pallet thrown down, as the PC game's: the survivor runs out of the room along the path's line
+ * to the pallet standing beside the icon, pulls it, and it falls flat across the path with a slam
+ * (splinters, the sound, the board shaking); then they run back into the room. `start`: when to
+ * begin (ms, at the animation speed). Without its line to the room (Windows of Opportunity's
+ * pallet in the next room) the pallet falls by itself, from the side of the path's first room.
+ */
+/**
+ * A mini's run out of its room along a path's line (`leg`, as ROUTES has it: from the icon out)
+ * to stand just short of the icon, a moment there (`busy`, ms at the animation speed), and back
+ * the same way; from `start`. `dir`: the way to the icon over its last stretch (unit, in board
+ * widths). `lunges`: times into the moment (ms, full length) it lunges at the icon, a kick each.
+ * Returns how long the run out takes (ms, at the animation speed); 0 when there is no mini.
+ */
+function runToIcon(key: string, leg: [number, number][], icon: [number, number], [dx, dy]: [number, number], start: number, busy: number, lunges: number[] = []): number {
+  const el = boardEl.value?.querySelector<HTMLElement>(`[data-mini="${key}"]`)
+  const home = rects.value.minis.get(key)
+  if (!el || !home) return 0
+  const aspect = board.value.aspect
+  const at = ([x, y]: [number, number]) => ({ x: x - home.w / 2, y: y - (home.w * aspect) / 2 })
+  // they stand on their side of the icon, a pallet's length short of it
+  const near = (by: number): [number, number] => [icon[0] - dx * by, icon[1] - dy * by * aspect]
+  const stand = at(near(0.045))
+  const pts = smoothRun([home, ...[...leg].reverse().map(at), stand], aspect)
+  let run = 0
+  const dist = [0]
+  for (let i = 1; i < pts.length; i++) dist.push((run += Math.hypot(pts[i].x - pts[i - 1].x, (pts[i].y - pts[i - 1].y) / aspect)))
+  const out = anim(Math.min(650, Math.max(260, (run / GAIT.sprint.speed) * 1000)))
+  const total = out + busy + out
+  const f = (t: number) => t / total
+  const frames: Keyframe[] = pts.map((p, i) => ({ left: pct(p.x), top: pct(p.y), offset: f(run ? (out * dist[i]) / run : 0) }))
+  // a kick: a lunge at the icon and back
+  const lunge = at(near(0.03))
+  for (const t of lunges) {
+    frames.push({ left: pct(stand.x), top: pct(stand.y), offset: f(out + anim(t) - anim(90)) })
+    frames.push({ left: pct(lunge.x), top: pct(lunge.y), offset: f(out + anim(t)) })
+    frames.push({ left: pct(stand.x), top: pct(stand.y), offset: f(out + anim(t) + anim(110)) })
+  }
+  ;[...pts].reverse().forEach((p, i, back) => frames.push({ left: pct(p.x), top: pct(p.y), offset: f(out + busy + (run ? (out * (run - dist[back.length - 1 - i])) / run : 0)) }))
+  // (from `start`: a walk before it plays first)
+  animateNow(el, frames, { duration: total, delay: start, easing: 'linear' })
+  return out
+}
+
+/** The killer at a pallet (ms, full length): his kicks, the last one breaking it, then a breath. */
+const KICKS = [140, 430, 720]
+const KICK_REST = 380
+
+/**
+ * A pallet broken, as the PC game's: the killer runs out of his room along the path's line to the
+ * pallet, kicks it (it shudders and splinters), and the third kick breaks it in two, the halves
+ * flying apart with the crack, the splinters and the board shaking; then he goes back into his
+ * room (he stays: p.14). When he walks on through it (Enduring), or nobody of his is at its line
+ * (a survivor pushed through it), the pallet breaks where it lies with no run to it.
+ */
+function breakPallet(path: string, start: number) {
+  const id = tokenOf(board.value, path)
+  const icon = pathAt(path)
+  const aspect = board.value.aspect
+  const leg = killerWalks ? undefined : ROUTES[board.value.id]?.[id]?.[props.st.killer.room]
+  const smash = () => {
+    addFx('debris', icon)
+    fxSound.palletBreak()
+    shake()
+  }
+  if (reducedMotion.value) {
+    window.setTimeout(smash, start)
+    fxEnds = Math.max(fxEnds, start + anim(300))
+    return
+  }
+  let out = 0
+  if (leg) {
+    const [nx, ny] = leg[0]
+    let dx = icon[0] - nx
+    let dy = (icon[1] - ny) / aspect
+    const len = Math.hypot(dx, dy) || 1
+    dx /= len
+    dy /= len
+    out = runToIcon('k', leg, icon, [dx, dy], start, anim(KICKS[KICKS.length - 1] + KICK_REST), KICKS)
+  }
+  // with no one kicking it, it breaks at once
+  const kicks = leg ? KICKS : [0]
+  const t0 = start + out
+  // the pallet itself, on the path from now (the state has it gone already) until it splits:
+  // shuddering at each kick, then in two (its CSS keyframes are timed to KICKS). CSS plays its
+  // delay at the animation speed, so the wait is given at full length.
+  const rate = anim(1000) / 1000 || 1
+  addFx('palletSmash', icon, { quick: !leg, wait: t0 / rate, life: t0 / rate + 1400 })
+  kicks.forEach((t, i) => {
+    const last = i === kicks.length - 1
+    window.setTimeout(() => {
+      if (last) smash()
+      else {
+        fxSound.palletKick()
+        addFx('debris', icon)
+      }
+    }, t0 + anim(t))
+  })
+  fxEnds = Math.max(fxEnds, t0 + anim(kicks[kicks.length - 1] + KICK_REST) + out)
+}
+
+function dropPallet(s: number, path: string, start: number) {
+  const id = tokenOf(board.value, path)
+  const icon = pathAt(path)
+  const lines = ROUTES[board.value.id]?.[id]
+  const room = props.st.survivors[s].room
+  const leg = lines?.[room]
+  const side = leg ?? lines?.[pathDef(props.st, path).a]
+  // the way it falls: from the line's last stretch before the icon, across the path
+  const aspect = board.value.aspect
+  const [nx, ny] = side?.[0] ?? [icon[0], icon[1] - 0.1]
+  let dx = icon[0] - nx
+  let dy = (icon[1] - ny) / aspect
+  const len = Math.hypot(dx, dy) || 1
+  dx /= len
+  dy /= len
+  const hit = () => {
+    addFx('debris', icon)
+    fxSound.palletDrop()
+    shake()
+  }
+  const token = boardEl.value?.querySelector<HTMLElement>(`[data-token="${id}"]`)
+  if (reducedMotion.value || !token) {
+    window.setTimeout(hit, start)
+    fxEnds = Math.max(fxEnds, start + anim(300))
+    return
+  }
+  // the survivor's run out to the pallet and back (not when the pallet is in another room)
+  const out = leg ? runToIcon(`s${s}`, leg, icon, [dx, dy], start, anim(DROP.pull + DROP.fall + DROP.stay)) : 0
+  // the pallet: hidden until they reach it, standing, pulled a little, then down across the path
+  // (hinged on its near edge, falling away from them) with a bounce as it lands
+  const turn = (Math.atan2(dy, dx) * 180) / Math.PI - 90
+  const fold = (deg: number) => `perspective(150px) rotate(${turn}deg) translateY(-50%) rotateX(${deg}deg) translateY(50%) rotate(${-turn}deg)`
+  const t0 = start + out
+  const fall = DROP.pull + DROP.fall
+  const g = (t: number) => t / (fall + DROP.settle)
+  // (hidden while it waits: the first frame fills the delay)
+  animateNow(
+    token,
+    [
+      { opacity: 0, transform: fold(62), offset: 0 },
+      { opacity: 1, transform: fold(62), offset: g(40), easing: 'ease-out' },
+      { opacity: 1, transform: fold(72), offset: g(DROP.pull), easing: 'cubic-bezier(0.55, 0, 1, 0.45)' },
+      { opacity: 1, transform: fold(0), offset: g(fall), easing: 'ease-out' },
+      { opacity: 1, transform: fold(9), offset: g(fall + DROP.settle * 0.45), easing: 'ease-in' },
+      { opacity: 1, transform: fold(0), offset: 1 },
+    ],
+    { duration: anim(fall + DROP.settle), delay: t0, fill: 'backwards', easing: 'linear' },
+  )
+  window.setTimeout(hit, t0 + anim(fall))
+  fxEnds = Math.max(fxEnds, t0 + anim(fall + DROP.stay) + out)
+}
+
+/** How fast a mini goes along each kind of path (board widths a second) and how it moves. */
+const GAIT: Record<PathKind, { speed: number; stride: number; bob: number; lean: number; low: number }> = {
+  sprint: { speed: 0.62, stride: 320, bob: 0.07, lean: 12, low: 1 },
+  vault: { speed: 0.52, stride: 340, bob: 0.06, lean: 10, low: 1 },
+  sneak: { speed: 0.55, stride: 440, bob: 0.035, lean: 5, low: 1 },
+  crouch: { speed: 0.5, stride: 480, bob: 0.025, lean: 5, low: 0.88 },
+}
+
+/** A point a mini runs through (its top-left), with the kind of path it is on. */
+interface WalkPoint {
+  x: number
+  y: number
+  kind?: PathKind
+  /** The path whose icon this is. */
+  icon?: string
+  /** The room this point is the edge of, where a path's line comes into it. */
+  enters?: string
+}
+
+/**
+ * What a run leaves on the map, as in the PC game: a survivor's red scratch marks on a sprint or
+ * a vault (a sneak or a crouch leaves none), a wounded one's blood. The mini leans into its run (a sprint most), stretches running up or down the map, crouches
+ * low, and sways upright when it stops; dust where it lands off a vault and where it stops; crows
+ * fly up from a room a survivor sprints into. It only shows what everyone sees anyway.
+ */
+function walkFx(k: string, el: HTMLElement, pts: WalkPoint[], times: number[], w: number) {
+  const aspect = board.value.aspect
+  const total = times[times.length - 1]
+  const mid = (p: { x: number; y: number }): [number, number] => [p.x + w / 2, p.y + (w * aspect) / 2]
+  const later = (t: number, f: () => void) => window.setTimeout(f, t)
+  const survivor = k.startsWith('s') ? props.st.survivors[+k.slice(1)] : null
+  const killer = k === 'k'
+  // along the run: every \`every\` board widths of the kinds wanted, when the mini is there
+  const along = (every: number, on: (kind: PathKind | undefined) => boolean, f: (at: [number, number], dir: number) => void) => {
+    let next = every * 0.5
+    let run = 0
+    for (let i = 1; i < pts.length; i++) {
+      const a = mid(pts[i - 1])
+      const b = mid(pts[i])
+      const d = Math.hypot(b[0] - a[0], (b[1] - a[1]) / aspect)
+      const dir = (Math.atan2((b[1] - a[1]) / aspect, b[0] - a[0]) * 180) / Math.PI
+      while (next <= run + d) {
+        const u = d ? (next - run) / d : 0
+        const at: [number, number] = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]
+        if (on(pts[i].kind)) later(times[i - 1] + (times[i] - times[i - 1]) * u, () => f(at, dir))
+        next += every
+      }
+      run += d
+    }
+  }
+  if (survivor && survivor.status !== 'carried') {
+    // (on the paths between the rooms: in a room they would scrawl over its tiles)
+    const inRoom = (at: [number, number]) => board.value.rooms.some(({ box: [x, y, bw, bh] }) => at[0] > x && at[0] < x + bw && at[1] > y && at[1] < y + bh)
+    along(0.028, (kind) => kind === 'sprint' || kind === 'vault', (at, dir) => {
+      if (inRoom(at)) return
+      const side = (Math.random() - 0.5) * 0.012
+      const r = (dir * Math.PI) / 180
+      addFx('scratch', [at[0] - Math.sin(r) * side, at[1] + Math.cos(r) * side * aspect], { angle: dir + (Math.random() - 0.5) * 70 })
+    })
+    if (survivor.wounded) along(0.05, () => true, (at) => addFx('drip', [at[0] + (Math.random() - 0.5) * 0.01, at[1] + (Math.random() - 0.5) * 0.012]))
+    // crows take off from a room a survivor sprints into
+    pts.forEach((p, i) => {
+      if (!p.enters || p.kind !== 'sprint') return
+      const crows = props.st.props.filter((q) => q.kind === 'crow' && q.room === p.enters && q.revealed && !q.removed)
+      crows.forEach((c, n) => {
+        const t = rects.value.tiles.get(c.id)
+        if (t) later(times[i] + n * anim(120), () => addFx('crowFly', centre(t)))
+      })
+      if (crows.length) later(times[i], () => fxSound.crow())
+    })
+  }
+  pts.forEach((p, i) => {
+    if (p.icon && p.kind === 'vault') later(times[i] + anim(80), () => addFx('dust', mid(p)))
+  })
+  if (survivor || killer) later(total, () => addFx('dust', mid(pts[pts.length - 1])))
+  // the lean and how the body is held: into each stretch, a little past it at a turn, upright
+  // with a sway at the end (\`rotate\` and \`scale\`, apart from the bob's \`translate\`)
+  if (el.classList.contains('carried')) return
+  const settle = anim(300)
+  const end = total + settle
+  // (one lean per piece of the run, at its middle: round a corner's curve it swings over)
+  const lean: Keyframe[] = [{ rotate: '0deg', scale: '1 1', offset: 0 }]
+  let tilt = 0
+  for (let i = 1; i < pts.length; i++) {
+    const g = GAIT[pts[i].kind ?? 'sprint']
+    const dx = pts[i].x - pts[i - 1].x
+    const dy = (pts[i].y - pts[i - 1].y) / aspect
+    const d = Math.hypot(dx, dy)
+    if (!d) continue
+    const uy = Math.abs(dy / d)
+    tilt = (g.lean * dx) / d
+    const body = `${(1 - 0.06 * uy) * g.low} ${(1 + 0.09 * uy) * g.low}`
+    lean.push({ rotate: `${tilt}deg`, scale: body, offset: (times[i - 1] + times[i]) / 2 / end, easing: 'ease-in-out' })
+    // up over a vault's icon: bigger, nearer the eye
+    if (pts[i].icon && pts[i].kind === 'vault') lean.push({ scale: '1.15 1.15', offset: times[i] / end })
+  }
+  lean.push({ rotate: `${tilt}deg`, offset: total / end })
+  lean.push({ rotate: `${-tilt * 0.4}deg`, scale: '1 1', offset: (total + settle * 0.4) / end })
+  lean.push({ rotate: `${tilt * 0.15}deg`, offset: (total + settle * 0.75) / end })
+  lean.push({ rotate: '0deg', scale: '1 1', offset: 1 })
+  animateNow(el, lean, { duration: end, easing: 'linear' })
+}
+
+/**
+ * A run's points with its corners rounded (the map's lines turn square; a runner doesn't): each
+ * turn becomes a short curve `r` board widths out from the corner, and long stretches are cut in
+ * pieces so the run can ease in and out along them (`easeTimes`). A corner's marks (`icon`,
+ * `enters`) go on the middle of its curve.
+ */
+function smoothRun(pts: WalkPoint[], aspect: number, r = 0.028): WalkPoint[] {
+  const len = (a: WalkPoint, b: WalkPoint) => Math.hypot(b.x - a.x, (b.y - a.y) / aspect)
+  const out: WalkPoint[] = [pts[0]]
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [a, p, b] = [pts[i - 1], pts[i], pts[i + 1]]
+    const la = len(a, p)
+    const lb = len(p, b)
+    const cos = la && lb ? ((p.x - a.x) * (b.x - p.x) + ((p.y - a.y) * (b.y - p.y)) / aspect ** 2) / (la * lb) : 1
+    // straight on (an icon on a straight line), or no room to turn: the point as it is
+    if (cos > 0.985 || la < 1e-4 || lb < 1e-4) {
+      out.push(p)
+      continue
+    }
+    const rr = Math.min(r, la / 2, lb / 2)
+    const q0 = { x: p.x + ((a.x - p.x) * rr) / la, y: p.y + ((a.y - p.y) * rr) / la }
+    const q2 = { x: p.x + ((b.x - p.x) * rr) / lb, y: p.y + ((b.y - p.y) * rr) / lb }
+    for (const s of [0, 0.25, 0.5, 0.75, 1]) {
+      const x = (1 - s) ** 2 * q0.x + 2 * (1 - s) * s * p.x + s ** 2 * q2.x
+      const y = (1 - s) ** 2 * q0.y + 2 * (1 - s) * s * p.y + s ** 2 * q2.y
+      // (into the corner on the way in's kind of path, out of it on the way out's)
+      out.push({ x, y, kind: s <= 0.5 ? p.kind : b.kind, icon: s === 0.5 ? p.icon : undefined, enters: s === 0.5 ? p.enters : undefined })
+    }
+  }
+  out.push(pts[pts.length - 1])
+  // long stretches in pieces of about 0.05 board widths
+  const cut: WalkPoint[] = [out[0]]
+  for (let i = 1; i < out.length; i++) {
+    const [a, b] = [out[i - 1], out[i]]
+    const n = Math.floor(len(a, b) / 0.05)
+    for (let j = 1; j <= n; j++) cut.push({ x: a.x + ((b.x - a.x) * j) / (n + 1), y: a.y + ((b.y - a.y) * j) / (n + 1), kind: b.kind })
+    cut.push(b)
+  }
+  return cut
+}
+
+/**
+ * A run's times eased at both ends: it gets going out of the room and slows into the next
+ * instead of starting and stopping dead. Every effect reads these times, so they stay with the
+ * mini. Same total; half the speed at the very start and the very end.
+ */
+function easeTimes(times: number[]): number[] {
+  const total = times[times.length - 1]
+  if (!total) return times
+  // E: how far along the run (as its time at a steady pace) at a moment of the eased run
+  const E = (s: number) => 0.5 * s + 0.5 * s * s * (3 - 2 * s)
+  const inv = (u: number) => {
+    let lo = 0
+    let hi = 1
+    for (let k = 0; k < 24; k++) {
+      const m = (lo + hi) / 2
+      if (E(m) < u) lo = m
+      else hi = m
+    }
+    return (lo + hi) / 2
+  }
+  return times.map((t) => total * inv(t / total))
+}
+
+/** The longest one path's run may take (ms): a long way round goes quicker, not slower. */
+const MAX_LEG = 2200
+
+/**
+ * The points a mini runs through along one path, from one room to the other: out of the room to
+ * the line drawn on the map, along it (round its corners) to the icon, and on along the other
+ * line to the next room (ROUTES, traced from the map art). Without a traced line, the icon alone.
+ */
+function routeOf(path: string, from: string | null, to: string): { pts: [number, number][]; icon: number } {
+  const lines = ROUTES[board.value.id]?.[tokenOf(board.value, path)]
+  const out = (from && lines?.[from]) || []
+  const into = lines?.[to] ?? []
+  return { pts: [...[...out].reverse(), pathAt(path), ...into], icon: out.length }
+}
+
+/**
+ * Minis run from where they were along each path they took, as drawn on the map, at the pace of
+ * its kind (a sprint quick, a crouch low and slow) and with a hop over a vault; returns how long
+ * it takes.
+ */
 function walk(events: GameEvent[], from: Map<string, Rect>): number {
   let longest = 0
-  const step = anim(380) // one path's stride
-  const moved = new Map<string, string[]>()
+  const moved = new Map<string, { path: string; from: string | null; to: string }[]>()
+  const add = (k: string, m: { path: string; from: string | null; to: string }) => moved.set(k, [...(moved.get(k) ?? []), m])
   for (const ev of events) {
-    if (ev.k === 'move') moved.set(key(ev.who), [...(moved.get(key(ev.who)) ?? []), ev.path])
-    if (ev.k === 'dog' && ev.path) moved.set('d', [...(moved.get('d') ?? []), ev.path])
+    if (ev.k === 'move' && ev.path) add(key(ev.who), ev)
+    if (ev.k === 'dog' && ev.path) add('d', ev)
   }
+  const aspect = board.value.aspect
   for (const [k, now] of rects.value.minis) {
     const was = from.get(k)
     if (!was || (was.x === now.x && was.y === now.y) || reducedMotion.value) continue
     const el = boardEl.value?.querySelector<HTMLElement>(`[data-mini="${k}"]`)
     if (!el) continue
+    // the mini's top-left when its middle is on a point of the map
+    const at = ([x, y]: [number, number]) => ({ x: x - now.w / 2, y: y - (now.w * aspect) / 2 })
     // A teleport has no path: straight there.
-    const via = (moved.get(k) ?? []).filter(Boolean).map((p) => {
-      const [cx, cy] = pathAt(p)
-      return { x: cx - now.w / 2, y: cy - (now.w * board.value.aspect) / 2, w: now.w }
-    })
-    const frames = [was, ...via, now].map((r) => ({ left: pct(r.x), top: pct(r.y) }))
-    el.animate(frames, { duration: step * (frames.length - 1), easing: 'ease-in-out' })
-    // a footstep per path — or the vault's, or going over a pallet
-    ;(moved.get(k) ?? []).filter(Boolean).forEach((p, i) => window.setTimeout(() => pathSound(p), step * (i + 1)))
-    longest = Math.max(longest, step * (frames.length - 1))
+    const legs = moved.get(k) ?? []
+    // `icon`: the path whose icon the point is
+    // `enters`: the room the point is the edge of, at the end of a path's line
+    const line: WalkPoint[] = [was]
+    for (const m of legs) {
+      const kind = pathDef(props.st, m.path).kind
+      const route = routeOf(m.path, m.from, m.to)
+      route.pts.forEach((p, i) => line.push({ ...at(p), kind, icon: i === route.icon ? m.path : undefined, enters: i === route.pts.length - 1 ? m.to : undefined }))
+    }
+    line.push({ ...now, kind: legs.length ? pathDef(props.st, legs[legs.length - 1].path).kind : undefined })
+    const pts = smoothRun(line, aspect)
+    // time to each point at its path's pace (distances in board widths)
+    const times = [0]
+    for (let i = 1; i < pts.length; i++) {
+      const d = Math.hypot(pts[i].x - pts[i - 1].x, (pts[i].y - pts[i - 1].y) / aspect)
+      const gait = GAIT[pts[i].kind ?? 'sprint']
+      times.push(times[i - 1] + anim((d / gait.speed) * 1000))
+    }
+    // a long line is run faster, so a turn never waits long on the board
+    const cap = anim(MAX_LEG) * Math.max(1, legs.length)
+    if (times[times.length - 1] > cap) {
+      const k = cap / times[times.length - 1]
+      for (let i = 0; i < times.length; i++) times[i] *= k
+    }
+    times.splice(0, times.length, ...easeTimes(times))
+    const total = times[times.length - 1]
+    if (!total) continue
+    animateNow(
+      el,
+      pts.map((p, i) => ({ left: pct(p.x), top: pct(p.y), offset: times[i] / total })),
+      { duration: total, easing: 'linear' },
+    )
+    // the stride: a bob at each step, lower for a sneak or a crouch, and a hop over a vault's icon
+    // (one step after another over the whole run, at the pace of the path it is on)
+    const bobs: Keyframe[] = []
+    const kindAt = (t: number) => pts[Math.max(1, times.findIndex((x) => x >= t))]?.kind ?? 'sprint'
+    for (let t = 0, up = false; t < total; up = !up) {
+      const gait = GAIT[kindAt(t)]
+      bobs.push({ translate: up ? `0 ${-gait.bob * 100}%` : '0 0', offset: t / total, easing: 'ease-in-out' })
+      t += anim(gait.stride) / 2
+    }
+    pts.forEach((p, i) => p.icon && p.kind === 'vault' && bobs.push({ translate: '0 -55%', offset: times[i] / total }))
+    bobs.push({ translate: '0 0', offset: 1 })
+    bobs.sort((p, q) => (p.offset as number) - (q.offset as number))
+    animateNow(el, bobs, { duration: total, easing: 'linear' })
+    // a footstep as it reaches each icon — or the vault's, or going over a pallet
+    pts.forEach((p, i) => p.icon && window.setTimeout(() => pathSound(p.icon!), times[i]))
+    walkFx(k, el, pts, times, now.w)
+    // (the sway upright at the end)
+    longest = Math.max(longest, total + anim(300))
   }
   return longest
 }
@@ -492,22 +907,18 @@ function play(ev: GameEvent, delay: number): number {
       return delay
     }
     case 'palletBreak':
+      // he kicks it apart (after any walk of this batch, unless he walks on through it)
+      breakPallet(ev.path, killerWalks ? anim(delay) : Math.max(walkEnds, anim(delay)))
+      return delay
     case 'wallBreak':
       addFx('debris', pathAt(ev.path), {}, delay)
       fxSound.palletBreak()
       shake()
       return delay
-    case 'palletDrop': {
-      // the pallet falls onto the path: the token drops in turning, then splinters and the slam's
-      // sound on the hit (the token is hidden until its fall starts, so it never shows early)
-      const id = tokenOf(board.value, ev.path)
-      // the CSS delay at full length: the animation speed plays CSS (its delay too) at its own rate
-      dropping.value = [...dropping.value.filter((d) => d.id !== id), { id, delay }]
-      window.setTimeout(() => (dropping.value = dropping.value.filter((d) => d.id !== id)), anim(delay + 800))
-      addFx('debris', pathAt(ev.path), {}, delay + PALLET_HIT_MS)
-      window.setTimeout(() => fxSound.palletDrop(), anim(delay + PALLET_HIT_MS - 60))
+    case 'palletDrop':
+      // after any walk of this batch: they pull it down where they stand
+      dropPallet(ev.s, ev.path, Math.max(walkEnds, anim(delay)))
       return delay
-    }
     case 'pickUp':
       fxSound.pickUp()
       return delay
@@ -901,8 +1312,8 @@ function guard(e: MouseEvent) {
       <img
         v-if="p.token"
         class="path-token"
-        :class="{ dropping: dropping.some((d) => d.id === p.id) }"
-        :style="{ left: pct(p.at[0]), top: pct(p.at[1]), '--delay': `${dropping.find((d) => d.id === p.id)?.delay ?? 0}ms` }"
+        :data-token="p.id"
+        :style="{ left: pct(p.at[0]), top: pct(p.at[1]) }"
         :src="asset(p.token)"
         alt=""
       />
@@ -923,10 +1334,18 @@ function guard(e: MouseEvent) {
       />
     </template>
 
-    <div v-for="f in effects" :key="f.id" class="fx" :class="[f.kind, f.tone]" :style="{ left: pct(f.x), top: pct(f.y) }">
+    <div v-for="f in effects" :key="f.id" class="fx" :class="[f.kind, f.tone, { quick: f.quick }]" :style="{ left: pct(f.x), top: pct(f.y), '--angle': `${f.angle ?? 0}deg`, '--wait': `${f.wait ?? 0}ms` }">
       <span v-if="f.text"><BpText :text="f.text" /></span>
       <template v-if="f.kind === 'spikes'"><i v-for="n in 7" :key="n" :style="{ '--n': n }" /></template>
       <template v-if="f.kind === 'debris'"><i v-for="n in 8" :key="n" :style="{ '--n': n }" /></template>
+      <template v-if="f.kind === 'palletSmash'">
+        <img class="half left" :src="asset(PROP_IMAGE.pallet)" alt="" />
+        <img class="half right" :src="asset(PROP_IMAGE.pallet)" alt="" />
+      </template>
+      <template v-if="f.kind === 'dust'"><i v-for="n in 6" :key="n" :style="{ '--n': n }" /></template>
+      <template v-if="f.kind === 'crowFly'">
+        <svg v-for="n in 4" :key="n" class="crow-bird" :style="{ '--n': n }" viewBox="0 0 40 20" aria-hidden="true"><path d="M0 9 Q10 0 20 10 Q30 0 40 9 Q30 5 20 14 Q10 5 0 9Z" /></svg>
+      </template>
     </div>
     <PingLayer v-if="canPing || shownPings.length" />
   </div>
@@ -1578,38 +1997,6 @@ button.tile.picked {
   pointer-events: none;
   filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.95));
 }
-/* a pallet thrown down: it falls in turning, hits the path (with the splinters), and settles */
-.path-token.dropping {
-  transform-origin: 50% 70%;
-  animation: pallet-drop 0.75s linear var(--delay, 0ms) both;
-}
-/* falling it speeds up (ease-in) to the hit at 45%, then bounces and settles (ease-out) */
-@keyframes pallet-drop {
-  0% {
-    opacity: 0;
-    transform: translateY(-260%) rotate(-95deg) scale(2.6);
-    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5);
-  }
-  12% {
-    opacity: 1;
-  }
-  45% {
-    transform: translateY(0) rotate(8deg) scale(1.15);
-    animation-timing-function: ease-out;
-  }
-  60% {
-    transform: translateY(-8%) rotate(-3deg) scale(0.93);
-    animation-timing-function: ease-in-out;
-  }
-  78% {
-    transform: rotate(1deg) scale(1.03);
-    animation-timing-function: ease-out;
-  }
-  100% {
-    opacity: 1;
-    transform: none;
-  }
-}
 /* over another token on the same path: the same size and faint, so the token under it still shows */
 .path-entity {
   opacity: 0.5;
@@ -1885,6 +2272,229 @@ button.tile.picked {
   100% {
     transform: scale(4.5);
     opacity: 0;
+  }
+}
+/* scratch marks (the PC game's): red streaks a run leaves behind, fading */
+.fx.scratch {
+  z-index: 2;
+  width: 2.4%;
+  height: 1.1%;
+  rotate: var(--angle);
+  background:
+    linear-gradient(170deg, transparent 0 18%, rgb(230 20 30 / 0.95) 20% 27%, transparent 29%),
+    linear-gradient(176deg, transparent 0 46%, rgb(255 45 45 / 0.9) 48% 54%, transparent 56%),
+    linear-gradient(168deg, transparent 0 70%, rgb(210 10 20 / 0.9) 72% 78%, transparent 80%);
+  filter: drop-shadow(0 0 3px rgb(255 0 0 / 0.75));
+  animation: scratch 2.6s ease-in forwards;
+}
+@keyframes scratch {
+  0% {
+    opacity: 0;
+    scale: 0.4 1;
+  }
+  8% {
+    opacity: 1;
+    scale: 1;
+  }
+  55% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* a wounded survivor's blood on the way */
+.fx.drip {
+  z-index: 2;
+  width: 0.9%;
+  aspect-ratio: 1;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 40% 35%, #c0101a, #5a0006 75%);
+  box-shadow: 0 0 4px rgb(255 0 0 / 0.5);
+  animation: drip 2.8s ease-in forwards;
+}
+@keyframes drip {
+  0% {
+    scale: 0;
+  }
+  10% {
+    scale: 1.2;
+  }
+  20% {
+    scale: 1;
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* a pallet kicked apart: it lies on the path, shudders at each kick (KICKS: 140, 430 and 720 ms
+   of 1.4 s), and the last splits it in two, the halves flying off and fading */
+.fx.palletSmash {
+  z-index: 3;
+  width: 4.2%;
+  aspect-ratio: 1;
+  animation: smash-shudder 1.4s linear var(--wait) both;
+}
+.fx.palletSmash .half {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.95));
+  animation: smash-left 1.4s linear var(--wait) both;
+}
+.fx.palletSmash .half.left {
+  clip-path: polygon(0 0, 54% 0, 44% 100%, 0 100%);
+}
+.fx.palletSmash .half.right {
+  clip-path: polygon(54% 0, 100% 0, 100% 100%, 44% 100%);
+  animation-name: smash-right;
+}
+/* nobody kicking it (it breaks under a push, or as he walks on): it splits at once */
+.fx.palletSmash.quick,
+.fx.palletSmash.quick .half {
+  animation-duration: 0.75s;
+}
+.fx.palletSmash.quick {
+  animation-name: none;
+}
+.fx.palletSmash.quick .half.left {
+  animation-name: smash-left-now;
+}
+.fx.palletSmash.quick .half.right {
+  animation-name: smash-right-now;
+}
+@keyframes smash-shudder {
+  0%,
+  8% {
+    transform: none;
+  }
+  10% {
+    transform: rotate(-7deg) scale(1.08);
+  }
+  15% {
+    transform: rotate(3deg);
+  }
+  20%,
+  28% {
+    transform: none;
+  }
+  30.7% {
+    transform: rotate(8deg) scale(1.1);
+  }
+  36% {
+    transform: rotate(-4deg);
+  }
+  42%,
+  50% {
+    transform: none;
+  }
+  51.4% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes smash-left {
+  0%,
+  51.4% {
+    transform: none;
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  100% {
+    transform: translate(-75%, 25%) rotate(-50deg);
+    opacity: 0;
+  }
+}
+@keyframes smash-right {
+  0%,
+  51.4% {
+    transform: none;
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  100% {
+    transform: translate(75%, -20%) rotate(45deg);
+    opacity: 0;
+  }
+}
+@keyframes smash-left-now {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translate(-75%, 25%) rotate(-50deg);
+    opacity: 0;
+  }
+}
+@keyframes smash-right-now {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translate(75%, -20%) rotate(45deg);
+    opacity: 0;
+  }
+}
+/* dust where a mini lands or stops */
+.fx.dust {
+  width: 1px;
+  height: 1px;
+}
+.fx.dust i {
+  position: absolute;
+  width: 1.3cqw;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(205 190 165 / 0.75), transparent 70%);
+  --a: calc(var(--n) * 60deg);
+  animation: dust 0.65s ease-out forwards;
+}
+@keyframes dust {
+  from {
+    transform: rotate(var(--a)) translateX(0) scale(0.4);
+    opacity: 0.9;
+  }
+  to {
+    transform: rotate(var(--a)) translateX(1.6cqw) scale(1.5);
+    opacity: 0;
+  }
+}
+/* crows taking off from their tile, flapping up and away */
+.fx.crowFly {
+  z-index: 7;
+  width: 1px;
+  height: 1px;
+}
+.crow-bird {
+  position: absolute;
+  width: 3.6cqw;
+  translate: -50% -50%;
+  fill: #0d0b0e;
+  /* black birds on a dark map: a pale rim so they show */
+  filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.95)) drop-shadow(0 0 4px rgb(255 255 255 / 0.6));
+  opacity: 0;
+  animation:
+    crow-away 1.4s cubic-bezier(0.3, 0.1, 0.7, 1) forwards,
+    crow-flap 0.16s ease-in-out infinite alternate;
+  animation-delay: calc(var(--n) * 70ms), 0s;
+}
+@keyframes crow-away {
+  from {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 1;
+  }
+  to {
+    transform: translate(calc((var(--n) - 2.5) * 5cqw + 3cqw), calc(-9cqw - var(--n) * 1.5cqw)) scale(1.25);
+    opacity: 0;
+  }
+}
+@keyframes crow-flap {
+  to {
+    scale: 1 0.35;
   }
 }
 /* splinters flying out */

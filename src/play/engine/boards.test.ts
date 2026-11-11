@@ -3,12 +3,29 @@ import { boards } from './boards'
 import { apply, createGame, killerMoves, survivorMoves, tokenOf } from './engine'
 import { legalActions } from './legal'
 import type { PropCategory } from './types'
+import { ROUTES } from '../boardRoutes'
 
 // Prop tiles per category (p.3): every board's printed slots must use them exactly.
 const TILES: Record<PropCategory, number> = { objective: 10, survival: 12, altruism: 12, boldness: 10 }
 
 describe.each(Object.values(boards))('board $name', (board) => {
-  it('has a slot for every prop tile, one room per start face 0–5, and paths between real rooms', () => {
+  it('has the line drawn from each path icon to each of its rooms (a mini runs along it)', () => {
+    const lines = ROUTES[board.id]
+    for (const p of board.paths) {
+      const icon = lines?.[tokenOf(board, p.id)]
+      for (const r of [p.a, p.b]) {
+        const leg = icon?.[r]
+        expect(leg?.length, `${p.id} to ${r}`).toBeGreaterThan(0)
+        // it ends at the room (on its edge, or just short of it where an arrow points in)
+        const [x, y] = leg!.at(-1)!
+        const [bx, by, bw, bh] = board.rooms.find((q) => q.id === r)!.box
+        const off = Math.max(bx - x, x - bx - bw, 0) + Math.max(by - y, y - by - bh, 0)
+        expect(off, `${p.id} to ${r}`).toBeLessThan(0.06)
+      }
+    }
+  })
+
+  it('has a slot for every prop tile, one room per start face 0โ€“5, and paths between real rooms', () => {
     const slots = { objective: 0, survival: 0, altruism: 0, boldness: 0 }
     for (const r of board.rooms) for (const c of r.props) slots[c]++
     expect(slots).toEqual(TILES)

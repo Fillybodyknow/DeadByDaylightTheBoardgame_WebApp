@@ -20,6 +20,7 @@ npm run build    # type-check + build into dist/
 |---|---|
 | `src/play/engine/types.ts` | Game state, steps, actions (plain data, JSON-safe) |
 | `src/play/engine/boards.ts` | Board graphs: rooms, printed prop slots, paths, walls, coordinates |
+| `src/play/boardRoutes.ts` | The line drawn on the map from each path icon to each of its rooms, traced from the map art: a mini runs along it (`walk` in `Board`) |
 | `src/play/engine/engine.ts` | The rules: `createGame`, `apply(state, action)`, legal-option queries |
 | `src/play/engine/legal.ts` | Every legal action in a state (tests, bots) |
 | `src/play/engine/bot.ts` | The bot: a move for one player (`botMove`), from what that player can see |
@@ -36,6 +37,27 @@ queue tasks (`state.queue`) that run until one needs input again. The RNG seed l
 state, so a saved game replays exactly and undo cannot be used to re-roll dice. Log entries
 carry a structured event (`ev`) beside the text; the UI animates those, and the summaries
 count them, so the engine never depends on the UI.
+
+A mini that moves runs along the path's line as the map draws it (`ROUTES` in `boardRoutes.ts`):
+out of its room, round the line's corners to the icon and on to the next room, at its kind's
+pace (a sprint quick and bouncing, a sneak or a crouch slower and lower, a hop over a vault's
+icon), and never longer than 2.2 s a path. It leaves what the PC game shows (`walkFx`): a
+survivor's red scratch marks on a sprint or a vault (between the rooms; a sneak or a crouch
+leaves none) and a wounded one's blood. The run rounds the line's corners and eases in and out
+(`smoothRun`, `easeTimes`). The mini leans into its run, crouches low on a crouch and sways upright when it
+stops; dust where it lands off a vault and where it stops; crows fly up from a room a survivor
+sprints into. All of it only shows what everyone sees anyway. The lines were traced from the map
+images by their colours (each map's own, read off its icons' borders) and checked by eye; a stub
+too short to trace is a straight line to the room's edge. A new map needs its lines traced too:
+`boards.test.ts` fails on a path with no line to one of its rooms.
+
+A pallet thrown down is shown as the PC game's (`dropPallet` in `Board`): the survivor runs out along
+the line to the pallet standing beside the icon, pulls it, and it folds down flat across the path
+(hinged on their side) with a slam: splinters, the sound, the board shaking. Then they run back
+into the room. A pallet in another room (Windows of Opportunity) falls by itself. One the killer
+breaks (`breakPallet`): he runs out to it and kicks it, it shudders and splinters, and the third
+kick splits it in two with the crack and the board shaking; he goes back into his room. Broken as
+he walks on (Enduring) or under a push, it splits at once.
 
 ## Online play
 

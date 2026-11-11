@@ -51,6 +51,7 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
 | Path | What |
 |---|---|
 | `src/play/engine/` | Rules engine: `engine.ts` (pure reducer), `types.ts`, `perks.ts`, `legal.ts`, `seats.ts`, `boards.ts` (board graphs, read from the map art; `boards.test.ts` checks them), tests |
+| `src/play/boardRoutes.ts` | Each path's line on the map art, icon to room (traced from the image): minis run along it |
 | `src/play/components/` | Game UI: `GameScreen` (layout), `Board`, `ActionPanel`, `PerkPrompt`, `Planning`, `CardHand`, `StatusPanel` (player tiles), `ObjectiveHud` (both sides' goals, under the tiles), modals |
 | `src/play/engine/loadout.ts` | Game modes Adept / Bloodweb / Devout (p.19): the perk-card deck, Bloodweb's draws, what a loadout may hold; `createGame` takes each character's `perks` |
 | `src/play/engine/offerings.ts` | Offerings (p.19): ids, sides, all ten played (`READY_OFFERINGS`), how many a side burns. Room settings `offerings` / `offeringCount` / `offeringRandom`; `createGame` takes `offerings` and `drawOfferings`; effects in `engine.ts` (`hasOffering`) |
@@ -487,7 +488,9 @@ game, reset the tutorial, reset settings). Settings live in `src/settings.ts` (`
   synthesised sound as fallback. They follow the mute toggle in `src/sound.ts`.
 - The clips cut from the "Common Sound Effects — Dead by Daylight" video (vault, pallet-run, equip,
   unequip, lobby-join / -leave, char-pick / -confirm / -unconfirm, match-ready, locker-open / -close /
-  -search, sabotage, crow-touch / -destroy, totem-touch) are named in `CLIPS` (`fx/audio.ts`). The
+  -search, sabotage, crow-touch / -destroy, totem-touch, pallet-impact) are named in `CLIPS` (`fx/audio.ts`).
+  pallet-impact holds "Pallet Impact 1–13" one after another, a kick of the killer's plays one
+  (`IMPACTS`). The
   board's sounds come from the `touch` game event (a prop handled: Board's `play`) and from the
   path a mini walks (`pathSound`); the room's from OnlineRoom. A game starting: `MatchBeat` plays
   match-ready over the page as it was (laid out as that page: `introStage` in `intro.ts` keeps App
