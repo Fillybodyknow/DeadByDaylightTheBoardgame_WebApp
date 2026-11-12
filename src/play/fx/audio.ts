@@ -176,6 +176,10 @@ const synth = {
   powered() {
     for (let i = 0; i < 3; i++) tone(440, 0.5, { type: 'sawtooth', gain: 0.07, at: i * 0.55, slideTo: 660 })
   },
+  /** A wound closing: a soft rising chime. */
+  heal() {
+    ;[523, 659, 880].forEach((f, i) => tone(f, 0.35, { type: 'sine', gain: 0.07, at: i * 0.07 }))
+  },
   /** A boot against wood: the killer kicking a pallet before it gives. */
   kick() {
     tone(95, 0.16, { gain: 0.45, slideTo: 55 })
@@ -250,6 +254,8 @@ export const fxSound = {
   palletDrop: () => clip('pallet-drop', synth.crack),
   /** Pallet or breakable wall smashed. */
   palletBreak: () => clip('pallet-break', synth.crack),
+  /** A survivor healing another. */
+  heal: () => synth.heal(),
   /** The killer's kick at a pallet before it breaks. */
   palletKick: () => {
     lastImpact = (lastImpact + 1 + Math.floor(Math.random() * (IMPACTS.length - 1))) % IMPACTS.length

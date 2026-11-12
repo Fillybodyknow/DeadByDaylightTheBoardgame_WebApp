@@ -9,17 +9,35 @@ import { asset } from '../../i18n'
 import { isFailure, isGreat, succeeded } from '../engine/engine'
 import type { Die } from '../engine/types'
 import { fxSound } from '../fx/audio'
-import { fx, type SkillVerdict } from '../fx/bus'
+import { boardHooks, fx, type SkillVerdict } from '../fx/bus'
 import DiceRow from './DiceRow.vue'
 import BpText from '../../components/BpText.vue'
 
 // Dice and perk cards are shown in the order they happened (`id` counts up as they are queued):
 // a perk that sets a roll up comes before it (Unnerving Presence, Bond), one that answers it
 // comes after (A Nurse's Calling, Lucky Break, Off the Record).
-const current = computed(() => {
+const upNext = computed(() => {
   const dice = fx.dice[0]
   const perk = fx.perks[0]
   return dice && (!perk || dice.id < perk.id) ? dice : null
+})
+// A repair's survivor reaches for the generator when its dice are next, and the dice wait for
+// the board: hands on it first, the skill check after (the user's call). Asked once per roll.
+const reached = new Set<number>()
+watch(
+  upNext,
+  (d) => {
+    if (!d?.reach || reached.has(d.id)) return
+    reached.add(d.id)
+    boardHooks.reach?.(d.reach.key, d.reach.prop)
+  },
+  { flush: 'sync' },
+)
+const current = computed(() => (upNext.value && !fx.boardBusy ? upNext.value : null))
+// ...and lets go of it once its skill check is over
+watch(current, (now, before) => {
+  // (gone from the queue, not just held back a moment)
+  if (before?.reach && before.id !== now?.id && !fx.dice.some((d) => d.id === before.id)) boardHooks.release?.(before.reach.key)
 })
 const phase = ref<'warn' | 'sweep' | 'landed'>('warn')
 

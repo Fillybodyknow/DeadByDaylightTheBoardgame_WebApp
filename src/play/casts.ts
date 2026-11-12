@@ -24,6 +24,8 @@ function pictureOf(text: string): string | undefined {
   if (/Locker/.test(text)) return PROP_IMAGE.locker
   if (/Crow/.test(text)) return PROP_IMAGE.crow
   if (/Chest/.test(text)) return PROP_IMAGE.chest
+  if (/Generator/.test(text)) return PROP_IMAGE.generator
+  if (/Exit Gate/.test(text)) return PROP_IMAGE.exitGate
   if (/Hex Totem|Totem/.test(text)) return PROP_IMAGE.totem
   if (/Entity/.test(text)) return components.entity.image
   if (/Bonus Turn/.test(text)) return components.bloodpoint.image

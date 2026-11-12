@@ -2330,6 +2330,9 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
     case 'repair':
       // Friendly Competition looks back at who worked on a generator this round
       st.genBy = { ...st.genBy, [i.prop]: [...new Set([...(st.genBy?.[i.prop] ?? []), s])] }
+      // the repair begun, before its roll: the screen's action card for it, as a pallet's or a
+      // chest's has (the roll and its progress have reveals of their own)
+      log(st, `${sv.name} ซ่อม Generator — ความคืบหน้า ${prop!.progress}/${PROGRESS_MAX}`, s)
       return startCheck(st, { k: 'repair', s, prop: i.prop })
     case 'partner': {
       const t = i.target
@@ -2345,6 +2348,8 @@ function survivorInteract(st: GameState, s: number, i: SurvivorInteraction, aske
       return
     }
     case 'openGate':
+      // the lever pulled, before its roll: its action card, as a repair's
+      log(st, `${sv.name} เปิด Exit Gate — ความคืบหน้า ${prop!.progress}/${PROGRESS_MAX}`, s)
       return startCheck(st, { k: 'openGate', s, prop: i.prop })
     case 'cleanse':
       return startCheck(st, { k: 'cleanse', s, prop: i.prop })

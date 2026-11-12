@@ -52,12 +52,43 @@ too short to trace is a straight line to the room's edge. A new map needs its li
 `boards.test.ts` fails on a path with no line to one of its rooms.
 
 A pallet thrown down is shown as the PC game's (`dropPallet` in `Board`): the survivor runs out along
-the line to the pallet standing beside the icon, pulls it, and it folds down flat across the path
-(hinged on their side) with a slam: splinters, the sound, the board shaking. Then they run back
-into the room. A pallet in another room (Windows of Opportunity) falls by itself. One the killer
+the line to the pallet standing up on its edge on their left beside the icon and yanks it (leaning
+back, the pallet pulled a little more upright, a beat); it folds over from their left to their
+right, as the one pulling it sees them facing the icon, like a page turning, down flat onto the
+path (the user's choice), its shadow
+tightening as it nears the ground. It squashes there and springs back, dust bursts out to both
+sides of the path, splinters fly, the board shakes, and the path's whole line flashes while its
+icon keeps a glow a moment: the way is shut. Then they run back into the room. A pallet in another room (Windows of Opportunity) falls by itself. One the killer
 breaks (`breakPallet`): he runs out to it and kicks it, it shudders and splinters, and the third
 kick splits it in two with the crack and the board shaking; he goes back into his room. Broken as
 he walks on (Enduring) or under a push, it splits at once.
+Interactions show who does what (`reach` in `Board`): the mini lunges part of the way to what it
+handles and back, and the effect lands as it gets there. The killer's blow: a slash across the one
+struck, the screen's edge going red, blood, the shake. A repair: the survivor reaches for the
+generator as its skill check comes up and keeps their hands on it until the check is over (the
+dice wait for the reach: `reach` on the roll, `boardHooks.reach` / `release` from DiceModal), then
+sparks and the tile shuddering. An exit gate is the same: the lever reached for before its check,
+held through it, the gate shuddering as it gives. Both have an action card first, from a line the
+engine logs as the interaction begins ("… ซ่อม Generator", "… เปิด Exit Gate", with the progress). His kick at a generator: red sparks, smoke, the tile jolting hard. A heal: a line of
+light from healer to healed and green rings on them, a soft chime. A locker: its door swings open
+and shut on someone going in or out; searched, it rattles and is wrenched open. (The sound clips
+video has no heal sound, so it is drawn with Web Audio.)
+More of them: a chest opened heaves open where it stood and an item's card (its back) rises out of
+it; a crow chased takes off cawing; a totem cleansed (reached for before its check, as a repair)
+flares, cracks in two and sheds embers; a hook sabotaged wrenches with cold sparks. The killer
+lunges and sweeps a survivor onto his shoulder, reaches the hook to hang them (the spikes come with
+it); a rescuer reaches up, the hook jolts and the one hung drops off it; one who wriggles free
+springs off him and he staggers. Those survivors fly on an arc (`flyMini`) instead of walking, and
+a chest's or a totem's last place is kept for its effect (`lastTiles`), as it is gone by then.
+Any prop taken out of a room (cleansed, opened, thrown down, finished) keeps its place in the row,
+empty, until the board's animations of that batch are over (`lingering`); then the others close up,
+eased, instead of the next tile sliding in under the effect still playing there.
+A survivor whose run crosses a dropped pallet slides over it (`slidesOf`, in `walk` and `walkFx`):
+down low and flat, thrown forward into it, no bounce, up again on the far side; the pallet jolts
+under them and dust kicks up where they go down and come up.
+A breakable wall the killer walks through (`smashWall`): his walk stops short of it while he kicks
+it, it shudders, and the third kick bursts it into four pieces; then he walks on through. Broken
+by a survivor's item or a push, it bursts at once.
 
 ## Online play
 

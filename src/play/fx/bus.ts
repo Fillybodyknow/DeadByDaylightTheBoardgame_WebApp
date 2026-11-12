@@ -21,6 +21,11 @@ export interface DiceShow {
   action?: string
   /** What the roll is on (a prop, a trap, a survivor or the killer), in the middle of the ring. */
   icon?: { src: string; round: boolean }
+  /**
+   * The survivor's mini reaching for the prop first, on the board (a repair): played when these
+   * dice are next to show, after any perk card before them, and the dice wait for it.
+   */
+  reach?: { key: string; prop: string }
   /** Progress of the generator or gate, before and after this roll. */
   progress?: { before: number; after: number; max: number }
   /**
@@ -111,6 +116,13 @@ export const fx = reactive({
 })
 
 let boardTimer: number | undefined
+
+/**
+ * What the board can be asked to play before the screen moves on (Board fills it in while it is
+ * on screen): a survivor reaching for the prop they work on as the skill check's dice come up,
+ * and staying there until they are done (`release`).
+ */
+export const boardHooks: { reach?: (key: string, prop: string) => void; release?: (key: string) => void } = {}
 
 /** The board's animations need `ms` more: keep `boardBusy` up until then. */
 export function holdBoard(ms: number) {

@@ -182,8 +182,10 @@ watch(
       }
       // A roll already shown while it waited for a decision, and kept as it was, isn't shown twice;
       // a die of it kept (Bond's) stands still while the result shows
-      if (e.dice && ev?.k === 'roll' && JSON.stringify(e.dice) !== pendingShown)
+      if (e.dice && ev?.k === 'roll' && JSON.stringify(e.dice) !== pendingShown) {
         showDice({
+          // a repair or a gate: their hands on it first, the skill check after
+          ...((ev.ctx === 'repair' || ev.ctx === 'openGate' || ev.ctx === 'cleanse') && ev.prop ? { reach: { key: `s${ev.s}`, prop: ev.prop } } : {}),
           dice: e.dice,
           ...stillDice(e.dice),
           title: st.survivors[ev.s].name,
@@ -191,6 +193,7 @@ watch(
           ...skillCheck(ev.ctx, e.dice, rollProgress(prev, ev.ctx, ev.prop, fresh.slice(n + 1))),
           icon: rollIcon(st, ev.ctx, ev.s, ev.target),
         })
+      }
       if (ev?.k === 'roll' && afterRoll) {
         showPerk(afterRoll)
         afterRoll = null
@@ -210,6 +213,7 @@ watch(
         const still = stillDice(pending.dice)
         pendingShown = sig
         showDice({
+          ...((pending.ctx === 'repair' || pending.ctx === 'openGate' || pending.ctx === 'cleanse') && pending.prop ? { reach: { key: `s${pending.s}`, prop: pending.prop } } : {}),
           dice: pending.dice,
           ...still,
           title: st.survivors[pending.s].name,

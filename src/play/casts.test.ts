@@ -30,6 +30,45 @@ describe('action cards', () => {
     expect(new CastBuilder(prev, prev).of(move('killer'))).toBeNull()
   })
 
+  it('shows a repair begun, with the generator, before its skill check', () => {
+    let st = game()
+    // play on until a survivor may repair, and take it
+    for (let i = 0; i < 600; i++) {
+      const act = legalActions(st).find((a) => a.t === 'interact' && a.i.k === 'repair')
+      if (act) {
+        const next = apply(st, act)
+        const line = next.log.slice(st.log.length).find((e) => /ซ่อม Generator/.test(e.text))!
+        const cast = new CastBuilder(st, next).of(line)
+        expect(cast?.title).toMatch(/ซ่อม Generator$/)
+        expect(cast?.sub).toMatch(/ความคืบหน้า \d\/3/)
+        expect(cast?.image).toContain('generator')
+        return
+      }
+      const acts = legalActions(st)
+      st = apply(st, acts[i % acts.length])
+    }
+    throw new Error('no repair came up')
+  })
+
+  it('shows an exit gate being opened, with the gate, before its skill check', () => {
+    // a survivor at a revealed gate with the gates powered: their interaction is to open it
+    const st = game()
+    const gate = st.props.find((p) => p.kind === 'exitGate')!
+    Object.assign(gate, { revealed: true, removed: false, progress: 1, room: st.survivors[0].room })
+    st.props.filter((p) => p.kind === 'generator').forEach((g) => Object.assign(g, { done: true, room: null }))
+    st.phase = 'survivors'
+    st.activeSurvivor = 0
+    st.step = { t: 'survivorInteract', s: 0, canInteract: true } as GameState['step']
+    const act = legalActions(st).find((a) => a.t === 'interact' && a.i.k === 'openGate')
+    expect(act).toBeTruthy()
+    const next = apply(st, act!)
+    const line = next.log.slice(st.log.length).find((e) => /เปิด Exit Gate/.test(e.text))!
+    const cast = new CastBuilder(st, next).of(line)
+    expect(cast?.title).toMatch(/เปิด Exit Gate$/)
+    expect(cast?.sub).toBe('ความคืบหน้า 1/3')
+    expect(cast?.image).toContain('exit-gate')
+  })
+
   it("takes the card from the card line when the move follows it in the same batch", () => {
     const prev = game()
     const b = new CastBuilder(prev, prev)

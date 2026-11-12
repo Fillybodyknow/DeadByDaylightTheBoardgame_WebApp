@@ -13,7 +13,7 @@ import { CARD_NAMES, GUARD_NAMES, boardOf, charlotteRoom, palletOn, pathDef, pro
 import type { GameEvent, GameState, Guard, PathKind, Prop } from '../engine/types'
 import { ROUTES } from '../boardRoutes'
 import { fxSound } from '../fx/audio'
-import { holdBoard } from '../fx/bus'
+import { boardHooks, holdBoard } from '../fx/bus'
 import type { InspectTarget } from '../inspect'
 import { preview, type Focus } from '../focus'
 import { ANTIDOTE_IMAGE, BEAR_TRAP_IMAGE, GUARD_IMAGE, GUARD_SYMBOL, KNIFE_IMAGE, MADNESS_IMAGE, TONIC_IMAGE, VILE_PURGE_IMAGE, PROP_IMAGE, VICTOR_MINI, DOG_MINI, cardImage, killerMini, propPicture, survivorMini, unknownMini, roundEffects } from '../labels'
@@ -152,12 +152,68 @@ function propImage(p: Prop): string {
   return p.revealed ? propPicture(p) : `assets/props/back-${p.category}.webp`
 }
 
+/**
+ * Props just taken out of a room (a totem cleansed, a chest opened, a pallet thrown down, a
+ * generator finished): each keeps its place in the room's row, empty, while its effect plays
+ * there, instead of the next tile sliding straight in under it. By id: the room and the place.
+ * Let go once the board's animations of that batch are over (the log watcher), and the others
+ * then close up (the tiles' `left` is eased).
+ */
+const lingering = ref(new Map<string, { room: string; index: number }>())
+/** The ones this batch added, to let go when its animations end. */
+let lingerAdded: string[] = []
+
+watch(
+  () => props.st,
+  (st, prev) => {
+    // (an undo, or a game swapped in: nothing to keep)
+    if (!prev || st.log.length <= prev.log.length) {
+      if (lingering.value.size) lingering.value = new Map()
+      return
+    }
+    const shown = new Set(st.props.filter((p) => p.room && !p.removed && !p.done).map((p) => p.id))
+    const next = new Map(lingering.value)
+    lingerAdded = []
+    for (const r of board.value.rooms)
+      propsIn(prev, r.id).forEach((p, index) => {
+        // gone from every room now (a crow moved to another room shows there instead)
+        if (shown.has(p.id) || next.has(p.id)) return
+        next.set(p.id, { room: r.id, index })
+        lingerAdded.push(p.id)
+      })
+    if (lingerAdded.length) lingering.value = next
+  },
+)
+
+/** Let this batch's empty places go after `ms` (at the animation speed). */
+function releaseLinger(ms: number) {
+  const ids = lingerAdded
+  lingerAdded = []
+  if (!ids.length) return
+  window.setTimeout(() => {
+    const next = new Map(lingering.value)
+    for (const id of ids) next.delete(id)
+    lingering.value = next
+  }, ms)
+}
+
+/** A room's props as shown: those in it, and those just taken out of it still holding their places. */
+function shownProps(room: string): Prop[] {
+  const list = propsIn(props.st, room)
+  for (const [id, l] of [...lingering.value].sort((a, b) => a[1].index - b[1].index)) {
+    if (l.room !== room) continue
+    const p = props.st.props.find((q) => q.id === id)
+    if (p) list.splice(Math.min(l.index, list.length), 0, p)
+  }
+  return list
+}
+
 // During setup's reveals the minis aren't on the board yet: their start rooms are rolled after.
 const rooms = computed(() => {
   const hidden = new Set(props.hideMinis)
   return board.value.rooms.map((r) => ({
     ...r,
-    props: propsIn(props.st, r.id),
+    props: shownProps(r.id),
     survivors: props.st.startPending ? [] : props.st.survivors.flatMap((sv, i) => (sv.room === r.id && (sv.status === 'board' || sv.status === 'carried') && !hidden.has(`s${i}`) ? [i] : [])),
     // The Twins: Charlotte is the killer's mini; Victor is a second, smaller one
     killer: !props.st.startPending && !hidden.has('k') && charlotteRoom(props.st) === r.id,
@@ -280,7 +336,7 @@ const hotDests = computed(() => new Set(preview.value?.dests ?? []))
 
 // ---------- effects ----------
 
-type FxKind = 'blood' | 'spikes' | 'burst' | 'debris' | 'snap' | 'float' | 'heal' | 'scratch' | 'drip' | 'dust' | 'crowFly' | 'palletSmash'
+type FxKind = 'blood' | 'spikes' | 'burst' | 'debris' | 'snap' | 'float' | 'heal' | 'scratch' | 'drip' | 'dust' | 'crowFly' | 'palletSmash' | 'wallSmash' | 'slamDust' | 'blocked' | 'slash' | 'vignette' | 'sparks' | 'smoke' | 'ripple' | 'chestOpen' | 'totemOut' | 'embers'
 interface Fx {
   id: number
   kind: FxKind
@@ -288,6 +344,8 @@ interface Fx {
   y: number
   /** Which way it lies (deg): a scratch mark. */
   angle?: number
+  /** How big against its kind's own size: scratch marks and drops of blood vary. */
+  size?: number
   /** A pallet breaking with no one kicking it: it splits at once. */
   quick?: boolean
   /** How long it waits before its animation starts (ms, full length). */
@@ -306,7 +364,7 @@ let fxId = 0
 
 import { anim, reducedMotion } from '../../settings'
 
-const FX_MS: Record<FxKind, number> = { blood: 1100, spikes: 1600, burst: 1100, debris: 800, snap: 500, float: 1300, heal: 1100, scratch: 2600, drip: 2800, dust: 650, crowFly: 1700, palletSmash: 1400 }
+const FX_MS: Record<FxKind, number> = { blood: 1100, spikes: 1600, burst: 1100, debris: 800, snap: 500, float: 1300, heal: 1100, scratch: 2600, drip: 2800, dust: 650, crowFly: 1700, palletSmash: 1400, wallSmash: 1400, slamDust: 750, blocked: 1700, slash: 400, vignette: 600, sparks: 600, smoke: 1600, ripple: 900, chestOpen: 1400, totemOut: 1100, embers: 2100 }
 
 function addFx(kind: FxKind, at: [number, number], extra: Partial<Fx> = {}, delay = 0) {
   const show = () => {
@@ -384,6 +442,10 @@ watch(
   () => props.st.log.length,
   (len, old) => {
     const from = unknownSwap(prevMinis, prevUnknownAt)
+    lastMinis = from
+    batch = fresh0(len, old)
+    lastTiles = prevTiles
+    prevTiles = new Map(rects.value.tiles)
     prevMinis = new Map(rects.value.minis)
     prevUnknownAt = props.st.killer.unknownAt ?? 0
     if (old === undefined || len <= old) return
@@ -397,6 +459,8 @@ watch(
     // Hits, hooks and repairs need a moment to be seen before the next question pops up.
     const big = fresh.some((e) => ['wound', 'hook', 'genDone', 'gatesPowered', 'rescue', 'trapSprung', 'palletBreak', 'wallBreak', 'palletDrop'].includes(e.k))
     holdBoard(Math.max(walking, fxEnds, big ? anim(delay + 900) : 0))
+    // the places of props taken out stay until the effects on them are done
+    releaseLinger(Math.max(walking, fxEnds, anim(delay + 900)) + anim(150))
   },
   // once the minis are in their new rooms on the page but before it is painted: waiting a tick
   // let a frame or two show them there already, and the walk jumped back to start (a player saw
@@ -422,16 +486,201 @@ let fxEnds = 0
 /** The killer walks in this batch: a pallet he breaks on the way breaks where it is, with no run to it. */
 let killerWalks = false
 
-/** A pallet pulled down, at full length (ms): the run out, the pull, the fall, the settle. */
-const DROP = { pull: 170, fall: 210, settle: 170, stay: 200 }
+/**
+ * Where this batch's minis and tiles stood before it (the board shows the new state already):
+ * for a mini lifted onto the killer's shoulder, dropped off a hook or wriggling free, and for a
+ * chest or a totem gone from the room as it is opened or cleansed.
+ */
+let lastMinis = new Map<string, Rect>()
+/** This batch's events, for one of them to know what else came with it. */
+let batch: GameEvent[] = []
+const fresh0 = (len: number, old: number | undefined) => (old === undefined || len <= old ? [] : props.st.log.slice(old).flatMap((e) => (e.ev ? [e.ev] : [])))
+let lastTiles = new Map<string, Rect>()
+let prevTiles = new Map<string, Rect>()
+onMounted(() => {
+  prevTiles = new Map(rects.value.tiles)
+})
+
+/** Survivors this batch carries, hangs, frees or drops: they fly or fall (`flyMini`), never walk. */
+function flown(events: GameEvent[]): Set<string> {
+  return new Set(
+    events.flatMap((e) => (e.k === 'pickUp' || e.k === 'hook' || e.k === 'carryEscape' || (e.k === 'rescue' && e.by !== e.s) ? [`s${e.s}`] : [])),
+  )
+}
 
 /**
- * A pallet thrown down, as the PC game's: the survivor runs out of the room along the path's line
- * to the pallet standing beside the icon, pulls it, and it falls flat across the path with a slam
- * (splinters, the sound, the board shaking); then they run back into the room. `start`: when to
- * begin (ms, at the animation speed). Without its line to the room (Windows of Opportunity's
- * pallet in the next room) the pallet falls by itself, from the side of the path's first room.
+ * A mini thrown from where it was to where it is now, on an arc (`lift`, board heights up at the
+ * top) that ends in a bounce: swept onto the killer's shoulder, hung, dropped off a hook. From
+ * `start` (ms, at the animation speed); `ms` at full length.
  */
+function flyMini(key: string, start: number, lift = 0.05, ms = 420) {
+  const el = boardEl.value?.querySelector<HTMLElement>(`[data-mini="${key}"]`)
+  const was = lastMinis.get(key)
+  const now = rects.value.minis.get(key)
+  if (!el || !was || !now || reducedMotion.value || (was.x === now.x && was.y === now.y)) return
+  const mid = { x: (was.x + now.x) / 2, y: Math.min(was.y, now.y) - lift }
+  animateNow(
+    el,
+    [
+      { left: pct(was.x), top: pct(was.y), scale: '1', offset: 0, easing: 'ease-out' },
+      { left: pct(mid.x), top: pct(mid.y), scale: '1.18', offset: 0.45, easing: 'ease-in' },
+      { left: pct(now.x), top: pct(now.y), scale: '0.9', offset: 0.8, easing: 'ease-out' },
+      { left: pct(now.x), top: pct(now.y), scale: '1', offset: 1 },
+    ],
+    // (held where it was until it goes: it is drawn in its new place already)
+    { duration: anim(ms), delay: start, fill: 'backwards', easing: 'linear' },
+  )
+  fxEnds = Math.max(fxEnds, start + anim(ms))
+}
+
+/** The prop of `kind` this batch took out of `room` (a chest opened, a totem cleansed), where it stood. */
+function goneFrom(kind: string, room: string): { id: string; at: [number, number] } | null {
+  const p = props.st.props.find((q) => q.kind === kind && q.room === room && lastTiles.has(q.id) && (lingering.value.has(q.id) || !rects.value.tiles.has(q.id)))
+  return p ? { id: p.id, at: centre(lastTiles.get(p.id)!) } : null
+}
+
+/** A mini reaching for what it handles (ms, full length): out to it, a moment there, back. */
+const REACH = { out: 150, stay: 110, back: 190 }
+
+/**
+ * A mini reaching out to what it handles — a generator, a locker, a friend it heals, the survivor
+ * the killer strikes: it moves part of the way there and back (a lunge, `far` of the way, never
+ * more than a step), so every interaction shows who did it. From `start` (ms, at the animation
+ * speed); returns when it gets there, for the effect to land on (`start` itself when there is no
+ * mini to move, or motion is reduced).
+ */
+function reach(key: string, at: [number, number], start: number, far = 0.45): number {
+  const got = reachTo(key, at, far)
+  if (!got) return start
+  const { el, to } = got
+  const T = REACH.out + REACH.stay + REACH.back
+  animateNow(
+    el,
+    [
+      { translate: '0 0', offset: 0, easing: 'cubic-bezier(0.3, 0, 0.2, 1)' },
+      { translate: to, offset: REACH.out / T },
+      { translate: to, offset: (REACH.out + REACH.stay) / T, easing: 'ease-in-out' },
+      { translate: '0 0', offset: 1 },
+    ],
+    { duration: anim(T), delay: start, easing: 'linear' },
+  )
+  fxEnds = Math.max(fxEnds, start + anim(T))
+  return start + anim(REACH.out)
+}
+
+/**
+ * Where a mini's reach for `at` takes it: `far` of the way there, never more than a step, as a
+ * translate in the mini's own size (its height on the board is its width times the aspect).
+ * Null when there is no mini to move, or motion is reduced.
+ */
+function reachTo(key: string, at: [number, number], far: number): { el: HTMLElement; to: string } | null {
+  const el = boardEl.value?.querySelector<HTMLElement>(`[data-mini="${key}"]`)
+  const r = rects.value.minis.get(key)
+  if (!el || !r || reducedMotion.value) return null
+  const aspect = board.value.aspect
+  let dx = (at[0] - (r.x + r.w / 2)) * far
+  let dy = (at[1] - (r.y + (r.w * aspect) / 2)) * far
+  const len = Math.hypot(dx, dy / aspect)
+  if (len > 0.035) {
+    dx *= 0.035 / len
+    dy *= 0.035 / len
+  }
+  return { el, to: `${(dx / r.w) * 100}% ${(dy / (r.w * aspect)) * 100}%` }
+}
+
+/** Minis held out at what they work on while its skill check plays (a repair): to bring back. */
+const reachHolds = new Map<string, { el: HTMLElement; to: string; a: Animation }>()
+
+// The screen asks for a survivor's reach as a repair's skill check comes up (DiceModal): the board
+// still shows the state before the roll, so the mini and the generator are where they were. They
+// stay there, hands on it, until the check is over (`release`), then come back.
+onMounted(() => {
+  boardHooks.reach = (key, prop) => {
+    const t = rects.value.tiles.get(prop)
+    const got = t && reachTo(key, centre(t), 0.45)
+    if (!got) return
+    reachHolds.get(key)?.a.cancel()
+    const a = animateNow(got.el, [{ translate: '0 0' }, { translate: got.to }], { duration: anim(REACH.out), easing: 'cubic-bezier(0.3, 0, 0.2, 1)', fill: 'forwards' })
+    reachHolds.set(key, { ...got, a })
+    holdBoard(anim(REACH.out + REACH.stay))
+  }
+  boardHooks.release = (key) => {
+    const held = reachHolds.get(key)
+    if (!held) return
+    reachHolds.delete(key)
+    const back = animateNow(held.el, [{ translate: held.to }, { translate: '0 0' }], { duration: anim(REACH.back), easing: 'ease-in-out' })
+    held.a.cancel()
+    void back.finished.catch(() => {})
+  }
+})
+onBeforeUnmount(() => {
+  boardHooks.reach = undefined
+  boardHooks.release = undefined
+  for (const h of reachHolds.values()) h.a.cancel()
+  reachHolds.clear()
+})
+
+/** A tile taking a blow or a hand: a jolt and a shudder; `hard` for the killer's kick. */
+function jolt(prop: string, at: number, hard = false) {
+  const el = boardEl.value?.querySelector<HTMLElement>(`[data-prop="${prop}"]`)
+  if (!el || reducedMotion.value) return
+  const a = hard ? 9 : 4
+  animateNow(
+    el,
+    [
+      { rotate: '0deg', scale: '1' },
+      { rotate: `${-a}deg`, scale: hard ? '1.12' : '1.06', offset: 0.18 },
+      { rotate: `${a * 0.6}deg`, offset: 0.42 },
+      { rotate: `${-a * 0.3}deg`, offset: 0.68 },
+      { rotate: '0deg', scale: '1' },
+    ],
+    { duration: anim(hard ? 420 : 320), delay: at, easing: 'ease-out' },
+  )
+}
+
+/** A locker's door swinging open and shut (`rattle`: shaken in its frame, the killer searching). */
+function lockerDoor(prop: string, at: number, rattle = false) {
+  const el = boardEl.value?.querySelector<HTMLElement>(`[data-prop="${prop}"]`)
+  if (!el || reducedMotion.value) return
+  const frames: Keyframe[] = rattle
+    ? [
+        { transform: 'none' },
+        { transform: 'translateX(-6%) rotate(-3deg)', offset: 0.15 },
+        { transform: 'translateX(6%) rotate(3deg)', offset: 0.3 },
+        { transform: 'perspective(120px) rotateY(-55deg)', offset: 0.55 },
+        { transform: 'perspective(120px) rotateY(-55deg)', offset: 0.75 },
+        { transform: 'none' },
+      ]
+    : [
+        { transform: 'none' },
+        { transform: 'perspective(120px) rotateY(-62deg)', offset: 0.35 },
+        { transform: 'perspective(120px) rotateY(-62deg)', offset: 0.55 },
+        { transform: 'perspective(120px) rotateY(8deg)', offset: 0.85 },
+        { transform: 'none' },
+      ]
+  animateNow(el, frames.map((f) => ({ ...f, transformOrigin: '0% 50%' })), { duration: anim(rattle ? 620 : 520), delay: at, easing: 'ease-in-out' })
+}
+
+/** Lines of light between two minis (a survivor healing another), each drawn a moment and gone. */
+const beams = ref<{ id: number; x1: number; y1: number; x2: number; y2: number }[]>([])
+
+function beam(from: [number, number], to: [number, number], at: number) {
+  window.setTimeout(() => {
+    const b = { id: ++fxId, x1: from[0], y1: from[1], x2: to[0], y2: to[1] }
+    beams.value = [...beams.value, b]
+    window.setTimeout(() => (beams.value = beams.value.filter((x) => x.id !== b.id)), anim(900))
+  }, at)
+}
+
+/** The locker a survivor is in, or, when they came out, the one in their room. */
+function lockerOf(s: number): string | undefined {
+  const lockers = props.st.props.filter((p) => p.kind === 'locker' && !p.removed && p.room)
+  return (lockers.find((p) => p.occupant === s) ?? lockers.find((p) => p.room === props.st.survivors[s]?.room))?.id
+}
+
+/** A pallet pulled down, at full length (ms): the run out, the pull, the fall, the settle. */
+const DROP = { pull: 220, hold: 110, fall: 170, settle: 260, stay: 280 }
+
 /**
  * A mini's run out of its room along a path's line (`leg`, as ROUTES has it: from the icon out)
  * to stand just short of the icon, a moment there (`busy`, ms at the animation speed), and back
@@ -467,6 +716,47 @@ function runToIcon(key: string, leg: [number, number][], icon: [number, number],
   // (from `start`: a walk before it plays first)
   animateNow(el, frames, { duration: total, delay: start, easing: 'linear' })
   return out
+}
+
+/** Walls the killer kicks down on his walk in this batch: the path's icon → when he starts kicking (ms, at the animation speed). */
+const wallKicks = new Map<string, number>()
+/** How long he stays at a wall (ms, full length): his kicks, then a breath before he goes through. */
+const WALL_REST = 220
+
+/**
+ * A breakable wall broken, as the PC game's: the killer walking through it stops short of it (his
+ * walk holds there: `walk`), kicks it twice, it shudders and splinters, and the third kick bursts
+ * it into pieces with the crack and the board shaking; then he walks on through. Broken with no
+ * kicks (a survivor's item, a push through it) it bursts at once. `start`: when (ms, at the
+ * animation speed), for one with no kicks.
+ */
+function smashWall(path: string, start: number) {
+  const id = tokenOf(board.value, path)
+  const icon = pathAt(path)
+  const kicked = wallKicks.get(id)
+  const smash = () => {
+    addFx('debris', icon)
+    fxSound.palletBreak()
+    shake()
+  }
+  if (reducedMotion.value) {
+    window.setTimeout(smash, start)
+    return
+  }
+  const t0 = kicked ?? start
+  const kicks = kicked === undefined ? [0] : KICKS
+  // the wall itself, from now (the state has it gone already) until it bursts; its CSS is timed
+  // to KICKS, and plays its delay at the animation speed, so the wait is given at full length
+  const rate = anim(1000) / 1000 || 1
+  addFx('wallSmash', icon, { quick: kicked === undefined, wait: t0 / rate, life: t0 / rate + 1400 })
+  kicks.forEach((t, i) => {
+    window.setTimeout(() => {
+      if (i === kicks.length - 1) return smash()
+      fxSound.palletKick()
+      addFx('debris', icon)
+    }, t0 + anim(t))
+  })
+  fxEnds = Math.max(fxEnds, t0 + anim(kicks[kicks.length - 1] + 400))
 }
 
 /** The killer at a pallet (ms, full length): his kicks, the last one breaking it, then a breath. */
@@ -526,6 +816,16 @@ function breakPallet(path: string, start: number) {
   fxEnds = Math.max(fxEnds, t0 + anim(kicks[kicks.length - 1] + KICK_REST) + out)
 }
 
+/**
+ * A pallet thrown down, as the PC game's: the survivor runs out of the room along the path's line
+ * to the pallet standing beside the icon and yanks it — leaning back, the pallet tipping their
+ * way, a beat — and it slams flat across the path, its shadow closing in under it as it comes
+ * down. On the ground it flattens a little and springs back, dust bursts out to both sides of the
+ * path, splinters fly, the board shakes, and the path's line flashes and its icon keeps a glow a
+ * while: this way is shut now. Then they run back into the room. `start`: when to begin (ms, at
+ * the animation speed). Without its line to the room (Windows of Opportunity's pallet in the next
+ * room) the pallet falls by itself, from the side of the path's first room.
+ */
 function dropPallet(s: number, path: string, start: number) {
   const id = tokenOf(board.value, path)
   const icon = pathAt(path)
@@ -541,8 +841,12 @@ function dropPallet(s: number, path: string, start: number) {
   const len = Math.hypot(dx, dy) || 1
   dx /= len
   dy /= len
+  const way = (Math.atan2(dy, dx) * 180) / Math.PI
   const hit = () => {
     addFx('debris', icon)
+    addFx('slamDust', icon, { angle: way })
+    addFx('blocked', icon)
+    flashPath(id, icon)
     fxSound.palletDrop()
     shake()
   }
@@ -553,29 +857,70 @@ function dropPallet(s: number, path: string, start: number) {
     return
   }
   // the survivor's run out to the pallet and back (not when the pallet is in another room)
-  const out = leg ? runToIcon(`s${s}`, leg, icon, [dx, dy], start, anim(DROP.pull + DROP.fall + DROP.stay)) : 0
-  // the pallet: hidden until they reach it, standing, pulled a little, then down across the path
-  // (hinged on its near edge, falling away from them) with a bounce as it lands
-  const turn = (Math.atan2(dy, dx) * 180) / Math.PI - 90
-  const fold = (deg: number) => `perspective(150px) rotate(${turn}deg) translateY(-50%) rotateX(${deg}deg) translateY(50%) rotate(${-turn}deg)`
+  const fall = DROP.pull + DROP.hold + DROP.fall
+  const out = leg ? runToIcon(`s${s}`, leg, icon, [dx, dy], start, anim(fall + DROP.stay)) : 0
   const t0 = start + out
-  const fall = DROP.pull + DROP.fall
+  // the yank: leaning back from it as they pull, a beat, then thrown forward as it goes down
+  const mini = leg && boardEl.value?.querySelector<HTMLElement>(`[data-mini="s${s}"]`)
+  if (mini) {
+    const T = fall + DROP.stay
+    const back = { translate: `${-dx * 18}% ${-dy * 18}%`, rotate: `${-dx * 14}deg` }
+    animateNow(
+      mini,
+      [
+        { translate: '0 0', rotate: '0deg', offset: 0, easing: 'ease-out' },
+        { ...back, offset: DROP.pull / T },
+        { ...back, offset: (DROP.pull + DROP.hold) / T, easing: 'ease-in' },
+        { translate: `${dx * 12}% ${dy * 12}%`, rotate: `${dx * 6}deg`, offset: fall / T, easing: 'ease-out' },
+        { translate: '0 0', rotate: '0deg', offset: 1 },
+      ],
+      { duration: anim(T), delay: t0, easing: 'linear' },
+    )
+  }
+  // the pallet: hidden until they reach it, then standing up on its edge on their left, pulled a
+  // little more upright, and folded over from their left to their right down onto the path like a
+  // page turning (the user's choice: left and right as the one pulling it sees them, facing the
+  // icon): hinged on that left edge, it rises out of the map towards the eye while it stands and
+  // opens out flat to their right as it falls. Its shadow tightens as it nears the ground, and it
+  // squashes there and springs back.
+  // Their right, facing (dx, dy) on a screen whose y runs down, is (-dy, dx): the fold is drawn
+  // turned that way (`right`), hinged half the pallet's width to the other side of its middle.
+  const right = (Math.atan2(dx, -dy) * 180) / Math.PI
+  const fold = (deg: number, k = 1) =>
+    `perspective(160px) rotate(${right}deg) translateX(-50%) rotateY(${deg}deg) translateX(50%) rotate(${-right}deg) scale(${k})`
+  const high = 'drop-shadow(12px 10px 8px rgb(0 0 0 / 0.3))'
+  const low = 'drop-shadow(0 3px 4px rgb(0 0 0 / 0.95))'
   const g = (t: number) => t / (fall + DROP.settle)
+  const hinge = '50% 50%'
   // (hidden while it waits: the first frame fills the delay)
   animateNow(
     token,
     [
-      { opacity: 0, transform: fold(62), offset: 0 },
-      { opacity: 1, transform: fold(62), offset: g(40), easing: 'ease-out' },
-      { opacity: 1, transform: fold(72), offset: g(DROP.pull), easing: 'cubic-bezier(0.55, 0, 1, 0.45)' },
-      { opacity: 1, transform: fold(0), offset: g(fall), easing: 'ease-out' },
-      { opacity: 1, transform: fold(9), offset: g(fall + DROP.settle * 0.45), easing: 'ease-in' },
-      { opacity: 1, transform: fold(0), offset: 1 },
+      { opacity: 0, transform: fold(-66), transformOrigin: hinge, filter: high, offset: 0 },
+      { opacity: 1, transform: fold(-66), transformOrigin: hinge, filter: high, offset: g(40), easing: 'ease-out' },
+      { opacity: 1, transform: fold(-76), transformOrigin: hinge, filter: high, offset: g(DROP.pull) },
+      { opacity: 1, transform: fold(-78), transformOrigin: hinge, filter: high, offset: g(DROP.pull + DROP.hold), easing: 'cubic-bezier(0.6, 0, 1, 0.5)' },
+      { opacity: 1, transform: fold(0, 1.12), transformOrigin: hinge, filter: low, offset: g(fall), easing: 'ease-out' },
+      { opacity: 1, transform: fold(-7, 0.96), transformOrigin: hinge, filter: low, offset: g(fall + DROP.settle * 0.35), easing: 'ease-in-out' },
+      { opacity: 1, transform: fold(0, 1.03), transformOrigin: hinge, filter: low, offset: g(fall + DROP.settle * 0.7), easing: 'ease-in-out' },
+      { opacity: 1, transform: fold(0), transformOrigin: hinge, filter: low, offset: 1 },
     ],
     { duration: anim(fall + DROP.settle), delay: t0, fill: 'backwards', easing: 'linear' },
   )
   window.setTimeout(hit, t0 + anim(fall))
   fxEnds = Math.max(fxEnds, t0 + anim(fall + DROP.stay) + out)
+}
+
+/** Paths flashing along their whole line (a pallet just thrown down on them): each as its lines from the icon out. */
+const flashes = ref<{ id: number; lines: string[] }[]>([])
+
+/** The path's line on the map lights up from its icon out to both rooms, and fades. */
+function flashPath(token: string, icon: [number, number]) {
+  const legs = Object.values(ROUTES[board.value.id]?.[token] ?? {})
+  if (!legs.length) return
+  const f = { id: ++fxId, lines: legs.map((leg) => [icon, ...leg].map(([x, y]) => `${x},${y}`).join(' ')) }
+  flashes.value = [...flashes.value, f]
+  window.setTimeout(() => (flashes.value = flashes.value.filter((x) => x.id !== f.id)), anim(1000))
 }
 
 /** How fast a mini goes along each kind of path (board widths a second) and how it moves. */
@@ -595,6 +940,8 @@ interface WalkPoint {
   icon?: string
   /** The room this point is the edge of, where a path's line comes into it. */
   enters?: string
+  /** The path whose breakable wall the killer kicks down standing here. */
+  wall?: string
 }
 
 /**
@@ -631,13 +978,32 @@ function walkFx(k: string, el: HTMLElement, pts: WalkPoint[], times: number[], w
   if (survivor && survivor.status !== 'carried') {
     // (on the paths between the rooms: in a room they would scrawl over its tiles)
     const inRoom = (at: [number, number]) => board.value.rooms.some(({ box: [x, y, bw, bh] }) => at[0] > x && at[0] < x + bw && at[1] > y && at[1] < y + bh)
-    along(0.028, (kind) => kind === 'sprint' || kind === 'vault', (at, dir) => {
-      if (inRoom(at)) return
-      const side = (Math.random() - 0.5) * 0.012
+    // Scattered, as the PC game's are: a few at a time, off to either side of the path and a
+    // little ahead or behind, each its own size, turned every way, and not all at once.
+    // `spread` and `ahead` in board widths, round the point the mini is at.
+    const scatter = (at: [number, number], dir: number, spread: number, ahead: number): [number, number] => {
       const r = (dir * Math.PI) / 180
-      addFx('scratch', [at[0] - Math.sin(r) * side, at[1] + Math.cos(r) * side * aspect], { angle: dir + (Math.random() - 0.5) * 70 })
+      const side = (Math.random() - 0.5) * 2 * spread
+      const fwd = (Math.random() - 0.5) * 2 * ahead
+      return [at[0] + Math.cos(r) * fwd - Math.sin(r) * side, at[1] + (Math.sin(r) * fwd + Math.cos(r) * side) * aspect]
+    }
+    const soon = (f: () => void) => later(Math.random() * anim(120), f)
+    along(0.016, (kind) => kind === 'sprint' || kind === 'vault', (at, dir) => {
+      const n = 1 + Math.floor(Math.random() * 3)
+      for (let i = 0; i < n; i++) {
+        const p = scatter(at, dir, 0.022, 0.01)
+        if (inRoom(p)) continue
+        soon(() => addFx('scratch', p, { angle: dir + (Math.random() - 0.5) * 120, size: 0.6 + Math.random() * 0.8 }))
+      }
     })
-    if (survivor.wounded) along(0.05, () => true, (at) => addFx('drip', [at[0] + (Math.random() - 0.5) * 0.01, at[1] + (Math.random() - 0.5) * 0.012]))
+    if (survivor.wounded)
+      along(0.022, () => true, (at, dir) => {
+        const n = 1 + Math.floor(Math.random() * 3)
+        for (let i = 0; i < n; i++) {
+          const p = scatter(at, dir, 0.014, 0.008)
+          soon(() => addFx('drip', p, { size: 0.5 + Math.random() * 1.1 }))
+        }
+      })
     // crows take off from a room a survivor sprints into
     pts.forEach((p, i) => {
       if (!p.enters || p.kind !== 'sprint') return
@@ -678,7 +1044,51 @@ function walkFx(k: string, el: HTMLElement, pts: WalkPoint[], times: number[], w
   lean.push({ rotate: `${-tilt * 0.4}deg`, scale: '1 1', offset: (total + settle * 0.4) / end })
   lean.push({ rotate: `${tilt * 0.15}deg`, offset: (total + settle * 0.75) / end })
   lean.push({ rotate: '0deg', scale: '1 1', offset: 1 })
+  // Over a dropped pallet a survivor slides, as the PC game's: down low and flat, thrown well
+  // forward into it, then up again on the far side; the pallet jolts under them, and dust kicks
+  // up where they go down and where they come up
+  for (const i of slidesOf(k, pts)) {
+    const [a, b] = [times[i] - anim(SLIDE.before), times[i] + anim(SLIDE.after)]
+    const prev = pts[Math.max(0, i - 1)]
+    const dx = pts[i].x - prev.x
+    const dy = (pts[i].y - prev.y) / aspect
+    const d = Math.hypot(dx, dy) || 1
+    const dive = (26 * dx) / d
+    const flat = `${1.18 + 0.1 * Math.abs(dy / d)} 0.72`
+    for (let j = lean.length - 1; j >= 0; j--) if ((lean[j].offset as number) * end > a && (lean[j].offset as number) * end < b) lean.splice(j, 1)
+    lean.push(
+      { offset: Math.max(0, a) / end },
+      { rotate: `${dive}deg`, scale: flat, offset: (times[i] - anim(SLIDE.before) * 0.35) / end, easing: 'ease-out' },
+      { rotate: `${dive * 0.8}deg`, scale: flat, offset: (times[i] + anim(SLIDE.after) * 0.45) / end, easing: 'ease-in-out' },
+      { offset: Math.min(end, b) / end },
+    )
+    later(Math.max(0, a), () => addFx('dust', mid(prev)))
+    later(times[i] + anim(SLIDE.after * 0.6), () => addFx('dust', mid(pts[i + 1] ?? pts[i])))
+    const token = boardEl.value?.querySelector<HTMLElement>(`[data-token="${tokenOf(board.value, pts[i].icon!)}"]`)
+    if (token)
+      animateNow(
+        token,
+        [
+          { translate: '-50% -50%', rotate: '0deg' },
+          { translate: `calc(-50% + ${dx / d * 6}%) calc(-50% + ${dy / d * 6}%)`, rotate: '-4deg' },
+          { translate: '-50% -50%', rotate: '2deg' },
+          { translate: '-50% -50%', rotate: '0deg' },
+        ],
+        { duration: anim(260), delay: Math.max(0, times[i] - anim(40)), easing: 'ease-out' },
+      )
+  }
+  // (keyframes whose properties it leaves out are filled in from their neighbours)
+  lean.sort((p, q) => (p.offset as number) - (q.offset as number))
   animateNow(el, lean, { duration: end, easing: 'linear' })
+}
+
+/** How long a slide over a pallet takes either side of its icon (ms, full length). */
+const SLIDE = { before: 170, after: 210 }
+
+/** The points of a survivor's run at the icon of a path a pallet lies on: they slide over it there. */
+function slidesOf(k: string, pts: WalkPoint[]): number[] {
+  if (!k.startsWith('s') || props.st.survivors[+k.slice(1)]?.status === 'carried') return []
+  return pts.flatMap((p, i) => (p.icon && palletOn(props.st, p.icon) ? [i] : []))
 }
 
 /**
@@ -774,9 +1184,13 @@ function walk(events: GameEvent[], from: Map<string, Rect>): number {
     if (ev.k === 'dog' && ev.path) add('d', ev)
   }
   const aspect = board.value.aspect
+  // the walls the killer breaks on his way (finishKillerMove): he stops at each to kick it down
+  const walls = new Set(events.flatMap((e) => (e.k === 'wallBreak' ? [tokenOf(board.value, e.path)] : [])))
+  wallKicks.clear()
+  const flying = flown(events)
   for (const [k, now] of rects.value.minis) {
     const was = from.get(k)
-    if (!was || (was.x === now.x && was.y === now.y) || reducedMotion.value) continue
+    if (!was || (was.x === now.x && was.y === now.y) || reducedMotion.value || flying.has(k)) continue
     const el = boardEl.value?.querySelector<HTMLElement>(`[data-mini="${k}"]`)
     if (!el) continue
     // the mini's top-left when its middle is on a point of the map
@@ -789,7 +1203,17 @@ function walk(events: GameEvent[], from: Map<string, Rect>): number {
     for (const m of legs) {
       const kind = pathDef(props.st, m.path).kind
       const route = routeOf(m.path, m.from, m.to)
-      route.pts.forEach((p, i) => line.push({ ...at(p), kind, icon: i === route.icon ? m.path : undefined, enters: i === route.pts.length - 1 ? m.to : undefined }))
+      route.pts.forEach((p, i) => {
+        if (i === route.icon && k === 'k' && walls.has(tokenOf(board.value, m.path))) {
+          // where he stands to kick it: a wall's length short of the icon, on his way in
+          const last = line[line.length - 1]
+          const [px, py] = i > 0 ? route.pts[i - 1] : [last.x + now.w / 2, last.y + (now.w * aspect) / 2]
+          const len = Math.hypot(p[0] - px, (p[1] - py) / aspect) || 1
+          const by = Math.min(0.035, len / 2) / len
+          line.push({ ...at([p[0] - (p[0] - px) * by, p[1] - (p[1] - py) * by]), kind, wall: m.path })
+        }
+        line.push({ ...at(p), kind, icon: i === route.icon ? m.path : undefined, enters: i === route.pts.length - 1 ? m.to : undefined })
+      })
     }
     line.push({ ...now, kind: legs.length ? pathDef(props.st, legs[legs.length - 1].path).kind : undefined })
     const pts = smoothRun(line, aspect)
@@ -807,13 +1231,30 @@ function walk(events: GameEvent[], from: Map<string, Rect>): number {
       for (let i = 0; i < times.length; i++) times[i] *= k
     }
     times.splice(0, times.length, ...easeTimes(times))
+    // at a wall: he holds there while he kicks it, the rest of the walk later by as much
+    const w = pts.findIndex((p) => p.wall)
+    const hold = w < 0 ? 0 : anim(KICKS[KICKS.length - 1] + WALL_REST)
+    if (w >= 0) {
+      for (let i = w + 1; i < times.length; i++) times[i] += hold
+      wallKicks.set(tokenOf(board.value, pts[w].wall!), times[w])
+    }
     const total = times[times.length - 1]
     if (!total) continue
-    animateNow(
-      el,
-      pts.map((p, i) => ({ left: pct(p.x), top: pct(p.y), offset: times[i] / total })),
-      { duration: total, easing: 'linear' },
-    )
+    const frames: Keyframe[] = []
+    pts.forEach((p, i) => {
+      frames.push({ left: pct(p.x), top: pct(p.y), offset: times[i] / total })
+      if (i !== w || !pts[i + 1]) return
+      // each kick a lunge at the wall and back
+      const next = pts[i + 1]
+      const lunge = { left: pct(p.x + (next.x - p.x) * 0.45), top: pct(p.y + (next.y - p.y) * 0.45) }
+      for (const t of KICKS) {
+        frames.push({ left: pct(p.x), top: pct(p.y), offset: (times[i] + anim(t) - anim(90)) / total })
+        frames.push({ ...lunge, offset: (times[i] + anim(t)) / total })
+        frames.push({ left: pct(p.x), top: pct(p.y), offset: (times[i] + anim(t) + anim(110)) / total })
+      }
+      frames.push({ left: pct(p.x), top: pct(p.y), offset: (times[i] + hold) / total })
+    })
+    animateNow(el, frames, { duration: total, easing: 'linear' })
     // the stride: a bob at each step, lower for a sneak or a crouch, and a hop over a vault's icon
     // (one step after another over the whole run, at the pace of the path it is on)
     const bobs: Keyframe[] = []
@@ -823,7 +1264,14 @@ function walk(events: GameEvent[], from: Map<string, Rect>): number {
       bobs.push({ translate: up ? `0 ${-gait.bob * 100}%` : '0 0', offset: t / total, easing: 'ease-in-out' })
       t += anim(gait.stride) / 2
     }
-    pts.forEach((p, i) => p.icon && p.kind === 'vault' && bobs.push({ translate: '0 -55%', offset: times[i] / total }))
+    // (no hop over a vault a pallet lies on: they slide over the pallet instead, flat on the ground)
+    const slides = slidesOf(k, pts)
+    pts.forEach((p, i) => p.icon && p.kind === 'vault' && !slides.includes(i) && bobs.push({ translate: '0 -55%', offset: times[i] / total }))
+    for (const i of slides) {
+      const [a, b] = [times[i] - anim(SLIDE.before), times[i] + anim(SLIDE.after)]
+      for (let j = bobs.length - 1; j >= 0; j--) if ((bobs[j].offset as number) * total > a && (bobs[j].offset as number) * total < b) bobs.splice(j, 1)
+      bobs.push({ translate: '0 0', offset: Math.max(0, a) / total }, { translate: '0 0', offset: Math.min(total, b) / total })
+    }
     bobs.push({ translate: '0 0', offset: 1 })
     bobs.sort((p, q) => (p.offset as number) - (q.offset as number))
     animateNow(el, bobs, { duration: total, easing: 'linear' })
@@ -856,11 +1304,19 @@ function play(ev: GameEvent, delay: number): number {
       return delay
     case 'wound': {
       const at = whereIs(ev.s)
-      if (at) addFx('blood', at, {}, delay)
-      if (ev.by === 'attack') {
+      if (ev.by !== 'attack' || !at) {
+        if (at) addFx('blood', at, {}, delay)
+        return delay + 150
+      }
+      // he lunges at them, and the blow lands as he gets there
+      const hit = reach('k', at, Math.max(walkEnds, anim(delay)), 0.6)
+      window.setTimeout(() => {
+        addFx('slash', at, { angle: -35 - Math.random() * 25 })
+        addFx('vignette', [0.5, 0.5])
+        addFx('blood', at)
         shake()
         fxSound.hit()
-      }
+      }, hit)
       return delay + 150
     }
     case 'trapSprung':
@@ -869,24 +1325,56 @@ function play(ev: GameEvent, delay: number): number {
       return delay + 150
     case 'hook': {
       const t = rects.value.tiles.get(ev.prop)
-      if (t) addFx('spikes', centre(t), {}, delay)
-      fxSound.hook()
-      shake()
+      const start = Math.max(walkEnds, anim(delay))
+      const at = t ? reach('k', centre(t), start, 0.6) : start
+      flyMini(`s${ev.s}`, at, 0.04, 360)
+      window.setTimeout(() => {
+        if (t) addFx('spikes', centre(t))
+        fxSound.hook()
+        shake()
+      }, at + anim(200))
       return delay + 300
     }
     case 'rescue': {
-      const at = whereIs(ev.s)
-      if (at) addFx('burst', at, { tone: 'white' }, delay)
+      const was = lastMinis.get(`s${ev.s}`)
+      const hook = props.st.props.find((p) => p.kind === 'hook' && p.room === props.st.survivors[ev.s].room && rects.value.tiles.has(p.id))
+      const t = hook ? rects.value.tiles.get(hook.id)! : null
+      const start = Math.max(walkEnds, anim(delay))
+      const freed = ev.by !== ev.s && t ? reach(`s${ev.by}`, centre(t), start, 0.6) : start
+      if (hook) jolt(hook.id, freed, true)
+      if (ev.by !== ev.s) flyMini(`s${ev.s}`, freed, 0.03, 380)
+      window.setTimeout(() => {
+        const at = was ? centre(was) : whereIs(ev.s)
+        if (at) addFx('burst', at, { tone: 'white' })
+        fxSound.whoosh()
+      }, freed)
       return delay
     }
     case 'heal': {
       const at = whereIs(ev.s)
-      if (at) addFx('heal', at, { text: '✚' }, delay)
+      if (!at) return delay
+      const from = ev.by !== ev.s ? whereIs(ev.by) : null
+      const t = from ? reach(`s${ev.by}`, at, Math.max(walkEnds, anim(delay)), 0.35) : Math.max(walkEnds, anim(delay))
+      if (from) beam(from, at, t)
+      window.setTimeout(() => {
+        addFx('ripple', at)
+        addFx('heal', at, { text: '✚' })
+        fxSound.heal()
+      }, t)
       return delay
     }
-    case 'repair':
-      if (ev.add > 0) addFx('float', roomCentre(props.st.props.find((p) => p.id === ev.prop)!.room!), { text: `⚡ +${ev.add}`, tone: 'gold' }, delay)
+    case 'repair': {
+      const t = rects.value.tiles.get(ev.prop)
+      const room = props.st.props.find((p) => p.id === ev.prop)!.room!
+      // (they reached for it before the skill check: `boardHooks.reach`)
+      const at = Math.max(walkEnds, anim(delay))
+      window.setTimeout(() => {
+        if (t) addFx('sparks', centre(t))
+        if (ev.add > 0) addFx('float', roomCentre(room), { text: `⚡ +${ev.add}`, tone: 'gold' })
+      }, at)
+      jolt(ev.prop, at)
       return delay + 100
+    }
     case 'genDone':
       addFx('burst', roomCentre(ev.room), { tone: 'gold' }, delay + 200)
       fxSound.generator()
@@ -902,6 +1390,8 @@ function play(ev: GameEvent, delay: number): number {
       const gate = props.st.props.find((p) => p.kind === 'exitGate' && p.revealed && p.progress === ev.progress)
       const t = gate && rects.value.tiles.get(gate.id)
       if (t) addFx('float', centre(t), { text: `🚪 ${ev.progress}/3`, tone: 'gold' }, delay)
+      // (the lever giving under their hands, as a generator does: they reached for it before the check)
+      if (gate) jolt(gate.id, Math.max(walkEnds, anim(delay)))
       if (ev.progress >= 3) fxSound.gateOpen()
       else fxSound.lever()
       return delay
@@ -911,45 +1401,111 @@ function play(ev: GameEvent, delay: number): number {
       breakPallet(ev.path, killerWalks ? anim(delay) : Math.max(walkEnds, anim(delay)))
       return delay
     case 'wallBreak':
-      addFx('debris', pathAt(ev.path), {}, delay)
-      fxSound.palletBreak()
-      shake()
+      // kicked down on the killer's walk (timed by it), or burst at once
+      smashWall(ev.path, anim(delay))
       return delay
     case 'palletDrop':
       // after any walk of this batch: they pull it down where they stand
       dropPallet(ev.s, ev.path, Math.max(walkEnds, anim(delay)))
       return delay
-    case 'pickUp':
-      fxSound.pickUp()
+    case 'itemGot': {
+      const sv = props.st.survivors[ev.s]
+      const gone = goneFrom('chest', sv.room)
+      if (!gone) return delay
+      const at = reach(`s${ev.s}`, gone.at, Math.max(walkEnds, anim(delay)), 0.6)
+      window.setTimeout(() => {
+        addFx('chestOpen', gone.at)
+        fxSound.flip()
+      }, at)
+      // (its place stays empty until the card has risen out of it)
+      fxEnds = Math.max(fxEnds, at + anim(FX_MS.chestOpen))
       return delay
+    }
+    case 'pickUp': {
+      const was = lastMinis.get(`s${ev.s}`)
+      const start = Math.max(walkEnds, anim(delay))
+      const at = was ? reach('k', centre(was), start, 0.6) : start
+      flyMini(`s${ev.s}`, at, 0.06)
+      window.setTimeout(() => {
+        fxSound.pickUp()
+        fxSound.whoosh()
+      }, at)
+      return delay
+    }
     case 'touch':
       switch (ev.what) {
         case 'lockerIn':
-          fxSound.lockerIn()
+        case 'lockerOut': {
+          // the door swings open and shut on them going in or coming out
+          const locker = typeof ev.who === 'number' ? lockerOf(ev.who) : undefined
+          const t = locker ? rects.value.tiles.get(locker) : undefined
+          const start = Math.max(walkEnds, anim(delay))
+          const at = locker && t && ev.what === 'lockerIn' ? reach(`s${ev.who}`, centre(t), start, 0.7) : start
+          if (locker) lockerDoor(locker, at)
+          window.setTimeout(() => (ev.what === 'lockerIn' ? fxSound.lockerIn() : fxSound.lockerOut()), at)
           break
-        case 'lockerOut':
-          fxSound.lockerOut()
+        }
+        case 'lockerSearch': {
+          // he goes to a locker in his room and wrenches it open
+          const locker = props.st.props.find((p) => p.kind === 'locker' && !p.removed && p.room === props.st.killer.room)
+          const t = locker ? rects.value.tiles.get(locker.id) : undefined
+          const at = locker && t ? reach('k', centre(t), Math.max(walkEnds, anim(delay)), 0.6) : Math.max(walkEnds, anim(delay))
+          if (locker) lockerDoor(locker.id, at, true)
+          window.setTimeout(() => fxSound.lockerSearch(), at)
           break
-        case 'lockerSearch':
-          fxSound.lockerSearch()
-          break
-        case 'crow':
+        }
+        case 'crow': {
           fxSound.crowTouch()
+          // the crow nearest where they stood (their bonus turn may have taken them on already)
+          const was = typeof ev.who === 'number' ? lastMinis.get(`s${ev.who}`) : undefined
+          const near = (r: Rect) => (was ? Math.hypot(r.x - was.x, r.y - was.y) : Infinity)
+          const crows = props.st.props.flatMap((p) => (p.kind === 'crow' && lastTiles.has(p.id) ? [lastTiles.get(p.id)!] : []))
+          const t = was ? crows.sort((a, b) => near(a) - near(b))[0] : undefined
+          if (t) {
+            addFx('crowFly', centre(t), {}, delay)
+            window.setTimeout(() => fxSound.crow(), anim(delay + 80))
+          }
           break
+        }
         case 'crowDestroy':
           fxSound.crowDestroy()
           break
-        case 'sabotage':
-          fxSound.sabotage()
+        case 'sabotage': {
+          const s = typeof ev.who === 'number' ? ev.who : null
+          // a hook with someone on it: that is a rescue, shown as one ('rescue')
+          if (batch.some((e) => e.k === 'rescue' && e.by === s)) {
+            fxSound.sabotage()
+            break
+          }
+          const hook = s !== null ? props.st.props.find((p) => p.kind === 'hook' && p.room === props.st.survivors[s].room && rects.value.tiles.has(p.id)) : undefined
+          const t = hook && rects.value.tiles.get(hook.id)
+          const start = Math.max(walkEnds, anim(delay))
+          const at = t && s !== null ? reach(`s${s}`, centre(t), start, 0.6) : start
+          if (hook) jolt(hook.id, at, true)
+          window.setTimeout(() => {
+            if (t) addFx('sparks', centre(t), { tone: 'white' })
+            fxSound.sabotage()
+          }, at)
           break
+        }
         case 'totem':
           fxSound.totemTouch()
           break
       }
       return delay
-    case 'cleanse':
-      fxSound.cleanse()
+    case 'cleanse': {
+      const gone = goneFrom('totem', props.st.survivors[ev.s].room)
+      const at = Math.max(walkEnds, anim(delay))
+      if (gone) fxEnds = Math.max(fxEnds, at + anim(FX_MS.totemOut))
+      window.setTimeout(() => {
+        if (gone) {
+          addFx('totemOut', gone.at)
+          addFx('embers', gone.at)
+        }
+        fxSound.cleanse()
+      }, at)
       return delay
+    }
     case 'phantasmSet':
       addFx('float', roomCentre(ev.room), { text: '👻', tone: 'white' }, delay)
       fxSound.snap()
@@ -965,8 +1521,19 @@ function play(ev: GameEvent, delay: number): number {
       return delay
     case 'damage': {
       const t = rects.value.tiles.get(ev.prop)
-      if (t) addFx('float', centre(t), { text: '⚡ 0', tone: 'red' }, delay)
-      fxSound.damage()
+      if (!t) {
+        fxSound.damage()
+        return delay
+      }
+      const at = reach('k', centre(t), Math.max(walkEnds, anim(delay)), 0.6)
+      window.setTimeout(() => {
+        addFx('sparks', centre(t), { tone: 'red' })
+        addFx('smoke', centre(t))
+        addFx('float', centre(t), { text: '⚡ 0', tone: 'red' })
+        fxSound.damage()
+        shake()
+      }, at)
+      jolt(ev.prop, at, true)
       return delay
     }
     case 'bp': {
@@ -976,8 +1543,19 @@ function play(ev: GameEvent, delay: number): number {
       return delay + 120
     }
     case 'carryEscape': {
-      const at = whereIs(ev.s)
-      if (at) addFx('float', at, { text: 'หลุด!', tone: 'green' }, delay)
+      const start = Math.max(walkEnds, anim(delay))
+      flyMini(`s${ev.s}`, start, 0.05, 380)
+      const k = boardEl.value?.querySelector<HTMLElement>('[data-mini="k"]')
+      if (k && !reducedMotion.value)
+        animateNow(k, [{ rotate: '0deg' }, { rotate: '-14deg', offset: 0.25 }, { rotate: '9deg', offset: 0.55 }, { rotate: '0deg' }], { duration: anim(520), delay: start, easing: 'ease-out' })
+      window.setTimeout(() => {
+        const at = whereIs(ev.s)
+        if (at) {
+          addFx('float', at, { text: 'หลุด!', tone: 'green' })
+          addFx('dust', at)
+        }
+        fxSound.whoosh()
+      }, start + anim(380))
       return delay
     }
     default:
@@ -1147,6 +1725,7 @@ function guard(e: MouseEvent) {
             flip: flipping.includes(p.id),
             hiding: p.occupant !== null && p.kind === 'locker',
             hooked: p.occupant !== null && p.kind === 'hook',
+            gone: lingering.has(p.id),
           },
         ]"
         :style="rectStyle(rects.tiles.get(p.id)!)"
@@ -1334,10 +1913,25 @@ function guard(e: MouseEvent) {
       />
     </template>
 
-    <div v-for="f in effects" :key="f.id" class="fx" :class="[f.kind, f.tone, { quick: f.quick }]" :style="{ left: pct(f.x), top: pct(f.y), '--angle': `${f.angle ?? 0}deg`, '--wait': `${f.wait ?? 0}ms` }">
+    <div v-for="f in effects" :key="f.id" class="fx" :class="[f.kind, f.tone, { quick: f.quick }]" :style="{ left: pct(f.x), top: pct(f.y), '--angle': `${f.angle ?? 0}deg`, '--wait': `${f.wait ?? 0}ms`, '--size': f.size ?? 1 }">
       <span v-if="f.text"><BpText :text="f.text" /></span>
       <template v-if="f.kind === 'spikes'"><i v-for="n in 7" :key="n" :style="{ '--n': n }" /></template>
       <template v-if="f.kind === 'debris'"><i v-for="n in 8" :key="n" :style="{ '--n': n }" /></template>
+      <template v-if="f.kind === 'chestOpen'">
+        <img class="box" :src="asset(PROP_IMAGE.chest)" alt="" />
+        <img class="item" :src="asset('assets/items/back.webp')" alt="" />
+      </template>
+      <template v-if="f.kind === 'totemOut'">
+        <img :src="asset(PROP_IMAGE.totem)" alt="" />
+        <img :src="asset(PROP_IMAGE.totem)" alt="" />
+      </template>
+      <template v-if="f.kind === 'embers'"><i v-for="n in 10" :key="n" :style="{ '--n': n }" /></template>
+      <template v-if="f.kind === 'sparks'"><i v-for="n in 8" :key="n" :style="{ '--n': n }" /></template>
+      <template v-if="f.kind === 'smoke'"><i v-for="n in 4" :key="n" :style="{ '--n': n }" /></template>
+      <template v-if="f.kind === 'slamDust'"><i v-for="n in 8" :key="n" :style="{ '--n': n, '--s': n % 2 ? 1 : -1 }" /></template>
+      <template v-if="f.kind === 'wallSmash'">
+        <img v-for="q in 4" :key="q" class="chunk" :class="`q${q}`" :src="asset(components.breakableWall.image)" alt="" />
+      </template>
       <template v-if="f.kind === 'palletSmash'">
         <img class="half left" :src="asset(PROP_IMAGE.pallet)" alt="" />
         <img class="half right" :src="asset(PROP_IMAGE.pallet)" alt="" />
@@ -1347,6 +1941,14 @@ function guard(e: MouseEvent) {
         <svg v-for="n in 4" :key="n" class="crow-bird" :style="{ '--n': n }" viewBox="0 0 40 20" aria-hidden="true"><path d="M0 9 Q10 0 20 10 Q30 0 40 9 Q30 5 20 14 Q10 5 0 9Z" /></svg>
       </template>
     </div>
+    <svg v-if="beams.length" class="beam-layer" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
+      <line v-for="b in beams" :key="b.id" :x1="b.x1" :y1="b.y1" :x2="b.x2" :y2="b.y2" />
+    </svg>
+    <svg v-if="flashes.length" class="path-flash" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
+      <template v-for="fl in flashes" :key="fl.id">
+        <polyline v-for="(l, i) in fl.lines" :key="i" :points="l" />
+      </template>
+    </svg>
     <PingLayer v-if="canPing || shownPings.length" />
   </div>
 </template>
@@ -1475,7 +2077,16 @@ button.room-hit.pick:hover:not(:disabled) .pick-tag {
   border: none;
   background: none;
   border-radius: 50%;
-  transition: transform 0.15s ease;
+  /* (the row closing up after a prop has gone: `lingering`) */
+  transition:
+    transform 0.15s ease,
+    left 0.35s ease,
+    width 0.35s ease;
+}
+/* a prop just taken out: its place kept, empty, while its effect plays */
+.tile.gone {
+  visibility: hidden;
+  pointer-events: none;
 }
 /* Pointing at a revealed prop shows a bigger copy of it just above, to look at. The tile itself
    stays as it is: grown in place it covered the props beside it, and lifted it would leave the
@@ -2277,8 +2888,8 @@ button.tile.picked {
 /* scratch marks (the PC game's): red streaks a run leaves behind, fading */
 .fx.scratch {
   z-index: 2;
-  width: 2.4%;
-  height: 1.1%;
+  width: calc(2.4% * var(--size, 1));
+  height: calc(1.1% * var(--size, 1));
   rotate: var(--angle);
   background:
     linear-gradient(170deg, transparent 0 18%, rgb(230 20 30 / 0.95) 20% 27%, transparent 29%),
@@ -2306,7 +2917,7 @@ button.tile.picked {
 /* a wounded survivor's blood on the way */
 .fx.drip {
   z-index: 2;
-  width: 0.9%;
+  width: calc(0.9% * var(--size, 1));
   aspect-ratio: 1;
   border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
   background: radial-gradient(circle at 40% 35%, #c0101a, #5a0006 75%);
@@ -2437,6 +3048,457 @@ button.tile.picked {
     transform: translate(75%, -20%) rotate(45deg);
     opacity: 0;
   }
+}
+/* a breakable wall kicked down: it shudders at his kicks (KICKS, as a pallet's) and the last one
+   bursts it into four pieces flying off every way; with no kicks (an item, a push) at once */
+.fx.wallSmash {
+  z-index: 3;
+  width: 4.2%;
+  aspect-ratio: 1;
+  animation: smash-shudder 1.4s linear var(--wait) both;
+}
+.fx.wallSmash .chunk {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.95));
+  animation: wall-chunk 1.4s linear var(--wait) both;
+}
+.fx.wallSmash .chunk.q1 {
+  clip-path: polygon(0 0, 55% 0, 48% 45%, 0 52%);
+  --dx: -80%;
+  --dy: -70%;
+  --rot: -40deg;
+}
+.fx.wallSmash .chunk.q2 {
+  clip-path: polygon(55% 0, 100% 0, 100% 48%, 48% 45%);
+  --dx: 85%;
+  --dy: -60%;
+  --rot: 35deg;
+}
+.fx.wallSmash .chunk.q3 {
+  clip-path: polygon(0 52%, 48% 45%, 52% 100%, 0 100%);
+  --dx: -75%;
+  --dy: 75%;
+  --rot: 30deg;
+}
+.fx.wallSmash .chunk.q4 {
+  clip-path: polygon(48% 45%, 100% 48%, 100% 100%, 52% 100%);
+  --dx: 80%;
+  --dy: 70%;
+  --rot: -45deg;
+}
+.fx.wallSmash.quick {
+  animation-name: none;
+}
+.fx.wallSmash.quick .chunk {
+  animation: wall-chunk-now 0.75s linear both;
+}
+@keyframes wall-chunk {
+  0%,
+  51.4% {
+    transform: none;
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.85);
+    opacity: 0;
+  }
+}
+@keyframes wall-chunk-now {
+  from {
+    transform: none;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.85);
+    opacity: 0;
+  }
+}
+/* a pallet slamming down: dust bursting out to both sides of the path (the container turned to
+   the way it fell, the puffs thrown either way across it) */
+.fx.slamDust {
+  z-index: 3;
+  width: 1px;
+  height: 1px;
+  rotate: var(--angle);
+}
+.fx.slamDust i {
+  position: absolute;
+  width: 1.7cqw;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(215 200 175 / 0.85), transparent 70%);
+  animation: slam-dust 0.75s ease-out forwards;
+}
+@keyframes slam-dust {
+  from {
+    transform: translate(calc((var(--n) - 4.5) * 0.45cqw), 0) scale(0.5);
+    opacity: 0.95;
+  }
+  to {
+    transform: translate(calc((var(--n) - 4.5) * 0.9cqw), calc(var(--s) * 3.2cqw)) scale(1.9);
+    opacity: 0;
+  }
+}
+/* the icon of a path a pallet now shuts: a glow that comes in and lingers, then goes */
+.fx.blocked {
+  z-index: 2;
+  width: 5.6%;
+  aspect-ratio: 1;
+  border-radius: 22%;
+  border: 2px solid rgb(255 222 130 / 0.95);
+  box-shadow:
+    0 0 16px rgb(255 200 90 / 0.85),
+    inset 0 0 12px rgb(255 200 90 / 0.5);
+  animation: blocked 1.7s ease-out forwards;
+}
+@keyframes blocked {
+  0% {
+    scale: 1.5;
+    opacity: 0;
+  }
+  14% {
+    scale: 1;
+    opacity: 1;
+  }
+  60% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* a path's line lighting up all along, at once, then fading (a dash drawn along it lagged: with
+   the stroke kept one width however the map scales, its dash lengths no longer matched the line) */
+.path-flash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+  /* the glow on the whole drawing: on a line itself, a level or upright one has no height or
+     width for its filter's region, and the filter cut it away entirely */
+  filter: drop-shadow(0 0 5px #ffc94d);
+}
+.path-flash polyline {
+  fill: none;
+  stroke: #ffe39a;
+  stroke-width: 6px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  animation: path-flash 1s ease-out forwards;
+}
+@keyframes path-flash {
+  0% {
+    opacity: 0;
+    stroke-width: 12px;
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    stroke-width: 5px;
+  }
+}
+/* the killer's blow: a slash across the one struck */
+.fx.slash {
+  z-index: 7;
+  width: 7%;
+  height: 1.2%;
+  rotate: var(--angle);
+  border-radius: 50%;
+  background: linear-gradient(90deg, transparent, rgb(255 235 235 / 0.95) 45%, rgb(255 40 40 / 0.95) 60%, transparent);
+  filter: drop-shadow(0 0 6px rgb(255 0 0 / 0.9));
+  animation: slash 0.38s ease-out forwards;
+}
+@keyframes slash {
+  0% {
+    clip-path: inset(0 100% 0 0);
+    opacity: 1;
+  }
+  45% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 70%);
+    opacity: 0;
+  }
+}
+/* the screen's edge going red with the blow */
+.fx.vignette {
+  z-index: 8;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at center, transparent 50%, rgb(190 0 0 / 0.55) 100%);
+  animation: vignette 0.6s ease-out forwards;
+}
+@keyframes vignette {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* sparks off a generator: gold as it is worked on, red as the killer kicks it */
+.fx.sparks {
+  z-index: 6;
+  width: 1px;
+  height: 1px;
+}
+.fx.sparks i {
+  position: absolute;
+  width: 0.35cqw;
+  height: 0.35cqw;
+  border-radius: 50%;
+  background: #ffe28a;
+  box-shadow: 0 0 6px 2px rgb(255 200 80 / 0.9);
+  --a: calc(var(--n) * 37deg - 100deg);
+  animation: sparks 0.55s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+}
+.fx.sparks.red i {
+  background: #ffb0a0;
+  box-shadow: 0 0 6px 2px rgb(255 60 30 / 0.95);
+}
+@keyframes sparks {
+  from {
+    transform: rotate(var(--a)) translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(var(--a)) translateX(calc(1.2cqw + var(--n) * 0.25cqw)) translateY(0.8cqw);
+    opacity: 0;
+  }
+}
+/* smoke rising from a kicked generator */
+.fx.smoke {
+  z-index: 6;
+  width: 1px;
+  height: 1px;
+}
+.fx.smoke i {
+  position: absolute;
+  width: 1.8cqw;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(70 70 70 / 0.7), transparent 70%);
+  animation: smoke 1.2s ease-out forwards;
+  animation-delay: calc(var(--n) * 90ms);
+  opacity: 0;
+}
+@keyframes smoke {
+  from {
+    transform: translate(calc((var(--n) - 2.5) * 0.4cqw), 0) scale(0.5);
+    opacity: 0.9;
+  }
+  to {
+    transform: translate(calc((var(--n) - 2.5) * 0.9cqw), -3.5cqw) scale(2);
+    opacity: 0;
+  }
+}
+/* a friend healed: green rings going out from them */
+.fx.ripple {
+  z-index: 5;
+  width: 5%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid rgb(120 255 150 / 0.9);
+  box-shadow: 0 0 12px rgb(80 255 120 / 0.7);
+  animation: ripple 0.9s ease-out forwards;
+}
+@keyframes ripple {
+  from {
+    scale: 0.5;
+    opacity: 1;
+  }
+  to {
+    scale: 2.4;
+    opacity: 0;
+  }
+}
+/* the light between a healer and the one healed */
+.beam-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  overflow: visible;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgb(90 255 130 / 0.9));
+}
+.beam-layer line {
+  stroke: #b8ffc8;
+  stroke-width: 4px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  animation: beam 0.9s ease-out forwards;
+}
+@keyframes beam {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* a chest opened: it heaves open where it stood, and an item's card (its back: what it is stays
+   the holder's) rises out of it and fades */
+.fx.chestOpen {
+  z-index: 6;
+  width: 4.6%;
+  aspect-ratio: 1;
+}
+.fx.chestOpen .box {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.9));
+  animation: chest-heave 0.9s ease-out forwards;
+}
+.fx.chestOpen .item {
+  position: absolute;
+  left: 22%;
+  top: 0;
+  width: 56%;
+  filter: drop-shadow(0 0 8px rgb(255 230 160 / 0.9));
+  opacity: 0;
+  animation: item-rise 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) 0.18s forwards;
+}
+@keyframes chest-heave {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  18% {
+    transform: scale(1.12, 0.86);
+  }
+  38% {
+    transform: scale(0.94, 1.1);
+  }
+  60% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+@keyframes item-rise {
+  0% {
+    transform: translateY(20%) scale(0.5) rotate(-8deg);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(-120%) scale(1) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-150%) scale(1.05) rotate(0deg);
+    opacity: 0;
+  }
+}
+/* a hex totem cleansed: it flares, its skull cracks apart and fades, and embers rise */
+.fx.totemOut {
+  z-index: 6;
+  width: 4.6%;
+  aspect-ratio: 1;
+}
+.fx.totemOut img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  filter: drop-shadow(0 0 10px rgb(255 120 40 / 0.9));
+  animation: totem-left 1s ease-in forwards;
+}
+.fx.totemOut img + img {
+  animation-name: totem-right;
+}
+.fx.totemOut img:first-child {
+  clip-path: polygon(0 0, 52% 0, 46% 40%, 55% 62%, 48% 100%, 0 100%);
+}
+.fx.totemOut img + img {
+  clip-path: polygon(52% 0, 100% 0, 100% 100%, 48% 100%, 55% 62%, 46% 40%);
+}
+@keyframes totem-left {
+  0% {
+    transform: none;
+    filter: brightness(2.2) drop-shadow(0 0 14px rgb(255 140 40));
+  }
+  30% {
+    transform: none;
+    filter: brightness(1.2) drop-shadow(0 0 10px rgb(255 120 40 / 0.9));
+  }
+  100% {
+    transform: translate(-30%, 25%) rotate(-25deg) scale(0.85);
+    opacity: 0;
+  }
+}
+@keyframes totem-right {
+  0% {
+    transform: none;
+    filter: brightness(2.2) drop-shadow(0 0 14px rgb(255 140 40));
+  }
+  30% {
+    transform: none;
+    filter: brightness(1.2) drop-shadow(0 0 10px rgb(255 120 40 / 0.9));
+  }
+  100% {
+    transform: translate(30%, 25%) rotate(25deg) scale(0.85);
+    opacity: 0;
+  }
+}
+.fx.embers {
+  z-index: 7;
+  width: 1px;
+  height: 1px;
+}
+.fx.embers i {
+  position: absolute;
+  width: 0.3cqw;
+  height: 0.3cqw;
+  border-radius: 50%;
+  background: #ffcf7a;
+  box-shadow: 0 0 6px 2px rgb(255 120 30 / 0.9);
+  opacity: 0;
+  animation: ember 1.4s ease-out forwards;
+  animation-delay: calc(var(--n) * 60ms);
+}
+@keyframes ember {
+  0% {
+    transform: translate(calc((var(--n) - 5.5) * 0.35cqw), 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc((var(--n) - 5.5) * 0.6cqw + 0.6cqw), -4.5cqw);
+    opacity: 0;
+  }
+}
+/* a hook sabotaged: cold metal sparks */
+.fx.sparks.white i {
+  background: #f2f6ff;
+  box-shadow: 0 0 6px 2px rgb(170 200 255 / 0.9);
 }
 /* dust where a mini lands or stops */
 .fx.dust {
