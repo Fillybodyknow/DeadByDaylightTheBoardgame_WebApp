@@ -12,6 +12,8 @@ import { boardOf,
   CARD_NAMES,
   crowsCards,
   dogPaths,
+  directRoom,
+  isDirect,
   isPathCard,
   ITEM_NAMES,
   WARD_COST,
@@ -501,8 +503,14 @@ function bonusMoves(card: MoveCard) {
   return w === 'killer' ? killerMoves(props.st, card) : survivorMoves(props.st, w, card)
 }
 const bonusPick = computed(() => props.bonusAsk?.card ?? null)
-/** The rooms the picked card reaches (clicked on the map). */
-const bonusRooms = computed(() => (bonusPick.value ? [...new Set(bonusMoves(bonusPick.value).map((m) => m.to))] : []))
+/** The rooms the picked card reaches (clicked on the map); a direct card's is its own room. */
+const bonusRooms = computed(() => {
+  const card = bonusPick.value
+  if (!card) return []
+  // The Dredge's direct cards take him to the room of that number, along no path at all
+  if (isDirect(card)) return bonusWho.value === 'killer' ? [directRoom(props.st, card)] : []
+  return [...new Set(bonusMoves(card).map((m) => m.to))]
+})
 const bonusHand = computed<HandCard[]>(() =>
   bonusCards.value.map((card) => {
     const dead = isPathCard(card) && bonusMoves(card).length === 0

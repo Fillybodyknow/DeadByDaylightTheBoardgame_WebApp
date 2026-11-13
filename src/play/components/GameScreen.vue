@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type ChaseLayer } from '../../sound'
 import { anim, settings } from '../../settings'
 import { botAction, botTurn, botsOnly, botsWaitedOn, onlineBotMove, peopleOnBothSides } from '../bots'
-import { anyMoves, boardOf, isPathCard, killerMoves, palletOn, survivorInteractions, survivorMoves, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, crowsCards, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
+import { anyMoves, boardOf, isDirect, isPathCard, killerMoves, palletOn, survivorInteractions, survivorMoves, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, crowsCards, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
 import type { Die, GameState, ItemUse, LogEntry, MoveCard, PathKind, RollContext, SurvivorInteraction } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showOfferings, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
@@ -742,6 +742,8 @@ const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'kill
 /** The mode the board is in, for the bar above it (with a way out). */
 /** The bonus turn's card takes them somewhere from where they stand (Wait never does). */
 function bonusCanMove(st: GameState, card: MoveCard): boolean {
+  // The Dredge's direct cards take him to the room of that number, along no path
+  if (isDirect(card)) return true
   if (!isPathCard(card)) return false
   const s = st.step
   const who = s.t === 'survivorInteract' || s.t === 'bonusOffer' ? s.s : null

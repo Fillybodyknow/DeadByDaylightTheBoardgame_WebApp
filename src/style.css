@@ -22,8 +22,12 @@
   --entity: rgb(200 20 29 / 0.55);
   --fog: rgb(140 160 185 / 0.07);
   --ok: #4fb36a;
-  /* what a button does: green goes ahead, red backs out, blue is one of several to choose */
-  --go: #2a9d52;
+  /*
+   * What a button does: green goes ahead, red backs out, blue is one of several to choose. The
+   * green is the green perk cards' own, sampled off the band their name sits on (#143918–#1a371b):
+   * a bright one stood out of the fog (a player's report).
+   */
+  --go: #18401c;
   --pick: #2a62c8;
   --warn: #d9a227;
   --radius: 4px;
@@ -150,11 +154,11 @@ button.pick {
   );
 }
 button.primary {
-  background: linear-gradient(180deg, #3fbf6a 0%, var(--go) 45%, #156b31 100%);
+  background: linear-gradient(180deg, #2c6433 0%, var(--go) 45%, #0b2a10 100%);
 }
 button.primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #58dd84 0%, #2ba354 45%, #1a7a38 100%);
-  filter: drop-shadow(0 0 12px rgb(60 220 120 / 0.5));
+  background: linear-gradient(180deg, #377840 0%, #1e4d23 45%, #0f3415 100%);
+  filter: drop-shadow(0 0 10px rgb(90 150 100 / 0.3));
 }
 button.stop {
   background: linear-gradient(180deg, #e01d26 0%, var(--blood) 45%, #8c0c13 100%);

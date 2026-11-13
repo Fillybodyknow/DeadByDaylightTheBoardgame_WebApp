@@ -15,7 +15,9 @@ import {
   carryMoves,
   carnifexProps,
   connectedRoomsOf,
+  directRoom,
   hookHere,
+  isDirect,
   isPathCard,
   isPower,
   itemUses,
@@ -322,6 +324,15 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       // an empty hand: no bonus turn to play, but the interaction that bought it still goes —
       // their own room confirms it, so the last tap is on the map here too
       if (!hand.length && modes.bonusAsk.value?.i) add(`room:${here}`, `ยืนยัน (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)`, send(null))
+      return out
+    }
+    // The Dredge's direct cards take him to the room of that number, with no path: that room is
+    // the one to click (lighting his own instead said "stay here" and was the only way to send it
+    // — a player's report)
+    if (isDirect(card)) {
+      const to = directRoom(st, card)
+      add(`room:${to}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, to)}`, send(null))
+      out[out.length - 1].dest = to
       return out
     }
     // Wait: nowhere to go, so their own room is the one to click

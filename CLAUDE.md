@@ -365,8 +365,10 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   killer a ▲ for nothing — which is what happened (a player's report). Cards with no path show
   "เดินไม่ได้" on the hand. Tutorial chapter 6 teaches the new order.
   **One way for every card and both sides**: pick the card, then click on the map the room it ends
-  in. A card that goes nowhere (Wait, a blocked path) ends where they stand, so **their own room**
-  is the one lit and clicking it is the confirm — there is no confirm button in the panel for any
+  in. The Dredge's direct cards go to the room of their number along no path, so that room is the
+  one lit (`directRoom`; lighting his own said "stay here" and was the only way to send it — a
+  player's report). A card that goes nowhere (Wait, a blocked path) ends where they stand, so
+  **their own room** is the one lit and clicking it is the confirm — there is no confirm button in the panel for any
   of it, and no "pick another card" button either (pressing another card in the hand does that).
   Before this a card with a path went on a click on the map while Wait grew a confirm button, and
   the two read as different systems (a player's report).
@@ -478,8 +480,9 @@ a plan's confirm, `.choices` in PerkPrompt) so nothing scrolling under it shows 
   success / healthy green, great success gold. A new place showing a perk's text uses PerkRichText.
 - **A button's colour says what it does** (`style.css`, a player's report that the loudest button
   was the same red whether it went ahead or backed out): `.primary` green — it goes ahead (a
-  confirm, a use, ready, start); `.stop` red — it backs out (cancel, decline, "ไม่ใช้", "ไม่เล่น",
-  leave, clear); `.pick` blue — one of several to choose between, where nothing happens until one
+  dark mossy green sampled off the green perk cards' name band, `#143918`–`#1a371b`; a bright one
+  stood out of the fog, another player's report): a confirm, a use, ready, start. `.stop` red — it
+  backs out (cancel, decline, "ไม่ใช้", "ไม่เล่น", leave, clear); `.pick` blue — one of several to choose between, where nothing happens until one
   is pressed. All three share the game's angled corners. A quiet secondary ("ไม่ใช้ และไม่ต้องถาม
   อีก") stays a plain small button, so it never shouts louder than the answer beside it; the red
   that marks **what is selected** (a tab, the mode card, the players count) is not a button role
