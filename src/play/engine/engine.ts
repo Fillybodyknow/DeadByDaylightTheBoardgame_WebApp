@@ -1239,9 +1239,18 @@ function handle(st: GameState, a: Action) {
       return cardMoveTo(st, step.s, m.path, m.to)
     }
     case 'killerAnyMove': {
-      if (a.t === 'stop') return log(st, `${actorName(st)} อยู่ห้องเดิม`, 'killer')
+      // Darkness Revealed says he moves: staying is the Antidote's alone ("may")
+      if (a.t === 'stop') {
+        if (step.why === 'darkness') fail('Darkness Revealed: he must move')
+        return log(st, `${actorName(st)} อยู่ห้องเดิม`, 'killer')
+      }
       if (a.t !== 'move') break
-      const m = antidoteKillerMoves(st).find((e) => e.path.id === a.path) ?? fail('cannot move there')
+      const m = (step.why === 'darkness' ? darkMoves(st) : antidoteKillerMoves(st)).find((e) => e.path.id === a.path) ?? fail('cannot move there')
+      // a pallet on it: it breaks and he stays, as on any perk's move (p.14)
+      if (step.why === 'darkness' && palletOn(st, m.path.id)) {
+        log(st, `${actorName(st)} เดินต่อด้วย เผยความมืดมิด`, 'killer')
+        return palletStop(st, m.path.id)
+      }
       if (askLeave(st, m.to, step, a)) return
       // a Firecracker in the room ahead may stop him, as on his card moves
       const holders = onBoardIn(st, m.to).filter((i) => st.survivors[i].item === 'firecracker' && st.itemLock !== i)
@@ -2483,9 +2492,12 @@ function darkLocker(st: GameState, room: string): Prop | undefined {
   return propsIn(st, room).find((p) => p.kind === 'locker' && p.revealed && p.occupant === null)
 }
 
-/** Darkness Revealed's move: any path, as the Antidote's (a pallet would stop him: not offered). */
+/**
+ * Darkness Revealed's move: any path out, as the other perks that move him (Agitation, Beast of
+ * Prey): a wall on it breaks as he goes, a pallet breaks and he stays (the user's ruling).
+ */
 export function darkMoves(st: GameState): { path: PathDef; to: string }[] {
-  return antidoteKillerMoves(st)
+  return exits(st, st.killer.room, 'any')
 }
 
 /** The Artist's passive: a crow (or Dire Crow) he removes from play goes onto his board. */

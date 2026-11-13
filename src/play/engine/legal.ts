@@ -204,7 +204,7 @@ export function legalActions(st: GameState): Action[] {
       break
     case 'killerAnyMove':
       for (const m of step.why === 'darkness' ? darkMoves(st) : antidoteKillerMoves(st)) out.push({ t: 'move', path: m.path.id })
-      out.push({ t: 'stop' })
+      if (step.why !== 'darkness') out.push({ t: 'stop' })
       break
     case 'killerInteract':
       if (step.canInteract) for (const i of killerInteractions(st)) if (!step.powerOnly || isPower(i)) out.push({ t: 'interact', i })

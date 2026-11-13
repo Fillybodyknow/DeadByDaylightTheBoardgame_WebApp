@@ -22,7 +22,7 @@ import { canPing, pingArmed, pingWait } from '../pings'
 import { isQuestion, timeoutActions, waitKeyOf } from '../online/timeout'
 import type { InspectTarget } from '../inspect'
 import { decisionFocus } from '../focus'
-import { STEP_NAME, boardActionKeys, interactRooms, offerPerk, perkPicked, perksToPick, plainInteract, unknownPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
+import { STEP_NAME, boardActionKeys, interactRooms, offerPerk, perkPicked, perksToPick, plainInteract, antidoteUsed, unknownPicked, boardActions, boardTargets, powerMode as isPowerMode, stepKind, undyingCards, undyingPaths, type BoardAction, type BoardModes } from '../boardActions'
 import { BEAR_TRAP_IMAGE, GUARD_IMAGE, PHASE_TH, PROP_IMAGE, ROLL_TITLE, cardImage, killerMini, playerOf, survivorMini } from '../labels'
 import SettingsDialog from '../../components/SettingsDialog.vue'
 import VoiceButton from './VoiceButton.vue'
@@ -451,6 +451,7 @@ watch(
     painHook.value = null
     perkPicked.value = null
     plainInteract.value = false
+    antidoteUsed.value = false
     unknownPicked.value = null
     itemPick.value = null
     forkMoves.value = null

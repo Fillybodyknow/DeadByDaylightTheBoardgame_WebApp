@@ -12,6 +12,7 @@ import {
   pathDef,
   tokenOf,
   antidoteKillerMoves,
+  darkMoves,
   carryMoves,
   carnifexProps,
   connectedRoomsOf,
@@ -431,7 +432,10 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       moves(survivorMoves(st, s.s, s.card), st.survivors[s.s].room)
       break
     case 'anyMove':
+      // the Antidote: asked in the panel first, its paths only once it is used, and no staying then
+      if (s.why === 'antidote' && !antidoteUsed.value) break
       moves(anyMoves(st, s.s), st.survivors[s.s].room)
+      if (s.why === 'antidote') break
       // after a rescue (house rule) or the Afterpiece Antidote they may stay put: their own room says so
       if (!mustMove(s.why)) add(`room:${st.survivors[s.s].room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
       break
@@ -451,9 +455,10 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       moves(survivorMoves(st, s.s, s.card), st.survivors[s.s].room)
       break
     case 'killerAnyMove':
-      // the Afterpiece Antidote or Darkness Revealed: on along any path, or stay (his own room says so)
-      moves(antidoteKillerMoves(st), st.killer.room)
-      add(`room:${st.killer.room}`, 'อยู่ห้องเดิม', go({ t: 'stop' }, sfx.select))
+      // the Afterpiece Antidote (once used, in the panel) or Darkness Revealed (any path, a
+      // pallet's too): on along a path, no staying — not using the Antidote is the panel's
+      if (s.why !== 'darkness' && !antidoteUsed.value) break
+      moves(s.why === 'darkness' ? darkMoves(st) : antidoteKillerMoves(st), st.killer.room)
       break
     case 'carryMove':
       // (out of steps on a free hook: only the hook, below)
@@ -878,6 +883,16 @@ export const REPLACES_INTERACT: PerkId[] = [
 
 /** The player answered the gate with "interact as usual": the perks above are declined for now. */
 export const plainInteract = ref(false)
+
+/**
+ * The Afterpiece Antidote's move is asked as a perk is (the user's call): use it or not, in the
+ * panel first. Used, the paths are on the map and the move must be made; not used, they stay
+ * (the step's `stop`). Reset with the step (GameScreen).
+ */
+export const antidoteUsed = ref(false)
+
+/** The step asks for the Antidote's move (the killer's, or a survivor's). */
+export const antidoteStep = (s: GameState['step']) => (s.t === 'killerAnyMove' && s.why !== 'darkness') || (s.t === 'anyMove' && s.why === 'antidote')
 
 /** The perks the interact step must ask about first; empty when the step has none of them. */
 export function gatePerks(st: GameState): PerkId[] {

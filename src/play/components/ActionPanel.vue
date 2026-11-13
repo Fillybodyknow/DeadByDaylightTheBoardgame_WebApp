@@ -18,6 +18,7 @@ import { boardOf,
   ITEM_NAMES,
   WARD_COST,
   antidoteKillerMoves,
+  darkMoves,
   bonusCost,
   charlotteRoom,
   victorRoom,
@@ -43,7 +44,7 @@ import { boardOf,
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
 import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
-import { onTargetPerk, STEP_NAME, type BoardAction, actionKey, aimedOnMap, gatePerks, interactGate, perkPicked, plainInteract, REPLACES_INTERACT, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
+import { onTargetPerk, STEP_NAME, type BoardAction, actionKey, aimedOnMap, gatePerks, interactGate, perkPicked, plainInteract, antidoteUsed, antidoteStep, REPLACES_INTERACT, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
 import {
@@ -213,7 +214,7 @@ const moves = computed(() => {
   if (s.t === 'anyMove') return anyMoves(st, s.s).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.survivors[s.s].room) }))
   if (s.t === 'killerMove') return killerMoves(st, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   if (s.t === 'reignPath') return survivorMoves(st, s.s, s.card).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.survivors[s.s].room) }))
-  if (s.t === 'killerAnyMove') return antidoteKillerMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
+  if (s.t === 'killerAnyMove') return (s.why === 'darkness' ? darkMoves(st) : antidoteKillerMoves(st)).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   if (s.t === 'carryMove' && !s.hang) return carryMoves(st).map((m) => ({ path: m.path.id, label: pathLabel(st, m.path.id, st.killer.room) }))
   return []
 })
@@ -808,15 +809,26 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p class="board-hint">🎯 คลิกเส้นทางที่กระพริบบนแผนที่</p>
     </template>
 
+    <!-- The Afterpiece Antidote, asked as a perk is: use it (then the move must be made) or not -->
+    <template v-else-if="antidoteStep(step) && !antidoteUsed">
+      <p>
+        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>ยาแก้พิษส่งท้าย</b> —
+        <b>{{ step.t === 'anyMove' ? st.survivors[step.s].name : st.killer.name }}</b> เข้าห้องที่มียาแก้พิษ: ใช้เพื่อเดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact ไหม?
+      </p>
+      <p class="muted small">ใช้แล้วต้องเดิน — ไม่ใช้ก็อยู่ห้องเดิม</p>
+      <button class="primary" @click="antidoteUsed = true">ใช้ยาแก้พิษส่งท้าย</button>
+      <button @click="act({ t: 'stop' })">ไม่ใช้</button>
+    </template>
+
     <template v-else-if="step.t === 'anyMove' || step.t === 'killerAnyMove'">
       <p v-if="step.t === 'killerAnyMove' && step.why === 'darkness'">
-        <b>เผยความมืดมิด</b> — Locker ถูกคว่ำแล้ว {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact (หรืออยู่ห้องเดิม)
+        <b>เผยความมืดมิด</b> — Locker ถูกคว่ำแล้ว {{ st.killer.name }} ต้องเดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact (เส้นทางที่มีกำแพงจะทุบผ่าน ที่มี Pallet จะทำลาย Pallet แล้วอยู่ที่เดิม)
       </p>
       <p v-else-if="step.t === 'killerAnyMove'">
-        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>ยาแก้พิษส่งท้าย</b> — {{ st.killer.name }} เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
+        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>ยาแก้พิษส่งท้าย</b> — <b>{{ st.killer.name }}</b> ต้องเดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact
       </p>
       <p v-else-if="step.why === 'antidote'">
-        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>ยาแก้พิษส่งท้าย</b> — <b>{{ st.survivors[step.s].name }}</b> เดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact หรือจะอยู่ห้องเดิมก็ได้
+        <img class="token-inline" :src="asset(ANTIDOTE_IMAGE)" alt="" /> <b>ยาแก้พิษส่งท้าย</b> — <b>{{ st.survivors[step.s].name }}</b> ต้องเดินต่อตามเส้นทางใดก็ได้ 1 ครั้งก่อน Interact
       </p>
       <p v-else-if="step.why === 'deadHard'"><b>ตายยาก!</b> <b>{{ st.survivors[step.s].name }}</b> หลุดจากการแบก — ต้องเดินไปตามเส้นทางใดก็ได้ 1 ครั้ง</p>
       <p v-else-if="step.why === 'collective'">
@@ -825,11 +837,13 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </p>
       <p v-else-if="step.why === 'spineChill'"><b>เสียวสันหลัง!</b> <b>{{ st.survivors[step.s].name }}</b> รู้ตัวทัน — ต้องเดินไปตามเส้นทางใดก็ได้ 1 ครั้งก่อนฆาตกร Interact</p>
       <p v-else>ช่วยลงจาก Hook แล้ว: <b>{{ st.survivors[step.s].name }}</b> เดินตามเส้นทางใดก็ได้ 1 ครั้ง (หน้า 13) หรือจะอยู่ห้องเดิมก็ได้</p>
-      <p class="muted small">{{ step.t === 'anyMove' && mustMove(step.why) ? 'คลิกเส้นทางบนแผนที่' : 'คลิกเส้นทางบนแผนที่ — คลิกห้องที่อยู่เพื่ออยู่ห้องเดิม' }}</p>
+      <p class="muted small">{{ (step.t === 'anyMove' && mustMove(step.why)) || step.t === 'killerAnyMove' || antidoteStep(step) ? 'คลิกเส้นทางบนแผนที่' : 'คลิกเส้นทางบนแผนที่ — คลิกห้องที่อยู่เพื่ออยู่ห้องเดิม' }}</p>
       <div class="buttons">
         <button v-for="m in moves.filter((m) => here({ t: 'move', path: m.path }))" :key="m.path" @click="act({ t: 'move', path: m.path })">{{ m.label }}</button>
       </div>
-      <button v-if="!(step.t === 'anyMove' && mustMove(step.why))" class="primary" @click="act({ t: 'stop' })">อยู่ห้องเดิม</button>
+      <button v-if="!(step.t === 'anyMove' && mustMove(step.why)) && step.t !== 'killerAnyMove' && !antidoteStep(step)" class="primary" @click="act({ t: 'stop' })">อยู่ห้องเดิม</button>
+      <!-- (used by mistake: back to the question; nothing was sent) -->
+      <button v-if="antidoteStep(step)" class="ghost" @click="antidoteUsed = false">ย้อนกลับ</button>
     </template>
 
     <!-- a target clicked that a perk may use: which perk, or the plain action -->

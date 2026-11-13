@@ -1201,7 +1201,9 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   then attack or pick up that survivor only (not a prop, not the power again).
 - Darkness Revealed: asked as he enters a room with an empty, revealed locker, before his reveal
   there. The locker is turned face down (it is a face-down prop again), he reveals nothing, and
-  moves along any path (not over a pallet), or stays, before interacting.
+  must move along any path before interacting (the card says he moves: no staying), as the other
+  perks that move him: a wall on it breaks as he goes, a pallet breaks and he stays (losing his
+  interaction, p.14). The user's ruling, after a player found no path and no way to stay.
 - Dissolution: at the start of planning, on a path's icon with nothing else on it (no wall, pallet,
   trap or Entity); the Bloodpoint token shows there. Any survivor moving along it is wounded (any
   move: a card, a perk, the rescue move, Reign of Darkness). It goes at the end of cleanup. The ▲ is
@@ -1214,7 +1216,10 @@ The Twins, The Blight, Élodie Rakoto, Felix Richter:
   Tonic: survivors on the board in its room when the cards are set (planning, Predator) set theirs
   face up. Antidote: whoever enters its room by their own move (a card, a perk, the rescue move;
   the killer by any move or teleport, not while carrying or in the middle of an interaction) may
-  move on along any path — the killer's not over a pallet — or stay; the board's own room says stay.
+  move on along any path — the killer's not over a pallet — or stay. It is asked as a perk is
+  (the user's call): the panel asks whether to use it (`antidoteStep`), "ไม่ใช้" stays, and once used
+  (`antidoteUsed`, reset with the step) its paths are on the map and the move must be made — no
+  staying then ("ย้อนกลับ" goes back to the question, nothing having been sent).
   A Firecracker in the room ahead stops the killer's Antidote move as it stops a card move (he's
   left where he is and loses the turn's interaction).
 - Coulrophobia: asked when a survivor's card move would take them into his room (perk moves and the

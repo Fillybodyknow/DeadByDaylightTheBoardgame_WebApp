@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { describe, expect, it } from 'vitest'
-import { DIRECT_CARDS, dogPaths, pathDef, crowdPledges, redeemerTargets, empIn, killerIn, killersIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, rerollers, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
+import { DIRECT_CARDS, darkMoves, dogPaths, pathDef, crowdPledges, redeemerTargets, empIn, killerIn, killersIn, unknownRooms, apply, killerMoves, artistCrows, anyMoves, boardOf, directRoom, antidoteKillerMoves, perkButtons, perkReady, rerollers, survivorMoves, charlotteRoom, connectedRoomsOf, createGame, healable, isFailure, itemUses, killerInteractions, perkChoices, powerOptions, survivorInteractions, touchingPaths, tryApply, victorRoom } from './engine'
 import { legalActions } from './legal'
 import { boards } from './boards'
 import { actorsOf, mayAct, playerOfSurvivor } from './seats'
@@ -3896,6 +3896,25 @@ describe('The Dredge', () => {
     // no prop revealed there: one more face-down tile (the locker), none turned up
     expect(g.props.filter((x) => x.room === to && !x.revealed).length).toBe(hidden + 1)
     expect(g.step).toMatchObject({ t: 'killerAnyMove', why: 'darkness' })
+    // he must move: no staying (the card says he moves)
+    expect(legalActions(g).some((a) => a.t === 'stop')).toBe(false)
+    expect(() => apply(g, { t: 'stop' })).toThrow()
+    // a pallet's path is offered too: it breaks and he stays, losing his interaction (p.14)
+    const exits = darkMoves(g)
+    const pallet = st.props.find((x) => x.kind === 'pallet')!
+    const withPallet = structuredClone(g)
+    const pp = withPallet.props.find((x) => x.id === pallet.id)!
+    Object.assign(pp, { room: null, path: exits[0].path.id, revealed: true, removed: false })
+    expect(legalActions(withPallet)).toContainEqual({ t: 'move', path: exits[0].path.id })
+    const broke = apply(withPallet, { t: 'move', path: exits[0].path.id })
+    expect(broke.killer.room).toBe(to)
+    expect(broke.props.find((x) => x.id === pallet.id)!.removed).toBe(true)
+    // a wall's path too: it breaks as he goes through
+    const withWall = structuredClone(g)
+    withWall.paths[exits[0].path.token ?? exits[0].path.id].wall = true
+    expect(legalActions(withWall)).toContainEqual({ t: 'move', path: exits[0].path.id })
+    const through = apply(withWall, { t: 'move', path: exits[0].path.id })
+    expect(through.killer.room).toBe(exits[0].to)
     const m = legalActions(g).find((a) => a.t === 'move')!
     g = apply(g, m)
     expect(g.killer.room).not.toBe(to)
