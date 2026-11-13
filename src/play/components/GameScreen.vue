@@ -213,7 +213,10 @@ watch(
         // A card turned over for a turn that follows another in the same batch waits for the
         // board to play the turn before it: the killer's two cards resolve in one go, and his
         // second card (Wait) was turned over before his attack had landed (a player's report).
-        showAction(cast, castShown && cast.kind === 'move')
+        // Only a card that moves nobody waits (`still`): the board plays every move of the batch
+        // at once, so holding a card that *does* move someone showed it after its own mini had
+        // already run (a crow's bonus turn — a player's report).
+        showAction(cast, castShown && !!cast.still)
         castShown = true
       }
       if (ev?.k === 'item') {

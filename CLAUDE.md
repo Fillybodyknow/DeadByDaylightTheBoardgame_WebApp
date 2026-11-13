@@ -207,8 +207,11 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   killer's move after it (players' reports).
   **A card for a turn that follows another waits for the board to play the one before it**: the
   killer's two cards resolve in one go, and his second card (Wait) was turned over before his
-  attack had landed (a player's report). The second and later `move` cast of a batch is queued
-  `hold`ed (`showAction(cast, true)`, `PerkShow.hold`); a held card, and everything behind it in
+  attack had landed (a player's report). A second or later card of a batch **that moves nobody**
+  (`ActionShow.still`: Wait, a blocked path — the board plays nothing for it) is queued `hold`ed
+  (`showAction(cast, true)`, `PerkShow.hold`); a card that does move someone is never held, since
+  the board plays every move of a batch at once and holding one showed it after its own mini had
+  already run (a crow's bonus turn, a player's report). A held card, and everything behind it in
   the queue, waits (`queueHead` in `fx/bus.ts`, which every reveal of that queue reads), while
   GameScreen lets the view move on past it so the board can play, and clears the hold a frame
   later. States are shown one at a time for the same reason (`waiting` in GameScreen: each entry

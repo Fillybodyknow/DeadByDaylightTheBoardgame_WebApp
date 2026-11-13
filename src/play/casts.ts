@@ -86,6 +86,8 @@ export class CastBuilder {
     let image: string | undefined
     let kind: ActionShow['kind'] = 'action'
     let target: number | undefined
+    /** This card moves nobody: the board has nothing to play for it. */
+    let still = false
 
     const card = CARD_RE.exec(e.text)
     if (card) this.cards.set(key, CARD_OF[card[1]])
@@ -94,6 +96,7 @@ export class CastBuilder {
       // card that goes nowhere — Wait, a blocked path — is shown here.
       if (card[1] !== 'Wait' && !/แต่/.test(e.text)) return null
       kind = 'move'
+      still = true
       image = cardImage(CARD_OF[card[1]])
     } else if (ev?.k === 'move') {
       // Only a move made with a movement card shows: being carried, a perk's move (Breakout) or a
@@ -164,7 +167,7 @@ export class CastBuilder {
     // swallowed the killer's move after it (players' reports).
     if (kind === 'move') this.shownFor.add(key)
     this.count++
-    return { owner, kind, title, sub: sub ?? '', image, target, ...(victor ? { victor } : {}) }
+    return { owner, kind, title, sub: sub ?? '', image, target, ...(still ? { still } : {}), ...(victor ? { victor } : {}) }
   }
 
   /** A power used without a line of its own (its effect had no card above): a card for it. */

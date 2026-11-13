@@ -100,6 +100,12 @@ export interface ActionShow {
   sub: string
   /** A movement card, a prop or token, or the power card (cropped to its icon). */
   image?: string
+  /**
+   * A movement card turned over that moves nobody — Wait, or a path blocked. The board plays
+   * nothing for it, so it is the one kind of card that may wait for the board (GameScreen's
+   * `hold`); every other card is shown before the board plays what it did.
+   */
+  still?: boolean
   /** The survivor on the receiving end (attacked, picked up, hooked, rescued). */
   target?: number
   /** Everyone hit at once (a power that wounds a whole room): their portraits, in a row. */

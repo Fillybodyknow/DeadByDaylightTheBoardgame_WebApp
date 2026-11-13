@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.46.1',
+    date: '2026-11-13',
+    items: [
+      'แก้ด่วนจาก 1.46.0: การ์ดเคลื่อนที่ของ Bonus Turn (เช่น ไล่ Crow) ขึ้นช้าไปจนตัวละครวิ่งไปก่อน — ตอนนี้มีแต่การ์ดที่ไม่ได้ทำให้ใครขยับ (Wait หรือทางตัน) ที่รอกระดาน',
+    ],
+  },
+  {
     version: '1.46.0',
     date: '2026-11-13',
     items: [
