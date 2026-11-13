@@ -130,12 +130,20 @@ import { PING_MS, pingFailed, pingWait, shownPings } from '../pings'
     opacity: 0;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .wave {
-    display: none;
-  }
-  .ring {
-    animation: none;
-  }
+/*
+ * Motion reduced: the waves and the blink go, but the ping must still be seen — its whole life is
+ * an animation (`ping-life`), and the page-wide rule that cuts every animation to 0.01ms left it
+ * holding that animation's last frame, which is `opacity: 0`: the ping was invisible on a machine
+ * that asks for less motion (a player's report). It is shown plainly instead and goes when
+ * `pings.ts` drops it, after PING_MS as always.
+ */
+html.reduce-motion .wave {
+  display: none;
+}
+html.reduce-motion .ping,
+html.reduce-motion .ring {
+  animation: none !important;
+  opacity: 1;
+  scale: 1;
 }
 </style>

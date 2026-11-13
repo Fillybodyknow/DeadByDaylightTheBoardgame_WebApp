@@ -364,14 +364,16 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   path out loses the bonus turn's interaction too (`startSurvivorMove`), so a player could buy the
   killer a ▲ for nothing — which is what happened (a player's report). Cards with no path show
   "เดินไม่ได้" on the hand. Tutorial chapter 6 teaches the new order.
-  **One way for every card and both sides**: pick the card, then click on the map the room it ends
-  in. The Dredge's direct cards go to the room of their number along no path, so that room is the
-  one lit (`directRoom`; lighting his own said "stay here" and was the only way to send it — a
-  player's report). A card that goes nowhere (Wait, a blocked path) ends where they stand, so
-  **their own room** is the one lit and clicking it is the confirm — there is no confirm button in the panel for any
-  of it, and no "pick another card" button either (pressing another card in the hand does that).
-  Before this a card with a path went on a click on the map while Wait grew a confirm button, and
-  the two read as different systems (a player's report).
+  **One way for every card and both sides, and the same shape as planning**: pick the card (from
+  the hand or by its colour on the map), click the room it ends in when there is more than one,
+  then press **ยืนยัน** in the panel — a click on the map only chooses, and nothing is spent until
+  the confirm. Planning ends with a confirm too, and a bonus turn that went on the room's click
+  made the two feel like two ways of playing the same thing (a player's report). What a card
+  leaves nothing to choose about (one room, a direct card, Wait, a blocked path) is taken as
+  chosen the moment the card is picked, so those are card → confirm. The Dredge's direct cards go
+  to the room of their number along no path, so that room is lit (`directRoom`); a card that goes
+  nowhere lights the room they stand in. There is no "pick another card" button — pressing another
+  card in the hand does that.
 - **A perk that moves a survivor is one tap on the path** (`MOVE_SOMEONE` in `boardActions.ts`:
   Infectious Fright, Dark Devotion, Exponential): every path only one of them could take is on the
   map at once, so a tap on it moves that survivor and uses the perk. The survivor (or their hook)
@@ -505,7 +507,8 @@ local backend syncs browser tabs.
 ## Settings
 
 The ⚙ button (the top bar, the online room's own header, and the game's rail) opens `src/components/SettingsDialog.vue`, a PC-game
-style window with tabs: Sound (volumes, mute, chase music), Display (animation speed, reduce motion,
+style window with tabs: Sound (volumes, mute, chase music), Display (animation speed, reduce
+motion (ตามเครื่อง / ลด / ไม่ลด),
 card language, the hand of cards: where it floats, how it is laid, a picked card, the hover height,
 a tablet's auto-raise), Online (turn sound, background notice, 20 s reminder), Data (clear the offline
 game, reset the tutorial, reset settings). Settings live in `src/settings.ts` (`dbdl-settings`).
@@ -514,8 +517,17 @@ game, reset the tutorial, reset settings). Settings live in `src/settings.ts` (`
   transitions that end are played at the same rate by `settings.ts` (endless ones keep their pace),
   so write CSS durations at full length. Reading time (TrialLoading's minimum), sound clips
   (MatchBeat) and online timers are not animations: leave them unscaled.
-- **Reduce motion:** read `reducedMotion` (the device's preference or the setting), never
-  `matchMedia` directly; `html.reduce-motion` stops CSS motion page-wide (`style.css`).
+- **Reduce motion:** read `reducedMotion`, never `matchMedia` directly; `html.reduce-motion` stops
+  CSS motion page-wide (`style.css`). The setting is three ways, not a switch: `auto` follows the
+  device, `on` always reduces, `off` never does — Windows has its animation effects off on plenty
+  of machines, which the browser reports as "reduce", and while the setting was "the device's
+  preference **or** the switch" there was no way to see an animation on such a machine (a player's
+  report, on two of them). `deviceReducesMotion` is what the device itself says, shown in the
+  settings. An old saved `true`/`false` reads as `on`/`auto`.
+  Anything whose **visibility** is an animation needs its own way out: the page-wide rule cuts
+  every animation to 0.01ms, so an element left holding the last frame of a fade-out is invisible.
+  A ping was (`PingLayer`: its whole life is `ping-life`, ending at `opacity: 0`) — it is shown
+  plainly under `html.reduce-motion` and goes when `pings.ts` drops it, as it always did.
 
 ## Sounds and PWA
 

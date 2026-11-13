@@ -9,8 +9,13 @@ export type AnimSpeed = 'slow' | 'normal' | 'fast' | 'skip'
 
 export interface Settings {
   animSpeed: AnimSpeed
-  /** Always reduce motion (no pulsing, shaking, sweeping); off: as the device's own setting says. */
-  reduceMotion: boolean
+  /**
+   * Reduce motion (no pulsing, shaking, sweeping): `auto` follows the device, `on` always, `off`
+   * never — the device's own setting ignored. Windows has its animation effects off on plenty of
+   * machines, which the browser reports as "reduce", and with `auto` the only choice there was no
+   * animation at all however the switch was set (a player's report, on two Windows machines).
+   */
+  reduceMotion: 'auto' | 'on' | 'off'
   /** The killer's chase theme when he stands on a survivor. */
   chaseMusic: boolean
   /** Online, your turn: the warning and the chime. */
@@ -72,13 +77,16 @@ export interface Settings {
   handTouchRaise: boolean
 }
 
-const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: false, chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true, lfgNotify: true, warmAssets: true, handPlace: 'auto', handLayout: 'fan', handPicked: 'raise', handHover: 'full', handTouchRaise: true }
+const DEFAULTS: Settings = { animSpeed: 'normal', reduceMotion: 'auto', chaseMusic: true, turnSound: true, turnNotify: true, turnRemind: true, voiceVolume: 1, micId: '', voiceAuto: false, micMode: 'open', pttKey: 'KeyV', voiceGate: 0.25, noiseFilter: true, lfgNotify: true, warmAssets: true, handPlace: 'auto', handLayout: 'fan', handPicked: 'raise', handHover: 'full', handTouchRaise: true }
 
 const KEY = 'dbdl-settings'
 
 function read(): Settings {
   try {
-    return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>) }
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>
+    // reduceMotion was a switch before: on means always, off means follow the device as it did
+    if (typeof saved.reduceMotion === 'boolean') saved.reduceMotion = saved.reduceMotion ? 'on' : 'auto'
+    return { ...DEFAULTS, ...saved }
   } catch {
     return { ...DEFAULTS }
   }
@@ -103,8 +111,11 @@ export function resetSettings() {
 const systemReduce = ref(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)
 if (typeof matchMedia === 'function') matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e) => (systemReduce.value = e.matches))
 
-/** Motion is to be reduced: the device asks for it, or the player does. */
-export const reducedMotion = computed(() => systemReduce.value || settings.reduceMotion)
+/** What the device itself asks for, whatever the player has set (shown in the settings). */
+export const deviceReducesMotion = computed(() => systemReduce.value)
+
+/** Motion is to be reduced: the player says so, or they leave it to the device and it says so. */
+export const reducedMotion = computed(() => settings.reduceMotion === 'on' || (settings.reduceMotion === 'auto' && systemReduce.value))
 
 // The whole page follows it: `html.reduce-motion` stops CSS animations and transitions (style.css).
 if (typeof document !== 'undefined')

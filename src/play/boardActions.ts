@@ -87,7 +87,7 @@ export interface BoardModes {
    * the bonus turn was worth having — a card with no path out loses the interaction too
    * (`startSurvivorMove`), so it could buy the killer a ▲ for nothing (a player's report).
    */
-  bonusAsk: Ref<{ i?: SurvivorInteraction; card: MoveCard | null; path: string | null; go?: boolean } | null>
+  bonusAsk: Ref<{ i?: SurvivorInteraction; card: MoveCard | null; path: string | null; chosen?: boolean } | null>
   /**
    * Interacting with a friend to use **their** perk (Collective Stealth, Power of Two): the perk's
    * card is shown and agreed to first. A click on the mini used to set it off at once, so the
@@ -306,7 +306,10 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   if ((modes.bonusAsk.value || s.t === 'bonusOffer' || s.t === 'killerBonusOffer') && bonusWho !== null) {
     const card = modes.bonusAsk.value?.card ?? null
     const here = bonusWho === 'killer' ? st.killer.room : st.survivors[bonusWho].room
-    const send = (path: string | null) => () => ((modes.bonusAsk.value = { ...(modes.bonusAsk.value ?? { card, path: null }), card, path, go: true }), sfx.click())
+    // Clicking a room chooses it; the panel's confirm is what sends the lot — the same shape as
+    // planning, where a path picks the card and the confirm commits it (a player's report: the
+    // bonus turn felt like a second way of playing beside it).
+    const choose = (path: string | null) => () => ((modes.bonusAsk.value = { ...(modes.bonusAsk.value ?? { card, path: null }), card, path, chosen: true }), sfx.click())
     // no card yet: a path out of their room picks the card of its colour (as the hand does); the room
     // is clicked next, and that click sends the whole bonus turn (the players' order: card → room)
     if (!card) {
@@ -323,7 +326,7 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
       }
       // an empty hand: no bonus turn to play, but the interaction that bought it still goes —
       // their own room confirms it, so the last tap is on the map here too
-      if (!hand.length && modes.bonusAsk.value?.i) add(`room:${here}`, `ยืนยัน (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)`, send(null))
+      if (!hand.length && modes.bonusAsk.value?.i) add(`room:${here}`, `ยืนยัน (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)`, choose(null))
       return out
     }
     // The Dredge's direct cards take him to the room of that number, with no path: that room is
@@ -331,30 +334,30 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
     // — a player's report)
     if (isDirect(card)) {
       const to = directRoom(st, card)
-      add(`room:${to}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, to)}`, send(null))
+      add(`room:${to}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, to)}`, choose(null))
       out[out.length - 1].dest = to
       return out
     }
     // Wait: nowhere to go, so their own room is the one to click
     if (!isPathCard(card)) {
-      add(`room:${here}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: อยู่ที่เดิม`, send(null))
+      add(`room:${here}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: อยู่ที่เดิม`, choose(null))
       return out
     }
     const ms = bonusWho === 'killer' ? killerMoves(st, card) : survivorMoves(st, bonusWho, card)
     // a card with no way out of this room: their own room again, and the move is wasted (p.9)
     if (!ms.length) {
-      add(`room:${here}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไม่มีเส้นทาง — อยู่ที่เดิม`, send(null))
+      add(`room:${here}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไม่มีเส้นทาง — อยู่ที่เดิม`, choose(null))
       return out
     }
     for (const m of ms) {
       if (out.some((a) => a.key === `room:${m.to}`)) continue
-      add(`room:${m.to}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, m.to)}`, () => ((modes.bonusAsk.value = { ...modes.bonusAsk.value!, path: m.path.id, go: true }), sfx.click()))
+      add(`room:${m.to}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, m.to)}`, choose(m.path.id))
       out[out.length - 1].dest = m.to
     }
     // the path itself again (the one clicked to pick the card, or any of its colour): that room too —
     // a player clicking the path a second time meant to go along it
     for (const m of ms) {
-      add(`path:${m.path.id}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, m.to)}`, () => ((modes.bonusAsk.value = { ...modes.bonusAsk.value!, path: m.path.id, go: true }), sfx.click()))
+      add(`path:${m.path.id}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, m.to)}`, choose(m.path.id))
       out[out.length - 1].dest = m.to
     }
     return out

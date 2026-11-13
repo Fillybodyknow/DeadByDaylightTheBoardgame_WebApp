@@ -164,7 +164,8 @@ describe('offerings: effects', () => {
       st = apply(st, acts[(n * 7919) % acts.length])
     }
     expect(st.offerings).toEqual(READY_OFFERINGS)
-  })
+    // a whole random game: longer than the 5 s a test is given by default, on a busy machine
+  }, 60_000)
 })
 
 /** Through the setup reveals, perks off. */

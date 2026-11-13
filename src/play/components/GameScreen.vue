@@ -763,9 +763,9 @@ const modeBar = computed(() => {
     const i = bonusAsk.value.i
     const what = !i ? 'Bonus Turn' : i.k === 'crow' ? 'ไล่ Crow' : PERKS.power_of_two.name
     if (!bonusAsk.value.card) return { text: `${what}: 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้น${i ? ' — ยังไม่เสีย ▲' : ''}`, cancel }
-    // a card that goes nowhere (Wait, a blocked path) ends in their own room: that one is lit
+    // a card that goes nowhere (Wait, a blocked path) ends where they stand: nothing to choose
     const stay = bonusCanMove(view.value, bonusAsk.value.card)
-    return { text: `${what} ด้วย ${CARD_NAMES[bonusAsk.value.card]}: 2. ${stay ? 'คลิกห้องที่จะไปบนแผนที่ แล้วไปทันที' : 'ไม่มีเส้นทาง — คลิกห้องของคุณบนแผนที่เพื่ออยู่ที่เดิม'}`, cancel }
+    return { text: `${what} ด้วย ${CARD_NAMES[bonusAsk.value.card]}: 2. ${stay ? 'คลิกห้องที่จะไปบนแผนที่ แล้วกดยืนยันในแผง' : 'ไม่มีเส้นทาง — อยู่ที่เดิม กดยืนยันในแผง'}`, cancel }
   }
   if (targetAsk.value) return { text: 'เลือกในแผงด้านข้าง: ใช้ Perk หรือทำตามปกติ', cancel: () => (targetAsk.value = null) }
   if (dogStay.value) return { text: 'กลิ่นเลือด: เลือกการ์ดใหม่ให้ The Dog จากมือ', cancel: () => (dogStay.value = false) }
@@ -933,7 +933,8 @@ function diceResult(ctx: RollContext['k'], dice: Die[]): Pick<DiceShow, 'outcome
       return fail ? { outcome: 'ไม่สำเร็จ', tone: 'bad' } : { outcome: 'หายบาดเจ็บ!', tone: 'great' }
     case 'phantasm': {
       const face = dice[0].face
-      return face === 0 ? { outcome: 'ได้ 0 — Hag วาร์ปมาฟรี!', tone: 'bad' } : { outcome: `ได้ ${face} — Hag รับ ${face} ▲ หรือจ่าย ${face} ▲ เพื่อวาร์ป`, tone: face >= 4 ? 'great' : 'good' }
+      // the die is the teleport's price only: declining it is +1 ▲, whatever it shows (p.14)
+      return face === 0 ? { outcome: 'ได้ 0 — Hag วาร์ปมาฟรี!', tone: 'bad' } : { outcome: `ได้ ${face} — Hag รับ +1 ▲ หรือจ่าย ${face} ▲ เพื่อวาร์ป`, tone: face >= 4 ? 'great' : 'good' }
     }
     case 'overwhelm':
       return fail ? { outcome: 'item เสียเปล่า!', tone: 'bad' } : { outcome: 'ใช้ item ได้', tone: 'great' }

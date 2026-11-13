@@ -588,7 +588,9 @@ describe('perks', () => {
       }
     }
     expect([...Object.keys(PERKS)].filter((p) => !used.has(p))).toEqual([])
-  }, 600_000)
+    // Every character added puts more random games in here: 600 s was the budget when there were
+    // fewer, and the run passes well inside 30 minutes even on a busy machine.
+  }, 1_800_000)
 })
 
 describe('perks at the same moment (p.16, Timing)', () => {

@@ -4,7 +4,7 @@
 // device (settings.ts, and sound.ts / i18n.ts for the volumes and the card language).
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { lang } from '../i18n'
-import { settings, resetSettings, type AnimSpeed, type Settings } from '../settings'
+import { deviceReducesMotion, settings, resetSettings, type AnimSpeed, type Settings } from '../settings'
 import { muted, sfx, volumes, type Volumes } from '../sound'
 import { game, online, quitGame } from '../play/game'
 import { TAKEN_KEYS, keyLabel, micList, startMicTest, stopMicTest, voice } from '../play/voice'
@@ -107,6 +107,12 @@ const SPEEDS: { id: AnimSpeed; label: string; sub: string }[] = [
   { id: 'normal', label: 'ปกติ', sub: 'แอนิเมชันเต็ม' },
   { id: 'fast', label: 'เร็ว', sub: 'เร็วขึ้นเท่าตัว' },
   { id: 'skip', label: 'ข้าม', sub: 'เห็นผลแทบทันที' },
+]
+
+const MOTIONS: { id: Settings['reduceMotion']; label: string; sub: string }[] = [
+  { id: 'auto', label: 'ตามเครื่อง', sub: 'ทำตามที่ระบบของเครื่องตั้งไว้' },
+  { id: 'on', label: 'ลด', sub: 'ปิดการกะพริบ จอสั่น และแสงเต้น' },
+  { id: 'off', label: 'ไม่ลด', sub: 'เล่นแอนิเมชันเต็ม แม้เครื่องจะตั้งให้ลด' },
 ]
 
 const HAND_PLACES: { id: Settings['handPlace']; label: string; sub: string }[] = [
@@ -318,10 +324,27 @@ watch(tab, () => (confirming.value = null))
                 </button>
               </div>
             </div>
-            <label class="switch">
-              <input v-model="settings.reduceMotion" type="checkbox" />
-              <span><b>ลดการเคลื่อนไหว</b><small>ปิดการกะพริบ จอสั่น และแสงเต้น (เปิดให้อัตโนมัติถ้าเครื่องตั้งไว้)</small></span>
-            </label>
+            <div class="field">
+              <b>ลดการเคลื่อนไหว</b>
+              <small>
+                ปิดการกะพริบ จอสั่น และแสงเต้น — เครื่องนี้ตั้งไว้ว่า<b>{{ deviceReducesMotion ? 'ให้ลด' : 'ไม่ต้องลด' }}</b>&nbsp;
+                <template v-if="deviceReducesMotion">(Windows: ตั้งค่า → การช่วยการเข้าถึง → เอฟเฟกต์ภาพ → เอฟเฟกต์ภาพเคลื่อนไหว)</template>
+              </small>
+              <div class="choice" role="radiogroup" aria-label="ลดการเคลื่อนไหว">
+                <button
+                  v-for="m in MOTIONS"
+                  :key="m.id"
+                  type="button"
+                  role="radio"
+                  :aria-checked="settings.reduceMotion === m.id"
+                  :class="{ on: settings.reduceMotion === m.id }"
+                  @click="settings.reduceMotion = m.id"
+                >
+                  <b>{{ m.label }}</b>
+                  <small>{{ m.sub }}</small>
+                </button>
+              </div>
+            </div>
             <div class="field">
               <b>ตำแหน่งการ์ดบนมือ</b>
               <small>การ์ดเคลื่อนที่ที่เลือกตอนวางแผนและตอนใช้ Perk</small>
