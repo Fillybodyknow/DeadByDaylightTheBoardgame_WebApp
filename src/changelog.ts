@@ -12,6 +12,13 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '1.47.2',
+    date: '2026-11-13',
+    items: [
+      'บอร์ดและการ์ด Perk ของ Taurie Cain กับ The Houndmaster คมขึ้น — ไฟล์เดิมผ่านการบีบอัดมาจนเบลอ (ทั้งฉบับไทยและอังกฤษ รวมถึงการ์ด Power/Passive ของ The Houndmaster)',
+    ],
+  },
+  {
     version: '1.47.1',
     date: '2026-11-13',
     items: [
