@@ -4,7 +4,7 @@ import { muted, setChase, sfx, startHeartbeat, stopChase, stopHeartbeat, type Ch
 import { anim, settings } from '../../settings'
 import { botAction, botTurn, botsOnly, botsWaitedOn, onlineBotMove, peopleOnBothSides } from '../bots'
 import { anyMoves, boardOf, isDirect, isPathCard, killerMoves, palletOn, survivorInteractions, survivorMoves, unknownRooms, CARD_NAMES, ITEM_NAMES, charlotteRoom, crowsCards, isGreat, perkChoices, PROGRESS_MAX, roomName, SACRIFICE_TO_WIN, succeeded, touchingPaths, victorRoom } from '../engine/engine'
-import type { Die, GameState, ItemUse, LogEntry, MoveCard, PathKind, RollContext, SurvivorInteraction } from '../engine/types'
+import type { Die, GameState, ItemUse, LogEntry, MoveCard, RollContext, SurvivorInteraction } from '../engine/types'
 import { clearFx, flash, fx, showAction, showBanner, showDice, showFinale, showOfferings, showPerk, showRush, showSacrifice, showStarts, type DiceShow, type SkillVerdict } from '../fx/bus'
 import { CastBuilder } from '../casts'
 import { fxSound } from '../fx/audio'
@@ -376,16 +376,6 @@ const bonusAsk = ref<{ i?: SurvivorInteraction; card: MoveCard | null; path: str
 const partnerAsk = ref<Extract<SurvivorInteraction, { k: 'partner' }> | null>(null)
 /** A crow's (or Power of Two's) bonus card, sent when the engine offers that survivor the bonus turn. */
 const bonusIntent = ref<{ s: number; card: MoveCard | null; from: string } | null>(null)
-/**
- * The move a settled bonus turn is to make, kept until the engine asks for it: the interaction and
- * the card come first, and a perk may be offered on the card (`cardMove`), so the move step isn't
- * always the very next one. `from`: the room it leaves — dropped only once they are no longer
- * there (a perk moved them) or their turn is over, and then the map asks as usual.
- */
-const moveIntent = ref<{ s: number | 'killer'; card: PathKind; path: string; from: string } | null>(null)
-function onBonusMove(m: { s: number | 'killer'; card: PathKind; path: string } | null) {
-  moveIntent.value = m && { ...m, from: m.s === 'killer' ? props.st.killer.room : props.st.survivors[m.s].room }
-}
 /** Treacherous Crows: the crow to send to a connected room. */
 const crowsCrow = ref<string | null>(null)
 /** Treacherous Crows: the killer's card to reveal, picked in the side panel. */
@@ -765,7 +755,7 @@ const modeBar = computed(() => {
     if (!bonusAsk.value.card) return { text: `${what}: 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้น${i ? ' — ยังไม่เสีย ▲' : ''}`, cancel }
     // a card that goes nowhere (Wait, a blocked path) ends where they stand: nothing to choose
     const stay = bonusCanMove(view.value, bonusAsk.value.card)
-    return { text: `${what} ด้วย ${CARD_NAMES[bonusAsk.value.card]}: 2. ${stay ? 'คลิกห้องที่จะไปบนแผนที่ แล้วกดยืนยันในแผง' : 'ไม่มีเส้นทาง — อยู่ที่เดิม กดยืนยันในแผง'}`, cancel }
+    return { text: `${what} ด้วย ${CARD_NAMES[bonusAsk.value.card]}: 2. ${stay ? 'กดยืนยันในแผง แล้วเลือกเส้นทางบนแผนที่' : 'ไม่มีเส้นทาง — อยู่ที่เดิม กดยืนยันในแผง'}`, cancel }
   }
   if (targetAsk.value) return { text: 'เลือกในแผงด้านข้าง: ใช้ Perk หรือทำตามปกติ', cancel: () => (targetAsk.value = null) }
   if (dogStay.value) return { text: 'กลิ่นเลือด: เลือกการ์ดใหม่ให้ The Dog จากมือ', cancel: () => (dogStay.value = false) }
@@ -1315,33 +1305,6 @@ watch(
   },
   { immediate: true },
 )
-watch(
-  () => [props.st.step, moveIntent.value] as const,
-  () => {
-    const want = moveIntent.value
-    if (!want) return
-    const s = props.st.step
-    // the killer's bonus turn: his move step with that card
-    if (want.s === 'killer') {
-      if (s.t === 'killerMove' && s.card === want.card) {
-        moveIntent.value = null
-        if (killerMoves(props.st, want.card).some((m) => m.path.id === want.path)) dispatch({ t: 'move', path: want.path })
-      } else if (props.st.phase !== 'killer' || props.st.killer.room !== want.from) moveIntent.value = null
-      return
-    }
-    if (s.t !== 'survivorMove' || s.s !== want.s || s.card !== want.card) {
-      // gone past the move it was for: the turn is over, or they left the room another way. (Not
-      // on an interact step: online the one it was settled on can still be the step shown while the
-      // interaction is on its way, and dropping it there asked the player for the path again.)
-      const sv = props.st.survivors[want.s]
-      if (sv.acted || sv.room !== want.from || props.st.phase !== 'survivors') moveIntent.value = null
-      return
-    }
-    moveIntent.value = null
-    if (survivorMoves(props.st, want.s, want.card).some((m) => m.path.id === want.path)) dispatch({ t: 'move', path: want.path })
-  },
-  { immediate: true },
-)
 
 // ---------- terror radius ----------
 
@@ -1815,7 +1778,6 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           @bonus-ask="bonusAsk = $event"
           :partner-ask="partnerAsk"
           @partner-ask="partnerAsk = $event"
-          @bonus-move="onBonusMove"
           @bonus-card="bonusIntent = $event && { ...$event, from: st.survivors[$event.s].room }"
           :dog-stay="dogStay"
           @dog-stay="dogStay = $event"

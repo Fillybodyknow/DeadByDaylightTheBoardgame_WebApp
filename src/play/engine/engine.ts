@@ -3416,9 +3416,12 @@ function discardPerkCard(st: GameState, s: number, perk: PerkId) {
 }
 
 /**
- * Whether a perk reaches this survivor: in a locker they are off the board for interactions,
- * perks and killer powers (p.12), so no perk finds them there — not even one worded without a
- * space (Thanatophobia, Lucky Break). The killer's Search of the locker is the way to them.
+ * Whether a survivor is in a space at all: in a locker they are off the board (p.12), so a perk
+ * that asks for a space — "in your space or a connected space" — cannot reach them, the roll of
+ * the locker being searched included. A perk whose card names no space is not blocked by it
+ * (Thanatophobia, Lucky Break): Level 99 on their Discord, asked about the search's skill check,
+ * "1. No because the Survivor is not in your space or a connected one. 2. Yes because no space
+ * requirement. 3. If they have space requirements, being in a locker effectively prevents it".
  */
 function inSpace(st: GameState, s: number): boolean {
   return st.survivors[s].status === 'board'
@@ -3475,8 +3478,9 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       if (w.k !== 'planningStart') return []
       return st.survivors.flatMap((sv, i) => (sv.wounded && sv.status === 'board' ? [{ target: i }] : []))
     case 'thanatophobia':
+      // "a wounded survivor": no space on the card, so a locker is no shelter from it
       if (w.k !== 'preRoll' || !SKILL_CHECKS.includes(w.ctx.k) || st.rollMods.danger) return []
-      return inSpace(st, w.ctx.s) && st.survivors[w.ctx.s].wounded ? NONE : []
+      return st.survivors[w.ctx.s].wounded ? NONE : []
     case 'nurses_calling':
       return [] // automatic, see makeHealthy
 
@@ -3495,8 +3499,8 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       if (w.k !== 'preRoll' || !SKILL_CHECKS.includes(w.ctx.k) || st.rollMods.danger) return []
       return w.ctx.s === o ? NONE : []
     case 'sloppy_butcher':
-      if (w.k !== 'preRoll' || w.ctx.k !== 'heal' || st.rollMods.danger) return []
-      return inSpace(st, w.ctx.s) ? NONE : []
+      // "when a Survivor attempts to heal": no space on the card (a heal is never in a locker anyway)
+      return w.k === 'preRoll' && w.ctx.k === 'heal' && !st.rollMods.danger ? NONE : []
     case 'resilience':
       // the bonus turn is taken with a card from the hand, as Adrenaline's is
       if (w.k !== 'cleanupStart' || !me!.woundedThisRound || me!.status !== 'board') return []
@@ -3827,7 +3831,8 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
       return st.survivors.flatMap((sv, i) => (sv.status === 'board' && sv.wounded ? anyMoves(st, i).map((m) => ({ target: i, path: m.path.id })) : []))
     }
     case 'lucky_break':
-      return w.k === 'greatRoll' && inSpace(st, w.s) && healable(st, o as number) ? NONE : []
+      // "any Survivor": no space on the card, so the one searched in a locker counts too
+      return w.k === 'greatRoll' && healable(st, o as number) ? NONE : []
     case 'any_means_necessary':
       if (w.k !== 'turnEnd' || w.s !== o || me!.wounded) return []
       return [...new Set(st.survivorHands[me!.hand])].map((card) => ({ card }))
@@ -4289,8 +4294,9 @@ export function perkChoices(st: GameState, perk: PerkId, o: PerkOwner, w: PerkWi
     case 'poised': {
       // a skill check's great success on a survivor turn: that survivor takes a bonus turn
       if (w.k !== 'greatRoll' || !w.ctx || !SKILL_CHECKS.includes(w.ctx) || st.phase !== 'survivors' || st.activeSurvivor === null) return []
+      // "a Survivor": no space on the card (the turn being a survivor's is the limit)
       const sv = st.survivors[w.s]
-      return inSpace(st, w.s) && st.survivorHands[sv.hand].length > 0 ? [{ target: w.s }] : []
+      return st.survivorHands[sv.hand].length > 0 ? [{ target: w.s }] : []
     }
     case 'solidarity':
       // her interaction for the turn: the ordinary heal, on a survivor in a connected room

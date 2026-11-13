@@ -364,16 +364,15 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   path out loses the bonus turn's interaction too (`startSurvivorMove`), so a player could buy the
   killer a ▲ for nothing — which is what happened (a player's report). Cards with no path show
   "เดินไม่ได้" on the hand. Tutorial chapter 6 teaches the new order.
-  **One way for every card and both sides, and the same shape as planning**: pick the card (from
-  the hand or by its colour on the map), click the room it ends in when there is more than one,
-  then press **ยืนยัน** in the panel — a click on the map only chooses, and nothing is spent until
-  the confirm. Planning ends with a confirm too, and a bonus turn that went on the room's click
-  made the two feel like two ways of playing the same thing (a player's report). What a card
-  leaves nothing to choose about (one room, a direct card, Wait, a blocked path) is taken as
-  chosen the moment the card is picked, so those are card → confirm. The Dredge's direct cards go
-  to the room of their number along no path, so that room is lit (`directRoom`); a card that goes
-  nowhere lights the room they stand in. There is no "pick another card" button — pressing another
-  card in the hand does that.
+  **A bonus turn is a plan and a move, nothing of its own**: pick the card (from the hand, or by
+  its colour on the map as planning does), press **ยืนยัน**, and then the map asks where they go,
+  exactly as it does for a revealed card — the interaction and the card go as one action
+  (`then: { card }`, `bonusThen` plays the card and stops at the move step), and the move is sent
+  after it like any other. Choosing the room in the panel as well made it feel like a second way
+  of playing beside an ordinary turn (a player's report). Nothing is spent until the confirm, and
+  a card that can go nowhere says so on it ("เดินไม่ได้" on the hand, "(เดินไม่ได้)" on the
+  confirm) before it is pressed. There is no "pick another card" button — pressing another card in
+  the hand does that.
 - **A perk that moves a survivor is one tap on the path** (`MOVE_SOMEONE` in `boardActions.ts`:
   Infectious Fright, Dark Devotion, Exponential): every path only one of them could take is on the
   map at once, so a tap on it moves that survivor and uses the perk. The survivor (or their hook)

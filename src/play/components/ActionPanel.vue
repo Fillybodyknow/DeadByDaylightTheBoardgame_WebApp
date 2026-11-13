@@ -42,7 +42,7 @@ import { boardOf,
   usableHook,
 } from '../engine/engine'
 import { PERKS, type PerkId } from '../engine/perks'
-import type { Action, GameState, KillerInteraction, MoveCard, PathKind, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
+import type { Action, GameState, KillerInteraction, MoveCard, PerkChoice, PropCategory, SurvivorInteraction } from '../engine/types'
 import { onTargetPerk, STEP_NAME, type BoardAction, actionKey, aimedOnMap, gatePerks, interactGate, perkPicked, plainInteract, REPLACES_INTERACT, undyingCards, undyingOptions, undyingPaths, undyingRoomOf, type StepKind } from '../boardActions'
 import { controls, dispatch, online } from '../game'
 import { pathPick, pathPickFor } from '../pathPick'
@@ -126,7 +126,6 @@ const emit = defineEmits<{
   bonusAsk: [pick: { i?: SurvivorInteraction; card: MoveCard | null; path: string | null; chosen?: boolean } | null]
   partnerAsk: [ask: Extract<SurvivorInteraction, { k: 'partner' }> | null]
   /** A confirmed crow bonus turn: the move it already settled, made when the engine asks for it. */
-  bonusMove: [move: { s: number | 'killer'; card: PathKind; path: string } | null]
   /** The bonus turn's card (null: none), to be sent when the engine offers the bonus turn. */
   bonusCard: [pick: { s: number; card: MoveCard | null } | null]
   crowsCrow: [crow: string | null]
@@ -539,17 +538,16 @@ function sendBonus() {
   if (w === null) return
   preview.value = null
   const card = pick?.card ?? null
-  const path = pick?.path ?? null
   emit('bonusAsk', null)
-  if (path && card && isPathCard(card)) emit('bonusMove', { s: w, card, path })
   if (pick?.i) {
-    // one action carries it all (`then`): the engine plays the card and the move on at once, so
-    // nothing is left to send after it (sent apart, online, the later ones were refused)
-    const then = { card, ...(path && card && isPathCard(card) ? { path } : {}) }
-    // kept too (from before the action, while they are still in their room): if the game asks
-    // something else first (a perk on the card), the rest goes when that is answered
+    // The interaction and the card go as one action (`then`), and the move is asked on the map
+    // after it, the way a revealed card's always is — the bonus turn is then a plan and a move,
+    // nothing of its own (a player's report: having to pick the room here felt like a second way
+    // of playing). Sending the interaction and the card apart was what raced online, not this.
+    // The card is kept too (from before the action, while they are still in their room): if the
+    // game asks something else first (a perk on the card), it goes when that is answered.
     if (w !== 'killer') emit('bonusCard', { s: w, card })
-    if (!dispatch({ t: 'interact', i: pick.i, then })) return void (emit('bonusCard', null), emit('bonusMove', null))
+    if (!dispatch({ t: 'interact', i: pick.i, then: { card } })) return void emit('bonusCard', null)
     sfx.select()
     return
   }
@@ -571,34 +569,26 @@ watchEffect(() => {
   }
 })
 onBeforeUnmount(() => bonusPathPick && (pathPick.value = null))
-/**
- * Which room a bonus turn ends in, when the card reaches more than one: clicked on the map and
- * held here until the confirm sends it. Nothing to choose (one room, a direct card, Wait, a
- * blocked path) counts as chosen the moment the card is picked.
- */
-const bonusRoomNeeded = computed(() => {
+/** A card is picked (or there is none to pick): the confirm may go. */
+const bonusReady = computed(() => !!bonusPick.value || !bonusCards.value.length)
+/** The card goes nowhere from here: the move is wasted, and the bonus turn's interaction with it. */
+const bonusStuck = computed(() => {
   const c = bonusPick.value
-  return !!c && isPathCard(c) && bonusRooms.value.length > 1
+  return !!c && isPathCard(c) && bonusRooms.value.length === 0
 })
-const bonusReady = computed(() => !!bonusPick.value && (!bonusRoomNeeded.value || !!props.bonusAsk?.path))
-/** The one room a card reaches is taken as soon as the card is picked: nothing is left to choose. */
-watch([bonusPick, bonusRooms], () => {
-  const card = bonusPick.value
-  const pick = props.bonusAsk
-  if (!card || !pick || pick.path || !isPathCard(card)) return
-  const ms = bonusMoves(card)
-  if (ms.length && new Set(ms.map((m) => m.to)).size === 1) emit('bonusAsk', { ...pick, path: ms[0].path.id })
+/** The map will ask where they go once this is confirmed (a direct card and Wait never do). */
+const bonusAsksPath = computed(() => {
+  const c = bonusPick.value
+  return !!c && isPathCard(c) && bonusRooms.value.length > 0
 })
-/** "ยืนยัน: ไล่ Crow แล้ว Bonus Turn ด้วย Sprint → Scrapyard" */
+/** "ยืนยัน: ไล่ Crow แล้ว Bonus Turn ด้วย Sprint" — where it goes is asked on the map after. */
 const bonusGoLabel = computed(() => {
   const card = bonusPick.value
   // only an interaction that bought the bonus turn is named first (a crow, Power of Two)
   const lead = props.bonusAsk?.i ? `${bonusWhat.value} แล้ว ` : ''
   if (!bonusCards.value.length) return `ยืนยัน: ${bonusWhat.value} (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)`
   if (!card) return 'เลือกการ์ดก่อน'
-  const to = props.bonusAsk?.path ? bonusMoves(card).find((m) => m.path.id === props.bonusAsk!.path)?.to : bonusRooms.value[0]
-  const where = to ? ` → ${roomName(props.st, to)}` : ' (อยู่ที่เดิม)'
-  return `ยืนยัน: ${lead}Bonus Turn ด้วย ${CARD_NAMES[card]}${where}`
+  return `ยืนยัน: ${lead}Bonus Turn ด้วย ${CARD_NAMES[card]}${bonusStuck.value ? ' (เดินไม่ได้)' : ''}`
 })
 
 // ---------- Scent of Blood, step 2: a card for The Dog, picked from the hand, then confirmed ----------
@@ -900,9 +890,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
              that goes nowhere (Wait, a blocked path) ends in their own room, so that one is lit. -->
         <p v-if="!bonusCards.length" class="board-hint">🎯 ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn — กดยืนยันด้านล่าง</p>
         <p v-else-if="!bonusPick" class="board-hint">👇 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</p>
-        <p v-else-if="bonusRoomNeeded" class="board-hint">🎯 2. คลิกห้องที่จะไปบนแผนที่ ({{ bonusRooms.map((r) => roomName(st, r)).join(' · ') }}) แล้วกดยืนยัน</p>
-        <p v-else-if="isPathCard(bonusPick) && !bonusRooms.length" class="board-hint">🎯 2. {{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ — อยู่ที่เดิม และเสีย Interact ของ Bonus Turn ด้วย</p>
-        <p v-else class="board-hint">🎯 2. ไม่มีอะไรให้เลือกต่อ — กดยืนยันด้านล่าง</p>
+        <p v-else-if="bonusStuck" class="board-hint">🎯 2. {{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ — อยู่ที่เดิม และเสีย Interact ของ Bonus Turn ด้วย</p>
+        <p v-else-if="bonusAsksPath" class="board-hint">🎯 2. กดยืนยันด้านล่าง แล้วเลือกเส้นทางบนแผนที่ เหมือนเปิดการ์ดตามปกติ</p>
+        <p v-else class="board-hint">🎯 2. {{ bonusRooms.length ? `จะไป ${roomName(st, bonusRooms[0])} — ` : '' }}กดยืนยันด้านล่าง</p>
         <div class="buttons col way-on">
           <button class="primary" :disabled="!bonusReady" @click="sendBonus">{{ bonusGoLabel }}</button>
           <button class="stop" @click="emit('bonusAsk', null), sfx.click()">ยกเลิก</button>
@@ -981,9 +971,9 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
            map (their own when the card goes nowhere). A card picked by mistake is changed by
            pressing another in the hand, so there is no "pick again" button. -->
       <p v-if="!bonusPick" class="board-hint">👇 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</p>
-      <p v-else-if="bonusRoomNeeded" class="board-hint">🎯 2. คลิกห้องที่จะไปบนแผนที่ ({{ bonusRooms.map((r) => roomName(st, r)).join(' · ') }}) แล้วกดยืนยัน</p>
-      <p v-else-if="isPathCard(bonusPick) && !bonusRooms.length" class="board-hint">🎯 2. {{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ — อยู่ที่เดิม และเสีย Interact ของ Bonus Turn ด้วย</p>
-      <p v-else class="board-hint">🎯 2. ไม่มีอะไรให้เลือกต่อ — กดยืนยันด้านล่าง</p>
+      <p v-else-if="bonusStuck" class="board-hint">🎯 2. {{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ — อยู่ที่เดิม และเสีย Interact ของ Bonus Turn ด้วย</p>
+      <p v-else-if="bonusAsksPath" class="board-hint">🎯 2. กดยืนยันด้านล่าง แล้วเลือกเส้นทางบนแผนที่ เหมือนเปิดการ์ดตามปกติ</p>
+      <p v-else class="board-hint">🎯 2. {{ bonusRooms.length ? `จะไป ${roomName(st, bonusRooms[0])} — ` : '' }}กดยืนยันด้านล่าง</p>
       <div class="buttons col way-on">
         <button class="primary" :disabled="!bonusReady" @click="sendBonus">{{ bonusGoLabel }}</button>
         <button v-if="step.t !== 'killerBonusOffer' || !step.free" class="stop" @click="act({ t: 'declineBonus' })">ไม่เล่น</button>

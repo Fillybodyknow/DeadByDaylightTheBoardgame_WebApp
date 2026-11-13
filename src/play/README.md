@@ -891,10 +891,15 @@ Perks:
 
 - Unnerving Presence, Thanatophobia and Bond change single-die skill checks (repair, exit gate,
   cleanse, heal, locker search), not the carry roll or danger-die rolls.
-- A survivor in a locker is off the board for perks (p.12), so **no** perk reaches them, even for
-  the roll of the locker being searched: Unnerving Presence, Thanatophobia, Bond, Off the Record
-  and Lucky Break all skip them, whether or not the card names a space. Searching the locker is
-  the killer's way to them.
+- A survivor in a locker is off the board (p.12), and the roll of the locker being searched is
+  still a skill check (p.14): **what the card asks for decides**. A card that names a space —
+  Unnerving Presence, Bond, Off the Record ("in your space or a connected space") — cannot reach
+  them there; one that names none — Thanatophobia ("a wounded survivor"), Lucky Break ("any
+  Survivor"), Sloppy Butcher, Poised — reaches the roll as it would any other. Level 99 on their
+  Discord, asked about exactly this: "1. No because the Survivor is not in your space or a
+  connected one. 2. Yes because no space requirement. 3. If they have space requirements, being in
+  a locker effectively prevents it yes. 4. Regarding doctor yes." Using a perk is still beyond the
+  survivor **in** the locker (p.12): Lucky Break's owner must be out of it.
 - A perk that changes the dice changes all of them, never adds one, and the last one used wins
   (a community ruling, from the designers' answer on Discord). The passives come first (Madness,
   the Jailer), then the perks in the order they are asked (the survivors', then the killer's,
