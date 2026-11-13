@@ -553,7 +553,7 @@ const boardCount = computed(() => {
               <button
                 v-for="(c, i) in o.choices.filter((c) => !c.card && o.perk !== 'oppression' && here(perkAct(o.perk, c)))"
                 :key="i"
-                class="primary"
+                class="pick"
                 @mouseenter="hover(step.owner, c, o.perk)"
                 @mouseleave="hover(step.owner, null)"
                 @focus="hover(step.owner, c, o.perk)"
@@ -576,7 +576,7 @@ const boardCount = computed(() => {
           <button v-if="handChoices.length" class="primary" :disabled="!cardPick" @click="confirmCard">
             <BpText :text="cardPick && activePerk ? `ยืนยัน: ${PERKS[activePerk].name} — ${perkChoiceLabel(st, activePerk, step.owner, step.w, cardPick)}` : 'เลือกการ์ดจากมือก่อน'" />
           </button>
-          <button @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้ทั้งหมด</button>
+          <button class="stop" @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้ทั้งหมด</button>
           <button class="quiet" @click="act({ t: 'perk', perk: step.perk, use: false, quiet: true })">ไม่ใช้ และไม่ต้องถามอีกในรอบนี้</button>
         </div>
       </template>
@@ -638,7 +638,7 @@ const boardCount = computed(() => {
         <p v-else-if="handChoices.length" class="hand-hint">👇 เลือกการ์ดจากไพ่บนมือด้านล่าง{{ MOVE_PERKS.includes(step.perk) ? ' — ชี้เพื่อดูเส้นทาง' : '' }}</p>
         <!-- a survivor moved along a path (Dark Devotion, Infectious Fright): who, then where -->
         <template v-if="movesSomeone">
-          <p class="board-hint">🎯 คลิก{{ step.t === 'offer' && step.perk === 'exponential' ? ' Hook ของคนที่จะลง' : 'ผู้รอดชีวิต' }}บนแผนที่ แล้วคลิกเส้นทาง — หรือเลือกด้านล่าง</p>
+          <p class="board-hint">🎯 คลิก<b>เส้นทาง</b>บนแผนที่ได้เลย (หรือคลิก{{ step.t === 'offer' && step.perk === 'exponential' ? ' Hook ของคนที่จะลง' : 'ผู้รอดชีวิต' }}ก่อน เมื่อสองคนอยู่ห้องเดียวกัน) — หรือเลือกด้านล่าง</p>
           <div class="who-row">
             <button v-for="t in moveTargets" :key="t" type="button" class="who-chip" :class="{ on: moveWho === t }" @click="moveWho = moveWho === t ? null : t">
               <FaceLabel :st="st" :who="t" :text="st.survivors[t].name" />
@@ -648,7 +648,7 @@ const boardCount = computed(() => {
             <button
               v-for="(c, i) in offerChoices.filter((c) => c.target === moveWho)"
               :key="i"
-              class="primary"
+              class="pick"
               @mouseenter="hover(step.owner, c)"
               @mouseleave="hover(step.owner, null)"
               @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })"
@@ -667,7 +667,7 @@ const boardCount = computed(() => {
           <button
             v-for="(c, i) in offerChoices.filter((c) => !c.card && offerHere(c) && !isOppression && !isLightborn && !movesSomeone && !unforeseenUnknown && (!unknownStep || c.index === unknownPicked))"
             :key="i"
-            class="primary"
+            class="pick"
             @mouseenter="hover(step.owner, c)"
             @mouseleave="hover(step.owner, null)"
             @focus="hover(step.owner, c)"
@@ -681,7 +681,7 @@ const boardCount = computed(() => {
             <button
               v-for="(c, i) in offerChoices"
               :key="`u${i}`"
-              class="primary unknown-pick"
+              class="pick unknown-pick"
               @mouseenter="hover(step.owner, c)"
               @mouseleave="hover(step.owner, null)"
               @click="act({ t: 'perk', perk: step.perk, use: true, choice: c })"
@@ -694,7 +694,7 @@ const boardCount = computed(() => {
               <img v-if="st.killer.planned[c.index!]" class="card" :src="asset(cardImage(st.killer.planned[c.index!]))" alt="" />
             </button>
           </template>
-          <button @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้</button>
+          <button class="stop" @click="act({ t: 'perk', perk: step.perk, use: false })">ไม่ใช้</button>
           <button class="quiet" @click="act({ t: 'perk', perk: step.perk, use: false, quiet: true })">ไม่ใช้ และไม่ต้องถามอีกในรอบนี้</button>
         </div>
       </template>
@@ -725,7 +725,7 @@ const boardCount = computed(() => {
             </template>
         </PerkCard>
         <!-- not using one is never the loudest button: the perks that can be used are -->
-        <button class="wide" @click="act({ t: 'continue' })">ไม่ใช้ Perk — เปิดการ์ดแล้วเดิน</button>
+        <button class="stop wide" @click="act({ t: 'continue' })">ไม่ใช้ Perk — เปิดการ์ดแล้วเดิน</button>
       </template>
 
       <!-- Whispers: pay or set the card face up -->
@@ -768,7 +768,7 @@ const boardCount = computed(() => {
             <button
               v-for="(i, n) in hagMoves.filter((i) => here({ t: 'phantasm', teleport: true, i }))"
               :key="n"
-              class="primary"
+              class="pick"
               @mouseenter="hoverHag(i, step.room)"
               @mouseleave="hoverHag(null, '')"
               @click="act({ t: 'phantasm', teleport: true, i })"
@@ -864,7 +864,7 @@ const boardCount = computed(() => {
             <button class="primary" :disabled="weave.total !== WEAVING_COST" @click="act({ t: 'weavePay', pay: pledgedPay(weave.pledge) })">
               <BpText :text="weave.total === WEAVING_COST ? `ยืนยัน: จ่าย ${WEAVING_COST} ▲ — Generator +3` : `อีก ${WEAVING_COST - weave.total} ▲ ถึงจะจ่ายได้`" />
             </button>
-            <button type="button" @click="act({ t: 'weavePay', pay: [] })">ยกเลิก — ไม่ใช้ แมงมุมทอใย (กลับไป Interact)</button>
+            <button type="button" class="stop" @click="act({ t: 'weavePay', pay: [] })">ยกเลิก — ไม่ใช้ แมงมุมทอใย (กลับไป Interact)</button>
           </template>
         </div>
       </template>
@@ -970,7 +970,7 @@ const boardCount = computed(() => {
         <RollDice :st="st" :key-holders="keyHolders" :can-keep="rollMine && !keyWaiting.length" @act="act" />
         <PerkCard v-for="b in buttons" :key="b.perk" :perk="b.perk" state="static">
           <template #title><FaceLabel :st="st" :who="b.owner" :text="`${ownerLabel(st, b.owner)}: ${PERKS[b.perk].name}`" /></template>
-          <button v-for="(c, n) in b.choices" :key="n" class="primary" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">ใช้ — <BpText :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
+          <button v-for="(c, n) in b.choices" :key="n" class="pick" @click="act({ t: 'perk', perk: b.perk, use: true, choice: c })">ใช้ — <BpText :text="perkChoiceLabel(st, b.perk, b.owner, b.w, c)" /></button>
         </PerkCard>
         <div class="choices">
           <!-- someone else's roll: each helper on this device passes on it here -->

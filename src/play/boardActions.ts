@@ -297,9 +297,14 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
   // A bonus turn being settled (a crow chased, Power of Two, a perk's or a power's, the killer's):
   // a path on the map sends it at once (its colour is the card); a card picked from the hand first
   // lights the rooms it reaches, and a click on one (or on its path) sends it. Nothing asked after.
+  // One rule for every card and both sides (a player's report: a card with a path went on a click
+  // on the map, while Wait and a blocked card grew a confirm button in the panel instead): a card
+  // that goes nowhere lights **their own room** — clicking it is the confirm, and they stay.
   const bonusWho = s.t === 'survivorInteract' || s.t === 'bonusOffer' ? s.s : s.t === 'killerBonusOffer' ? 'killer' : null
   if ((modes.bonusAsk.value || s.t === 'bonusOffer' || s.t === 'killerBonusOffer') && bonusWho !== null) {
     const card = modes.bonusAsk.value?.card ?? null
+    const here = bonusWho === 'killer' ? st.killer.room : st.survivors[bonusWho].room
+    const send = (path: string | null) => () => ((modes.bonusAsk.value = { ...(modes.bonusAsk.value ?? { card, path: null }), card, path, go: true }), sfx.click())
     // no card yet: a path out of their room picks the card of its colour (as the hand does); the room
     // is clicked next, and that click sends the whole bonus turn (the players' order: card → room)
     if (!card) {
@@ -314,10 +319,22 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
           add(`path:${m.path.id}`, `เลือกการ์ด ${CARD_NAMES[c]} สำหรับ Bonus Turn`, () => ((modes.bonusAsk.value = { ...(modes.bonusAsk.value ?? {}), card: c, path: null }), sfx.click()))
         }
       }
+      // an empty hand: no bonus turn to play, but the interaction that bought it still goes —
+      // their own room confirms it, so the last tap is on the map here too
+      if (!hand.length && modes.bonusAsk.value?.i) add(`room:${here}`, `ยืนยัน (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)`, send(null))
       return out
     }
-    if (!isPathCard(card)) return out
+    // Wait: nowhere to go, so their own room is the one to click
+    if (!isPathCard(card)) {
+      add(`room:${here}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: อยู่ที่เดิม`, send(null))
+      return out
+    }
     const ms = bonusWho === 'killer' ? killerMoves(st, card) : survivorMoves(st, bonusWho, card)
+    // a card with no way out of this room: their own room again, and the move is wasted (p.9)
+    if (!ms.length) {
+      add(`room:${here}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไม่มีเส้นทาง — อยู่ที่เดิม`, send(null))
+      return out
+    }
     for (const m of ms) {
       if (out.some((a) => a.key === `room:${m.to}`)) continue
       add(`room:${m.to}`, `Bonus Turn ด้วย ${CARD_NAMES[card]}: ไป ${roomName(st, m.to)}`, () => ((modes.bonusAsk.value = { ...modes.bonusAsk.value!, path: m.path.id, go: true }), sfx.click()))
@@ -602,6 +619,17 @@ export function boardActions(st: GameState, modes: BoardModes): BoardAction[] {
             const pick = () => ((modes.breakoutTarget.value = target), sfx.click())
             if (hook) add(`prop:${hook.id}`, `${name}: ${st.survivors[target].name} ลงจาก Hook (แล้วเลือกเส้นทาง)`, pick)
             else add(`s:${target}`, `${name}: ย้าย ${st.survivors[target].name} (แล้วเลือกเส้นทาง)`, pick, 'act', target)
+          }
+          // A path only one of them could take is a single tap: the perk is used on it at once,
+          // with nobody to pick first. Two in one room share their paths, and those still ask who
+          // (a player's report: reading room names in the panel to move someone).
+          const owners = new Map<string, number>()
+          for (const c of choices) if (c.path) owners.set(c.path, owners.has(c.path) && owners.get(c.path) !== c.target ? -1 : c.target!)
+          for (const c of choices) {
+            if (!c.path || owners.get(c.path) === -1) continue
+            const run = go({ t: 'perk', perk, use: true, choice: c }, sfx.drop)
+            add(`path:${c.path}`, `${name}: ${perkChoiceLabel(st, perk, s.owner, s.w, c)}`, run)
+            out[out.length - 1].dest = perkDest(st, perk, s.owner, c)
           }
           break
         }

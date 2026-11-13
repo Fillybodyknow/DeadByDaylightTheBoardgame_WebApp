@@ -7,7 +7,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { asset } from '../../i18n'
 import { anim, reducedMotion } from '../../settings'
 import { fxSound } from '../fx/audio'
-import { fx } from '../fx/bus'
+import { fx, queueHead } from '../fx/bus'
 import { CARD_NAMES } from '../engine/engine'
 import type { GameState } from '../engine/types'
 import { KILLER_CARD_BACK, cardImage, powerName } from '../labels'
@@ -16,7 +16,7 @@ const props = defineProps<{ st: GameState }>()
 
 /** The entry at the head of the queue, once the dice before it have been shown. */
 const current = computed(() => {
-  const head = fx.perks[0]
+  const head = queueHead()
   const dice = fx.dice[0]
   return head?.rush && (!dice || head.id < dice.id) ? head : null
 })

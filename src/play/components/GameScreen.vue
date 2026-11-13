@@ -64,6 +64,64 @@ const emit = defineEmits<{ settled: [on: boolean] }>()
 const view = shallowRef<GameState>(props.st)
 
 /**
+ * States waiting to be shown, oldest first. One action's cards and dice play, then the view moves
+ * to that state and the board plays it out — and only then does the next action's first card come
+ * up. A second action can arrive while the first is still being shown (the killer's two cards, a
+ * bot, another player online), and moving the view straight to the newest state played every card
+ * first and both animations together at the end: the killer's second card, Wait, turned over
+ * before his attack had landed (a player's report). Each entry remembers what was queued with it,
+ * so it waits for its own cards and for the board, not for the cards of the action after it.
+ */
+const waiting: { st: GameState; ids: Set<number> }[] = []
+
+/** Everything on the screen's queues right now: what was queued for the action just processed. */
+function queuedIds(): Set<number> {
+  return new Set([...fx.perks.map((p) => p.id), ...fx.dice.map((d) => d.id)])
+}
+
+/** Move the view on to the oldest state whose own cards are done and whose board is free. */
+function advance() {
+  if (fx.finale || fx.boardBusy) return
+  // A flood of states (a bot playing fast, an online game catching up): the board doesn't play
+  // every one of them on the way — the newest is kept and the cards still queued play over it.
+  if (waiting.length > 2) waiting.splice(0, waiting.length - 1)
+  const head = waiting[0]
+  if (!head) {
+    // nothing waiting: don't let the view fall behind a state that had nothing to show
+    if (!fx.perks.length && !fx.dice.length) view.value = props.st
+    return
+  }
+  // A held card, and everything queued behind it, is meant to come after the board has played
+  // what is in front of it: those don't keep the view (and so the board) waiting.
+  const until = fx.perks.find((p) => p.hold)?.id ?? Infinity
+  const blocks = (id: number) => head.ids.has(id) && id < until
+  if (fx.perks.some((p) => blocks(p.id)) || fx.dice.some((d) => blocks(d.id))) return
+  waiting.shift()
+  view.value = head.st
+  // the board starts on the next frame: let it, then let the held card go (it waits on boardBusy)
+  void nextTick().then(() =>
+    requestAnimationFrame(() => {
+      const held = fx.perks.find((p) => p.hold)
+      if (held) held.hold = false
+      advance()
+    }),
+  )
+}
+watch(
+  () => fx.boardBusy,
+  (busy) => {
+    if (busy) return
+    // the board has finished: a card held for it goes now (with no state left to move the view
+    // to, nothing else would let it go)
+    if (!waiting.length) {
+      const held = fx.perks.find((p) => p.hold)
+      if (held) held.hold = false
+    }
+    advance()
+  },
+)
+
+/**
  * Sacrifice Progress rises that come with a hanging: shown once the board has played it (the
  * survivor on the hook, its spikes and shake), not before it as the rest of the queue is. The view
  * moves on to the new state first, so the board can play it.
@@ -126,6 +184,7 @@ watch(
     if (!prev || st.log.length < prev.log.length) {
       // Undo: show it straight away.
       clearFx()
+      waiting.splice(0)
       afterBoard.splice(0)
       afterBoardFinale = null
       sacrificeHold.value = false
@@ -142,13 +201,21 @@ watch(
     const rushes: NonNullable<Parameters<typeof showRush>[0]>[] = []
     // Chalk Pouch acts on a roll's dice before the roll is logged: its card waits for the roll
     let afterRoll: Parameters<typeof showPerk>[0] | null = null
+    // an action of this batch has had its card: the next turn's card waits for the board
+    let castShown = false
     for (const [n, e] of fresh.entries()) {
       const ev = e.ev
       if (ev?.k === 'rushDraw') rushes.push({ card: ev.card, hand: ev.hand, ...(ev.stuck ? { stuck: true } : {}) })
       if (ev?.k === 'hook') hung = true
       // a player's action (a card played, an attack, a pallet, the power): shown before the result
       const cast = casts.of(e)
-      if (cast) showAction(cast)
+      if (cast) {
+        // A card turned over for a turn that follows another in the same batch waits for the
+        // board to play the turn before it: the killer's two cards resolve in one go, and his
+        // second card (Wait) was turned over before his attack had landed (a player's report).
+        showAction(cast, castShown && cast.kind === 'move')
+        castShown = true
+      }
       if (ev?.k === 'item') {
         const said = fresh.slice(n + 1).find((x) => x.text && x.who === ev.s)
         showPerk({ item: ev.item, owner: ev.s, detail: said?.text.replace(`${st.survivors[ev.s].name} `, '') ?? '' })
@@ -224,15 +291,14 @@ watch(
         })
       }
     } else if (!pendingRoll(prev)) pendingShown = null
-    if (!fx.perks.length && !fx.dice.length && !fx.finale) view.value = st
+    waiting.push({ st, ids: queuedIds() })
+    advance()
   },
 )
 
 watch(
   () => fx.perks.length + fx.dice.length + (fx.finale ? 1 : 0),
-  (n) => {
-    if (n === 0) view.value = props.st
-  },
+  () => advance(),
 )
 
 // ---------- the game's opening: the offerings burnt, then the minis' start-room rolls on the map ----------
@@ -671,6 +737,14 @@ function onRoom(id: string) {
 const onInteract = (key: string) => onSpot(key.startsWith('s:') || key === 'killer' || key === 'victor' || key === 'dog' || /^u\d$/.test(key) ? key : `prop:${key}`)
 
 /** The mode the board is in, for the bar above it (with a way out). */
+/** The bonus turn's card takes them somewhere from where they stand (Wait never does). */
+function bonusCanMove(st: GameState, card: MoveCard): boolean {
+  if (!isPathCard(card)) return false
+  const s = st.step
+  const who = s.t === 'survivorInteract' || s.t === 'bonusOffer' ? s.s : null
+  return (who === null ? killerMoves(st, card) : survivorMoves(st, who, card)).length > 0
+}
+
 const modeBar = computed(() => {
   if (palletMode.value) return { text: 'เลือกเส้นทางที่เชื่อมกับห้องเพื่อทิ้ง Pallet (คลิกวงบนแผนที่)', cancel: () => (palletMode.value = null) }
   if (calmCrow.value) return { text: `${PERKS.calm_spirit.name}: คลิกห้องที่จะส่ง Crow ไป`, cancel: () => (calmCrow.value = null) }
@@ -684,7 +758,9 @@ const modeBar = computed(() => {
     const i = bonusAsk.value.i
     const what = !i ? 'Bonus Turn' : i.k === 'crow' ? 'ไล่ Crow' : PERKS.power_of_two.name
     if (!bonusAsk.value.card) return { text: `${what}: 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้น${i ? ' — ยังไม่เสีย ▲' : ''}`, cancel }
-    return { text: `${what} ด้วย ${CARD_NAMES[bonusAsk.value.card]}: 2. คลิกห้องที่จะไปบนแผนที่ แล้วไปทันที`, cancel }
+    // a card that goes nowhere (Wait, a blocked path) ends in their own room: that one is lit
+    const stay = bonusCanMove(view.value, bonusAsk.value.card)
+    return { text: `${what} ด้วย ${CARD_NAMES[bonusAsk.value.card]}: 2. ${stay ? 'คลิกห้องที่จะไปบนแผนที่ แล้วไปทันที' : 'ไม่มีเส้นทาง — คลิกห้องของคุณบนแผนที่เพื่ออยู่ที่เดิม'}`, cancel }
   }
   if (targetAsk.value) return { text: 'เลือกในแผงด้านข้าง: ใช้ Perk หรือทำตามปกติ', cancel: () => (targetAsk.value = null) }
   if (dogStay.value) return { text: 'กลิ่นเลือด: เลือกการ์ดใหม่ให้ The Dog จากมือ', cancel: () => (dogStay.value = false) }
@@ -1646,7 +1722,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
         <div class="board-bars">
           <div v-if="modeBar" class="reveal-bar card">
             <span><BpText :text="modeBar.text" /></span>
-            <button @click="modeBar.cancel()">ยกเลิก</button>
+            <button class="stop" @click="modeBar.cancel()">ยกเลิก</button>
           </div>
           <div v-if="oppressing" class="reveal-bar card">
             <span v-if="!multiPick.length">การกดขี่: คลิก Generator ที่กระพริบบนแผนที่ 1–2 เครื่อง (แต่ละเครื่อง −1)</span>
@@ -1657,7 +1733,7 @@ const planning = computed(() => view.value.step.t === 'planSurvivors' || view.va
           <div v-if="revealing" class="reveal-bar card">
             <span>{{ view.survivors[revealing.s].name }}: คลิกไทล์คว่ำที่จะเปิด ({{ revealing.props.length }}/3)</span>
             <button class="primary" :disabled="!revealing.props.length" @click="confirmReveal">เปิด</button>
-            <button @click="revealing = null">ยกเลิก</button>
+            <button class="stop" @click="revealing = null">ยกเลิก</button>
           </div>
         </div>
         <!-- the player tiles beside the map, on its left -->

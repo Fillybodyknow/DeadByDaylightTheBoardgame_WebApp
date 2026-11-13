@@ -8,7 +8,7 @@ import { sfx } from '../../sound'
 import { asset } from '../../i18n'
 import type { GameState } from '../engine/types'
 import { fxSound } from '../fx/audio'
-import { fx } from '../fx/bus'
+import { fx, queueHead } from '../fx/bus'
 import { VICTOR_MINI, killerMini, survivorMini } from '../labels'
 import Mini from './Mini.vue'
 import BpText from '../../components/BpText.vue'
@@ -17,7 +17,7 @@ const props = defineProps<{ st: GameState }>()
 
 /** The action at the head of the queue, once the dice before it have been shown. */
 const current = computed(() => {
-  const head = fx.perks[0]
+  const head = queueHead()
   const dice = fx.dice[0]
   return head?.action && (!dice || head.id < dice.id) ? head.action : null
 })

@@ -641,14 +641,14 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p><b>{{ offeringName('vigos-blueprint') }}</b>: เปิดเจอ Exit Gate ที่ {{ propRoom(step.gate) }} — สลับกับ Generator ที่หงายอยู่และยังไม่มีความคืบหน้าไหม?</p>
       <p class="board-hint">🎯 คลิก Generator ที่กระพริบบนแผนที่เพื่อสลับ</p>
       <div class="buttons">
-        <button class="ghost" @click="act({ t: 'vigo', gen: null })">ไม่สลับ</button>
+        <button class="stop" @click="act({ t: 'vigo', gen: null })">ไม่สลับ</button>
       </div>
     </template>
     <template v-else-if="step.t === 'whiteWard'">
       <p><b>{{ offeringName('white-ward') }}</b>: {{ ITEM_NAMES[step.item] }} กำลังจะถูกทิ้ง — จ่าย {{ WARD_COST }} ▲ เพื่อวางไว้บนสุดของกอง Item ไหม? (มี {{ st.survivors[step.s].bp }} ▲)</p>
       <div class="buttons">
         <button class="primary" :disabled="st.survivors[step.s].bp < WARD_COST" @click="act({ t: 'ward', pay: true })">จ่าย {{ WARD_COST }} ▲ เก็บไว้บนกอง</button>
-        <button class="ghost" @click="act({ t: 'ward', pay: false })">ไม่จ่าย</button>
+        <button class="stop" @click="act({ t: 'ward', pay: false })">ไม่จ่าย</button>
         <button class="ghost" @click="act({ t: 'ward', pay: false, mute: true })">ไม่ต้องถามฉันอีก</button>
       </div>
     </template>
@@ -717,7 +717,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <div class="buttons col way-on">
         <button class="primary" :disabled="!dogPick" @click="confirmDog">{{ dogPick ? `ยืนยัน: มอบ ${CARD_NAMES[dogPick]} ให้ The Dog` : 'เลือกการ์ดจากมือก่อน' }}</button>
         <!-- staying with no new card would change nothing: it goes back, nothing used -->
-        <button v-if="dogStaying" @click="emit('dogStay', false)">ยกเลิก — กลับไปเลือกใหม่</button>
+        <button v-if="dogStaying" class="stop" @click="emit('dogStay', false)">ยกเลิก — กลับไปเลือกใหม่</button>
         <button v-else @click="act({ t: 'dogCard', card: null })">{{ st.killer.dogCard ? `ไม่มอบ — The Dog ใช้ ${CARD_NAMES[st.killer.dogCard]} ต่อ` : 'ไม่มอบการ์ด (The Dog ไม่วิ่ง)' }}</button>
       </div>
       <CardHand :cards="dogHand" :label="`กลิ่นเลือด — มือของ ${st.killer.name}`" prompt="กลิ่นเลือด — เลือกการ์ดให้ The Dog" @pick="pickDog" />
@@ -819,7 +819,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <button v-for="(a, i) in askPlain" :key="`p${i}`" @click="answer(a)">
         <FaceLabel :st="st" :who="a.who" :text="`ไม่ใช้ Perk — ${a.label}`" :icon="a.icon" />
       </button>
-      <button class="ghost" @click="emit('ask')">ยกเลิก</button>
+      <button class="stop" @click="emit('ask')">ยกเลิก</button>
     </template>
 
     <!-- Treacherous Crows, the crow picked: which of the killer's cards to reveal, then the room on the map -->
@@ -840,7 +840,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
         </button>
       </div>
       <p v-if="crowsCard !== null && crowsCard !== undefined" class="board-hint">🎯 2. คลิกห้องที่เชื่อมกันบนแผนที่ ที่จะส่ง Crow ไป</p>
-      <button @click="emit('crowsCrow', null)">ยกเลิก</button>
+      <button class="stop" @click="emit('crowsCrow', null)">ยกเลิก</button>
     </template>
 
     <!-- survivor interact -->
@@ -857,7 +857,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           <button class="primary" @click="usePartner">
             <FaceLabel :st="st" :who="partnerAsk.target" :text="`ใช้ ${PERKS[partnerAsk.perk].name}`" />
           </button>
-          <button @click="emit('partnerAsk', null), sfx.click()">ยกเลิก</button>
+          <button class="stop" @click="emit('partnerAsk', null), sfx.click()">ยกเลิก</button>
         </div>
       </template>
       <!-- it buys the killer a ▲: the whole bonus turn is settled here, and sent only on confirm -->
@@ -866,15 +866,14 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           <b>{{ bonusWhat }}</b> — {{ st.killer.name }} ได้ +1 <BpIcon /> แล้วเล่น Bonus Turn: ทิ้งการ์ด 1 ใบ เคลื่อนที่ + Interact อีกครั้ง (หน้า 12)<br />
           <span class="muted small">ยังไม่เสียอะไรจนกว่าจะคลิกห้อง — ยกเลิกได้</span>
         </p>
-        <p v-if="!bonusPick" class="board-hint">👇 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</p>
+        <!-- one rule for every card: pick it, then click the room it ends in on the map. A card
+             that goes nowhere (Wait, a blocked path) ends in their own room, so that one is lit. -->
+        <p v-if="!bonusCards.length" class="board-hint">🎯 ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn — คลิกห้องของคุณบนแผนที่เพื่อยืนยัน</p>
+        <p v-else-if="!bonusPick" class="board-hint">👇 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</p>
         <p v-else-if="bonusRooms.length" class="board-hint">🎯 2. คลิกห้องที่จะไปบนแผนที่ ({{ bonusRooms.map((r) => roomName(st, r)).join(' · ') }}) — ไปทันที</p>
-        <p v-else-if="isPathCard(bonusPick)" class="warn">{{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ — เดินไม่ได้ และเสียการ Interact ของ Bonus Turn ไปด้วย</p>
+        <p v-else class="board-hint">🎯 2. {{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ (เสีย Interact ของ Bonus Turn ด้วย) — คลิกห้องของคุณบนแผนที่เพื่ออยู่ที่เดิม</p>
         <div class="buttons col way-on">
-          <!-- nothing to click on the map (no card left, or a card that can't move): confirmed here -->
-          <button v-if="!bonusCards.length || (bonusPick && !bonusRooms.length)" class="primary" @click="sendBonus">
-            {{ !bonusCards.length ? `ยืนยัน: ${bonusWhat} (ไม่มีการ์ดเหลือ ไม่ได้ Bonus Turn)` : `ยืนยัน: ${bonusWhat} แล้ว Bonus Turn ด้วย ${CARD_NAMES[bonusPick!]}` }}
-          </button>
-          <button @click="emit('bonusAsk', null), sfx.click()">ยกเลิก</button>
+          <button class="stop" @click="emit('bonusAsk', null), sfx.click()">ยกเลิก</button>
         </div>
         <!-- a card is being asked for, so the hand glows and names what wants it, as everywhere else -->
         <CardHand
@@ -932,7 +931,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       </div>
       <div v-if="!bonusAsk && !partnerAsk" class="buttons col way-on">
         <!-- the question's other answer; and a way back to it for a player who changes their mind -->
-        <button v-if="gateOpen" class="primary" @click="declineGate">ไม่ใช้ Perk — Interact ตามปกติ</button>
+        <button v-if="gateOpen" class="stop" @click="declineGate">ไม่ใช้ Perk — Interact ตามปกติ</button>
         <button v-else-if="plainInteract && gateCards.length && !perkPicked" class="small" @click="plainInteract = false">↩ กลับไปดู Perk ที่ใช้แทน Interact</button>
         <button v-if="!gateOpen" class="end" @click="act({ t: 'endTurn' })">จบเทิร์น (ไม่ทำอะไรต่อ)</button>
       </div>
@@ -946,14 +945,14 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
       <p v-else-if="step.t === 'bonusOffer'">Bonus Turn: ทิ้งการ์ด 1 ใบจากมือ แล้วเคลื่อนที่ + Interact อีกครั้ง (หน้า 9)</p>
       <p v-else-if="step.free"><b>สลิปสตรีม</b> — การ์ดทั้งหมดกลับเข้ามือแล้ว เลือกการ์ด 1 ใบเล่น Bonus Turn (ไม่เสีย ▲)</p>
       <p v-else>จ่าย {{ bonusCost(st) }} <BpIcon /> (มี {{ st.killer.bp }}) เพื่อเล่นเทิร์นที่ 3? (หน้า 10)</p>
+      <!-- the same rule as the settled bonus turn above: the card, then the room it ends in on the
+           map (their own when the card goes nowhere). A card picked by mistake is changed by
+           pressing another in the hand, so there is no "pick again" button. -->
       <p v-if="!bonusPick" class="board-hint">👇 1. เลือกการ์ดจากมือ หรือคลิกเส้นทางสีนั้นบนแผนที่</p>
       <p v-else-if="bonusRooms.length" class="board-hint">🎯 2. คลิกห้องที่จะไปบนแผนที่ ({{ bonusRooms.map((r) => roomName(st, r)).join(' · ') }}) — ไปทันที</p>
-      <p v-else-if="isPathCard(bonusPick)" class="warn">{{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ — เดินไม่ได้ และเสียการ Interact ของ Bonus Turn ไปด้วย</p>
+      <p v-else class="board-hint">🎯 2. {{ CARD_NAMES[bonusPick] }} ไม่มีเส้นทางจากห้องนี้ (เสีย Interact ของ Bonus Turn ด้วย) — คลิกห้องของคุณบนแผนที่เพื่ออยู่ที่เดิม</p>
       <div class="buttons col way-on">
-        <!-- Wait, or a card that can't move: nothing to click on the map, so it is confirmed here -->
-        <button v-if="bonusPick && !bonusRooms.length" class="primary" @click="sendBonus">ยืนยัน: Bonus Turn ด้วย {{ CARD_NAMES[bonusPick] }}</button>
-        <button v-if="bonusPick" @click="emit('bonusAsk', null), sfx.click()">ยกเลิก (เลือกการ์ดใหม่)</button>
-        <button v-if="step.t !== 'killerBonusOffer' || !step.free" @click="act({ t: 'declineBonus' })">ไม่เล่น</button>
+        <button v-if="step.t !== 'killerBonusOffer' || !step.free" class="stop" @click="act({ t: 'declineBonus' })">ไม่เล่น</button>
       </div>
       <CardHand
         :cards="bonusHand"
@@ -1044,7 +1043,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
           </div>
         </template>
 
-        <button @click="stopSteps">{{ stepKind === 'haunt' ? 'ยกเลิก ไม่ใช้พลัง' : 'ยกเลิก ไม่ใช้ ไม่รู้จักตาย' }}</button>
+        <button class="stop" @click="stopSteps">{{ stepKind === 'haunt' ? 'ยกเลิก ไม่ใช้พลัง' : 'ยกเลิก ไม่ใช้ ไม่รู้จักตาย' }}</button>
       </template>
 
       <!-- choosing where the power goes, after "use power" -->
@@ -1158,7 +1157,7 @@ const rollMine = computed(() => step.value.t === 'roll' && controls(props.st, st
             <button v-for="(i, n) in kInteractions.powers.filter((i) => here(powerAct(i)) && !(i.k === 'dog' && i.stay))" :key="n" @mouseenter="hoverPower(i)" @mouseleave="hoverPower(null)" @click="act({ t: 'interact', i })"><FaceLabel :st="st" :who="interactionWho(st, i)" :text="killerInteractionLabel(st, i)" /></button>
           </div>
         </template>
-        <button v-if="!step.powerOnly" @click="emit('trapPath', null), emit('powerCard', null), emit('powerOn', false)">ยกเลิก ไม่ใช้พลัง</button>
+        <button v-if="!step.powerOnly" class="stop" @click="emit('trapPath', null), emit('powerCard', null), emit('powerOn', false)">ยกเลิก ไม่ใช้พลัง</button>
         <button v-else @click="act({ t: 'endTurn' })">ไม่ใช้พลัง</button>
       </template>
 

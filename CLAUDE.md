@@ -205,6 +205,15 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   crow's bonus turn, whose interaction and move are one action now (`then`), showed the chase but
   never the card it was played with, and a power that hit two survivors at once swallowed the
   killer's move after it (players' reports).
+  **A card for a turn that follows another waits for the board to play the one before it**: the
+  killer's two cards resolve in one go, and his second card (Wait) was turned over before his
+  attack had landed (a player's report). The second and later `move` cast of a batch is queued
+  `hold`ed (`showAction(cast, true)`, `PerkShow.hold`); a held card, and everything behind it in
+  the queue, waits (`queueHead` in `fx/bus.ts`, which every reveal of that queue reads), while
+  GameScreen lets the view move on past it so the board can play, and clears the hold a frame
+  later. States are shown one at a time for the same reason (`waiting` in GameScreen: each entry
+  remembers what was queued with it, so it waits for its own cards and not the next action's); a
+  flood of them (a bot, catching up online) keeps only the newest.
 - **Online, the player being waited on is told** (`notifyTurn` in `GameScreen`): the skill-check
   warning and a chime, a banner saying what is asked, the side panel glowing, and with the tab in
   the background a blinking title and a system notification. While it stays their turn a gold
@@ -352,6 +361,18 @@ Before saying work is done: type-check, tests and build must all pass. Report fa
   path out loses the bonus turn's interaction too (`startSurvivorMove`), so a player could buy the
   killer a ▲ for nothing — which is what happened (a player's report). Cards with no path show
   "เดินไม่ได้" on the hand. Tutorial chapter 6 teaches the new order.
+  **One way for every card and both sides**: pick the card, then click on the map the room it ends
+  in. A card that goes nowhere (Wait, a blocked path) ends where they stand, so **their own room**
+  is the one lit and clicking it is the confirm — there is no confirm button in the panel for any
+  of it, and no "pick another card" button either (pressing another card in the hand does that).
+  Before this a card with a path went on a click on the map while Wait grew a confirm button, and
+  the two read as different systems (a player's report).
+- **A perk that moves a survivor is one tap on the path** (`MOVE_SOMEONE` in `boardActions.ts`:
+  Infectious Fright, Dark Devotion, Exponential): every path only one of them could take is on the
+  map at once, so a tap on it moves that survivor and uses the perk. The survivor (or their hook)
+  can still be clicked first, and two of them in one room share their paths, so that case asks who
+  before the paths light. Reading room names off the panel to move someone was the only way before
+  (a player's report).
 - **Using a friend's perk shows their card first** (`partnerAsk` in `boardActions.ts`): Collective
   Stealth and Power of Two belong to another survivor and are set off by interacting with them, so
   a click on their mini used to use the perk on the spot — the player never read what it did, and
@@ -452,6 +473,14 @@ a plan's confirm, `.choices` in PerkPrompt) so nothing scrolling under it shows 
   the game's panels, the card pages and the Thai perk card images (drawn from the same rules). Terms,
   English names and numbers in bold white, props in their category's colour, failure / wounded red,
   success / healthy green, great success gold. A new place showing a perk's text uses PerkRichText.
+- **A button's colour says what it does** (`style.css`, a player's report that the loudest button
+  was the same red whether it went ahead or backed out): `.primary` green — it goes ahead (a
+  confirm, a use, ready, start); `.stop` red — it backs out (cancel, decline, "ไม่ใช้", "ไม่เล่น",
+  leave, clear); `.pick` blue — one of several to choose between, where nothing happens until one
+  is pressed. All three share the game's angled corners. A quiet secondary ("ไม่ใช้ และไม่ต้องถาม
+  อีก") stays a plain small button, so it never shouts louder than the answer beside it; the red
+  that marks **what is selected** (a tab, the mode card, the players count) is not a button role
+  and keeps its colour.
 - Fixed overlays inside a `.card` must `<Teleport to="body">`: `.card` has `backdrop-filter`,
   which traps `position: fixed` children.
 - The full game runs on computers and tablets only. Phones get a notice (`src/play/device.ts`:

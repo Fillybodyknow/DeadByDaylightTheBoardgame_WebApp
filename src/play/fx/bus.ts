@@ -78,6 +78,12 @@ export interface PerkShow {
   sacrifice?: { total: number; gained: number }
   /** Not a card at all: Blighted Corruption's random draw from his hand (RushReveal shows these). */
   rush?: { card: MoveCard; hand: MoveCard[]; stuck?: boolean }
+  /**
+   * Held back until the board has played what came before it, and so is everything behind it in
+   * the queue. Set on the card of a turn that follows another in the same batch; GameScreen lets
+   * the view move on past a held card so the board can play, and clears the hold after it.
+   */
+  hold?: boolean
 }
 
 /** A player's action, shown briefly before the board plays it out (built in casts.ts). */
@@ -115,6 +121,18 @@ export const fx = reactive({
   boardBusy: false,
 })
 
+/**
+ * The head of the cards' queue, held back while the board is still playing what came before it.
+ * The cards of one batch are shown and then the view moves on, so the board only plays once the
+ * queue is empty — but the next batch's cards are queued the moment that move arrives, and came
+ * up over the hit the board was still showing (a player's report: the killer's second card, Wait,
+ * turned over before his attack had landed). DiceModal holds its own head the same way.
+ */
+export function queueHead(): PerkShow | undefined {
+  const head = fx.perks[0]
+  return !head || fx.boardBusy || head.hold ? undefined : head
+}
+
 let boardTimer: number | undefined
 
 /**
@@ -146,9 +164,9 @@ export function showBanner(b: Omit<Banner, 'id' | 'at'>, opts: { replace?: boole
   fx.banners.push({ ...b, id: ++id, at: Date.now() })
 }
 
-export function showAction(a: Omit<ActionShow, 'id'>) {
+export function showAction(a: Omit<ActionShow, 'id'>, hold = false) {
   const n = ++id
-  fx.perks.push({ id: n, owner: a.owner, detail: '', action: { ...a, id: n } })
+  fx.perks.push({ id: n, owner: a.owner, detail: '', action: { ...a, id: n }, ...(hold ? { hold } : {}) })
 }
 
 export function showSacrifice(total: number, gained: number) {

@@ -10,7 +10,7 @@ import { offeringName } from '../engine/offerings'
 import { PERKS } from '../engine/perks'
 import type { GameState } from '../engine/types'
 import { fxSound } from '../fx/audio'
-import { fx } from '../fx/bus'
+import { fx, queueHead } from '../fx/bus'
 import { ITEM_NAMES } from '../engine/engine'
 import { itemImage, killerMini, ownerLabel, perkImage, perkText, survivorMini } from '../labels'
 import Mini from './Mini.vue'
@@ -22,7 +22,7 @@ const props = defineProps<{ st: GameState }>()
 // In the order they happened, the same way round as DiceModal: a perk that answers a roll waits
 // for that roll's dice to be shown first.
 const current = computed(() => {
-  const perk = fx.perks[0]
+  const perk = queueHead()
   const dice = fx.dice[0]
   // a player's action in the same queue is ActionReveal's, the Sacrifice track SacrificeReveal's,
   // Blighted Corruption's draw RushReveal's
